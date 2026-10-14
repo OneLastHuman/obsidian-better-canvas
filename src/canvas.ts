@@ -132,7 +132,7 @@ export function layoutTree(
   gapY = 44
 ): number {
   const data = readCanvasData(canvas);
-  const nodeMap = new Map(data.nodes.map(node => [node.id, node]));
+  const nodeMap = new Map<string, CanvasNodeData>(data.nodes.map(node => [node.id, node] as [string, CanvasNodeData]));
   const root = nodeMap.get(rootId);
   if (!root) return 0;
 
