@@ -1442,7 +1442,7 @@ export default class BetterCanvasFeatures {
       return;
     }
     const view = this.activeCanvasView();
-    const baseName = String(view?.file?.basename ?? "canvas").replace(/[\\/:*?"<>|]/g, "-");
+    const baseName = String(view?.file?.basename ?? "canvas").replace(/[ :*?"<>|]/g, "-").replaceAll("/", "-").replaceAll(String.fromCharCode(92), "-");
     const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").split("/").filter(Boolean).join("/");
     const notice = new Notice("正在按所有节点边界渲染整张 Canvas…", 0);
     let objectUrl = "";
