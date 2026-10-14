@@ -40,7 +40,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Encapsulate selection into a new Canvas | Implemented | Re-bases moved nodes near the child Canvas origin, preserves internal edges and reconnects crossing edges to the new file node |
 | Export JSON Canvas | Implemented | Saves a separate .canvas file in the Vault |
 | Export PNG / SVG | Implemented, configurable | Uses html-to-image against the Canvas DOM; PNG/SVG scale is configurable from 1x to 4x and a transparent or CSS-color background can be selected. Embeds/fonts/very large canvases may need manual testing |
-| Copy node Wikilink / embed Canvas node in Markdown | Partial | Supports `[[file.canvas#node-id]]` and an embed-style preview using a Markdown post-processor |
+| Copy node Wikilink / embed Canvas node in Markdown | Implemented, basic | Supports `[[file.canvas#node-id]]`; the Markdown post-processor renders text nodes as Markdown, Canvas file nodes as Markdown/image/audio/video/file links and URL nodes as safe external links. Complex interactive embeds and large media still need manual testing |
 | Auto edges from file-node frontmatter | Implemented, basic | Reads a configurable key, default `canvas-edges` |
 | Metadata cache for .canvas | Implemented, opt-in / internal API | Indexes text-node links, file nodes and Canvas frontmatter for cache/resolved-link consumers. Obsidian upgrade testing required |
 | Graph links / backlinks panel | Partial | Resolved-link cache and a guarded backlink-scan bridge are provided; the built-in Backlinks pane must be verified on desktop |
