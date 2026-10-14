@@ -10,7 +10,7 @@ import {
   TFile
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
-import { chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
+import { chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { readCanvasData, makeTextNode, insertCanvasNode, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
@@ -261,6 +261,8 @@ export default class BetterCanvasFeatures {
     add("bc-set-node-provider", "为节点指定 AI 供应商", () => this.setNodeProvider());
     add("bc-set-node-model", "为节点指定 AI 模型", () => this.setNodeModel());
     add("bc-ask-custom-model", "指定模型并向 AI 提问", () => this.askWithModel());
+    add("bc-expand-idea-mindmap", "用 AI 将想法扩展为思维导图", () => this.expandIdeaIntoMindMap());
+    add("bc-generate-flashcard-nodes", "生成独立复习闪卡节点", () => this.generateFlashcardNodes());
     add("bc-generate-image", "根据所选节点生成图片", () => void this.generateImageForNode());
     add("bc-regenerate", "重新生成所选 AI 节点", () => void this.regenerate());
     add("bc-stop-ai", "停止当前 AI 生成", () => this.stopAI());
@@ -800,6 +802,123 @@ export default class BetterCanvasFeatures {
     return images;
   }
 
+  private parseJsonPayload<T>(raw: string): T {
+    const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start < 0 || end <= start) throw new Error("AI 没有返回有效 JSON。");
+    return JSON.parse(cleaned.slice(start, end + 1)) as T;
+  }
+
+  private async completeStructured(prompt: string, node?: CanvasNodeData): Promise<string> {
+    const provider = this.currentProvider(node);
+    const settings = this.aiSettings(node);
+    return chatCompletion(settings, [
+      { role: "system", content: "Return only valid JSON. Do not include Markdown fences or commentary." },
+      { role: "user", content: prompt }
+    ]);
+  }
+
+  private async expandIdeaIntoMindMap(): Promise<void> {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开一个 Canvas。"); return; }
+    const selected = this.selected(canvas);
+    this.input("AI 扩展思维导图", "输入想法、主题或问题", async idea => {
+      const notice = new Notice("正在生成思维导图结构…", 0);
+      try {
+        const context = selected ? await this.getNodeContext(canvas, selected.node.id) : "";
+        const raw = await this.completeStructured(
+          "将主题扩展成中文思维导图，返回 JSON：{\"nodes\":[{\"id\":\"n1\",\"parentId\":null,\"text\":\"...\"}]}. " +
+          "最多 24 个节点；id 必须唯一；第一个节点是主题根节点并使用 parentId=null；每个后续节点的 parentId 指向已有节点；每个 text 不超过 180 字；" +
+          "不确定的信息需标明，不得编造来源。主题：" + idea + (context ? "\n现有 Canvas 上下文：\n" + context : "") ,
+          selected?.node
+        );
+        const parsed = this.parseJsonPayload<{nodes?: Array<{id?: string; parentId?: string | null; text?: string}>}>(raw);
+        const items = Array.isArray(parsed.nodes) ? parsed.nodes.slice(0, 24) : [];
+        if (!items.length) throw new Error("AI 返回的 nodes 为空。");
+        const validItems = items.filter(item => typeof item.text === "string" && item.text.trim());
+        if (!validItems.length) throw new Error("AI 没有提供有效的节点文本。");
+        const idMap = new Map<string, CanvasNodeData>();
+        const fallbackRoot = selected?.node;
+        const ordered = validItems.slice();
+        const roots = ordered.filter(item => item.parentId == null);
+        const rootItems = roots.length ? roots.slice(0, 1) : [ordered[0]];
+        const baseX = fallbackRoot ? fallbackRoot.x + fallbackRoot.width + 100 : 0;
+        const baseY = fallbackRoot ? fallbackRoot.y : 0;
+        let rootNode: CanvasNodeData | undefined = fallbackRoot;
+        for (let i = 0; i < rootItems.length; i++) {
+          const item = rootItems[i];
+          if (!fallbackRoot) {
+            rootNode = makeTextNode(String(item.text).trim(), baseX, baseY, { width: 320, height: 150 });
+            insertCanvasNode(canvas, rootNode);
+          }
+          const itemId = String(item.id ?? "root");
+          if (rootNode) idMap.set(itemId, rootNode);
+        }
+        if (!rootNode) throw new Error("无法创建思维导图根节点。");
+
+        const remaining = ordered.filter(item => !rootItems.includes(item));
+        let unresolved = remaining;
+        let guard = remaining.length + 1;
+        let row = 0;
+        while (unresolved.length && guard-- > 0) {
+          const nextRound: typeof unresolved = [];
+          let madeProgress = false;
+          for (const item of unresolved) {
+            const parentId = item.parentId == null ? String(rootItems[0].id ?? "root") : String(item.parentId);
+            const parent = idMap.get(parentId) ?? (item.parentId == null ? rootNode : undefined);
+            if (!parent) { nextRound.push(item); continue; }
+            const child = makeTextNode(String(item.text).trim().slice(0, 1200),
+              parent.x + parent.width + 100, parent.y + row * 12, { width: 300, height: 140 });
+            insertCanvasNode(canvas, child, parent.id);
+            idMap.set(String(item.id ?? "node-" + row), child);
+            row += 1;
+            madeProgress = true;
+          }
+          if (!madeProgress) break;
+          unresolved = nextRound;
+        }
+        if (unresolved.length) new Notice("有 " + unresolved.length + " 个节点因 parentId 无效而跳过。");
+        this.decorate(canvas);
+        notice.hide();
+        new Notice("已从主题创建思维导图（" + idMap.size + " 个节点）。");
+      } catch (error) {
+        notice.hide();
+        new Notice(error instanceof Error ? error.message : String(error), 8000);
+      }
+    });
+  }
+
+  private async generateFlashcardNodes(): Promise<void> {
+    const selected = this.selected();
+    if (!selected) return;
+    const notice = new Notice("正在生成独立闪卡…", 0);
+    try {
+      const context = await this.getNodeContext(selected.canvas, selected.node.id);
+      const raw = await this.completeStructured(
+        "基于以下资料生成 5 至 10 张中文复习闪卡，只返回 JSON：{\"cards\":[{\"question\":\"...\",\"answer\":\"...\"}]}. " +
+        "问题要能主动回忆，答案简洁可验证；不要补充资料中没有的事实。资料：\n" + context,
+        selected.node
+      );
+      const parsed = this.parseJsonPayload<{cards?: Array<{question?: string; answer?: string}>}>(raw);
+      const cards = Array.isArray(parsed.cards) ? parsed.cards.slice(0, 12).filter(card =>
+        typeof card.question === "string" && Boolean(card.question.trim()) &&
+        typeof card.answer === "string" && Boolean(card.answer.trim())) : [];
+      if (!cards.length) throw new Error("AI 未返回有效的复习闪卡。");
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        const text = "问题：" + card.question!.trim() + "\n\n答案：" + card.answer!.trim();
+        const node = makeTextNode(text, selected.node.x + selected.node.width + 100,
+          selected.node.y + i * 180, { width: 330, height: 150 });
+        insertCanvasNode(selected.canvas, node, selected.node.id);
+      }
+      notice.hide();
+      new Notice("已创建 " + cards.length + " 张独立复习闪卡节点。");
+    } catch (error) {
+      notice.hide();
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+    }
+  }
   private async runAI(nodeId: string, instruction: string, modelOverride?: string, replaceNodeId?: string): Promise<void> {
     const canvas = this.canvas();
     if (!canvas) return;
