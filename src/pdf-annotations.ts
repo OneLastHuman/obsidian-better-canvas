@@ -1,5 +1,5 @@
 import { ItemView, Notice } from "obsidian";
-import { readCanvasData } from "./canvas";
+import { insertCanvasNode, makeTextNode, readCanvasData } from "./canvas";
 import { patchNode } from "./enhancements";
 
 interface PdfPoint {
@@ -35,6 +35,7 @@ function makeSvgElement<K extends keyof SVGElementTagNameMap>(name: K): SVGEleme
 export class PdfAnnotationManager {
   private plugin: any;
   private observers = new Map<HTMLElement, MutationObserver>();
+  private excerptContainers = new WeakSet<HTMLElement>();
   private refreshQueued = false;
 
   constructor(plugin: any) {
@@ -197,6 +198,43 @@ export class PdfAnnotationManager {
   }
 
   private attachOverlay(canvas: any, nodeData: any, container: HTMLElement): void {
+    if (!this.excerptContainers.has(container)) {
+      this.excerptContainers.add(container);
+      const onCreateExcerpt = (event: Event) => {
+        const custom = event as CustomEvent<{ text?: string }>;
+        const selectedText = String(custom.detail?.text ?? "").trim();
+        if (!selectedText) {
+          new Notice("请先在 PDF 文本面板中选择一段文字，再点击创建摘录。");
+          return;
+        }
+        if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+          new Notice("当前 Canvas 处于只读模式，不能添加 PDF 摘录。");
+          return;
+        }
+        const latest = readCanvasData(canvas);
+        const source = latest.nodes.find((node: any) => node.id === nodeData.id);
+        if (!source) {
+          new Notice("找不到 PDF 页面节点，无法创建摘录。");
+          return;
+        }
+
+        const excerptIndex = latest.nodes.filter((node: any) => node.bcPdfExcerptSource === source.id).length;
+        const quoted = selectedText.slice(0, 10000).split(/\\r?\\n/).map(line => "> " + line).join("\\n");
+        const body = "PDF 摘录\\n\\n" + quoted + (selectedText.length > 10000 ? "\\n\\n（摘录已截断至 10,000 个字符）" : "") + "\\n\\n批注：";
+        const note = makeTextNode(
+          body,
+          source.x + source.width + 70,
+          source.y + excerptIndex * 190,
+          { width: 340, height: Math.max(180, Math.min(420, Math.ceil(body.length / 42) * 24)) }
+        );
+        (note as any).bcPdfExcerptSource = source.id;
+        insertCanvasNode(canvas, note, source.id);
+        new Notice("已创建 PDF 文本摘录节点，并连接到对应页面。");
+      };
+      container.addEventListener("better-canvas-pdf-selection", onCreateExcerpt as EventListener);
+      this.plugin.register(() => container.removeEventListener("better-canvas-pdf-selection", onCreateExcerpt as EventListener));
+    }
+
     let svg = container.querySelector(":scope > .bc-pdf-annotation-overlay") as SVGSVGElement | null;
     if (!Array.isArray(nodeData.bcPdfStrokes) && !nodeData.bcPdfAnnotating) {
       svg?.remove();
