@@ -547,15 +547,49 @@ export default class BetterCanvasFeatures {
       const node = canvas.nodes?.get?.(item.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
       if (!(element instanceof HTMLElement)) continue;
-      if (typeof (item as any).bcNodeColor === "string") element.style.borderColor = String((item as any).bcNodeColor);
-      element.dataset.bcShape = typeof (item as any).bcShape === "string" ? String((item as any).bcShape) : "default";
-      element.dataset.bcBorder = typeof (item as any).bcBorderStyle === "string" ? String((item as any).bcBorderStyle) : "solid";
-      const previousClass = element.dataset.bcCustomClass;
-      if (previousClass) element.classList.remove("bc-user-" + previousClass);
+      const host = (element.closest(".canvas-node") as HTMLElement | null) ?? element;
+      if (typeof (item as any).bcNodeColor === "string") host.style.borderColor = String((item as any).bcNodeColor);
+      host.dataset.bcShape = typeof (item as any).bcShape === "string" ? String((item as any).bcShape) : "default";
+      host.dataset.bcBorder = typeof (item as any).bcBorderStyle === "string" ? String((item as any).bcBorderStyle) : "solid";
+      const previousClass = host.dataset.bcCustomClass;
+      if (previousClass) host.classList.remove("bc-user-" + previousClass);
       const nextClass = typeof (item as any).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item as any).bcCustomClass))
         ? String((item as any).bcCustomClass) : "";
-      if (nextClass) element.classList.add("bc-user-" + nextClass);
-      element.dataset.bcCustomClass = nextClass;
+      if (nextClass) host.classList.add("bc-user-" + nextClass);
+      host.dataset.bcCustomClass = nextClass;
+
+      if (canvas?.wrapperEl?.classList?.contains("bc-readonly") || item.type === "group") {
+        host.querySelector(":scope > .bc-card-toolbar")?.remove();
+        host.classList.remove("bc-has-card-toolbar");
+        continue;
+      }
+      if (!host.querySelector(":scope > .bc-card-toolbar")) {
+        const toolbar = host.createDiv({ cls: "bc-card-toolbar" });
+        const actions: Array<{ label: string; title: string; run: () => void }> = [
+          { label: "AI", title: "向此节点提问", run: () => this.askSelectedNode(item.id) },
+          { label: "Img", title: "根据此节点生成图片", run: () => this.generateImageFromSelection(item.id) },
+          { label: "卡片", title: "从此节点生成复习闪卡", run: () => this.generateFlashcardsFromSelection(item.id) },
+          { label: "模型", title: "为此节点选择 AI 模型", run: () => { this.selectNode(canvas, item.id); this.setNodeModel(); } }
+        ];
+        if ((item as any).bcGenerated) {
+          actions.push({ label: "↻", title: "重新生成此 AI 节点", run: () => { this.selectNode(canvas, item.id); void this.regenerate(); } });
+        }
+        for (const action of actions) {
+          const button = toolbar.createEl("button", {
+            cls: "bc-card-action",
+            text: action.label,
+            attr: { type: "button", "aria-label": action.title, title: action.title }
+          });
+          button.addEventListener("pointerdown", event => event.stopPropagation());
+          button.addEventListener("mousedown", event => event.stopPropagation());
+          button.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            action.run();
+          });
+        }
+        host.classList.add("bc-has-card-toolbar");
+      }
     }
     this.applyFocus(canvas);
   }
