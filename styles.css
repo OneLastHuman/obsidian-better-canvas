@@ -83,3 +83,13 @@
 .canvas-node[data-bc-shape="cloud"] {
   clip-path: polygon(22% 18%, 28% 5%, 44% 8%, 55% 2%, 69% 13%, 84% 11%, 94% 27%, 90% 43%, 100% 55%, 88% 72%, 84% 87%, 66% 91%, 53% 100%, 38% 91%, 22% 94%, 12% 78%, 0% 70%, 7% 51%, 2% 35%, 12% 20%);
 }
+
+/* Better Canvas read-only mode keeps the canvas background available for panning/zooming. */
+.bc-readonly .canvas-node,
+.bc-readonly .canvas-edges,
+.bc-readonly .canvas-edges * {
+  pointer-events: none !important;
+}
+.bc-readonly .canvas-node {
+  cursor: default !important;
+}
