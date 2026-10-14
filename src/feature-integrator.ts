@@ -349,6 +349,12 @@ export default class BetterCanvasFeatures {
       if (typeof (item as any).bcNodeColor === "string") element.style.borderColor = String((item as any).bcNodeColor);
       element.dataset.bcShape = typeof (item as any).bcShape === "string" ? String((item as any).bcShape) : "default";
       element.dataset.bcBorder = typeof (item as any).bcBorderStyle === "string" ? String((item as any).bcBorderStyle) : "solid";
+      const previousClass = element.dataset.bcCustomClass;
+      if (previousClass) element.classList.remove("bc-user-" + previousClass);
+      const nextClass = typeof (item as any).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item as any).bcCustomClass))
+        ? String((item as any).bcCustomClass) : "";
+      if (nextClass) element.classList.add("bc-user-" + nextClass);
+      element.dataset.bcCustomClass = nextClass;
     }
     this.applyFocus(canvas);
   }
