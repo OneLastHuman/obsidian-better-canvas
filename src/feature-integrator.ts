@@ -33,6 +33,7 @@ import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 import { PdfAnnotationManager } from "./pdf-annotations";
 import { extractPdfPages } from "./pdf-context";
 import { CanvasPortalManager } from "./canvas-portals";
+import { scaleSvgIntrinsicDimensions } from "./export-utils";
 
 interface ProviderProfile {
   id: string;
@@ -1141,15 +1142,21 @@ export default class BetterCanvasFeatures {
         ? await toPng(container, exportOptions)
         : await toSvg(container, exportOptions);
       const filePath = await this.uniquePath(folder + "/" + baseName + "-export", format);
-      const payload = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      const comma = dataUrl.indexOf(",");
+      if (comma < 0) throw new Error("导出图像的数据 URL 格式无效。");
+      const metadata = dataUrl.slice(0, comma);
+      const payload = dataUrl.slice(comma + 1);
       if (format === "svg") {
-        if (dataUrl.includes(";base64,")) {
+        let svgText: string;
+        if (metadata.includes(";base64")) {
           const binary = atob(payload);
           const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-          await this.p.app.vault.create(filePath, new TextDecoder().decode(bytes));
+          svgText = new TextDecoder().decode(bytes);
         } else {
-          await this.p.app.vault.create(filePath, decodeURIComponent(payload));
+          svgText = decodeURIComponent(payload);
         }
+        svgText = scaleSvgIntrinsicDimensions(svgText, pixelRatio);
+        await this.p.app.vault.create(filePath, svgText);
       } else {
         const binary = atob(payload);
         const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
