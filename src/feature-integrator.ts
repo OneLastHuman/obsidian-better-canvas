@@ -39,6 +39,7 @@ import { PdfAnnotationManager } from "./pdf-annotations";
 import { extractPdfPages } from "./pdf-context";
 import { CanvasPortalManager } from "./canvas-portals";
 import { scaleSvgIntrinsicDimensions } from "./export-utils";
+import { canvasDataToFullSvg } from "./full-canvas-export";
 import { extractWikiLinks } from "./canvas-links";
 import { discoverModels } from "./model-discovery";
 import { syncHtmlPreviews } from "./html-preview";
@@ -455,6 +456,8 @@ export default class BetterCanvasFeatures {
     add("bc-export-json", "导出 Canvas JSON", () => void this.export("canvas"));
     add("bc-export-png", "导出 Canvas PNG", () => void this.export("png"));
     add("bc-export-svg", "导出 Canvas SVG", () => void this.export("svg"));
+    add("bc-export-full-png", "导出 Canvas 全内容 PNG（按所有节点边界）", () => void this.exportFullContent("png"));
+    add("bc-export-full-svg", "导出 Canvas 全内容 SVG（按所有节点边界）", () => void this.exportFullContent("svg"));
     add("bc-ingest-web", "导入网页正文", () => this.input("导入网页正文", "完整 URL", value => void this.ingest(value, false)));
     add("bc-ingest-youtube", "导入 YouTube 字幕", () => this.input("导入 YouTube 字幕", "YouTube 视频 URL", value => void this.ingest(value, true)));
     add("bc-gemini-youtube-video", "用 Gemini 直接分析 YouTube 视频", () => this.askGeminiAboutYoutube());
@@ -1429,6 +1432,82 @@ export default class BetterCanvasFeatures {
     } catch (error) {
       notice.hide();
       new Notice("导出失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+    }
+  }
+
+  private async exportFullContent(format: "png" | "svg"): Promise<void> {
+    const canvas = this.canvas();
+    if (!canvas) {
+      new Notice("请先打开 Canvas。");
+      return;
+    }
+    const view = this.activeCanvasView();
+    const baseName = String(view?.file?.basename ?? "canvas").replace(/[\\/:*?"<>|]/g, "-");
+    const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").replace(/^\\/+|\\/+$/g, "");
+    const notice = new Notice("正在按所有节点边界渲染整张 Canvas…", 0);
+    let objectUrl = "";
+    try {
+      await this.ensureFolder(folder);
+      const settings = this.settings();
+      const ratio = Math.max(1, Math.min(4, Number(settings.exportPixelRatio) || 2));
+      let backgroundColor: string | undefined;
+      const requestedBackground = String(settings.exportBackgroundColor ?? "").trim();
+      if (requestedBackground) {
+        const probe = document.createElement("span");
+        probe.style.backgroundColor = requestedBackground;
+        if (!probe.style.backgroundColor) {
+          throw new Error("导出背景色无效；请留空使用透明背景，或输入有效 CSS 颜色。");
+        }
+        backgroundColor = probe.style.backgroundColor;
+      }
+
+      const full = canvasDataToFullSvg(readCanvasData(canvas), { backgroundColor, margin: 48 });
+      const filePath = await this.uniquePath(folder + "/" + baseName + "-full-content", format);
+      if (format === "svg") {
+        await this.p.app.vault.create(filePath, full.svg);
+      } else {
+        const pixelWidth = Math.ceil(full.width * ratio);
+        const pixelHeight = Math.ceil(full.height * ratio);
+        if (pixelWidth > 20_000 || pixelHeight > 20_000 || pixelWidth * pixelHeight > 40_000_000) {
+          throw new Error("导出的位图分辨率过大。请降低设置中的 PNG/SVG 导出倍率，或拆分 Canvas。");
+        }
+
+        const blob = new Blob([full.svg], { type: "image/svg+xml;charset=utf-8" });
+        objectUrl = URL.createObjectURL(blob);
+        const image = new Image();
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error("无法将整张 Canvas SVG 渲染为 PNG。"));
+          image.src = objectUrl;
+        });
+        const output = document.createElement("canvas");
+        output.width = pixelWidth;
+        output.height = pixelHeight;
+        const context = output.getContext("2d", { alpha: !backgroundColor });
+        if (!context) throw new Error("浏览器无法创建 PNG 渲染上下文。");
+        if (backgroundColor) {
+          context.fillStyle = backgroundColor;
+          context.fillRect(0, 0, output.width, output.height);
+        }
+        context.drawImage(image, 0, 0, output.width, output.height);
+        const png = await new Promise<Blob>((resolve, reject) => {
+          output.toBlob(blobResult => {
+            if (blobResult) resolve(blobResult);
+            else reject(new Error("PNG 编码失败。"));
+          }, "image/png");
+        });
+        const bytes = await png.arrayBuffer();
+        await this.p.app.vault.createBinary(filePath, bytes);
+        output.width = 0;
+        output.height = 0;
+      }
+      notice.hide();
+      new Notice("已导出整张 Canvas：" + filePath);
+    } catch (error) {
+      notice.hide();
+      new Notice("全内容导出失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     }
   }
 
