@@ -7,12 +7,28 @@ interface PdfPoint {
   y: number;
 }
 
+interface PdfRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface PdfTextHighlight {
+  text: string;
+  rects: PdfRect[];
+  color?: string;
+  opacity?: number;
+  createdAt?: number;
+}
+
 interface PdfStroke {
   points: PdfPoint[];
   color: string;
   width: number;
   tool?: "pen" | "highlighter";
   opacity?: number;
+  createdAt?: number;
 }
 
 function isPinnedPdf(node: any): boolean {
@@ -144,21 +160,37 @@ export class PdfAnnotationManager {
     const selected = this.selectedPdfNode();
     if (!selected) return;
     const strokes = Array.isArray(selected.node.bcPdfStrokes) ? selected.node.bcPdfStrokes as PdfStroke[] : [];
-    if (!strokes.length) {
+    const highlights = Array.isArray(selected.node.bcPdfTextHighlights)
+      ? selected.node.bcPdfTextHighlights as PdfTextHighlight[]
+      : [];
+    const lastStroke = strokes[strokes.length - 1];
+    const lastHighlight = highlights[highlights.length - 1];
+    if (!lastStroke && !lastHighlight) {
       new Notice("所选 PDF 页面没有可撤销的批注。");
       return;
     }
-    patchNode(selected.canvas, selected.node.id, { bcPdfStrokes: strokes.slice(0, -1) });
+    const undoHighlight = Boolean(lastHighlight) &&
+      (!lastStroke || (lastHighlight?.createdAt ?? 0) > (lastStroke?.createdAt ?? 0));
+    if (undoHighlight) {
+      patchNode(selected.canvas, selected.node.id, { bcPdfTextHighlights: highlights.slice(0, -1) });
+      new Notice("已撤销最后一处文字高亮。");
+    } else {
+      patchNode(selected.canvas, selected.node.id, { bcPdfStrokes: strokes.slice(0, -1) });
+      new Notice("已撤销最后一笔手绘批注。");
+    }
     this.refresh();
-    new Notice("已撤销最后一笔批注。");
   }
 
   private clearForSelection(): void {
     const selected = this.selectedPdfNode();
     if (!selected) return;
-    patchNode(selected.canvas, selected.node.id, { bcPdfStrokes: [], bcPdfAnnotating: false });
+    patchNode(selected.canvas, selected.node.id, {
+      bcPdfStrokes: [],
+      bcPdfTextHighlights: [],
+      bcPdfAnnotating: false
+    });
     this.refresh();
-    new Notice("已清除所选 PDF 页面的手绘批注。");
+    new Notice("已清除所选 PDF 页面的手绘批注与文字高亮。");
   }
 
   private scheduleRefresh(): void {
