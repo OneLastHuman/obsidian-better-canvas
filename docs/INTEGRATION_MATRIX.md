@@ -58,17 +58,17 @@ This matrix distinguishes code included in Better Canvas from features that stil
 | Stop streaming generation | Implemented when streaming transport is available | A compatibility fallback may perform a non-streaming request when the runtime blocks streaming fetch |
 | Live response node updates | Implemented | Progressive updates use the Canvas node API when available |
 | Per-node provider/model overrides | Implemented | Profile settings use OpenAI-compatible Chat Completions / Images endpoints |
-| Multiple provider profiles | Implemented, OpenAI-compatible endpoints | Native provider SDKs and provider-specific auth/request schemas are not yet equivalent to the upstream plugin |
+| Multiple provider profiles | Implemented | OpenAI-compatible endpoints plus native Anthropic Messages and Gemini generateContent adapters; not every upstream provider is supported natively |
 | Connected-image vision context | Implemented, basic | Sends up to four nearby image files under size limits through OpenAI-compatible multimodal message content |
-| Image generation to Vault | Implemented, API-dependent | Service must support a compatible /images/generations response |
+| Image generation to Vault | Implemented, API-dependent | OpenAI-compatible /images/generations or a Gemini image-generation model; Anthropic native image generation is unsupported |
 | Flashcard generation | Implemented | Generates cards as an AI response node; does not directly create a spaced-repetition deck file |
 | Webpage text ingestion | Implemented, best-effort | JavaScript-only, login-gated, and anti-bot pages may fail |
 | YouTube caption ingestion | Implemented, best-effort | Tries public timedtext captions; videos without retrievable captions cannot be transcribed |
 | MCP tools | Implemented, remote Streamable HTTP | Does not support stdio or SSE-only MCP transports; tool calls require user-provided endpoint and arguments |
 | Per-card AI model choice | Implemented | Model can be overridden for individual nodes |
-| Multi-provider streaming / native Gemini YouTube context | Not yet equivalent | Current version relies on OpenAI-compatible API paths and public caption retrieval |
+| Native Gemini / Anthropic streaming | Implemented, best-effort | Uses the provider SSE endpoints; if fetch/CORS blocks streaming, adapter falls back to a non-streaming request |\n| Gemini-native YouTube video context | Not yet migrated | Current YouTube ingestion uses public captions rather than native Gemini video context |
 | PDF document context, full multimodal provider routing, and rich model picker | Partial | Local Markdown and connected images are supported; full upstream provider/model functionality needs more adapters |
-| Cancel in-flight request on plugin unload | Partial | Requests can be stopped by command; unload lifecycle cancellation still needs dedicated cleanup and runtime testing |
+| Cancel in-flight request on plugin unload | Implemented | Active fetch requests are aborted during plugin cleanup; a fallback non-streaming request may not abort at the transport layer |
 
 ## Build and verification
 
