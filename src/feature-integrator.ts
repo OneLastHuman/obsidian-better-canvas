@@ -100,6 +100,7 @@ export default class BetterCanvasFeatures {
   private focusedCanvases = new Map<any, string>();
   private paletteStyle: HTMLStyleElement | null = null;
   private boundContainers = new WeakSet<HTMLElement>();
+  private resizeObservers = new WeakSet<HTMLElement>();
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private p: any;
 
@@ -239,6 +240,7 @@ export default class BetterCanvasFeatures {
     add("bc-set-node-shape", "设置节点形状", () => this.setNodeShape());
     add("bc-set-node-border", "设置节点边框样式", () => this.setNodeBorder());
     add("bc-resize-node", "根据文字自动调整节点尺寸", () => this.resizeNode());
+    add("bc-toggle-auto-resize", "切换所选节点自动调整尺寸", () => this.toggleAutoResize());
     add("bc-flip-edges", "翻转节点关联的连线", () => this.flipEdges());
     add("bc-color-edges", "设置节点关联连线颜色", () => this.colorEdges());
     add("bc-select-edges", "选择节点关联的连线", () => this.selectEdges("all"));
@@ -303,6 +305,7 @@ export default class BetterCanvasFeatures {
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as any;
       if (!view?.canvas) continue;
+      this.observeAutoResize(view, view.canvas);
       this.decorate(view.canvas);
       this.applyFocus(view.canvas);
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
@@ -386,6 +389,37 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     new Notice(resizeNodeToText(selection.canvas, selection.node.id) ? "已调整节点尺寸。" : "仅支持文本节点。");
+  }
+
+  private toggleAutoResize(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    const enabled = (selection.node as any).bcAutoResize !== true;
+    patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
+    if (enabled) resizeNodeToText(selection.canvas, selection.node.id);
+    new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
+  }
+
+  private observeAutoResize(view: any, canvas: any): void {
+    const container = view?.containerEl;
+    if (!(container instanceof HTMLElement) || this.resizeObservers.has(container)) return;
+    this.resizeObservers.add(container);
+    let pending = false;
+    const observer = new MutationObserver(() => {
+      if (pending) return;
+      pending = true;
+      window.setTimeout(() => {
+        pending = false;
+        const data = readCanvasData(canvas);
+        for (const node of data.nodes) {
+          if (node.type === "text" && (node as any).bcAutoResize === true) {
+            resizeNodeToText(canvas, node.id);
+          }
+        }
+      }, 220);
+    });
+    observer.observe(container, { subtree: true, childList: true, characterData: true });
+    this.p.register(() => observer.disconnect());
   }
 
   private flipEdges(): void {
