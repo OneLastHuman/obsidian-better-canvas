@@ -36,16 +36,14 @@ export async function chatCompletion(
   settings: AISettings,
   messages: Array<{ role: "system" | "user" | "assistant"; content: ChatMessageContent }>
 ): Promise<string> {
-  if (!settings.apiKey.trim()) throw new Error("请先在 Better Canvas 设置中填写 API Key。");
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (settings.apiKey.trim()) headers.Authorization = `Bearer ${settings.apiKey.trim()}`;
   const response = await requestUrl({
     url: endpoint(settings.baseUrl, "chat/completions"),
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.apiKey.trim()}`
-    },
+    headers,
     body: JSON.stringify({
       model: settings.model.trim(),
       messages,
@@ -72,19 +70,19 @@ export async function chatCompletionStream(
   signal: AbortSignal,
   onDelta: (delta: string) => void
 ): Promise<string> {
-  if (!settings.apiKey.trim()) throw new Error("请先在 Better Canvas 设置中填写 API Key。");
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
 
   let accumulated = "";
   let response: Response;
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream, application/json"
+    };
+    if (settings.apiKey.trim()) headers.Authorization = "Bearer " + settings.apiKey.trim();
     response = await fetch(endpoint(settings.baseUrl, "chat/completions"), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + settings.apiKey.trim(),
-        "Accept": "text/event-stream, application/json"
-      },
+      headers,
       body: JSON.stringify({
         model: settings.model.trim(),
         messages,
@@ -177,17 +175,15 @@ export async function generateImage(
   settings: AISettings,
   prompt: string
 ): Promise<{ bytes: Uint8Array; extension: string }> {
-  if (!settings.apiKey.trim()) throw new Error("请先在 Better Canvas 设置中填写 API Key。");
   const model = settings.imageModel.trim() || settings.model.trim();
   if (!model) throw new Error("请先在设置中填写 Image model。");
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (settings.apiKey.trim()) headers.Authorization = `Bearer ${settings.apiKey.trim()}`;
   const response = await requestUrl({
     url: endpoint(settings.baseUrl, "images/generations"),
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.apiKey.trim()}`
-    },
+    headers,
     body: JSON.stringify({
       model,
       prompt,
