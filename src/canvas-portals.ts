@@ -1,4 +1,4 @@
-import { Notice, TFile } from "obsidian";
+import { ItemView, Notice, TFile } from "obsidian";
 import { CanvasData, CanvasEdgeData, CanvasNodeData, readCanvasData } from "./canvas";
 
 const PORTAL_PREFIX = "bcportal||";
@@ -77,6 +77,7 @@ interface ViewPatch {
 }
 
 interface PortalSnapshot {
+  portalId: string;
   file: TFile;
   data: CanvasData;
   offsetX: number;
@@ -117,6 +118,9 @@ export class CanvasPortalManager {
       for (const leaf of this.plugin.app.workspace.getLeavesOfType("canvas")) {
         const view = leaf.view as any;
         if (origin && view === origin) continue;
+        // A Canvas saving itself already has the latest live state. Other
+        // views that embed that file still need to rebuild their portal mirrors.
+        if (!origin && view?.file?.path === file.path) continue;
         void this.refreshView(view, true);
       }
     }));
@@ -183,7 +187,7 @@ export class CanvasPortalManager {
         }));
         portalNode.width = Math.max(MIN_PORTAL_SIZE, bounds.maxX - bounds.minX + PORTAL_PADDING * 2);
         portalNode.height = Math.max(MIN_PORTAL_SIZE, bounds.maxY - bounds.minY + PORTAL_PADDING * 2);
-        snapshots.push({ file, data, offsetX, offsetY, mirroredNodes, mirroredEdges });
+        snapshots.push({ portalId: portalNode.id, file, data, offsetX, offsetY, mirroredNodes, mirroredEdges });
       } catch (error) {
         console.warn("Better Canvas could not open Canvas portal:", portalNode.file, error);
       }
@@ -229,10 +233,7 @@ export class CanvasPortalManager {
       }
     }
 
-    const openPortalIds = new Set(snapshots.map(snapshot => {
-      const dataNode = canonical.nodes.find((node: CanvasNodeData) => node.file === snapshot.file.path && node.portal === true);
-      return dataNode?.id as string | undefined;
-    }).filter((id): id is string => Boolean(id)));
+    const openPortalIds = new Set(snapshots.map(snapshot => snapshot.portalId));
     const openCrossIds = new Set<string>();
     for (const portalId of openPortalIds) {
       for (const edge of storedCrossEdges.get(portalId) ?? []) openCrossIds.add(edge.id);
@@ -272,6 +273,7 @@ export class CanvasPortalManager {
       try {
         view.canvas.importData(nextData);
         view.canvas.requestFrame?.();
+        view.canvas.requestSave?.();
       } catch (error) {
         console.warn("Better Canvas portal refresh failed:", error);
         return;
