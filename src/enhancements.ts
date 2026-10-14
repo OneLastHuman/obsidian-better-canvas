@@ -205,10 +205,15 @@ export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" |
         y: group.y + node.y
       }))
     ];
-    const edges = [
-      ...data.edges,
-      ...hiddenEdges.filter(edge => !edgeIds.has(edge.id))
-    ];
+    // Restoring a collapsed group must not resurrect edges whose opposite
+    // endpoint was deleted while the group was collapsed.
+    const restoredNodeIds = new Set(nodes.map(node => node.id));
+    const restorableEdges = hiddenEdges.filter(edge =>
+      !edgeIds.has(edge.id) &&
+      restoredNodeIds.has(edge.fromNode) &&
+      restoredNodeIds.has(edge.toNode)
+    );
+    const edges = [...data.edges, ...restorableEdges];
     const updatedGroup = { ...extended, bcCollapsed: false };
     delete updatedGroup.bcCollapsedNodes;
     delete updatedGroup.bcCollapsedEdges;
