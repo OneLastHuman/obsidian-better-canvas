@@ -331,6 +331,7 @@ export default class BetterCanvasFeatures {
     add("bc-set-node-border", "设置节点边框样式", () => this.setNodeBorder());
     add("bc-set-node-text-align", "设置所选节点文字对齐", () => this.setNodeTextAlign());
     add("bc-set-node-class", "设置节点自定义样式类", () => this.setNodeCustomClass());
+    add("bc-edit-style-attributes", "编辑所选节点或连线的 styleAttributes JSON", () => this.editStyleAttributes());
     add("bc-set-edge-arrow", "设置所选连线箭头样式", () => this.edgeArrowStyle());
     add("bc-resize-node", "根据文字自动调整节点尺寸", () => this.resizeNode());
     add("bc-toggle-auto-resize", "切换所选节点自动调整尺寸", () => this.toggleAutoResize());
@@ -532,6 +533,71 @@ export default class BetterCanvasFeatures {
       });
       this.decorate(selection.canvas);
     });
+  }
+
+  private editStyleAttributes(): void {
+    const canvas = this.canvas();
+    if (!canvas) {
+      new Notice("请先打开 Canvas。");
+      return;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。");
+      return;
+    }
+    const selection = canvas.selection;
+    if (!selection || selection.size !== 1) {
+      new Notice("请只选择一个节点或一条连线。");
+      return;
+    }
+
+    const internal = selection.values().next().value;
+    const id = internal?.id ?? internal?.getData?.()?.id;
+    if (typeof id !== "string") {
+      new Notice("无法读取当前选择项 ID。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    const node = data.nodes.find((item: CanvasNodeData) => item.id === id);
+    const edge = data.edges.find((item: CanvasEdgeData) => item.id === id);
+    const target = node ?? edge;
+    if (!target) {
+      new Notice("当前选择项不是可编辑的 Canvas 节点或连线。");
+      return;
+    }
+
+    const initial = JSON.stringify((target as any).styleAttributes ?? {}, null, 2);
+    this.input(
+      "编辑 styleAttributes JSON",
+      "输入有效的 JSON 对象，例如 { \"shape\": \"diamond\" }",
+      raw => {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (error) {
+          new Notice("JSON 格式无效：" + (error instanceof Error ? error.message : String(error)));
+          return;
+        }
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          new Notice("styleAttributes 必须是 JSON 对象。");
+          return;
+        }
+
+        if (node) {
+          patchNode(canvas, node.id, { styleAttributes: parsed as Record<string, unknown> });
+        } else if (edge) {
+          const nextEdges = data.edges.map((item: CanvasEdgeData) =>
+            item.id === edge.id ? { ...item, styleAttributes: parsed as Record<string, unknown> } : item
+          );
+          canvas.importData({ ...data, nodes: data.nodes, edges: nextEdges });
+          canvas.requestSave?.();
+          canvas.requestFrame?.();
+        }
+        this.decorate(canvas);
+        new Notice("已保存 styleAttributes。实际渲染效果取决于 Obsidian 与当前 Canvas 渲染器支持的属性。");
+      },
+      initial
+    );
   }
 
   private makeConfiguredTextNode(text: string, x: number, y: number, height?: number): CanvasNodeData {
