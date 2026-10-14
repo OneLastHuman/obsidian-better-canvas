@@ -26,7 +26,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Node colors / custom palette | Implemented | Includes configurable color slots |
 | Node shapes | Implemented, basic | CSS-rendered shapes; complex clip-path styling may affect node content interaction |
 | Borders / text alignment / custom CSS class | Implemented, basic | Stored on Canvas data and reflected in the plugin's DOM decoration |
-| Edge colors / solid, dashed, dotted path | Implemented, basic | Uses plugin-specific edge metadata; custom edge geometry is not implemented |
+| Edge colors / solid, dashed, dotted path / custom arrow styles | Implemented, basic | Writes both standard `color` / `styleAttributes` and extension fallbacks; exact arrow geometry varies by renderer |
 | Flip incident edge direction | Implemented | Reverses edges touching the selected node |
 | Select incident edges | Implemented | Supports all, incoming and outgoing edge selection |
 | Bring node to front / send to back | Implemented, basic | Uses Canvas data ordering; renderer behavior may differ between Obsidian versions |
@@ -49,7 +49,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | PDF page splitting / fixed page rendering | Implemented, basic | Pinned PDF pages are rendered into Canvas file nodes through Obsidian's PDF embed registry |
 | Freehand PDF page annotations | Implemented, basic | Strokes persist in Canvas JSON; selection, resize, touch input and PDF page rotations require manual tests |
 | Full PDF annotation tools (highlighter, text selection, multipage toolbar) | Not yet complete | Current overlay is a freehand layer, not a full PDF editor |
-| Full metadata frontmatter editor / property UI for Canvas files | Not yet complete | Indexes available Canvas frontmatter; creating/editing all metadata properties in a dedicated UI remains |
+| Canvas frontmatter property editor | Implemented, basic | Command adds/updates/deletes one JSON-valued frontmatter property at a time; a richer multi-property editor and schema validation remain |
 | Alternative text renderer / all advanced export settings | Not yet complete | Needs further renderer-specific work |
 
 ## AI Canvas
