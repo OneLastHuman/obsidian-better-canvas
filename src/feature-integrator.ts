@@ -1914,6 +1914,7 @@ export default class BetterCanvasFeatures {
         insertCanvasNode(canvas, source, root.id);
 
         let answer = "";
+        let generationSucceeded = false;
         try {
           const note = (await this.p.app.vault.cachedRead(file)).slice(0, 12000);
           answer = await chatCompletion(settings, [
@@ -1928,6 +1929,7 @@ export default class BetterCanvasFeatures {
             }
           ]);
           succeeded++;
+          generationSucceeded = true;
         } catch (error) {
           failed++;
           answer = "处理失败： " + (error instanceof Error ? error.message : String(error));
@@ -1937,7 +1939,7 @@ export default class BetterCanvasFeatures {
           width: 340,
           height: Math.max(160, Math.min(420, Math.ceil(answer.length / 44) * 24))
         });
-        (result as any).bcGenerated = succeeded > 0 && !answer.startsWith("处理失败：");
+        (result as any).bcGenerated = generationSucceeded;
         (result as any).bcPrompt = instruction;
         (result as any).bcSourceNode = source.id;
         (result as any).bcSourcePath = file.path;
