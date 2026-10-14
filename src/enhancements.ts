@@ -117,6 +117,35 @@ export function styleSelectedEdges(canvas: any, color: string, pathStyle: "solid
   return count;
 }
 
+export type EdgePathfindingMethod = "bezier" | "direct" | "square" | "a-star";
+
+export function styleSelectedEdgePathfinding(canvas: any, method: EdgePathfindingMethod): number {
+  const selected = canvas?.selection;
+  if (!selected || typeof selected.values !== "function") return 0;
+  const ids = new Set<string>();
+  for (const item of selected.values()) {
+    const data = item?.getData?.();
+    const id = data?.id ?? item?.id;
+    if (typeof id === "string") ids.add(id);
+  }
+  const data = readCanvasData(canvas);
+  let count = 0;
+  const edges = data.edges.map(edge => {
+    if (!ids.has(edge.id)) return edge;
+    count += 1;
+    const styleAttributes = { ...((edge as any).styleAttributes ?? {}) };
+    if (method === "bezier") delete styleAttributes.pathfindingMethod;
+    else styleAttributes.pathfindingMethod = method;
+    return { ...edge, styleAttributes, bcPathfindingMethod: method === "bezier" ? undefined : method };
+  });
+  if (count > 0) {
+    canvas.importData({ ...data, nodes: data.nodes, edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+  }
+  return count;
+}
+
 export type EdgeArrowStyle = "default" | "triangle-outline" | "half-triangle" | "thin-triangle" | "diamond" | "diamond-outline" | "circle" | "circle-outline" | "blunt" | "none";
 
 export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle): number {
