@@ -10,7 +10,7 @@ import {
   TFile
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
-import { chatCompletion, generateImage, ChatMessageContent } from "./ai";
+import { chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { readCanvasData, makeTextNode, insertCanvasNode, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
@@ -100,6 +100,7 @@ export default class BetterCanvasFeatures {
   private focusedCanvases = new Map<any, string>();
   private paletteStyle: HTMLStyleElement | null = null;
   private boundContainers = new WeakSet<HTMLElement>();
+  private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private p: any;
 
   constructor(plugin: any) {
@@ -260,6 +261,7 @@ export default class BetterCanvasFeatures {
     add("bc-ask-custom-model", "指定模型并向 AI 提问", () => this.askWithModel());
     add("bc-generate-image", "根据所选节点生成图片", () => void this.generateImageForNode());
     add("bc-regenerate", "重新生成所选 AI 节点", () => void this.regenerate());
+    add("bc-stop-ai", "停止当前 AI 生成", () => this.stopAI());
     add("bc-mcp-tool", "调用远程 MCP 工具", () => void this.runMcpTool());
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
   }
@@ -731,20 +733,65 @@ export default class BetterCanvasFeatures {
     if (!canvas) return;
     const data = readCanvasData(canvas);
     const source = data.nodes.find((node: CanvasNodeData) => node.id === nodeId);
-    if (!source) { new Notice("找不到 AI 上下文的源节点。"); return; }
-    const notice = new Notice("Better Canvas：正在请求 AI…", 0);
+    if (!source) {
+      new Notice("找不到 AI 上下文的源节点。");
+      return;
+    }
+
+    const previous = this.activeGenerations.get(canvas);
+    if (previous) previous.controller.abort();
+    const controller = new AbortController();
+    this.activeGenerations.set(canvas, { controller, nodeId });
+    const notice = new Notice("Better Canvas：正在准备 AI 上下文…", 0);
+    let responseNodeId = "";
+    let accumulated = "";
+    let lastUpdate = 0;
+
     try {
       const context = await this.getNodeContext(canvas, nodeId);
       const images = await this.getConnectedImages(canvas, nodeId);
+      if (controller.signal.aborted) throw new DOMException("The AI request was aborted.", "AbortError");
       const prompt = "请基于所给 Obsidian Canvas 笔记回答，不要声称读取了未提供的来源。\n\n任务：" + instruction + "\n\n画布上下文：\n" + context;
       const content: ChatMessageContent = images.length
         ? [{ type: "text", text: prompt }, ...images]
         : prompt;
-      const answer = await chatCompletion(this.aiSettings(source, modelOverride), [
-        { role: "system", content: this.settings().systemPrompt || "You are a precise assistant. Preserve uncertainty." },
-        { role: "user", content }
-      ]);
-      if (replaceNodeId) {
+
+      const fresh = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === nodeId) ?? source;
+      const placeholder: CanvasNodeData = {
+        ...makeTextNode("", fresh.x + fresh.width + 100, fresh.y, {
+          width: Math.max(300, fresh.width),
+          height: 180
+        }),
+        bcGenerating: true,
+        bcGenerated: false,
+        bcPrompt: instruction,
+        bcSourceNode: nodeId,
+        bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
+        bcAIProvider: this.currentProvider(source).id
+      };
+      responseNodeId = placeholder.id;
+      insertCanvasNode(canvas, placeholder, nodeId);
+      notice.setMessage?.("Better Canvas：AI 正在生成；可使用“停止当前 AI 生成”命令中止。");
+
+      const answer = await chatCompletionStream(
+        this.aiSettings(source, modelOverride),
+        [
+          { role: "system", content: this.settings().systemPrompt || "You are a precise assistant. Preserve uncertainty." },
+          { role: "user", content }
+        ],
+        controller.signal,
+        delta => {
+          accumulated += delta;
+          const now = Date.now();
+          if (now - lastUpdate >= 120 || accumulated.length - lastUpdate > 120) {
+            patchNode(canvas, responseNodeId, { text: accumulated, bcGenerating: true });
+            lastUpdate = now;
+          }
+        }
+      );
+
+      accumulated = answer;
+      if (replaceNodeId && replaceNodeId !== responseNodeId) {
         const latest = readCanvasData(canvas);
         canvas.importData({
           ...latest,
@@ -752,25 +799,61 @@ export default class BetterCanvasFeatures {
           edges: latest.edges.filter((edge: any) => edge.fromNode !== replaceNodeId && edge.toNode !== replaceNodeId)
         });
       }
-      const fresh = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === nodeId) ?? source;
-      const responseNode: CanvasNodeData = {
-        ...makeTextNode(answer, fresh.x + fresh.width + 100, fresh.y, {
-          width: Math.max(300, fresh.width),
-          height: Math.max(180, Math.min(480, Math.ceil(answer.length / 42) * 24))
-        }),
+      patchNode(canvas, responseNodeId, {
+        text: answer,
+        bcGenerating: false,
         bcGenerated: true,
+        bcStopped: false,
         bcPrompt: instruction,
         bcSourceNode: nodeId,
         bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
         bcAIProvider: this.currentProvider(source).id
-      };
-      insertCanvasNode(canvas, responseNode, nodeId);
+      });
       notice.hide();
       new Notice("AI 回复已添加为关联节点。");
     } catch (error) {
+      const stopped = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      if (responseNodeId) {
+        if (stopped) {
+          patchNode(canvas, responseNodeId, {
+            text: accumulated || "（生成已停止，暂无文本输出）",
+            bcGenerating: false,
+            bcGenerated: false,
+            bcStopped: true
+          });
+        } else if (accumulated) {
+          patchNode(canvas, responseNodeId, {
+            text: accumulated,
+            bcGenerating: false,
+            bcGenerated: false,
+            bcGenerationError: error instanceof Error ? error.message : String(error)
+          });
+        } else {
+          const latest = readCanvasData(canvas);
+          canvas.importData({
+            ...latest,
+            nodes: latest.nodes.filter((node: CanvasNodeData) => node.id !== responseNodeId),
+            edges: latest.edges.filter((edge: any) => edge.fromNode !== responseNodeId && edge.toNode !== responseNodeId)
+          });
+        }
+      }
       notice.hide();
-      new Notice(error instanceof Error ? error.message : String(error), 8000);
+      if (stopped) new Notice("AI 生成已停止；已保留已生成的部分内容。");
+      else new Notice(error instanceof Error ? error.message : String(error), 8000);
+    } finally {
+      if (this.activeGenerations.get(canvas)?.controller === controller) this.activeGenerations.delete(canvas);
     }
+  }
+
+  private stopAI(): void {
+    const canvas = this.canvas();
+    const current = canvas ? this.activeGenerations.get(canvas) : undefined;
+    const active = current ?? Array.from(this.activeGenerations.values()).at(-1);
+    if (!active) {
+      new Notice("当前没有正在运行的 AI 请求。");
+      return;
+    }
+    active.controller.abort();
   }
 
   private async regenerate(): Promise<void> {
