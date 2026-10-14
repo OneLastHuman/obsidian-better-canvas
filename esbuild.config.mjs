@@ -6,7 +6,7 @@ const production = process.argv[2] === "production";
 await esbuild.build({
   entryPoints: ["src/main.ts"],
   bundle: true,
-  external: ["obsidian", "node:child_process", "node:os"],
+  external: ["obsidian", "node:child_process", "node:os", "node:process"],
   format: "cjs",
   target: "es2022",
   outfile: "main.js",
