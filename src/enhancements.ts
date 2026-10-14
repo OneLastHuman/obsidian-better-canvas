@@ -297,6 +297,17 @@ export function resizeNodeToText(canvas: any, nodeId: string): boolean {
 type RoutePoint = { x: number; y: number };
 type RouteBox = { minX: number; minY: number; maxX: number; maxY: number };
 
+export function bestFloatingSide(box: RouteBox, other: RoutePoint): "left" | "right" | "top" | "bottom" {
+  const centerX = (box.minX + box.maxX) / 2;
+  const centerY = (box.minY + box.maxY) / 2;
+  const halfWidth = Math.max(1, (box.maxX - box.minX) / 2);
+  const halfHeight = Math.max(1, (box.maxY - box.minY) / 2);
+  const dx = (other.x - centerX) / halfWidth;
+  const dy = (other.y - centerY) / halfHeight;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "right" : "left";
+  return dy >= 0 ? "bottom" : "top";
+}
+
 function normalizeBBox(value: any): RouteBox | null {
   if (!value || typeof value !== "object") return null;
   const minX = Number(value.minX ?? value.x);
@@ -501,7 +512,34 @@ function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes
 }
 
 export function decorateCanvas(canvas: any): void {
-  const data = readCanvasData(canvas);
+  let data = readCanvasData(canvas);
+
+  // Edges flagged as floating are re-docked to the side facing the opposite
+  // node. Persist one batch of side changes, then decorate the updated scene.
+  const nodeById = new Map(data.nodes.map(node => [node.id, node] as [string, CanvasNodeData]));
+  let floatingSidesChanged = false;
+  const alignedEdges = data.edges.map(edge => {
+    if (!edge.fromFloating && !edge.toFloating) return edge;
+    const fromNode = nodeById.get(edge.fromNode);
+    const toNode = nodeById.get(edge.toNode);
+    if (!fromNode || !toNode) return edge;
+    const fromBox = normalizeBBox(fromNode);
+    const toBox = normalizeBBox(toNode);
+    if (!fromBox || !toBox) return edge;
+    const fromCenter = { x: (fromBox.minX + fromBox.maxX) / 2, y: (fromBox.minY + fromBox.maxY) / 2 };
+    const toCenter = { x: (toBox.minX + toBox.maxX) / 2, y: (toBox.minY + toBox.maxY) / 2 };
+    const nextFrom = edge.fromFloating ? bestFloatingSide(fromBox, toCenter) : edge.fromSide;
+    const nextTo = edge.toFloating ? bestFloatingSide(toBox, fromCenter) : edge.toSide;
+    if (nextFrom === edge.fromSide && nextTo === edge.toSide) return edge;
+    floatingSidesChanged = true;
+    return { ...edge, fromSide: nextFrom, toSide: nextTo };
+  });
+  if (floatingSidesChanged) {
+    data = { ...data, edges: alignedEdges };
+    canvas.importData({ ...data, edges: alignedEdges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+  }
   for (const nodeData of data.nodes) {
     const node = canvas?.nodes?.get?.(nodeData.id);
     const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
