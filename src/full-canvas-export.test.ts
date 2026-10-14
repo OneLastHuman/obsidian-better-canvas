@@ -23,6 +23,25 @@ describe("full content SVG export", () => {
     expect(result.svg).toContain("<polygon");
   });
 
+  it("embeds a bounded raster image when export data includes a data URL", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "image",
+        type: "file",
+        file: "assets/demo.png",
+        x: 20,
+        y: 30,
+        width: 240,
+        height: 180,
+        bcExportImageDataUrl: "data:image/png;base64,AAA="
+      }],
+      edges: []
+    });
+    expect(result.svg).toContain('<image');
+    expect(result.svg).toContain('href="data:image/png;base64,AAA="');
+    expect(result.svg).toContain("demo.png");
+  });
+
   it("supports an optional background and empty canvas", () => {
     const colored = canvasDataToFullSvg(sample, { backgroundColor: "#fff" });
     expect(colored.svg).toContain('fill="#fff"');
