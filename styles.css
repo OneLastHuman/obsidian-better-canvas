@@ -93,3 +93,10 @@
 .bc-readonly .canvas-node {
   cursor: default !important;
 }
+
+/* Per-node zoom breakpoints: preserve node geometry while simplifying its content at low zoom. */
+.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-content,
+.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-iframe,
+.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-container {
+  visibility: hidden !important;
+}
