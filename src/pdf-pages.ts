@@ -33,6 +33,9 @@ class PinnedPdfPageEmbed extends Component {
   private file: TFile;
   private subpath?: string;
   private canvas: HTMLCanvasElement | null = null;
+  private textDetails: HTMLDetailsElement | null = null;
+  private textContentEl: HTMLDivElement | null = null;
+  private excerptButton: HTMLButtonElement | null = null;
   private cancelled = false;
 
   constructor(plugin: any, context: any, file: TFile, subpath?: string) {
@@ -52,6 +55,34 @@ class PinnedPdfPageEmbed extends Component {
     canvas.setAttribute("aria-label", "Pinned PDF page");
     container.appendChild(canvas);
     this.canvas = canvas;
+
+    const details = document.createElement("details");
+    details.className = "bc-pdf-text-selection";
+    const summary = document.createElement("summary");
+    summary.textContent = "PDF 文本（选择文字后可创建摘录节点）";
+    details.appendChild(summary);
+    const textContent = document.createElement("div");
+    textContent.className = "bc-pdf-selectable-text";
+    textContent.textContent = "正在提取页面文本…";
+    details.appendChild(textContent);
+    const excerptButton = document.createElement("button");
+    excerptButton.type = "button";
+    excerptButton.className = "bc-pdf-create-excerpt";
+    excerptButton.textContent = "从选中文本创建摘录节点";
+    excerptButton.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const text = String(window.getSelection()?.toString() ?? "").trim();
+      container.dispatchEvent(new CustomEvent("better-canvas-pdf-selection", {
+        bubbles: true,
+        detail: { text }
+      }));
+    });
+    details.appendChild(excerptButton);
+    container.appendChild(details);
+    this.textDetails = details;
+    this.textContentEl = textContent;
+    this.excerptButton = excerptButton;
   }
 
   async loadFile(): Promise<void> {
@@ -83,6 +114,30 @@ class PinnedPdfPageEmbed extends Component {
       const context = target.getContext("2d", { alpha: false });
       if (!context) throw new Error("Could not create a 2D canvas context.");
       await page.render({ canvasContext: context, viewport }).promise;
+
+      // Expose selectable text without modifying the original PDF or relying on
+      // undocumented native PDF selection internals. The details panel is
+      // collapsed by default so the page preview remains compact.
+      try {
+        const textContent = await page.getTextContent();
+        const selectableText = Array.isArray(textContent?.items)
+          ? textContent.items
+              .map((item: any) => typeof item?.str === "string" ? item.str : "")
+              .filter(Boolean)
+              .join(" ")
+              .replace(/\\s+/g, " ")
+              .trim()
+          : "";
+        if (this.textContentEl) {
+          this.textContentEl.textContent = selectableText || "此页没有可提取的文本。扫描版页面需要 OCR 后才能选择文字。";
+          this.textContentEl.dataset.extracted = String(Boolean(selectableText));
+        }
+        if (this.excerptButton) this.excerptButton.disabled = !selectableText;
+      } catch (error) {
+        if (this.textContentEl) this.textContentEl.textContent = "无法提取页面文本；如果这是扫描件，请先进行 OCR。";
+        if (this.excerptButton) this.excerptButton.disabled = true;
+        console.warn("Better Canvas PDF text extraction failed:", this.file.path, error);
+      }
       if (!this.cancelled) delete target.dataset.loading;
     } catch (error) {
       if (this.cancelled || !target.isConnected) return;
@@ -104,6 +159,10 @@ class PinnedPdfPageEmbed extends Component {
     this.cancelled = true;
     this.canvas?.remove();
     this.canvas = null;
+    this.textDetails?.remove();
+    this.textDetails = null;
+    this.textContentEl = null;
+    this.excerptButton = null;
   }
 }
 
