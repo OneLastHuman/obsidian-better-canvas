@@ -74,9 +74,11 @@
 
 ## 更多整合功能
 
-这一轮增加：节点颜色/形状/边框自定义、连线方向翻转及颜色/线型、前后层级调整、焦点模式、文本节点自动尺寸、分组折叠、选区封装成独立画布、节点 Wikilink 与 Markdown 节点嵌入、导出 JSON Canvas/PNG/SVG、自动文件连线（默认读取文件 frontmatter 的 `canvas-edges`）、网页正文提取、YouTube 公开字幕导入、PDF 分页节点、节点级 AI 模型覆盖，以及远程 MCP Streamable HTTP 工具调用。
+整合版目前包括：节点颜色/形状/边框、可互操作的 JSON Canvas `styleAttributes`、连线颜色/线型/箭头样式、连线方向翻转、前后层级、焦点模式、文本节点自动尺寸、分组折叠、选区封装成独立画布、节点 Wikilink/Markdown 嵌入、JSON Canvas/PNG/SVG 导出、frontmatter 自动连线、网页正文与可访问 YouTube 字幕导入、PDF 固定分页渲染与自由手绘批注、节点级 AI 模型覆盖、多供应商 AI、流式生成与停止、图像上下文、闪卡/思维导图生成，以及远程 MCP Streamable HTTP 工具调用。
 
-请注意：这些功能使用 JSON Canvas 扩展字段和 Obsidian DOM/内部 Canvas API，已通过构建检查不等于在每个 Obsidian 版本都经过交互测试。真正的 Canvas Portal、Canvas 元数据缓存/反向链接、PDF 单页固定渲染、所有 Advanced Canvas 高级路径算法、所有 AI Canvas 多供应商原生 SDK 与可靠流式中止机制仍需要单独迁移和桌面端回归验证。
+Canvas 元数据索引现在可以为画布文本节点、文件节点与 frontmatter 建立基础链接缓存；还加入了受设置开关控制的 Backlinks 扫描桥接。它通过 Obsidian 内部 API 工作，属于兼容性较敏感的功能。
+
+请注意：CI 已通过类型检查、单元测试和生产构建，但没有启动 Obsidian GUI。真实交互仍需在目标桌面版/移动版确认。完整交互式 Canvas Portal、覆盖全部 Advanced Canvas 的复杂边路由算法/全部样式属性、完整的 PDF 文本选择/高亮工具，以及 Gemini 原生视频上下文、所有 AI 供应商特有能力仍未完整迁移。
 
 
 ## 功能覆盖状态
