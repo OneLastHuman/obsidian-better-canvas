@@ -45,6 +45,9 @@ interface FeatureSettings {
   autoEdgesFrontmatterKey: string;
   customColors: string[];
   youtubeLanguage: string;
+  gridSize: number;
+  defaultNodeWidth: number;
+  defaultNodeHeight: number;
   mcpEndpoint: string;
   mcpApiKey: string;
 }
@@ -165,6 +168,9 @@ export default class BetterCanvasFeatures {
     if (typeof s.autoEdgesFrontmatterKey !== "string") s.autoEdgesFrontmatterKey = "canvas-edges";
     if (!Array.isArray(s.customColors)) s.customColors = ["#d14d41", "#438c7a", "#5c6bc0"];
     if (typeof s.youtubeLanguage !== "string") s.youtubeLanguage = "en";
+    if (!Number.isFinite(s.gridSize) || s.gridSize < 1 || s.gridSize > 500) s.gridSize = 20;
+    if (!Number.isFinite(s.defaultNodeWidth) || s.defaultNodeWidth < 120 || s.defaultNodeWidth > 1200) s.defaultNodeWidth = 280;
+    if (!Number.isFinite(s.defaultNodeHeight) || s.defaultNodeHeight < 80 || s.defaultNodeHeight > 1000) s.defaultNodeHeight = 140;
     if (typeof s.mcpEndpoint !== "string") s.mcpEndpoint = "";
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
     if (typeof s.customCss !== "string") s.customCss = "";
@@ -270,6 +276,7 @@ export default class BetterCanvasFeatures {
     add("bc-select-outgoing-edges", "选择从节点发出的连线", () => this.selectEdges("outgoing"));
     add("bc-style-selected-edges", "设置当前选中连线样式", () => this.edgeStyle());
     add("bc-front-node", "将节点置于最前", () => this.reorder(true));
+    add("bc-align-selection-grid", "将所选节点对齐到网格", () => this.alignSelectionToGrid());
     add("bc-back-node", "将节点置于最后", () => this.reorder(false));
     add("bc-focus", "切换专注模式", () => this.focus());
     add("bc-collapse-group", "折叠/展开所选分组", () => this.collapseGroup());
@@ -593,6 +600,28 @@ export default class BetterCanvasFeatures {
     new Notice(count ? "已选择 " + count + " 条连线。" : "没有匹配连线。");
   }
 
+  private alignSelectionToGrid(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    const selection = canvas.selection;
+    const ids = new Set<string>();
+    for (const item of selection?.values?.() ?? []) {
+      const id = item?.id ?? item?.getData?.()?.id;
+      if (typeof id === "string" && canvas.nodes?.has?.(id)) ids.add(id);
+    }
+    if (!ids.size) { new Notice("请先选择一个或多个节点。"); return; }
+    const data = readCanvasData(canvas);
+    const step = Math.max(1, Math.min(500, Number(this.settings().gridSize) || 20));
+    const nodes = data.nodes.map((node: CanvasNodeData) => ids.has(node.id) ? {
+      ...node,
+      x: Math.round(node.x / step) * step,
+      y: Math.round(node.y / step) * step
+    } : node);
+    canvas.importData({ ...data, nodes, edges: data.edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    new Notice("已将 " + ids.size + " 个节点对齐到 " + step + " px 网格。");
+  }
   private reorder(front: boolean): void {
     const selection = this.selected();
     if (!selection) return;
@@ -1562,6 +1591,24 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
           this.features.applyUserCss();
         });
       });
+    new Setting(c).setName("Canvas grid size")
+      .setDesc("用于“将所选节点对齐到网格”，单位为 Canvas 坐标像素。")
+      .addText(text => text.setValue(String(s.gridSize)).onChange(async value => {
+        const number = Number(value);
+        if (Number.isFinite(number) && number >= 1 && number <= 500) { s.gridSize = number; await this.features.save(); }
+      }));
+
+    new Setting(c).setName("Default node width")
+      .addText(text => text.setValue(String(s.defaultNodeWidth)).onChange(async value => {
+        const number = Number(value);
+        if (Number.isFinite(number) && number >= 120 && number <= 1200) { s.defaultNodeWidth = number; await this.features.save(); }
+      }));
+
+    new Setting(c).setName("Default node height")
+      .addText(text => text.setValue(String(s.defaultNodeHeight)).onChange(async value => {
+        const number = Number(value);
+        if (Number.isFinite(number) && number >= 80 && number <= 1000) { s.defaultNodeHeight = number; await this.features.save(); }
+      }));
     new Setting(c).setName("Custom canvas colors")
       .setDesc("以逗号分隔，例如 #d14d41, #438c7a, #5c6bc0；作为画布颜色 7、8、9…")
       .addText(text => text.setValue((s.customColors as string[]).join(", ")).onChange(async value => {
