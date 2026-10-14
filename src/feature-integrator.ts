@@ -7,6 +7,7 @@ import {
   Notice,
   PluginSettingTab,
   Setting,
+  SuggestModal,
   TFile
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
@@ -279,6 +280,8 @@ export default class BetterCanvasFeatures {
     add("bc-stop-ai", "停止当前 AI 生成", () => this.stopAI());
     add("bc-mcp-tool", "调用远程 MCP 工具", () => void this.runMcpTool());
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
+    add("bc-pdf-review-board", "为 PDF 创建分页批注工作区", () => this.createPdfReviewBoard());
+    add("bc-create-canvas-portal", "插入 Canvas 嵌入卡片", () => this.createCanvasPortal());
   }
 
   private registerCanvasMenus(): void {
@@ -1172,6 +1175,62 @@ export default class BetterCanvasFeatures {
     }
   }
 
+  private createCanvasPortal(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    const selection = this.selected(canvas);
+    const canvasFiles = this.p.app.vault.getFiles().filter((file: TFile) => file.extension.toLowerCase() === "canvas");
+    if (!canvasFiles.length) { new Notice("Vault 中还没有其他 Canvas 文件。"); return; }
+    const ModalClass = class extends SuggestModal<TFile> {
+      getSuggestions(query: string): TFile[] {
+        const needle = query.trim().toLocaleLowerCase();
+        return canvasFiles.filter((file: TFile) => !needle || file.path.toLocaleLowerCase().includes(needle) || file.basename.toLocaleLowerCase().includes(needle)).slice(0, 100);
+      }
+      renderSuggestion(file: TFile, element: HTMLElement): void {
+        element.createEl("div", { text: file.basename });
+        element.createEl("small", { text: file.path });
+      }
+      onChooseSuggestion(file: TFile): void {
+        const text = "![[\"" + file.path + "\"]]";
+        const node = makeTextNode(text, selection ? selection.node.x + selection.node.width + 100 : 0, selection ? selection.node.y : 0, { width: 500, height: 360 });
+        insertCanvasNode(canvas, node, selection?.node.id);
+        new Notice("已插入 Canvas 嵌入卡片。交互嵌入效果取决于当前 Obsidian 版本。");
+      }
+    };
+    new ModalClass(this.p.app).open();
+  }
+
+  private createPdfReviewBoard(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    if (selection.node.type !== "file" || !String(selection.node.file ?? "").toLowerCase().endsWith(".pdf")) {
+      new Notice("请选择一个 PDF 文件节点。");
+      return;
+    }
+    this.input("创建 PDF 分页批注工作区", "输入页数（1 至 30）", value => {
+      const count = Number(value);
+      if (!Number.isInteger(count) || count < 1 || count > 30) { new Notice("请输入 1 至 30 的整数。"); return; }
+      const { canvas, node } = selection;
+      for (let page = 1; page <= count; page++) {
+        const pageNode: CanvasNodeData = {
+          id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
+          type: "file",
+          file: String(node.file),
+          subpath: "#page=" + page,
+          pinned: true,
+          x: node.x + node.width + 100,
+          y: node.y + (page - 1) * 300,
+          width: 340,
+          height: 250
+        };
+        insertCanvasNode(canvas, pageNode, node.id);
+        const annotationNode = makeTextNode("第 " + page + " 页批注\n\n- 关键内容：\n- 疑问：\n- 后续行动：",
+          pageNode.x + pageNode.width + 50, pageNode.y, { width: 300, height: 230 });
+        insertCanvasNode(canvas, annotationNode, pageNode.id);
+      }
+      new Notice("已创建 " + count + " 个页面卡片和对应批注节点。此工作区提供手动批注，不包含 PDF 区域标注覆盖层。");
+    }, "10");
+  }
   private splitPdfPages(): void {
     const selection = this.selected();
     if (!selection) return;
