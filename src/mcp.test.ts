@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeMcpToolResult } from "./mcp";
+import { normalizeMcpToolResult } from "./mcp-result";
 
 describe("MCP result normalization", () => {
   it("preserves text blocks and image payloads", () => {
