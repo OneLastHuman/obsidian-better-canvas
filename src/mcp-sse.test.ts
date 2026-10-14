@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { resolveSsePostUrl, splitSseFrames } from "./mcp-sse";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { callSseMcpTool, listSseMcpTools, resolveSsePostUrl, splitSseFrames } from "./mcp-sse";
 
 describe("legacy MCP SSE parsing", () => {
   it("parses endpoint and message events across a partial buffer", () => {
@@ -25,4 +25,51 @@ describe("legacy MCP SSE parsing", () => {
     expect(() => resolveSsePostUrl("https://mcp.example/sse", "file:///tmp/message"))
       .toThrow(/HTTP/);
   });
+});
+
+describe("legacy MCP SSE JSON-RPC round trip", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lists and calls tools using SSE messages with an explicit endpoint event", async () => {
+    const encoder = new TextEncoder();
+    let eventController: ReadableStreamDefaultController<Uint8Array> | undefined;
+
+    const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = String(init?.method ?? "GET").toUpperCase();
+      if (method === "GET") {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            eventController = controller;
+            controller.enqueue(encoder.encode("event: endpoint\ndata: /messages?session=fixture\n\n"));
+          }
+        });
+        return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+      }
+      expect(url).toBe("https://mcp.example/messages?session=fixture");
+      const message = JSON.parse(String(init?.body ?? "{}"));
+      if (message.id !== undefined) {
+        let result: unknown;
+        if (message.method === "initialize") {
+          result = { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "sse-fixture", version: "1" } };
+        } else if (message.method === "tools/list") {
+          result = { tools: [{ name: "echo", description: "Echo arguments", inputSchema: { type: "object" } }] };
+        } else if (message.method === "tools/call") {
+          result = { content: [{ type: "text", text: JSON.stringify(message.params.arguments) }] };
+        }
+        eventController?.enqueue(encoder.encode("event: message\ndata: " + JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\n\n"));
+      }
+      return new Response(null, { status: 202 });
+    });
+
+    vi.stubGlobal("fetch", fakeFetch);
+    const tools = await listSseMcpTools("https://mcp.example/sse", "secret");
+    expect(tools.map(tool => tool.name)).toEqual(["echo"]);
+
+    const result = await callSseMcpTool("https://mcp.example/sse", "secret", "echo", { text: "hello" });
+    expect(result.text).toBe(JSON.stringify({ text: "hello" }));
+    expect(result.images).toEqual([]);
+  }, 15000);
 });
