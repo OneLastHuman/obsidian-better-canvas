@@ -315,7 +315,11 @@ export class PdfAnnotationManager {
     }
 
     let svg = container.querySelector(":scope > .bc-pdf-annotation-overlay") as SVGSVGElement | null;
-    if (!Array.isArray(nodeData.bcPdfStrokes) && !nodeData.bcPdfAnnotating) {
+    const strokes = Array.isArray(nodeData.bcPdfStrokes) ? nodeData.bcPdfStrokes as PdfStroke[] : [];
+    const textHighlights = Array.isArray(nodeData.bcPdfTextHighlights)
+      ? nodeData.bcPdfTextHighlights as PdfTextHighlight[]
+      : [];
+    if (strokes.length === 0 && textHighlights.length === 0 && !nodeData.bcPdfAnnotating) {
       svg?.remove();
       return;
     }
@@ -329,11 +333,10 @@ export class PdfAnnotationManager {
       this.installPointerHandlers(canvas, nodeData.id, svg);
     }
 
-    const strokes = Array.isArray(nodeData.bcPdfStrokes) ? nodeData.bcPdfStrokes as PdfStroke[] : [];
     const tool = typeof nodeData.bcPdfTool === "string" ? nodeData.bcPdfTool : "pen";
     const color = typeof nodeData.bcPdfColor === "string" ? nodeData.bcPdfColor : "#e53935";
     const width = Number.isFinite(nodeData.bcPdfWidth) ? Number(nodeData.bcPdfWidth) : 5;
-    const signature = JSON.stringify({ strokes, drawing: Boolean(nodeData.bcPdfAnnotating), tool, color, width });
+    const signature = JSON.stringify({ strokes, textHighlights, drawing: Boolean(nodeData.bcPdfAnnotating), tool, color, width });
     if (svg.dataset.bcSignature === signature) return;
     svg.dataset.bcSignature = signature;
     svg.dataset.drawEnabled = String(Boolean(nodeData.bcPdfAnnotating));
@@ -341,6 +344,36 @@ export class PdfAnnotationManager {
     svg.dataset.color = color;
     svg.dataset.width = String(width);
     svg.replaceChildren();
+
+    for (const highlight of textHighlights) {
+      if (!Array.isArray(highlight?.rects)) continue;
+      for (const box of highlight.rects) {
+        if (!box || !Number.isFinite(box.x) || !Number.isFinite(box.y) ||
+            !Number.isFinite(box.width) || !Number.isFinite(box.height) ||
+            box.width <= 0 || box.height <= 0) continue;
+        const x = Math.max(0, Math.min(1, box.x));
+        const y = Math.max(0, Math.min(1, box.y));
+        const rectWidth = Math.max(0, Math.min(1 - x, box.width));
+        const rectHeight = Math.max(0, Math.min(1 - y, box.height));
+        if (rectWidth <= 0 || rectHeight <= 0) continue;
+
+        const rect = makeSvgElement("rect");
+        rect.setAttribute("x", (x * 1000).toFixed(2));
+        rect.setAttribute("y", (y * 1000).toFixed(2));
+        rect.setAttribute("width", (rectWidth * 1000).toFixed(2));
+        rect.setAttribute("height", (rectHeight * 1000).toFixed(2));
+        rect.setAttribute("fill", highlight.color || "#ffeb3b");
+        rect.setAttribute("fill-opacity", String(Math.max(0.05, Math.min(0.9, highlight.opacity ?? 0.36))));
+        rect.setAttribute("rx", "2");
+        if (highlight.text) {
+          rect.setAttribute("aria-label", "PDF text highlight: " + highlight.text.slice(0, 120));
+          const title = makeSvgElement("title");
+          title.textContent = highlight.text;
+          rect.appendChild(title);
+        }
+        svg.appendChild(rect);
+      }
+    }
     for (const stroke of strokes) {
       if (!Array.isArray(stroke?.points) || stroke.points.length === 0) continue;
       svg.appendChild(this.createStrokePath(stroke));
@@ -430,6 +463,7 @@ export class PdfAnnotationManager {
           color: svg.dataset.color || (tool === "highlighter" ? "#ffeb3b" : "#e53935"),
           width,
           tool,
+          createdAt: Date.now(),
           ...(tool === "highlighter" ? { opacity: 0.32 } : {})
         };
         patchNode(canvas, nodeId, { bcPdfStrokes: [...existing, completed] });
