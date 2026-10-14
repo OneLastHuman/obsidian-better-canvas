@@ -11,6 +11,8 @@ interface PdfStroke {
   points: PdfPoint[];
   color: string;
   width: number;
+  tool?: "pen" | "highlighter";
+  opacity?: number;
 }
 
 function isPinnedPdf(node: any): boolean {
@@ -44,6 +46,31 @@ export class PdfAnnotationManager {
       id: "bc-toggle-pdf-annotation",
       name: "Better Canvas: 切换固定 PDF 页面批注模式",
       callback: () => this.toggleForSelection()
+    });
+    this.plugin.addCommand({
+      id: "bc-enable-pdf-pen",
+      name: "Better Canvas: PDF 红笔批注",
+      callback: () => this.setToolForSelection("pen", "#e53935", 5)
+    });
+    this.plugin.addCommand({
+      id: "bc-enable-pdf-blue-pen",
+      name: "Better Canvas: PDF 蓝笔批注",
+      callback: () => this.setToolForSelection("pen", "#1e88e5", 5)
+    });
+    this.plugin.addCommand({
+      id: "bc-enable-pdf-highlighter",
+      name: "Better Canvas: PDF 黄色荧光笔",
+      callback: () => this.setToolForSelection("highlighter", "#ffeb3b", 16)
+    });
+    this.plugin.addCommand({
+      id: "bc-enable-pdf-eraser",
+      name: "Better Canvas: PDF 批注橡皮擦",
+      callback: () => this.setToolForSelection("eraser", "#ffffff", 22)
+    });
+    this.plugin.addCommand({
+      id: "bc-undo-pdf-annotation",
+      name: "Better Canvas: 撤销最后一笔 PDF 批注",
+      callback: () => this.undoForSelection()
     });
     this.plugin.addCommand({
       id: "bc-clear-pdf-annotations",
@@ -86,11 +113,43 @@ export class PdfAnnotationManager {
     const selected = this.selectedPdfNode();
     if (!selected) return;
     const next = !Boolean(selected.node.bcPdfAnnotating);
-    patchNode(selected.canvas, selected.node.id, { bcPdfAnnotating: next });
+    patchNode(selected.canvas, selected.node.id, {
+      bcPdfAnnotating: next,
+      bcPdfTool: selected.node.bcPdfTool ?? "pen",
+      bcPdfColor: selected.node.bcPdfColor ?? "#e53935",
+      bcPdfWidth: selected.node.bcPdfWidth ?? 5
+    });
     this.refresh();
     new Notice(next
       ? "PDF 批注模式已开启。可直接在页面上拖动鼠标/触控笔绘制。再次运行命令退出。"
       : "PDF 批注模式已关闭。");
+  }
+
+  private setToolForSelection(tool: "pen" | "highlighter" | "eraser", color: string, width: number): void {
+    const selected = this.selectedPdfNode();
+    if (!selected) return;
+    patchNode(selected.canvas, selected.node.id, {
+      bcPdfAnnotating: true,
+      bcPdfTool: tool,
+      bcPdfColor: color,
+      bcPdfWidth: width
+    });
+    this.refresh();
+    const labels = { pen: "红/蓝笔", highlighter: "黄色荧光笔", eraser: "橡皮擦" };
+    new Notice("PDF " + labels[tool] + "已启用；拖动鼠标或触控笔进行操作。");
+  }
+
+  private undoForSelection(): void {
+    const selected = this.selectedPdfNode();
+    if (!selected) return;
+    const strokes = Array.isArray(selected.node.bcPdfStrokes) ? selected.node.bcPdfStrokes as PdfStroke[] : [];
+    if (!strokes.length) {
+      new Notice("所选 PDF 页面没有可撤销的批注。");
+      return;
+    }
+    patchNode(selected.canvas, selected.node.id, { bcPdfStrokes: strokes.slice(0, -1) });
+    this.refresh();
+    new Notice("已撤销最后一笔批注。");
   }
 
   private clearForSelection(): void {
@@ -154,10 +213,16 @@ export class PdfAnnotationManager {
     }
 
     const strokes = Array.isArray(nodeData.bcPdfStrokes) ? nodeData.bcPdfStrokes as PdfStroke[] : [];
-    const signature = JSON.stringify({ strokes, drawing: Boolean(nodeData.bcPdfAnnotating) });
+    const tool = typeof nodeData.bcPdfTool === "string" ? nodeData.bcPdfTool : "pen";
+    const color = typeof nodeData.bcPdfColor === "string" ? nodeData.bcPdfColor : "#e53935";
+    const width = Number.isFinite(nodeData.bcPdfWidth) ? Number(nodeData.bcPdfWidth) : 5;
+    const signature = JSON.stringify({ strokes, drawing: Boolean(nodeData.bcPdfAnnotating), tool, color, width });
     if (svg.dataset.bcSignature === signature) return;
     svg.dataset.bcSignature = signature;
     svg.dataset.drawEnabled = String(Boolean(nodeData.bcPdfAnnotating));
+    svg.dataset.tool = tool;
+    svg.dataset.color = color;
+    svg.dataset.width = String(width);
     svg.replaceChildren();
     for (const stroke of strokes) {
       if (!Array.isArray(stroke?.points) || stroke.points.length === 0) continue;
@@ -171,8 +236,10 @@ export class PdfAnnotationManager {
     path.setAttribute("fill", "none");
     path.setAttribute("stroke", stroke.color || "#e53935");
     path.setAttribute("stroke-width", String(stroke.width || 5));
-    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linecap", stroke.tool === "highlighter" ? "square" : "round");
     path.setAttribute("stroke-linejoin", "round");
+    if (stroke.tool === "highlighter") path.setAttribute("stroke-opacity", String(stroke.opacity ?? 0.32));
+    else if (typeof stroke.opacity === "number") path.setAttribute("stroke-opacity", String(stroke.opacity));
     path.setAttribute("vector-effect", "non-scaling-stroke");
     return path;
   }
@@ -204,7 +271,13 @@ export class PdfAnnotationManager {
       pointerId = event.pointerId;
       active = [pointFromEvent(event)];
       svg.setPointerCapture?.(pointerId);
-      preview = this.createStrokePath({ points: active, color: "#e53935", width: 5 });
+      const tool = svg.dataset.tool === "highlighter" ? "highlighter" : svg.dataset.tool === "eraser" ? "eraser" : "pen";
+      const color = svg.dataset.color || "#e53935";
+      const width = Math.max(1, Math.min(64, Number(svg.dataset.width) || 5));
+      const previewStroke: PdfStroke = tool === "eraser"
+        ? { points: active, color: "#ffffff", width: 22, opacity: 0.75, tool: "pen" }
+        : { points: active, color, width, opacity: tool === "highlighter" ? 0.32 : 1, tool };
+      preview = this.createStrokePath(previewStroke);
       preview.classList.add("bc-pdf-annotation-preview");
       svg.appendChild(preview);
     });
@@ -220,11 +293,30 @@ export class PdfAnnotationManager {
       event.preventDefault();
       event.stopPropagation();
       active.push(pointFromEvent(event));
-      const completed: PdfStroke = { points: active.slice(), color: "#e53935", width: 5 };
       preview?.remove();
-      const strokes = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeId) as any;
-      const existing = Array.isArray(strokes?.bcPdfStrokes) ? strokes.bcPdfStrokes as PdfStroke[] : [];
-      patchNode(canvas, nodeId, { bcPdfStrokes: [...existing, completed] });
+
+      const current = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeId) as any;
+      const existing = Array.isArray(current?.bcPdfStrokes) ? current.bcPdfStrokes as PdfStroke[] : [];
+      const tool = svg.dataset.tool === "highlighter" ? "highlighter" : svg.dataset.tool === "eraser" ? "eraser" : "pen";
+
+      if (tool === "eraser") {
+        const rect = svg.getBoundingClientRect();
+        const tolerance = 22;
+        const retained = existing.filter(stroke => !stroke.points?.some(point =>
+          active!.some(sample => Math.hypot((point.x - sample.x) * rect.width, (point.y - sample.y) * rect.height) <= tolerance
+        )));
+        patchNode(canvas, nodeId, { bcPdfStrokes: retained });
+      } else {
+        const width = Math.max(1, Math.min(64, Number(svg.dataset.width) || 5));
+        const completed: PdfStroke = {
+          points: active.slice(),
+          color: svg.dataset.color || (tool === "highlighter" ? "#ffeb3b" : "#e53935"),
+          width,
+          tool,
+          ...(tool === "highlighter" ? { opacity: 0.32 } : {})
+        };
+        patchNode(canvas, nodeId, { bcPdfStrokes: [...existing, completed] });
+      }
       active = null;
       preview = null;
       pointerId = null;
