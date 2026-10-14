@@ -194,6 +194,14 @@ export class CanvasMetadataIndexer {
       }
       const data = canvas && typeof canvas === "object" ? canvas : {};
       const hash = await this.hash(bytes);
+      // Obsidian's link resolver consults uniqueFileLookup to resolve Vault
+      // files by basename. Registering the Canvas itself allows notes to link
+      // to it and makes inbound backlinks possible.
+      try {
+        this.cache.uniqueFileLookup?.add(file.name.toLowerCase(), file);
+      } catch {
+        // Internal lookup implementation differs across Obsidian versions.
+      }
       let metadata = this.cache.metadataCache?.[hash];
 
       try {
