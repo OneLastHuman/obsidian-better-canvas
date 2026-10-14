@@ -306,6 +306,7 @@ export default class BetterCanvasFeatures {
       const view = leaf.view as any;
       if (!view?.canvas) continue;
       this.observeAutoResize(view, view.canvas);
+      this.bindMindMapShortcuts(view, view.canvas);
       this.decorate(view.canvas);
       this.applyFocus(view.canvas);
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
@@ -398,6 +399,43 @@ export default class BetterCanvasFeatures {
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) resizeNodeToText(selection.canvas, selection.node.id);
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
+  }
+
+  private bindMindMapShortcuts(view: any, canvas: any): void {
+    const container = view?.containerEl;
+    if (!(container instanceof HTMLElement) || this.boundContainers.has(container)) return;
+    this.boundContainers.add(container);
+
+    this.p.registerDomEvent(container, "keydown", (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || target.closest("input, textarea, [contenteditable='true'], .cm-editor"))) return;
+      const selectedInternal = canvas?.selection?.values?.().next?.().value;
+      if (!selectedInternal || selectedInternal.isEditing) return;
+      const direction = event.key === "ArrowLeft" ? "left"
+        : event.key === "ArrowRight" ? "right"
+        : event.key === "ArrowUp" ? "up"
+        : event.key === "ArrowDown" ? "down" : "";
+      if (!direction || !(event.ctrlKey || event.metaKey)) return;
+      const selected = this.selected(canvas);
+      if (!selected) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const node = selected.node;
+      const gap = 100;
+      const x = direction === "left" ? node.x - node.width - gap
+        : direction === "right" ? node.x + node.width + gap : node.x;
+      const y = direction === "up" ? node.y - node.height - gap
+        : direction === "down" ? node.y + node.height + gap : node.y;
+      const created = makeTextNode("", x, y, { width: node.width, height: node.height });
+      insertCanvasNode(canvas, created, event.shiftKey ? node.id : undefined);
+      window.setTimeout(() => {
+        const internal = canvas.nodes?.get?.(created.id);
+        if (!internal) return;
+        canvas.selectOnly?.(internal);
+        internal.startEditing?.();
+        canvas.zoomToSelection?.();
+      }, 0);
+    });
   }
 
   private observeAutoResize(view: any, canvas: any): void {
