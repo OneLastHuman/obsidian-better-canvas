@@ -552,7 +552,7 @@ export default class BetterCanvasFeatures {
 
   private async export(format: "canvas" | "png" | "svg"): Promise<void> {
     const canvas = this.canvas();
-    if (!canvas) return new Notice("请先打开 Canvas。");
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
     const view = this.activeCanvasView();
     const baseName = String(view?.file?.basename ?? "canvas").replace(/[\\/:*?"<>|]/g, "-");
     const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").replace(/^\/+|\/+$/g, "");
@@ -564,7 +564,7 @@ export default class BetterCanvasFeatures {
       return;
     }
     const container = canvas.wrapperEl;
-    if (!(container instanceof HTMLElement)) return new Notice("无法获取 Canvas DOM。");
+    if (!(container instanceof HTMLElement)) { new Notice("无法获取 Canvas DOM。"); return; }
     const notice = new Notice("正在导出 " + format.toUpperCase() + "…", 0);
     try {
       const dataUrl = format === "png"
@@ -731,7 +731,7 @@ export default class BetterCanvasFeatures {
     if (!canvas) return;
     const data = readCanvasData(canvas);
     const source = data.nodes.find((node: CanvasNodeData) => node.id === nodeId);
-    if (!source) return new Notice("找不到 AI 上下文的源节点。");
+    if (!source) { new Notice("找不到 AI 上下文的源节点。"); return; }
     const notice = new Notice("Better Canvas：正在请求 AI…", 0);
     try {
       const context = await this.getNodeContext(canvas, nodeId);
@@ -819,10 +819,10 @@ export default class BetterCanvasFeatures {
 
   private async runMcpTool(): Promise<void> {
     const s = this.settings();
-    if (!s.mcpEndpoint) return new Notice("请先在设置中填写 MCP Streamable HTTP endpoint。");
+    if (!s.mcpEndpoint) { new Notice("请先在设置中填写 MCP Streamable HTTP endpoint。"); return; }
     try {
       const tools = await listRemoteTools(s.mcpEndpoint, s.mcpApiKey);
-      if (!tools.length) return new Notice("MCP 服务未暴露工具。");
+      if (!tools.length) { new Notice("MCP 服务未暴露工具。"); return; }
       const summary = tools.map(tool => tool.name + (tool.description ? " — " + tool.description : "")).join("\n");
       this.input("选择 MCP 工具", summary + "\n\n输入完整工具名", name => {
         const tool = tools.find(item => item.name === name.trim());
@@ -863,7 +863,7 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     if (selection.node.type !== "file" || !String(selection.node.file ?? "").toLowerCase().endsWith(".pdf")) {
-      return new Notice("请选择一个 PDF 文件节点。");
+      new Notice("请选择一个 PDF 文件节点。"); return;
     }
     this.input("拆分 PDF 页面", "输入要创建的页面数（最多 30）", value => {
       const count = Number(value);
