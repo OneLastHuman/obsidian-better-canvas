@@ -52,7 +52,7 @@ export function selectedNodeIds(canvas: any): string[] {
   if (!selection || typeof selection.values !== "function") return [];
   const ids: string[] = [];
   for (const selected of selection.values()) {
-    const id = selected?.id ?? selected?.node?.id;
+    const id = selected?.id ?? selected?.node?.id ?? selected?.getData?.()?.id;
     if (typeof id === "string" && !ids.includes(id)) ids.push(id);
   }
   return ids;
