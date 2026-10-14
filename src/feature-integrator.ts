@@ -273,6 +273,8 @@ export default class BetterCanvasFeatures {
     add("bc-set-node-provider", "为节点指定 AI 供应商", () => this.setNodeProvider());
     add("bc-set-node-model", "为节点指定 AI 模型", () => this.setNodeModel());
     add("bc-ask-custom-model", "指定模型并向 AI 提问", () => this.askWithModel());
+    add("bc-test-provider", "测试当前 AI 供应商连接", () => void this.testProvider());
+    add("bc-related-questions", "生成后续研究问题节点", () => void this.generateRelatedQuestions());
     add("bc-expand-idea-mindmap", "用 AI 将想法扩展为思维导图", () => this.expandIdeaIntoMindMap());
     add("bc-generate-flashcard-nodes", "生成独立复习闪卡节点", () => this.generateFlashcardNodes());
     add("bc-generate-image", "根据所选节点生成图片", () => void this.generateImageForNode());
@@ -851,6 +853,50 @@ export default class BetterCanvasFeatures {
     return JSON.parse(cleaned.slice(start, end + 1)) as T;
   }
 
+  private async testProvider(): Promise<void> {
+    const profile = this.currentProvider();
+    const notice = new Notice("正在测试 " + profile.name + "…", 0);
+    try {
+      const response = await chatCompletion({ ...this.aiSettings(), model: profile.model }, [
+        { role: "system", content: "You are a connectivity test. Reply with exactly: OK" },
+        { role: "user", content: "Reply with exactly OK." }
+      ]);
+      notice.hide();
+      new Notice("供应商响应成功：" + response.slice(0, 80));
+    } catch (error) {
+      notice.hide();
+      new Notice("供应商测试失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+    }
+  }
+
+  private async generateRelatedQuestions(): Promise<void> {
+    const selected = this.selected();
+    if (!selected) return;
+    const notice = new Notice("正在生成后续研究问题…", 0);
+    try {
+      const context = await this.getNodeContext(selected.canvas, selected.node.id);
+      const raw = await this.completeStructured(
+        "根据以下笔记生成 5 个有差异的后续研究问题，只返回 JSON：{\"questions\":[\"问题 1\",\"问题 2\"]}。每个问题不超过 100 字；不要回答问题，不要重复。\n\n" + context,
+        selected.node
+      );
+      const parsed = this.parseJsonPayload<{questions?: string[]}>(raw);
+      const questions = Array.isArray(parsed.questions)
+        ? [...new Set(parsed.questions.filter(question => typeof question === "string").map(question => question.trim()).filter(Boolean))].slice(0, 8)
+        : [];
+      if (!questions.length) throw new Error("AI 没有返回有效的问题列表。");
+      for (let i = 0; i < questions.length; i++) {
+        const node = makeTextNode("研究问题：" + questions[i],
+          selected.node.x + selected.node.width + 100, selected.node.y + i * 135,
+          { width: 330, height: 110 });
+        insertCanvasNode(selected.canvas, node, selected.node.id);
+      }
+      notice.hide();
+      new Notice("已创建 " + questions.length + " 个后续研究问题节点。");
+    } catch (error) {
+      notice.hide();
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+    }
+  }
   private async completeStructured(prompt: string, node?: CanvasNodeData): Promise<string> {
     const provider = this.currentProvider(node);
     const settings = this.aiSettings(node);
@@ -1402,6 +1448,13 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
             }));
             if (!(s.providerProfiles as ProviderProfile[]).some(profile => profile.id === s.activeProviderId)) {
               s.activeProviderId = (s.providerProfiles as ProviderProfile[])[0].id;
+            }
+            const active = (s.providerProfiles as ProviderProfile[]).find(profile => profile.id === s.activeProviderId);
+            if (active) {
+              s.baseUrl = active.baseUrl;
+              s.apiKey = active.apiKey;
+              s.model = active.model;
+              s.imageModel = active.imageModel;
             }
             await this.features.save();
           } catch {
