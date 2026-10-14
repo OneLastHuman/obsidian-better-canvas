@@ -276,9 +276,9 @@ export default class BetterCanvasPlugin extends Plugin {
     this.addCommand({ id: "create-floating-node", name: "Better Canvas: 创建游离节点", callback: () => this.createFloatingNode() });
     this.addCommand({ id: "auto-layout-tree", name: "Better Canvas: 自动整理思维导图", callback: () => this.autoLayout() });
     this.addCommand({ id: "split-heading-into-mindmap", name: "Better Canvas: 将所选 Markdown 文件的 H1 拆为思维导图", callback: () => void this.splitHeadingsIntoMindMap() });
-    this.addCommand({ id: "ask-ai", name: "Better Canvas: 向 AI 提问所选节点", callback: () => this.promptAskNode() });
-    this.addCommand({ id: "generate-flashcards", name: "Better Canvas: 从所选节点生成复习闪卡", callback: () => this.generateFlashcards() });
-    this.addCommand({ id: "generate-image", name: "Better Canvas: 根据所选节点生成图片", callback: () => void this.generateImageForNode() });
+    this.addCommand({ id: "ask-ai", name: "Better Canvas: 向 AI 提问所选节点", callback: () => this.features.askSelectedNode() });
+    this.addCommand({ id: "generate-flashcards", name: "Better Canvas: 从所选节点生成复习闪卡", callback: () => this.features.generateFlashcardsFromSelection() });
+    this.addCommand({ id: "generate-image", name: "Better Canvas: 根据所选节点生成图片", callback: () => this.features.generateImageFromSelection() });
     this.addCommand({ id: "add-web-link", name: "Better Canvas: 在画布中添加网页链接卡片", callback: () => this.addWebLink() });
     this.addCommand({ id: "save-node-template", name: "Better Canvas: 保存所选节点为模板", callback: () => this.saveNodeTemplate() });
     this.addCommand({ id: "insert-node-template", name: "Better Canvas: 插入节点模板", callback: () => this.insertNodeTemplate() });
@@ -291,10 +291,10 @@ export default class BetterCanvasPlugin extends Plugin {
     const workspace = this.app.workspace as any;
     const ref = workspace.on("canvas:node-menu", (menu: any, node: any) => {
       if (!menu?.addItem || !node?.id) return;
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 向 AI 提问").setIcon("sparkles").onClick(() => this.promptAskNode(String(node.id))));
+      menu.addItem((item: any) => item.setTitle("Better Canvas: 向 AI 提问").setIcon("sparkles").onClick(() => this.features.askSelectedNode(String(node.id))));
       menu.addItem((item: any) => item.setTitle("Better Canvas: 生成复习闪卡").setIcon("graduation-cap").onClick(() => {
         this.selectNode(this.getCanvas(), String(node.id));
-        this.generateFlashcards();
+        this.features.generateFlashcardsFromSelection(String(node.id));
       }));
       menu.addItem((item: any) => item.setTitle("Better Canvas: 自动整理思维导图").setIcon("git-branch").onClick(() => {
         this.selectNode(this.getCanvas(), String(node.id));
