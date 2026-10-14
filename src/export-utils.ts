@@ -21,7 +21,7 @@ export function scaleSvgIntrinsicDimensions(svg: string, scale: number): string 
     const attribute = new RegExp("(^|\\\\s)" + name + "\\\\s*=\\\\s*([\\"'])([^\\"']*)\\\\2", "i");
     const match = attributes.match(attribute);
     const raw = match?.[3] ?? "";
-    const numeric = raw.match(/^([0-9]+(?:\\.[0-9]+)?)(px|pt|pc|mm|cm|in)?$/i);
+    const numeric = raw.match(/^([0-9]+(?:\.[0-9]+)?)(px|pt|pc|mm|cm|in)?$/i);
     const value = numeric ? Number(numeric[1]) : fallback;
     if (!Number.isFinite(value) || value <= 0) return;
     const unit = numeric?.[2] ?? "px";
