@@ -56,7 +56,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - **连线控制：** 设置颜色、线型和箭头样式，翻转关联边的方向，自动重定位 floating edges，并为选中连线选择 direct、square 或 A-star 路径。
 - **布局与专注：** 网格对齐、文本节点自动调整尺寸、层级排序、焦点模式、交互锁定及基础路径路由。
 - **日常工作流：** 搜索画布中的文本、文件路径和链接；打开“查看当前 Canvas 链接与反向链接”面板；保存节点模板；按节点顺序进入演示模式。
-- **组织与导出：** 创建独立分组、折叠/展开分组、将选区封装为独立 Canvas，并导出 JSON Canvas、视口 PNG/SVG，以及按所有节点边界导出的全内容 PNG/SVG。后者使用静态 SVG 渲染常见节点形状、文本和连线；图片/PDF 附件与交互 HTML 以标签表示，不会作为原生嵌入内容栅格化。节点模板可保存样式属性并重复使用。
+- **组织与导出：** 创建独立分组、折叠/展开分组、将选区封装为独立 Canvas，并导出 JSON Canvas、视口 PNG/SVG，以及按所有节点边界导出的全内容 PNG/SVG。后者使用静态 SVG 渲染常见节点形状、文本和连线，并将体积受限的 PNG/JPEG/WebP/GIF 附件嵌入导出结果；PDF 附件与交互 HTML 仍以标签表示，不会作为原生嵌入内容栅格化。节点模板可保存样式属性并重复使用。
 
 部分样式、分组行为和导出结果可能因画布复杂度或 Obsidian 渲染版本而异，详见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。
 
@@ -178,6 +178,22 @@ Codex CLI 使用自己的本地配置和模型供应商。节点内容与提示�
 ```
 
 不同供应商可能使用不同的模型名称、图像生成接口和权限策略。请填写当前账号实际有权调用的模型；不使用图像生成功能时，可按服务要求省略或留空 `imageModel`。
+
+例如，若已在本机运行 Ollama，可添加以下 OpenAI-compatible profile：
+
+```json
+{
+  "id": "ollama",
+  "name": "Ollama Local",
+  "protocol": "openai",
+  "baseUrl": "http://localhost:11434/v1",
+  "apiKey": "",
+  "model": "qwen2.5:7b",
+  "imageModel": ""
+}
+```
+
+将 `model` 替换成 `ollama list` 中已有的模型名称。该配置可用于本地文本问答；图像生成取决于本地服务是否实现兼容的 Images API。远程 OpenRouter、Groq、Azure-compatible 网关等也可使用 `openai` profile，但必须填写该服务兼容的 Base URL、模型和认证配置。
 
 **密钥与隐私提示**
 
