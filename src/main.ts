@@ -9,6 +9,7 @@ import {
   TFile
 } from "obsidian";
 import { chatCompletion, generateImage } from "./ai";
+import BetterCanvasFeatures from "./feature-integrator";
 import {
   CanvasNodeData,
   LayoutDirection,
@@ -176,6 +177,7 @@ class PresentationModal extends Modal {
 export default class BetterCanvasPlugin extends Plugin {
   declare settings: BetterCanvasSettings;
   private boundContainers = new WeakSet<HTMLElement>();
+  private features: BetterCanvasFeatures;
 
   async onload(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
@@ -183,6 +185,8 @@ export default class BetterCanvasPlugin extends Plugin {
     this.addSettingTab(new BetterCanvasSettingTab(this.app, this));
     this.registerCommands();
     this.registerCanvasContextMenu();
+    this.features = new BetterCanvasFeatures(this);
+    this.features.init();
     this.registerEvent(this.app.workspace.on("layout-change", () => this.bindCanvasKeyboard()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bindCanvasKeyboard()));
     this.app.workspace.onLayoutReady(() => this.bindCanvasKeyboard());
