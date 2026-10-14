@@ -104,6 +104,7 @@ class PinnedPdfPageEmbed extends Component {
     this.excerptButton = excerptButton;
     this.textResizeObserver = new ResizeObserver(() => this.renderSelectableTextLayer());
     this.textResizeObserver.observe(container);
+    void this.loadFile();
   }
 
   private renderSelectableTextLayer(): void {
