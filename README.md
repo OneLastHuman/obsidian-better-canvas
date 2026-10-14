@@ -77,3 +77,8 @@
 这一轮增加：节点颜色/形状/边框自定义、连线方向翻转及颜色/线型、前后层级调整、焦点模式、文本节点自动尺寸、分组折叠、选区封装成独立画布、节点 Wikilink 与 Markdown 节点嵌入、导出 JSON Canvas/PNG/SVG、自动文件连线（默认读取文件 frontmatter 的 `canvas-edges`）、网页正文提取、YouTube 公开字幕导入、PDF 分页节点、节点级 AI 模型覆盖，以及远程 MCP Streamable HTTP 工具调用。
 
 请注意：这些功能使用 JSON Canvas 扩展字段和 Obsidian DOM/内部 Canvas API，已通过构建检查不等于在每个 Obsidian 版本都经过交互测试。真正的 Canvas Portal、Canvas 元数据缓存/反向链接、PDF 单页固定渲染、所有 Advanced Canvas 高级路径算法、所有 AI Canvas 多供应商原生 SDK 与可靠流式中止机制仍需要单独迁移和桌面端回归验证。
+
+
+## 功能覆盖状态
+
+请查看 [整合功能矩阵](docs/INTEGRATION_MATRIX.md)，了解三个上游项目的已实现、部分实现和待迁移项。该矩阵区分代码已存在与已在 Obsidian 实际运行验证，避免将构建通过误认为所有运行时功能均已验证。
