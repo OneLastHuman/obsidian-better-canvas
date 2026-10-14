@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { parseLocalMcpConfig } from "./mcp-stdio";
+import process from "node:process";
+import { callLocalMcpTool, listLocalMcpTools, parseLocalMcpConfig } from "./mcp-stdio";
+
+const serverSource = String.raw`
+const readline = require("node:readline");
+const rl = readline.createInterface({ input: process.stdin });
+rl.on("line", (line) => {
+  let message;
+  try { message = JSON.parse(line); } catch { process.exit(2); }
+  if (!message || !message.id) return;
+  let result;
+  if (message.method === "initialize") {
+    result = { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } };
+  } else if (message.method === "tools/list") {
+    result = { tools: [{ name: "echo", description: "Returns its arguments", inputSchema: { type: "object" } }] };
+  } else if (message.method === "tools/call") {
+    result = { content: [{ type: "text", text: JSON.stringify(message.params.arguments) }] };
+  } else {
+    console.log(JSON.stringify({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found" } }));
+    return;
+  }
+  console.log(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
+});
+`;
+
+function fixtureConfig(): string {
+  return JSON.stringify({ command: process.execPath, args: ["-e", serverSource] });
+}
+
 
 describe("local MCP stdio config validation", () => {
   it("accepts a command with args, cwd, and environment", () => {
@@ -37,4 +65,21 @@ describe("local MCP stdio config validation", () => {
     expect(() => parseLocalMcpConfig(JSON.stringify({ command: "node", args: ["x".repeat(30001)] })))
       .toThrow(/过长|args/);
   });
+});
+
+describe("local MCP stdio JSON-RPC round trip", () => {
+  it("lists tools from a child process without a shell wrapper", async () => {
+    const tools = await listLocalMcpTools(fixtureConfig());
+    expect(tools).toEqual([{
+      name: "echo",
+      description: "Returns its arguments",
+      inputSchema: { type: "object" }
+    }]);
+  }, 15000);
+
+  it("executes a tool and normalizes the returned text content", async () => {
+    const result = await callLocalMcpTool(fixtureConfig(), "echo", { value: "safe" });
+    expect(result.text).toBe(JSON.stringify({ value: "safe" }));
+    expect(result.images).toEqual([]);
+  }, 15000);
 });
