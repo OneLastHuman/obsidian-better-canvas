@@ -251,6 +251,10 @@ export default class BetterCanvasPlugin extends Plugin {
       new Notice("请先打开一个 Obsidian Canvas。");
       return null;
     }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先运行“切换 Canvas 只读模式”解除锁定。");
+      return null;
+    }
     const node = this.getSelectedRecord(canvas);
     if (!node) {
       new Notice("请在画布中只选择一个节点。");
@@ -303,6 +307,7 @@ export default class BetterCanvasPlugin extends Plugin {
     this.registerDomEvent(container, "keydown", (event: KeyboardEvent) => {
       const canvas = this.getCanvas();
       if (!canvas) return;
+      if (canvas.wrapperEl?.classList?.contains("bc-readonly")) return;
       const target = event.target as HTMLElement | null;
       if (target && (target.isContentEditable || target.closest("input, textarea, [contenteditable='true'], .cm-editor"))) return;
       const selectedInternal = canvas.selection?.values?.().next?.().value;
@@ -441,6 +446,10 @@ export default class BetterCanvasPlugin extends Plugin {
       new Notice("请先打开一个 Obsidian Canvas。");
       return;
     }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再运行 AI 操作。");
+      return;
+    }
     if (nodeId) this.selectNode(canvas, nodeId);
     const selected = this.getSelectedRecord(canvas);
     if (!selected) {
@@ -483,6 +492,10 @@ export default class BetterCanvasPlugin extends Plugin {
   private async runAI(nodeId: string, instruction: string, taskLabel = "AI 回复"): Promise<void> {
     const canvas = this.getCanvas();
     if (!canvas) return;
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再写入 AI 结果。");
+      return;
+    }
     const source = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
     if (!source) {
       new Notice("找不到原始节点。");
@@ -568,6 +581,10 @@ export default class BetterCanvasPlugin extends Plugin {
       new Notice("请先打开一个 Obsidian Canvas。");
       return;
     }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再添加节点。");
+      return;
+    }
     const selected = this.getSelectedRecord(canvas);
     new PromptModal(this.app, "添加网页链接卡片", "输入完整的 http:// 或 https:// URL", value => {
       let url: URL;
@@ -615,6 +632,10 @@ export default class BetterCanvasPlugin extends Plugin {
     const canvas = this.getCanvas();
     if (!canvas) {
       new Notice("请先打开一个 Obsidian Canvas。");
+      return;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再插入模板。");
       return;
     }
     const selected = this.getSelectedRecord(canvas);
