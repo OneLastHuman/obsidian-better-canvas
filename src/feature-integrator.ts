@@ -1373,7 +1373,7 @@ export default class BetterCanvasFeatures {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
     const view = this.activeCanvasView();
-    const baseName = String(view?.file?.basename ?? "canvas").replace(/[\\/:*?"<>|]/g, "-");
+    const baseName = String(view?.file?.basename ?? "canvas").replace(/[ :*?"<>|]/g, "-").replaceAll("/", "-").replaceAll(String.fromCharCode(92), "-");
     const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").replace(/^\/+|\/+$/g, "");
     await this.ensureFolder(folder);
     if (format === "canvas") {
@@ -1443,7 +1443,7 @@ export default class BetterCanvasFeatures {
     }
     const view = this.activeCanvasView();
     const baseName = String(view?.file?.basename ?? "canvas").replace(/[\\/:*?"<>|]/g, "-");
-    const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").replace(/^\\/+|\\/+$/g, "");
+    const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").split("/").filter(Boolean).join("/");
     const notice = new Notice("正在按所有节点边界渲染整张 Canvas…", 0);
     let objectUrl = "";
     try {
