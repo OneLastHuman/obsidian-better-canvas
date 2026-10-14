@@ -146,10 +146,10 @@ CI 可检查类型、测试和构建产物，但不会启动 Obsidian 图形界�
 
 ## 已知限制
 
-- **功能覆盖并非完全等同于上游项目。** Canvas Portal 尚未实现为可同步编辑另一画布节点的原生 Portal。
+- **Portal 已有单层可编辑实现。** 选择“创建 Canvas Portal”并选择另一个 `.canvas` 后，会显示被引用画布的镜像节点/连线；节点更改和删除会同步回源文件，跨 Portal 连线会映射到 Portal 框。当前暂不支持在 Portal 内新建节点或展开嵌套 Portal；请在测试 Vault 中先验证，不要直接用于唯一副本。
 - **PDF 功能仍在完善。** 当前批注以自由手绘覆盖层为主，不是完整 PDF 编辑器；AI 上下文目前也不会从 PDF 节点提取完整文本或页面图像。
-- **部分功能依赖内部 API 或 DOM。** 元数据缓存、反向链接桥接、特定连线路由及节点样式可能随 Obsidian 版本变化。
-- **AI 支持存在服务差异。** 图像生成、流式取消、网页和 YouTube 内容获取，以及 MCP 工具调用都受远端 API、权限和内容可访问性影响。
+- **部分功能依赖内部 API 或 DOM。** Portal 文件同步、元数据缓存、反向链接桥接、PDF 单页渲染、特定连线路由及节点样式可能随 Obsidian 版本变化。CI 不运行 Obsidian GUI，仍需桌面端实测。
+- **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini profile 已接入；Gemini profile 还可把公开视频 URL 作为原生视频上下文发送。图像生成、流式取消、网页和 YouTube 内容获取，以及 MCP 工具调用都受远端 API、权限和内容可访问性影响。
 
 详细的已实现、部分实现和待完善项目请查看[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。我们会尽量区分“代码已实现”和“已在 Obsidian 实际验证”，避免把构建通过等同于完整的运行时兼容性。
 
