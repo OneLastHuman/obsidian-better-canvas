@@ -937,6 +937,7 @@ export default class BetterCanvasFeatures {
     let responseNodeId = "";
     let accumulated = "";
     let lastUpdate = 0;
+    let lastFlushedLength = 0;
 
     try {
       const context = await this.getNodeContext(canvas, nodeId);
@@ -973,9 +974,10 @@ export default class BetterCanvasFeatures {
         delta => {
           accumulated += delta;
           const now = Date.now();
-          if (now - lastUpdate >= 120 || accumulated.length - lastUpdate > 120) {
+          if (now - lastUpdate >= 120 || accumulated.length - lastFlushedLength >= 120) {
             patchNode(canvas, responseNodeId, { text: accumulated, bcGenerating: true });
             lastUpdate = now;
+            lastFlushedLength = accumulated.length;
           }
         }
       );
