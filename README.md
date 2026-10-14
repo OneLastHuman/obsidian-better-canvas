@@ -64,6 +64,7 @@ Better Canvas 是一款面向 Obsidian Canvas 的增强插件，整合节点与�
 - 导入网页正文和可访问的 YouTube 字幕，作为后续整理与分析的素材。
 - 支持远程 **MCP Streamable HTTP** 工具调用；也可让 AI 根据可用工具描述提出工具和参数建议，用户检查并确认后才执行。
 - 可从 OpenAI-compatible、Anthropic 和 Gemini 的模型端点发现可用模型，并为单个节点选择模型；接口不支持列出模型时仍可手动输入。
+- 桌面端可调用已安装并登录的 Codex CLI，在只读沙盒中分析选中节点和相邻上下文；任务可由“停止当前 AI 生成”中断，结果保存为关联节点。
 - 可选择 Vault 文件夹，对最多 20 篇 Markdown 顺序执行同一条 Prompt，逐篇创建源文件节点与结果节点；正文发送给当前 AI 供应商前会要求用户选择文件夹并确认任务。
 - 识别 AI 或手写节点中的 HTML 代码块，可通过按钮在隔离的 sandbox iframe 中预览交互页面。
 - 可把固定 PDF 页面提取为 AI 文本上下文，并将页面栅格图像发送给支持视觉输入的模型；Gemini profile 支持对公开视频进行原生视频上下文分析。
@@ -174,7 +175,7 @@ CI 可检查类型、测试和构建产物，但不会启动 Obsidian 图形界�
 - **Portal 已有单层可编辑实现。** 选择“创建 Canvas Portal”并选择另一个 `.canvas` 后，会显示被引用画布的镜像节点/连线；节点更改和删除会同步回源文件，跨 Portal 连线会映射到 Portal 框。还可以运行“在选中 Canvas Portal 中创建文本节点”，把新节点和连线写入 Portal 的源画布。任意点击新建节点还不会自动加入 Portal，嵌套 Portal 仍未支持；请先在测试 Vault 验证同步行为。
 - **PDF 功能仍在完善。** 固定分页支持文本提取与选择、从选中文本创建关联摘录节点、页面图像上下文、红/蓝笔、荧光笔、橡皮擦和撤销；它仍不是完整 PDF 编辑器，尚不支持 PDF 页面上的原生文字高亮对象、多页批注工具栏或扫描版 PDF 的 OCR。
 - **部分功能依赖内部 API 或 DOM。** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由及节点样式可能随 Obsidian 版本变化。插件自带的链接浏览器会扫描 Markdown 元数据和其他 Canvas JSON；CI 不运行 Obsidian GUI，仍需桌面端实测。
-- **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini profile 已接入，并支持模型端点发现和手动指定模型。批量 Prompt 每次最多处理 20 篇 Markdown；网页和 YouTube 内容获取、图像生成及 MCP 工具调用都受远端 API、权限和内容可访问性影响。HTML 预览在沙盒 iframe 中运行，不授予同源权限，但仍应只预览可信或已检查的代码。
+- **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini profile 已接入，并支持模型端点发现和手动指定模型。可选的本地 Codex CLI 只在桌面端运行，需要安装、登录并正确配置 Codex；提示词发送给 Codex 当前所配置的模型供应商，并非保证离线处理。批量 Prompt 每次最多处理 20 篇 Markdown；网页和 YouTube 内容获取、图像生成及 MCP 工具调用都受远端 API、权限和内容可访问性影响。HTML 预览在沙盒 iframe 中运行，不授予同源权限，但仍应只预览可信或已检查的代码。
 - **MCP 结果处理。** 远程 Streamable HTTP MCP 工具的文本结果会生成关联文本节点；PNG/JPEG/WebP/GIF 图片结果会写入 Vault 并生成关联文件节点。stdio 与仅 SSE 的 MCP 服务尚未接入。
 
 详细的已实现、部分实现和待完善项目请查看[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。我们会尽量区分“代码已实现”和“已在 Obsidian 实际验证”，避免把构建通过等同于完整的运行时兼容性。
