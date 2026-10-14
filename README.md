@@ -62,7 +62,7 @@ Better Canvas 是一款面向 Obsidian Canvas 的增强插件，整合节点与�
 - 支持流式生成、停止生成、重新生成，以及按节点覆盖模型或服务配置。
 - 通过配置的服务生成图片，并将图片保存到 Vault 的附件目录后插入画布。
 - 导入网页正文和可访问的 YouTube 字幕，作为后续整理与分析的素材。
-- 支持远程 **MCP Streamable HTTP** 工具调用；也可让 AI 根据可用工具描述提出工具和参数建议，用户检查并确认后才执行。
+- 支持远程 **MCP Streamable HTTP** 和本地 MCP **stdio** 工具调用；也可让 AI 根据可用工具描述提出工具和参数建议，用户检查并确认后才执行。stdio 通过单独配置的 command/args/env/cwd 启动本地进程，请只配置可信服务。
 - 可从 OpenAI-compatible、Anthropic 和 Gemini 的模型端点发现可用模型，并为单个节点选择模型；接口不支持列出模型时仍可手动输入。
 - 桌面端可调用已安装并登录的 Codex CLI，在只读沙盒中分析选中节点和相邻上下文；任务可由“停止当前 AI 生成”中断，结果保存为关联节点。
 - 可选择 Vault 文件夹，对最多 20 篇 Markdown 顺序执行同一条 Prompt，逐篇创建源文件节点与结果节点；正文发送给当前 AI 供应商前会要求用户选择文件夹并确认任务。
@@ -176,7 +176,7 @@ CI 可检查类型、测试和构建产物，但不会启动 Obsidian 图形界�
 - **PDF 功能仍在完善。** 固定分页支持文本提取与选择、从选中文本创建关联摘录节点、页面图像上下文、红/蓝笔、荧光笔、橡皮擦和撤销；它仍不是完整 PDF 编辑器，尚不支持 PDF 页面上的原生文字高亮对象、多页批注工具栏或扫描版 PDF 的 OCR。
 - **部分功能依赖内部 API 或 DOM。** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由及节点样式可能随 Obsidian 版本变化。插件自带的链接浏览器会扫描 Markdown 元数据和其他 Canvas JSON；CI 不运行 Obsidian GUI，仍需桌面端实测。
 - **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini profile 已接入，并支持模型端点发现和手动指定模型。可选的本地 Codex CLI 只在桌面端运行，需要安装、登录并正确配置 Codex；提示词发送给 Codex 当前所配置的模型供应商，并非保证离线处理。批量 Prompt 每次最多处理 20 篇 Markdown；网页和 YouTube 内容获取、图像生成及 MCP 工具调用都受远端 API、权限和内容可访问性影响。HTML 预览在沙盒 iframe 中运行，不授予同源权限，但仍应只预览可信或已检查的代码。
-- **MCP 结果处理。** 远程 Streamable HTTP MCP 工具的文本结果会生成关联文本节点；PNG/JPEG/WebP/GIF 图片结果会写入 Vault 并生成关联文件节点。stdio 与仅 SSE 的 MCP 服务尚未接入。
+- **MCP 结果处理。** 远程 Streamable HTTP 与本地 stdio MCP 工具的文本结果会生成关联文本节点；PNG/JPEG/WebP/GIF 图片结果会写入 Vault 并生成关联文件节点。远程 SSE-only transport 尚未接入。stdio 服务可以访问其进程用户与操作系统权限允许的本地资源；请只连接可信服务。
 
 详细的已实现、部分实现和待完善项目请查看[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。我们会尽量区分“代码已实现”和“已在 Obsidian 实际验证”，避免把构建通过等同于完整的运行时兼容性。
 
