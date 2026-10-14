@@ -134,6 +134,37 @@ class TemplatePickerModal extends Modal {
 
 class PresentationModal extends Modal {
   private index = 0;
+  private readonly keyHandler = (event: KeyboardEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (target && target.closest("input, textarea, select, [contenteditable='true']")) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.close();
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.index = Math.min(Math.max(0, this.slides.length - 1), this.index + 1);
+      this.renderSlide();
+    } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.index = Math.max(0, this.index - 1);
+      this.renderSlide();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.index = 0;
+      this.renderSlide();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.index = Math.max(0, this.slides.length - 1);
+      this.renderSlide();
+    }
+  };
 
   constructor(app: App, private readonly slides: Array<{ title: string; body: string }>) {
     super(app);
@@ -141,6 +172,7 @@ class PresentationModal extends Modal {
   }
 
   onOpen(): void {
+    document.addEventListener("keydown", this.keyHandler, true);
     this.renderSlide();
   }
 
@@ -153,7 +185,7 @@ class PresentationModal extends Modal {
     const slide = this.slides[this.index];
     this.contentEl.createEl("h2", { text: slide.title || `节点 ${this.index + 1}` });
     this.contentEl.createEl("div", { cls: "better-canvas-slide", text: slide.body });
-    this.contentEl.createEl("p", { text: `${this.index + 1} / ${this.slides.length}` });
+    this.contentEl.createEl("p", { text: `${this.index + 1} / ${this.slides.length} · ←/→ 或 PageUp/PageDown 翻页 · Esc 退出` });
     const actions = this.contentEl.createDiv({ cls: "modal-button-container" });
     const previous = actions.createEl("button", { text: "上一张" });
     previous.disabled = this.index === 0;
@@ -170,6 +202,7 @@ class PresentationModal extends Modal {
   }
 
   onClose(): void {
+    document.removeEventListener("keydown", this.keyHandler, true);
     this.contentEl.empty();
   }
 }
