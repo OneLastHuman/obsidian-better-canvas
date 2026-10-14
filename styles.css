@@ -285,3 +285,37 @@
   border-color: transparent !important;
   box-shadow: none !important;
 }
+
+.bc-html-preview-toolbar {
+  position: absolute;
+  inset: 4px 4px 4px 4px;
+  z-index: 50;
+  pointer-events: none;
+}
+.bc-html-preview-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  pointer-events: auto;
+  font-size: 12px;
+  padding: 2px 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+  background: var(--background-secondary);
+}
+.bc-html-preview-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: white;
+  pointer-events: auto;
+}
+.bc-html-preview-frame[hidden] {
+  display: none;
+}
