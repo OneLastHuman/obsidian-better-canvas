@@ -31,6 +31,7 @@ import {
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
+import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
 import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 import { PdfAnnotationManager } from "./pdf-annotations";
@@ -64,6 +65,8 @@ interface FeatureSettings {
   defaultNodeHeight: number;
   mcpEndpoint: string;
   mcpApiKey: string;
+  mcpTransport: "http" | "stdio";
+  mcpStdioConfig: string;
   canvasMetadataEnabled: boolean;
   exportPixelRatio: number;
   exportBackgroundColor: string;
@@ -322,6 +325,8 @@ export default class BetterCanvasFeatures {
     if (!Number.isFinite(s.defaultNodeHeight) || s.defaultNodeHeight < 80 || s.defaultNodeHeight > 1000) s.defaultNodeHeight = 140;
     if (typeof s.mcpEndpoint !== "string") s.mcpEndpoint = "";
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
+    if (s.mcpTransport !== "stdio" && s.mcpTransport !== "http") s.mcpTransport = "http";
+    if (typeof s.mcpStdioConfig !== "string") s.mcpStdioConfig = '{"command":"","args":[],"env":{},"cwd":""}';
     if (typeof s.canvasMetadataEnabled !== "boolean") s.canvasMetadataEnabled = true;
     if (typeof s.customCss !== "string") s.customCss = "";
     if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
@@ -2417,9 +2422,12 @@ export default class BetterCanvasFeatures {
       return;
     }
     const s = this.settings();
-    if (!s.mcpEndpoint) { new Notice("请先在设置中填写 MCP Streamable HTTP endpoint。"); return; }
+    const useStdio = s.mcpTransport === "stdio";
+    if (!useStdio && !s.mcpEndpoint) { new Notice("请先在设置中填写 MCP Streamable HTTP endpoint。"); return; }
     try {
-      const tools = await listRemoteTools(s.mcpEndpoint, s.mcpApiKey);
+      const tools = useStdio
+        ? await listLocalMcpTools(String(s.mcpStdioConfig ?? ""))
+        : await listRemoteTools(s.mcpEndpoint, s.mcpApiKey);
       if (!tools.length) { new Notice("MCP 服务未暴露工具。"); return; }
       const summary = tools.map(tool => tool.name + (tool.description ? " — " + tool.description : "")).join("\n");
       this.input("选择 MCP 工具", summary + "\n\n输入完整工具名", name => {
@@ -2437,7 +2445,9 @@ export default class BetterCanvasFeatures {
           const sourceSelection = this.selected(canvasForWrite);
           const notice = new Notice("正在调用 MCP 工具…", 0);
           try {
-            const result = await callRemoteTool(s.mcpEndpoint, s.mcpApiKey, tool.name, args);
+            const result = useStdio
+              ? await callLocalMcpTool(String(s.mcpStdioConfig ?? ""), tool.name, args)
+              : await callRemoteTool(s.mcpEndpoint, s.mcpApiKey, tool.name, args);
             await this.saveMcpResult(tool.name, result, canvasForWrite, sourceSelection?.node);
             notice.hide();
           } catch (error) {
@@ -2459,14 +2469,17 @@ export default class BetterCanvasFeatures {
       return;
     }
     const settings = this.settings();
-    if (!settings.mcpEndpoint) {
+    const useStdio = settings.mcpTransport === "stdio";
+    if (!useStdio && !settings.mcpEndpoint) {
       new Notice("请先在设置中填写 MCP Streamable HTTP endpoint。");
       return;
     }
 
     const loading = new Notice("正在读取 MCP 工具并让 AI 规划调用…", 0);
     try {
-      const tools = await listRemoteTools(settings.mcpEndpoint, settings.mcpApiKey);
+      const tools = useStdio
+        ? await listLocalMcpTools(String(settings.mcpStdioConfig ?? ""))
+        : await listRemoteTools(settings.mcpEndpoint, settings.mcpApiKey);
       if (!tools.length) throw new Error("MCP 服务未暴露工具。");
       const context = await this.getNodeContext(selection.canvas, selection.node.id);
       const menu = tools.slice(0, 80).map(tool => ({
@@ -2519,12 +2532,14 @@ export default class BetterCanvasFeatures {
 
           const running = new Notice("正在执行已确认的 MCP 工具：" + approved.toolName, 0);
           try {
-            const result = await callRemoteTool(
-              settings.mcpEndpoint,
-              settings.mcpApiKey,
-              approved.toolName,
-              approved.arguments as Record<string, unknown>
-            );
+            const result = useStdio
+              ? await callLocalMcpTool(String(settings.mcpStdioConfig ?? ""), approved.toolName, approved.arguments as Record<string, unknown>)
+              : await callRemoteTool(
+                  settings.mcpEndpoint,
+                  settings.mcpApiKey,
+                  approved.toolName,
+                  approved.arguments as Record<string, unknown>
+                );
             const canvas = selection.canvas;
             const current = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === selection.node.id);
             await this.saveMcpResult(approved.toolName, result, canvas, current);
@@ -2961,15 +2976,39 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
         await this.features.save();
       }));
 
+    new Setting(c).setName("MCP transport")
+      .setDesc("HTTP 适用于远程 Streamable HTTP MCP 服务；stdio 会启动本机配置的子进程。SSE-only 远程服务仍未支持。")
+      .addDropdown(dropdown => dropdown
+        .addOption("http", "Remote Streamable HTTP")
+        .addOption("stdio", "Local stdio (desktop)")
+        .setValue(s.mcpTransport === "stdio" ? "stdio" : "http")
+        .onChange(async value => {
+          s.mcpTransport = value === "stdio" ? "stdio" : "http";
+          await this.features.save();
+          this.display();
+        }));
+
+    new Setting(c).setName("MCP stdio server config (JSON)")
+      .setDesc("仅在 stdio transport 下使用。command、args、env、cwd；请只配置可信程序。服务进程可获得本机权限与配置的环境变量。")
+      .addTextArea(text => {
+        text.inputEl.rows = 7;
+        text.inputEl.style.width = "100%";
+        text.setValue(String(s.mcpStdioConfig ?? '{"command":"","args":[],"env":{},"cwd":""}'));
+        text.onChange(async value => {
+          s.mcpStdioConfig = value;
+          await this.features.save();
+        });
+      });
+
     new Setting(c).setName("MCP Streamable HTTP endpoint")
-      .setDesc("目前支持远程 Streamable HTTP MCP servers；不支持 stdio 或 SSE-only transport。")
+      .setDesc("远程 Streamable HTTP MCP endpoint。")
       .addText(text => text.setPlaceholder("https://server.example/mcp").setValue(String(s.mcpEndpoint)).onChange(async value => {
         s.mcpEndpoint = value.trim();
         await this.features.save();
       }));
 
     new Setting(c).setName("MCP bearer token")
-      .setDesc("可选，仅保存在此 Vault 的插件设置。")
+      .setDesc("HTTP transport 的可选 Bearer Token，仅保存在此 Vault 的插件设置。")
       .addText(text => {
         text.inputEl.type = "password";
         text.setValue(String(s.mcpApiKey)).onChange(async value => {
