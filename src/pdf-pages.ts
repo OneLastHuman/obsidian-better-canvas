@@ -37,6 +37,7 @@ class PinnedPdfPageEmbed extends Component {
   private textDetails: HTMLDetailsElement | null = null;
   private textContentEl: HTMLDivElement | null = null;
   private excerptButton: HTMLButtonElement | null = null;
+  private highlightButton: HTMLButtonElement | null = null;
   private pageTextItems: any[] = [];
   private pageViewport: any = null;
   private textResizeObserver: ResizeObserver | null = null;
@@ -79,29 +80,66 @@ class PinnedPdfPageEmbed extends Component {
     const excerptButton = document.createElement("button");
     excerptButton.type = "button";
     excerptButton.className = "bc-pdf-create-excerpt";
-    excerptButton.textContent = "从选中文本创建摘录节点";
-    excerptButton.addEventListener("pointerdown", event => {
-      event.stopPropagation();
-    });
-    excerptButton.addEventListener("mousedown", event => {
-      // Keep the text selection anchored when the action button receives focus.
-      event.preventDefault();
-      event.stopPropagation();
-    });
-    excerptButton.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      const text = String(window.getSelection()?.toString() ?? "").trim();
-      container.dispatchEvent(new CustomEvent("better-canvas-pdf-selection", {
-        bubbles: true,
-        detail: { text }
-      }));
-    });
+    excerptButton.textContent = "从选中文字创建摘录节点";
+    const highlightButton = document.createElement("button");
+    highlightButton.type = "button";
+    highlightButton.className = "bc-pdf-highlight-selection";
+    highlightButton.textContent = "持久化高亮页面上的选中文字";
+
+    const prepareButton = (button: HTMLButtonElement, action: "excerpt" | "highlight") => {
+      button.addEventListener("pointerdown", event => event.stopPropagation());
+      button.addEventListener("mousedown", event => {
+        // Keep the text selection anchored when the action button receives focus.
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      button.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const selection = window.getSelection();
+        const text = String(selection?.toString() ?? "").trim();
+        const rects: Array<{ x: number; y: number; width: number; height: number }> = [];
+        if (action === "highlight" && selection && selection.rangeCount > 0 && this.textLayerEl) {
+          const range = selection.getRangeAt(0);
+          const ancestor = range.commonAncestorContainer;
+          const element = ancestor.nodeType === Node.ELEMENT_NODE
+            ? ancestor as Element
+            : ancestor.parentElement;
+          if (element && this.textLayerEl.contains(element)) {
+            const bounds = container.getBoundingClientRect();
+            if (bounds.width > 0 && bounds.height > 0) {
+              for (const rect of Array.from(range.getClientRects())) {
+                const x = (rect.left - bounds.left) / bounds.width;
+                const y = (rect.top - bounds.top) / bounds.height;
+                const width = rect.width / bounds.width;
+                const height = rect.height / bounds.height;
+                if (width > 0 && height > 0 && Number.isFinite(x) && Number.isFinite(y)) {
+                  rects.push({
+                    x: Math.max(0, Math.min(1, x)),
+                    y: Math.max(0, Math.min(1, y)),
+                    width: Math.max(0, Math.min(1, width)),
+                    height: Math.max(0, Math.min(1, height))
+                  });
+                }
+              }
+            }
+          }
+        }
+        container.dispatchEvent(new CustomEvent("better-canvas-pdf-selection", {
+          bubbles: true,
+          detail: { text, action, rects }
+        }));
+      });
+    };
+    prepareButton(excerptButton, "excerpt");
+    prepareButton(highlightButton, "highlight");
     details.appendChild(excerptButton);
+    details.appendChild(highlightButton);
     container.appendChild(details);
     this.textDetails = details;
     this.textContentEl = textContent;
     this.excerptButton = excerptButton;
+    this.highlightButton = highlightButton;
     this.textResizeObserver = new ResizeObserver(() => this.renderSelectableTextLayer());
     this.textResizeObserver.observe(container);
     void this.loadFile();
@@ -218,9 +256,11 @@ class PinnedPdfPageEmbed extends Component {
           this.textContentEl.dataset.extracted = String(Boolean(selectableText));
         }
         if (this.excerptButton) this.excerptButton.disabled = !selectableText;
+        if (this.highlightButton) this.highlightButton.disabled = !selectableText;
       } catch (error) {
         if (this.textContentEl) this.textContentEl.textContent = "无法提取页面文本；如果这是扫描件，请先进行 OCR。";
         if (this.excerptButton) this.excerptButton.disabled = true;
+        if (this.highlightButton) this.highlightButton.disabled = true;
         console.warn("Better Canvas PDF text extraction failed:", this.file.path, error);
       }
       if (!this.cancelled) delete target.dataset.loading;
@@ -254,6 +294,7 @@ class PinnedPdfPageEmbed extends Component {
     this.textDetails = null;
     this.textContentEl = null;
     this.excerptButton = null;
+    this.highlightButton = null;
   }
 }
 
