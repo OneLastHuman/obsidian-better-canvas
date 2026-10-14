@@ -271,8 +271,9 @@ export function decorateCanvas(canvas: any): void {
         : edgeData.bcPathStyle === "dotted" ? "2 5" : "";
     }
 
-    if (!edgeData.bcArrowStyle || edgeData.bcArrowStyle === "default") continue;
+    if (!edgeData.bcArrowStyle) continue;
     const points: Record<string, string> = {
+      "default": "0,0 6.5,10.4 -6.5,10.4",
       "triangle-outline": "0,0 6.5,10.4 -6.5,10.4",
       "half-triangle": "-2,0 7.5,12 -2,12",
       "thin-triangle": "0,0 7,10 0,0 0,10 0,0 -7,10",
@@ -287,15 +288,23 @@ export function decorateCanvas(canvas: any): void {
       if (!(polygon instanceof SVGElement)) continue;
       if (edgeData.bcArrowStyle === "none") {
         polygon.style.display = "none";
-      } else {
-        polygon.style.display = "";
-        polygon.setAttribute("points", points[edgeData.bcArrowStyle] ?? points.default ?? "0,0 6.5,10.4 -6.5,10.4");
-        if (edgeData.bcColor) {
-          polygon.style.stroke = edgeData.bcColor;
-          if (edgeData.bcArrowStyle === "diamond" || edgeData.bcArrowStyle === "circle") polygon.style.fill = edgeData.bcColor;
-        }
-        if (edgeData.bcArrowStyle.endsWith("-outline")) polygon.style.fill = "var(--background-primary)";
+        continue;
       }
+      polygon.style.display = "";
+      polygon.setAttribute("points", points[edgeData.bcArrowStyle] ?? points.default);
+      if (edgeData.bcColor) {
+        polygon.style.stroke = edgeData.bcColor;
+      } else {
+        polygon.style.removeProperty("stroke");
+      }
+      if (edgeData.bcArrowStyle.endsWith("-outline") || edgeData.bcArrowStyle === "thin-triangle") {
+        polygon.style.fill = "var(--background-primary)";
+      } else if (edgeData.bcColor && ["diamond", "circle", "half-triangle", "default"].includes(edgeData.bcArrowStyle)) {
+        polygon.style.fill = edgeData.bcColor;
+      } else {
+        polygon.style.removeProperty("fill");
+      }
+    }
     }
   }
 }
