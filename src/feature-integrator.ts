@@ -411,6 +411,7 @@ export default class BetterCanvasFeatures {
     add("bc-create-standalone-group", "创建独立分组", () => this.createStandaloneGroup());
     add("bc-encapsulate", "将选区移动到新 Canvas", () => void this.encapsulate());
     add("bc-copy-node-link", "复制节点 Wikilink", () => void this.copyNodeLink());
+    add("bc-open-link-explorer", "查看当前 Canvas 链接与反向链接", () => void this.openCanvasLinkExplorer());
     add("bc-export-json", "导出 Canvas JSON", () => void this.export("canvas"));
     add("bc-export-png", "导出 Canvas PNG", () => void this.export("png"));
     add("bc-export-svg", "导出 Canvas SVG", () => void this.export("svg"));
@@ -1146,6 +1147,159 @@ export default class BetterCanvasFeatures {
         new Notice("封装选区失败：" + (error instanceof Error ? error.message : String(error)), 8000);
       }
     });
+  }
+
+  private async openCanvasLinkExplorer(): Promise<void> {
+    const view = this.activeCanvasView();
+    const canvas = view?.canvas;
+    const file = view?.file;
+    if (!canvas || !(file instanceof TFile)) {
+      new Notice("请先打开一个已保存的 Canvas 文件。");
+      return;
+    }
+
+    const sourcePath = file.path;
+    const data = readCanvasData(canvas);
+    const outgoing: CanvasLinkExplorerEntry[] = [];
+    const outgoingKeys = new Set<string>();
+    const addOutgoing = (entry: CanvasLinkExplorerEntry) => {
+      const key = [entry.external ? "url" : "internal", entry.target, entry.title].join("|");
+      if (outgoingKeys.has(key)) return;
+      outgoingKeys.add(key);
+      outgoing.push(entry);
+    };
+
+    for (const node of data.nodes) {
+      if (typeof node.text === "string") {
+        const label = node.text.split("\n")[0].trim().slice(0, 70) || ("节点 " + node.id);
+        for (const reference of extractWikiLinks(node.text)) {
+          addOutgoing({
+            title: "文本节点：" + label,
+            detail: reference.original,
+            target: reference.targetPath + (reference.subpath ? "#" + reference.subpath : ""),
+            sourcePath
+          });
+        }
+      }
+      if (node.type === "file" && typeof node.file === "string" && node.file.trim()) {
+        const subpath = typeof (node as any).subpath === "string" ? String((node as any).subpath) : "";
+        addOutgoing({
+          title: "文件节点：" + (node.file.split("/").pop() || node.file),
+          detail: node.file + (subpath ? "#" + subpath : ""),
+          target: node.file + (subpath ? "#" + subpath : ""),
+          sourcePath
+        });
+      }
+      if (node.type === "link" && typeof node.url === "string") {
+        try {
+          const url = new URL(node.url);
+          if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+          addOutgoing({
+            title: "网页节点",
+            detail: node.url,
+            target: url.toString(),
+            sourcePath,
+            external: true
+          });
+        } catch {
+          // Ignore malformed URL nodes in the navigation list.
+        }
+      }
+    }
+
+    const loading = new Notice("正在扫描当前 Vault 的反向链接…", 0);
+    const incoming: CanvasLinkExplorerEntry[] = [];
+    const incomingKeys = new Set<string>();
+    const addIncoming = (entry: CanvasLinkExplorerEntry, key: string) => {
+      if (incomingKeys.has(key)) return;
+      incomingKeys.add(key);
+      incoming.push(entry);
+    };
+    const resolvesToCurrentCanvas = (rawTarget: string, linkSourcePath: string): boolean => {
+      try {
+        const resolved = this.p.app.metadataCache.getFirstLinkpathDest(rawTarget, linkSourcePath);
+        return resolved?.path === sourcePath;
+      } catch {
+        return false;
+      }
+    };
+
+    try {
+      const files = this.p.app.vault.getFiles().filter((candidate: TFile) =>
+        candidate.path !== sourcePath &&
+        (candidate.extension.toLowerCase() === "md" || candidate.extension.toLowerCase() === "canvas")
+      );
+
+      for (const candidate of files) {
+        try {
+          if (candidate.extension.toLowerCase() === "md") {
+            const cache = this.p.app.metadataCache.getFileCache(candidate);
+            const markdownLinks = cache
+              ? [...(cache.links ?? []), ...(cache.embeds ?? [])]
+                  .map((link: any) => String(link?.link ?? ""))
+                  .filter(Boolean)
+              : extractWikiLinks(await this.p.app.vault.cachedRead(candidate)).map(reference =>
+                  reference.targetPath + (reference.subpath ? "#" + reference.subpath : "")
+                );
+
+            for (const cachedLink of markdownLinks) {
+              for (const reference of extractWikiLinks("[[" + cachedLink + "]]")) {
+                if (!resolvesToCurrentCanvas(reference.targetPath, candidate.path)) continue;
+                addIncoming({
+                  title: candidate.basename,
+                  detail: reference.original + (reference.alias ? " · " + reference.alias : ""),
+                  target: candidate.path,
+                  sourcePath
+                }, candidate.path + "|md|" + reference.original);
+              }
+            }
+          } else {
+            const raw = await this.p.app.vault.cachedRead(candidate);
+            const json = JSON.parse(raw);
+            const nodes = Array.isArray(json?.nodes) ? json.nodes as CanvasNodeData[] : [];
+            for (const node of nodes) {
+              if (typeof node.text === "string") {
+                for (const reference of extractWikiLinks(node.text)) {
+                  if (!resolvesToCurrentCanvas(reference.targetPath, candidate.path)) continue;
+                  addIncoming({
+                    title: candidate.basename + " · Canvas 节点",
+                    detail: (node.text.split("\n")[0].trim().slice(0, 70) || node.id) + " · " + reference.original,
+                    target: candidate.path + "#" + node.id,
+                    sourcePath
+                  }, candidate.path + "|" + node.id + "|" + reference.original);
+                }
+              }
+              if (node.type === "file" && typeof node.file === "string") {
+                const destination = this.p.app.vault.getAbstractFileByPath(node.file)
+                  ?? this.p.app.metadataCache.getFirstLinkpathDest(node.file, candidate.path);
+                if (destination?.path === sourcePath) {
+                  addIncoming({
+                    title: candidate.basename + " · 文件节点",
+                    detail: node.file,
+                    target: candidate.path + "#" + node.id,
+                    sourcePath
+                  }, candidate.path + "|" + node.id + "|file|" + node.file);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.warn("Better Canvas link explorer skipped a file:", candidate.path, error);
+        }
+      }
+    } catch (error) {
+      loading.hide();
+      new Notice("扫描反向链接失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+      return;
+    }
+
+    loading.hide();
+    new CanvasLinkExplorerModal(
+      this.p.app,
+      sourcePath,
+      outgoing,
+      incoming.slice(0, 250)
+    ).open();
   }
 
   private async copyNodeLink(): Promise<void> {
