@@ -103,7 +103,7 @@ export class CanvasPortalManager {
     this.plugin.addCommand({
       id: "bc-toggle-canvas-portal",
       name: "Better Canvas: 打开/关闭所选 Canvas Portal",
-      callback: () => this.toggleSelectedPortal()
+      callback: () => this.togglePortalForNode()
     });
 
     this.plugin.registerEvent(this.plugin.app.workspace.on("layout-change", () => {
@@ -482,7 +482,7 @@ export class CanvasPortalManager {
     }
   }
 
-  private toggleSelectedPortal(): void {
+  togglePortalForNode(nodeId?: string): void {
     const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
     const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
     if (!canvas) {
@@ -494,13 +494,12 @@ export class CanvasPortalManager {
       return;
     }
     const selection = canvas.selection;
-    if (!selection || selection.size !== 1) {
+    const selectedId = nodeId ?? (selection?.size === 1 ? selection.values().next().value?.id : undefined);
+    if (typeof selectedId !== "string") {
       new Notice("请只选择一个指向 .canvas 文件的节点。");
       return;
     }
-    const selected = selection.values().next().value;
-    const id = selected?.id;
-    const node = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === id) as any;
+    const node = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
     if (!isCanvasFileNode(node)) {
       new Notice("所选节点不是 Canvas 文件节点。");
       return;
