@@ -164,3 +164,38 @@
 .canvas-node[data-bc-shape="database"] {
   border-radius: 50% / 12% !important;
 }
+
+/* Selectable text extraction for pinned PDF pages. */
+.bc-pdf-text-selection {
+  margin-top: 0.45rem;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 0.35rem;
+  font-size: var(--font-smaller);
+}
+.bc-pdf-text-selection > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
+}
+.bc-pdf-selectable-text {
+  max-height: 9rem;
+  overflow: auto;
+  margin-top: 0.35rem;
+  padding: 0.45rem;
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  cursor: text;
+}
+.bc-pdf-create-excerpt {
+  margin-top: 0.4rem;
+  width: 100%;
+}
+.bc-pdf-create-excerpt:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
