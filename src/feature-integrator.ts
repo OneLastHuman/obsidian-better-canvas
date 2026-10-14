@@ -11,7 +11,7 @@ import {
   TFile
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
-import { chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
+import { AIProtocol, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { readCanvasData, makeTextNode, insertCanvasNode, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
@@ -30,6 +30,7 @@ import { callRemoteTool, listRemoteTools } from "./mcp";
 
 interface ProviderProfile {
   id: string;
+  protocol?: AIProtocol;
   name: string;
   baseUrl: string;
   apiKey: string;
@@ -50,6 +51,7 @@ interface FeatureSettings {
 
 const DEFAULT_PROFILES: ProviderProfile[] = [{
   id: "default",
+  protocol: "openai",
   name: "Default / OpenAI compatible",
   baseUrl: "https://api.openai.com/v1",
   apiKey: "",
@@ -146,6 +148,7 @@ export default class BetterCanvasFeatures {
     if (!Array.isArray(s.providerProfiles) || !s.providerProfiles.length) {
       s.providerProfiles = [{
         id: "default",
+        protocol: "openai",
         name: "Default / OpenAI compatible",
         baseUrl: s.baseUrl || "https://api.openai.com/v1",
         apiKey: s.apiKey || "",
@@ -185,7 +188,8 @@ export default class BetterCanvasFeatures {
         baseUrl: s.baseUrl || profile.baseUrl,
         apiKey: s.apiKey || profile.apiKey,
         model: s.model || profile.model,
-        imageModel: s.imageModel || profile.imageModel
+        imageModel: s.imageModel || profile.imageModel,
+        protocol: profile.protocol || "openai"
       };
     }
     return profile;
@@ -199,6 +203,7 @@ export default class BetterCanvasFeatures {
       apiKey: profile.apiKey,
       model: modelOverride || (typeof (node as any)?.bcAIModel === "string" ? String((node as any).bcAIModel) : profile.model),
       imageModel: profile.imageModel,
+      protocol: profile.protocol || "openai",
       systemPrompt: s.systemPrompt || "Answer accurately and preserve uncertainty."
     };
   }
@@ -1491,7 +1496,7 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
       });
 
     new Setting(c).setName("AI Provider Profiles (JSON)")
-      .setDesc("可配置 OpenAI-compatible endpoints，例如 OpenAI、Ollama、OpenRouter、Groq 或 Azure gateway。每个对象包含 id、name、baseUrl、apiKey、model、imageModel。不要分享包含真实密钥的导出文件。")
+      .setDesc("可配置原生 Anthropic、原生 Gemini 或 OpenAI-compatible endpoint。每个对象包含 id、name、protocol（openai/anthropic/gemini）、baseUrl、apiKey、model、imageModel。OpenAI-compatible 可用于 OpenAI、Ollama、OpenRouter、Groq 或兼容网关。不要分享包含真实密钥的导出文件。")
       .addTextArea(text => {
         text.inputEl.rows = 10;
         text.inputEl.style.width = "100%";
@@ -1508,6 +1513,7 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
             s.providerProfiles = parsed.map((profile: any) => ({
               id: profile.id,
               name: profile.name,
+              protocol: profile.protocol === "anthropic" || profile.protocol === "gemini" ? profile.protocol : "openai",
               baseUrl: profile.baseUrl,
               apiKey: String(profile.apiKey ?? ""),
               model: profile.model,
