@@ -100,3 +100,25 @@
 .canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-container {
   visibility: hidden !important;
 }
+
+/* Pinned PDF page nodes render a stable page snapshot inside the Canvas card. */
+.bc-pinned-pdf-embed-container {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+.bc-pinned-pdf-page {
+  max-width: 100%;
+  object-fit: contain;
+}
+.bc-pinned-pdf-page[data-loading="true"] {
+  opacity: 0.45;
+}
+.bc-pinned-pdf-page[data-error="true"] {
+  outline: 2px solid var(--color-red);
+}
+.bc-pinned-pdf-error {
+  color: var(--text-error);
+  padding: 0.5rem;
+  font-size: var(--font-smaller);
+}
