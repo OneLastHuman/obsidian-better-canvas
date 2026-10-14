@@ -358,6 +358,13 @@ export default class BetterCanvasFeatures {
           action[2]();
         }));
       }
+      const nodeData = node?.getData?.() ?? node;
+      if (nodeData?.type === "file" && typeof nodeData.file === "string" && nodeData.file.toLowerCase().endsWith(".canvas")) {
+        menu.addItem((item: any) => item
+          .setTitle("Better Canvas: " + (nodeData.portal ? "关闭 Canvas Portal" : "打开 Canvas Portal"))
+          .setIcon(nodeData.portal ? "door-closed" : "door-open")
+          .onClick(() => this.portalManager?.togglePortalForNode(String(node.id))));
+      }
     });
     this.p.registerEvent(nodeMenu);
 
