@@ -275,6 +275,7 @@ export default class BetterCanvasFeatures {
     add("bc-ask-custom-model", "指定模型并向 AI 提问", () => this.askWithModel());
     add("bc-test-provider", "测试当前 AI 供应商连接", () => void this.testProvider());
     add("bc-related-questions", "生成后续研究问题节点", () => void this.generateRelatedQuestions());
+    add("bc-generate-title", "生成节点标题或分组名称", () => void this.generateTitleOrGroupName());
     add("bc-expand-idea-mindmap", "用 AI 将想法扩展为思维导图", () => this.expandIdeaIntoMindMap());
     add("bc-generate-flashcard-nodes", "生成独立复习闪卡节点", () => this.generateFlashcardNodes());
     add("bc-generate-image", "根据所选节点生成图片", () => void this.generateImageForNode());
@@ -869,6 +870,38 @@ export default class BetterCanvasFeatures {
     }
   }
 
+  private async generateTitleOrGroupName(): Promise<void> {
+    const selected = this.selected();
+    if (!selected) return;
+    const notice = new Notice("正在生成标题建议…", 0);
+    try {
+      const data = readCanvasData(selected.canvas);
+      const node = selected.node;
+      let context = await this.getNodeContext(selected.canvas, node.id);
+      if (node.type === "group") {
+        const contained = data.nodes.filter((child: CanvasNodeData) => child.id !== node.id && child.x >= node.x && child.y >= node.y && child.x + child.width <= node.x + node.width && child.y + child.height <= node.y + node.height);
+        context += "\n\nGroup contents:\n" + contained.map((child: CanvasNodeData) => String(child.text ?? child.file ?? child.url ?? child.type)).join("\n").slice(0, 6000);
+      }
+      const raw = await this.completeStructured("根据以下 Canvas 内容生成一个简短、具体的中文标题。只返回 JSON：{\"title\":\"...\"}。标题 4 至 24 个汉字或适当长度的短语；不要带引号和序号。\n\n" + context, node);
+      const parsed = this.parseJsonPayload<{title?: string}>(raw);
+      const title = typeof parsed.title === "string" ? parsed.title.trim().replace(/^["“”]+|["“”]+$/g, "") : "";
+      if (!title) throw new Error("AI 没有返回有效标题。");
+      if (node.type === "group") {
+        patchNode(selected.canvas, node.id, { label: title, bcSuggestedGroupName: title });
+        this.decorate(selected.canvas);
+        notice.hide();
+        new Notice("已将分组名称更新为：" + title);
+      } else {
+        const suggestion = makeTextNode("标题建议\n" + title, node.x + node.width + 100, node.y, { width: 280, height: 100 });
+        insertCanvasNode(selected.canvas, suggestion, node.id);
+        notice.hide();
+        new Notice("已创建标题建议节点；原节点内容未修改。");
+      }
+    } catch (error) {
+      notice.hide();
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+    }
+  }
   private async generateRelatedQuestions(): Promise<void> {
     const selected = this.selected();
     if (!selected) return;
@@ -898,7 +931,6 @@ export default class BetterCanvasFeatures {
     }
   }
   private async completeStructured(prompt: string, node?: CanvasNodeData): Promise<string> {
-    const provider = this.currentProvider(node);
     const settings = this.aiSettings(node);
     return chatCompletion(settings, [
       { role: "system", content: "Return only valid JSON. Do not include Markdown fences or commentary." },
