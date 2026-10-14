@@ -370,6 +370,7 @@ export default class BetterCanvasFeatures {
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
     add("bc-pdf-review-board", "为 PDF 创建分页批注工作区", () => this.createPdfReviewBoard());
     add("bc-create-canvas-portal", "创建可编辑 Canvas Portal", () => this.createCanvasPortal());
+    add("bc-portal-add-node", "在选中 Canvas Portal 中创建文本节点", () => this.addTextNodeToPortal());
   }
 
   private registerCanvasMenus(): void {
@@ -1899,6 +1900,22 @@ export default class BetterCanvasFeatures {
       }
     };
     new ModalClass(this.p.app).open();
+  }
+
+  private addTextNodeToPortal(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    if (selection.node.type !== "file" ||
+        typeof selection.node.file !== "string" ||
+        !selection.node.file.toLowerCase().endsWith(".canvas")) {
+      new Notice("请先选择指向另一个 .canvas 文件的节点。");
+      return;
+    }
+    this.input(
+      "在 Canvas Portal 中创建文本节点",
+      "输入要添加到 Portal 源画布的内容",
+      value => void this.portalManager?.addTextNodeToPortal(value, selection.node.id)
+    );
   }
 
   private createPdfReviewBoard(): void {
