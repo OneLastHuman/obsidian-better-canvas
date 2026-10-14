@@ -8,7 +8,8 @@ import {
   PluginSettingTab,
   Setting,
   SuggestModal,
-  TFile
+  TFile,
+  TFolder
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
@@ -36,6 +37,8 @@ import { extractPdfPages } from "./pdf-context";
 import { CanvasPortalManager } from "./canvas-portals";
 import { scaleSvgIntrinsicDimensions } from "./export-utils";
 import { extractWikiLinks } from "./canvas-links";
+import { discoverModels } from "./model-discovery";
+import { syncHtmlPreviews } from "./html-preview";
 
 interface ProviderProfile {
   id: string;
@@ -112,6 +115,33 @@ class FeaturePromptModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+  }
+}
+
+class AIModelPickerModal extends SuggestModal<string> {
+  constructor(
+    app: App,
+    private readonly models: string[],
+    private readonly currentModel: string,
+    private readonly onChoose: (model: string) => void
+  ) {
+    super(app);
+    this.setPlaceholder("搜索可用模型；若供应商未列出模型，可手动输入模型名");
+  }
+
+  getSuggestions(query: string): string[] {
+    const needle = query.trim().toLocaleLowerCase();
+    const values = [...new Set([this.currentModel, ...this.models].filter(Boolean))];
+    return values.filter(model => !needle || model.toLocaleLowerCase().includes(needle)).slice(0, 250);
+  }
+
+  renderSuggestion(model: string, element: HTMLElement): void {
+    element.createEl("div", { text: model });
+    if (model === this.currentModel) element.createEl("small", { text: "当前模型" });
+  }
+
+  onChooseSuggestion(model: string): void {
+    this.onChoose(model);
   }
 }
 
@@ -419,7 +449,8 @@ export default class BetterCanvasFeatures {
     add("bc-ingest-youtube", "导入 YouTube 字幕", () => this.input("导入 YouTube 字幕", "YouTube 视频 URL", value => void this.ingest(value, true)));
     add("bc-gemini-youtube-video", "用 Gemini 直接分析 YouTube 视频", () => this.askGeminiAboutYoutube());
     add("bc-set-node-provider", "为节点指定 AI 供应商", () => this.setNodeProvider());
-    add("bc-set-node-model", "为节点指定 AI 模型", () => this.setNodeModel());
+    add("bc-set-node-model", "为节点指定 AI 模型（自动发现）", () => this.setNodeModel());
+    add("bc-run-prompt-folder", "对文件夹批量运行 AI Prompt", () => this.runPromptFolder());
     add("bc-ask-custom-model", "指定模型并向 AI 提问", () => this.askWithModel());
     add("bc-test-provider", "测试当前 AI 供应商连接", () => void this.testProvider());
     add("bc-related-questions", "生成后续研究问题节点", () => void this.generateRelatedQuestions());
@@ -496,6 +527,7 @@ export default class BetterCanvasFeatures {
   private decorate(canvas: any): void {
     decorateCanvas(canvas);
     const data = readCanvasData(canvas);
+    syncHtmlPreviews(canvas, data);
     for (const item of data.nodes) {
       const node = canvas.nodes?.get?.(item.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
@@ -869,6 +901,7 @@ export default class BetterCanvasFeatures {
           }
         }
         this.applyZoomBreakpoints(canvas);
+        syncHtmlPreviews(canvas, data);
       }, 220);
     });
     observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "transform", "class"] });
@@ -1644,23 +1677,179 @@ export default class BetterCanvasFeatures {
     }, String((selection.node as any).bcAIProvider ?? s.activeProviderId));
   }
 
+  private chooseModel(node: CanvasNodeData, onChoose: (model: string) => void): void {
+    const current = String((node as any).bcAIModel ?? this.currentProvider(node).model);
+    const notice = new Notice("正在从 AI 供应商读取模型列表…", 0);
+    void discoverModels(this.aiSettings(node)).then(models => {
+      notice.hide();
+      const available = models.includes(current) ? models : [current, ...models];
+      new AIModelPickerModal(this.p.app, available, current, onChoose).open();
+    }).catch(error => {
+      notice.hide();
+      new Notice("无法读取供应商模型列表；可在下一步手动输入模型名。", 5000);
+      this.input("设置节点 AI 模型", "输入模型名；留空恢复供应商默认模型", onChoose, current);
+      console.warn("Better Canvas model discovery failed", error);
+    });
+  }
+
   private setNodeModel(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.input("设置节点 AI 模型", "输入模型名；留空恢复当前供应商默认模型", value => {
-      patchNode(selection.canvas, selection.node.id, { bcAIModel: value.trim() || undefined });
-      new Notice(value.trim() ? "节点模型已设置为 " + value.trim() : "已恢复供应商默认模型。");
-    }, String((selection.node as any).bcAIModel ?? this.currentProvider(selection.node).model));
+    this.chooseModel(selection.node, model => {
+      const value = model.trim();
+      patchNode(selection.canvas, selection.node.id, { bcAIModel: value || undefined });
+      new Notice(value ? "节点模型已设置为 " + value : "已恢复供应商默认模型。");
+    });
   }
 
   private askWithModel(): void {
     const selection = this.selected();
     if (!selection) return;
-    const provider = this.currentProvider(selection.node);
-    this.input("指定模型并提问", "模型名，例如 gpt-4o-mini", model => {
+    this.chooseModel(selection.node, model => {
       this.input("向 AI 提问", "例如：总结笔记并指出不确定之处", question =>
         void this.runAI(selection.node.id, question, model), "");
-    }, provider.model);
+    });
+  }
+
+  private runPromptFolder(): void {
+    const canvas = this.canvas();
+    if (!canvas) {
+      new Notice("请先打开一个 Canvas，用于保存批量生成的结果。");
+      return;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，请先解除只读模式。");
+      return;
+    }
+    const folders = this.p.app.vault.getAllLoadedFiles().filter((file: any) => file instanceof TFolder) as TFolder[];
+    if (!folders.length) {
+      new Notice("当前 Vault 中没有可选文件夹。");
+      return;
+    }
+
+    const plugin = this;
+    class FolderPicker extends SuggestModal<TFolder> {
+      getSuggestions(query: string): TFolder[] {
+        const needle = query.trim().toLocaleLowerCase();
+        return folders.filter(folder => !needle ||
+          folder.path.toLocaleLowerCase().includes(needle) ||
+          folder.name.toLocaleLowerCase().includes(needle)).slice(0, 200);
+      }
+      renderSuggestion(folder: TFolder, element: HTMLElement): void {
+        element.createEl("div", { text: folder.name || "/" });
+        element.createEl("small", { text: folder.path || "/" });
+      }
+      onChooseSuggestion(folder: TFolder): void {
+        const provider = plugin.currentProvider();
+        plugin.input(
+          "批量运行文件夹 Prompt",
+          "任务说明。最多处理 20 篇 Markdown；文件正文将发送给当前供应商“" + provider.name + "”。",
+          prompt => void plugin.processPromptFolder(folder, prompt)
+        );
+      }
+    }
+    new FolderPicker(this.p.app).open();
+  }
+
+  private collectMarkdownFiles(folder: TFolder, output: TFile[], limit = 20): void {
+    for (const child of folder.children) {
+      if (output.length >= limit) return;
+      if (child instanceof TFile && child.extension.toLowerCase() === "md") {
+        output.push(child);
+      } else if (child instanceof TFolder) {
+        this.collectMarkdownFiles(child, output, limit);
+      }
+    }
+  }
+
+  private async processPromptFolder(folder: TFolder, instruction: string): Promise<void> {
+    const canvas = this.canvas();
+    if (!canvas) {
+      new Notice("当前没有可写入结果的 Canvas。");
+      return;
+    }
+    const files: TFile[] = [];
+    this.collectMarkdownFiles(folder, files, 20);
+    if (!files.length) {
+      new Notice("所选文件夹中没有 Markdown 文件。");
+      return;
+    }
+
+    const before = readCanvasData(canvas);
+    const selected = this.selected(canvas);
+    const x = selected
+      ? selected.node.x + selected.node.width + 100
+      : Math.max(0, ...before.nodes.map((node: CanvasNodeData) => node.x + node.width)) + 100;
+    const y = selected?.node.y ?? 0;
+    const root = makeTextNode(
+      "文件夹批量任务\n" + folder.path + "\n\nPrompt： " + instruction,
+      x, y, { width: 360, height: 180 }
+    );
+    (root as any).bcBatchFolder = folder.path;
+    (root as any).bcBatchPrompt = instruction;
+    insertCanvasNode(canvas, root, selected?.node.id);
+
+    const profile = this.currentProvider();
+    const settings = this.aiSettings();
+    const notice = new Notice("正在处理文件夹：" + folder.path + "（0 / " + files.length + "）", 0);
+    let succeeded = 0;
+    let failed = 0;
+
+    try {
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        const rowY = y + index * 260;
+        const source: CanvasNodeData = {
+          id: createId(),
+          type: "file",
+          file: file.path,
+          x: x + 360 + 100,
+          y: rowY,
+          width: 300,
+          height: 180
+        };
+        insertCanvasNode(canvas, source, root.id);
+
+        let answer = "";
+        try {
+          const note = (await this.p.app.vault.cachedRead(file)).slice(0, 12000);
+          answer = await chatCompletion(settings, [
+            {
+              role: "system",
+              content: String(this.settings().systemPrompt || "You are a precise assistant. Preserve uncertainty.")
+            },
+            {
+              role: "user",
+              content: "根据下面的 Vault 笔记执行用户指定的任务。只使用所提供的内容，不要声称读取了其他文件或网页。\n\n任务：\n" +
+                instruction + "\n\n源文件：" + file.path + "\n\n笔记正文：\n" + note
+            }
+          ]);
+          succeeded++;
+        } catch (error) {
+          failed++;
+          answer = "处理失败： " + (error instanceof Error ? error.message : String(error));
+        }
+
+        const result = makeTextNode(answer, source.x + source.width + 80, rowY, {
+          width: 340,
+          height: Math.max(160, Math.min(420, Math.ceil(answer.length / 44) * 24))
+        });
+        (result as any).bcGenerated = succeeded > 0 && !answer.startsWith("处理失败：");
+        (result as any).bcPrompt = instruction;
+        (result as any).bcSourceNode = source.id;
+        (result as any).bcSourcePath = file.path;
+        (result as any).bcAIProvider = profile.id;
+        (result as any).bcAIModel = profile.model;
+        insertCanvasNode(canvas, result, source.id);
+
+        notice.setMessage("正在处理文件夹：" + folder.path + "（" + (index + 1) + " / " + files.length + "）");
+      }
+    } finally {
+      notice.hide();
+    }
+
+    new Notice("文件夹任务完成：成功 " + succeeded + "，失败 " + failed +
+      "。最多处理 20 篇 Markdown，内容已发送给供应商“" + profile.name + "”。");
   }
 
   private async getNodeContext(canvas: any, rootId: string): Promise<string> {
