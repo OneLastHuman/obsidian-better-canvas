@@ -66,6 +66,113 @@ export async function chatCompletion(
   throw new Error("AI 服务返回了成功状态，但没有找到可用的文本内容。");
 }
 
+export async function chatCompletionStream(
+  settings: AISettings,
+  messages: Array<{ role: "system" | "user" | "assistant"; content: ChatMessageContent }>,
+  signal: AbortSignal,
+  onDelta: (delta: string) => void
+): Promise<string> {
+  if (!settings.apiKey.trim()) throw new Error("请先在 Better Canvas 设置中填写 API Key。");
+  if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
+
+  let accumulated = "";
+  let response: Response;
+  try {
+    response = await fetch(endpoint(settings.baseUrl, "chat/completions"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + settings.apiKey.trim(),
+        "Accept": "text/event-stream, application/json"
+      },
+      body: JSON.stringify({
+        model: settings.model.trim(),
+        messages,
+        temperature: 0.4,
+        stream: true
+      }),
+      signal
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    // Some Obsidian/mobile runtimes and custom gateways block streaming fetch/CORS.
+    // Fall back to requestUrl so AI remains usable on those platforms.
+    if (error instanceof TypeError) {
+      const answer = await chatCompletion(settings, messages);
+      onDelta(answer);
+      return answer;
+    }
+    throw error;
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    let detail = body;
+    try {
+      const parsed = JSON.parse(body);
+      detail = parsed?.error?.message ?? parsed?.message ?? body;
+    } catch {
+      // Keep the raw response when the endpoint did not return JSON.
+    }
+    throw new Error("AI API 请求失败（HTTP " + response.status + "）" + (detail ? ": " + detail.slice(0, 1000) : ""));
+  }
+
+  if (!response.body) {
+    const answer = await chatCompletion(settings, messages);
+    onDelta(answer);
+    return answer;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done = false;
+
+  const consumeLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) return false;
+    const payload = trimmed.slice(5).trim();
+    if (!payload) return false;
+    if (payload === "[DONE]") return true;
+    let event: any;
+    try { event = JSON.parse(payload); } catch { return false; }
+    const delta = event?.choices?.[0]?.delta?.content;
+    let text = "";
+    if (typeof delta === "string") text = delta;
+    else if (Array.isArray(delta)) {
+      text = delta.map((part: any) => typeof part?.text === "string" ? part.text : "").join("");
+    }
+    if (text) {
+      accumulated += text;
+      onDelta(text);
+    }
+    return false;
+  };
+
+  while (!done) {
+    if (signal.aborted) {
+      await reader.cancel().catch(() => undefined);
+      throw new DOMException("The AI request was aborted.", "AbortError");
+    }
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (consumeLine(line)) {
+        done = true;
+        break;
+      }
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer) consumeLine(buffer);
+  if (signal.aborted) throw new DOMException("The AI request was aborted.", "AbortError");
+  if (!accumulated.trim()) throw new Error("AI 服务结束了请求，但没有返回可显示的文本内容。");
+  return accumulated.trim();
+}
+
 export async function generateImage(
   settings: AISettings,
   prompt: string
@@ -86,7 +193,6 @@ export async function generateImage(
       prompt,
       n: 1,
       size: "1024x1024",
-      response_format: "b64_json"
     }),
     throw: false
   });
