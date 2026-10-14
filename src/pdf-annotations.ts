@@ -51,6 +51,7 @@ function makeSvgElement<K extends keyof SVGElementTagNameMap>(name: K): SVGEleme
 export class PdfAnnotationManager {
   private plugin: any;
   private observers = new Map<HTMLElement, MutationObserver>();
+  private resizeObservers = new Map<HTMLElement, ResizeObserver>();
   private excerptContainers = new WeakSet<HTMLElement>();
   private refreshQueued = false;
 
@@ -103,6 +104,8 @@ export class PdfAnnotationManager {
   stop(): void {
     for (const observer of this.observers.values()) observer.disconnect();
     this.observers.clear();
+    for (const observer of this.resizeObservers.values()) observer.disconnect();
+    this.resizeObservers.clear();
   }
 
   private activeCanvas(): any | null {
@@ -224,6 +227,11 @@ export class PdfAnnotationManager {
         if (!(nodeElement instanceof HTMLElement)) continue;
         const target = nodeElement.querySelector(".bc-pinned-pdf-embed-container") as HTMLElement | null;
         if (!target) continue;
+        if (!this.resizeObservers.has(target)) {
+          const observer = new ResizeObserver(() => this.scheduleRefresh());
+          observer.observe(target);
+          this.resizeObservers.set(target, observer);
+        }
         this.attachOverlay(canvas, data, target);
       }
     }
@@ -331,6 +339,17 @@ export class PdfAnnotationManager {
       svg.setAttribute("aria-label", "PDF page annotations");
       container.appendChild(svg);
       this.installPointerHandlers(canvas, nodeData.id, svg);
+    }
+
+    // Align the annotation SVG to the rendered PDF bitmap, not the complete
+    // embed container (which also contains the selectable-text panel).
+    const pageCanvas = container.querySelector(".bc-pinned-pdf-page") as HTMLCanvasElement | null;
+    if (pageCanvas) {
+      svg.style.inset = "auto";
+      svg.style.left = pageCanvas.offsetLeft + "px";
+      svg.style.top = pageCanvas.offsetTop + "px";
+      svg.style.width = pageCanvas.clientWidth + "px";
+      svg.style.height = pageCanvas.clientHeight + "px";
     }
 
     const tool = typeof nodeData.bcPdfTool === "string" ? nodeData.bcPdfTool : "pen";
