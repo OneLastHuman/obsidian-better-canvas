@@ -228,6 +228,10 @@ export default class BetterCanvasFeatures {
       new Notice("请先打开一个 Canvas。");
       return null;
     }
+    if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先运行“切换 Canvas 只读模式”解除锁定。");
+      return null;
+    }
     const selection = canvas.selection;
     if (!selection || selection.size !== 1) {
       new Notice("请在画布中只选择一个节点。");
@@ -277,6 +281,7 @@ export default class BetterCanvasFeatures {
     add("bc-style-selected-edges", "设置当前选中连线样式", () => this.edgeStyle());
     add("bc-front-node", "将节点置于最前", () => this.reorder(true));
     add("bc-align-selection-grid", "将所选节点对齐到网格", () => this.alignSelectionToGrid());
+    add("bc-toggle-readonly", "切换 Canvas 只读模式", () => this.toggleReadonly());
     add("bc-back-node", "将节点置于最后", () => this.reorder(false));
     add("bc-focus", "切换专注模式", () => this.focus());
     add("bc-collapse-group", "折叠/展开所选分组", () => this.collapseGroup());
@@ -606,6 +611,15 @@ export default class BetterCanvasFeatures {
     new Notice(count ? "已选择 " + count + " 条连线。" : "没有匹配连线。");
   }
 
+  private toggleReadonly(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    const wrapper = canvas.wrapperEl as HTMLElement | undefined;
+    if (!(wrapper instanceof HTMLElement)) { new Notice("无法获取 Canvas 容器。"); return; }
+    const enabled = !wrapper.classList.contains("bc-readonly");
+    wrapper.classList.toggle("bc-readonly", enabled);
+    new Notice(enabled ? "已启用只读模式；节点不能被鼠标拖动或编辑。再次运行命令可解除。" : "已退出只读模式。");
+  }
   private alignSelectionToGrid(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
