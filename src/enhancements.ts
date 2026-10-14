@@ -72,7 +72,7 @@ export function colorIncidentEdges(canvas: any, nodeId: string, color: string): 
   const edges = data.edges.map(edge => {
     if (edge.fromNode !== nodeId && edge.toNode !== nodeId) return edge;
     count += 1;
-    return { ...edge, bcColor: color };
+    return { ...edge, color, bcColor: color };
   });
   if (count > 0) {
     canvas.importData({ ...data, nodes: data.nodes, edges });
@@ -95,7 +95,16 @@ export function styleSelectedEdges(canvas: any, color: string, pathStyle: "solid
   const edges = data.edges.map(edge => {
     if (!ids.has(edge.id)) return edge;
     count += 1;
-    return { ...edge, bcColor: color, bcPathStyle: pathStyle };
+    return {
+      ...edge,
+      color,
+      bcColor: color,
+      bcPathStyle: pathStyle,
+      styleAttributes: {
+        ...((edge as any).styleAttributes ?? {}),
+        path: pathStyle === "solid" ? "solid" : pathStyle === "dashed" ? "short-dashed" : "dotted"
+      }
+    };
   });
   if (count > 0) {
     canvas.importData({ ...data, nodes: data.nodes, edges });
@@ -121,7 +130,16 @@ export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle):
   const edges = data.edges.map(edge => {
     if (!ids.has(edge.id)) return edge;
     count += 1;
-    return { ...edge, bcArrowStyle: arrowStyle };
+    const standardArrow = arrowStyle === "half-triangle" ? "halved-triangle" : arrowStyle === "default" ? "triangle" : arrowStyle;
+    return {
+      ...edge,
+      bcArrowStyle: arrowStyle,
+      styleAttributes: {
+        ...((edge as any).styleAttributes ?? {}),
+        ...(standardArrow === "none" ? { arrow: "triangle" } : { arrow: standardArrow })
+      },
+      ...(standardArrow === "none" ? { toEnd: "none" } : {})
+    };
   });
   if (count > 0) {
     canvas.importData({ ...data, nodes: data.nodes, edges });
