@@ -77,6 +77,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - 支持远程 **MCP Streamable HTTP**、旧式远程 **SSE** 和本地 MCP **stdio** 工具调用；也可让 AI 根据可用工具描述提出工具和参数建议，用户检查并确认后才执行。stdio 通过单独配置的 command/args/env/cwd 启动本地进程，请只配置可信服务。
 - 可从 OpenAI-compatible、Anthropic 和 Gemini 的模型端点发现可用模型，并为单个节点选择模型；接口不支持列出模型时仍可手动输入。
 - 桌面端可调用已安装并登录的 Codex CLI，在只读沙盒中分析选中节点和相邻上下文；任务可由“停止当前 AI 生成”中断，结果保存为关联节点。
+- 文本 AI 可选本机 OpenCode ACP：通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode 使用的模型与登录配置，不需要单独填写文本 API Key。
 - 可选择 Vault 文件夹，对最多 20 篇 Markdown 顺序执行同一条 Prompt，逐篇创建源文件节点与结果节点；正文发送给当前 AI 供应商前会要求用户选择文件夹并确认任务。
 - 识别 AI 或手写节点中的 HTML 代码块，可通过按钮在隔离的 sandbox iframe 中预览交互页面。
 - 可把固定 PDF 页面提取为 AI 文本上下文，并将页面栅格图像发送给支持视觉输入的模型；Gemini profile 支持对公开视频进行原生视频上下文分析。
@@ -142,6 +143,12 @@ npm run build
 `command` 是可执行文件路径，`args` 必须是字符串数组，`env` 是可选环境变量对象，`cwd` 是可选工作目录。服务列表与工具调用会各自启动一个新进程，因此 MCP 服务应能在每次启动时完成初始化。不要配置不可信的 MCP 程序：stdio 服务可以访问它自身用户权限允许的本地文件和网络。远程端点应使用可信服务器与 HTTPS。
 
 直接调用工具前会让你检查名称和参数；使用 AI 建议工具时也必须在执行前确认。工具调用可能会修改外部系统，建议先检查参数，并仅启用你信任的服务器。
+
+## 本地 OpenCode ACP
+
+在 Better Canvas 设置的 **文本 AI 后端** 中选择 **本机 OpenCode ACP**。默认启动 `opencode acp`；如果 Obsidian 找不到命令，可在 **OpenCode CLI 可执行文件** 中填写绝对路径。请先在终端完成 OpenCode 安装及登录，模型与额度使用 OpenCode 自己的配置。
+
+ACP 文本任务在系统临时目录中创建会话，不将 Vault 作为 OpenCode 工作区。此模式用于文本问答和闪卡；图片生成仍使用 API Base URL、API Key 和 Image model 配置。当前集成不会批准 ACP 请求的工具或文件操作权限。此模式要求桌面版 Obsidian 和本机 OpenCode CLI。
 
 ## 本地 Codex CLI
 
