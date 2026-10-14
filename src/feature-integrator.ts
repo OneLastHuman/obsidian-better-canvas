@@ -29,6 +29,7 @@ import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { callRemoteTool, listRemoteTools } from "./mcp";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
 import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
+import { PdfAnnotationManager } from "./pdf-annotations";
 
 interface ProviderProfile {
   id: string;
@@ -115,6 +116,7 @@ export default class BetterCanvasFeatures {
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private metadataIndexer: CanvasMetadataIndexer | null = null;
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
+  private pdfAnnotations: PdfAnnotationManager | null = null;
   private p: any;
 
   constructor(plugin: any) {
@@ -127,6 +129,8 @@ export default class BetterCanvasFeatures {
     this.metadataIndexer.start();
     this.pdfPageRenderer = new PinnedPdfPageRenderer(this.p);
     this.pdfPageRenderer.start();
+    this.pdfAnnotations = new PdfAnnotationManager(this.p);
+    this.pdfAnnotations.start();
     this.p.register(() => this.cleanup());
     this.registerCommands();
     this.registerCanvasMenus();
