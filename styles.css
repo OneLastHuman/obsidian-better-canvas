@@ -199,3 +199,37 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Selectable, transparent text aligned over the pinned PDF page raster. */
+.bc-pinned-pdf-embed-container {
+  position: relative;
+}
+.bc-pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+.bc-pdf-selectable-text-run {
+  position: absolute;
+  display: block;
+  color: transparent !important;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  line-height: 1;
+  white-space: pre;
+  overflow: hidden;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  pointer-events: auto;
+}
+.bc-pdf-selectable-text-run::selection {
+  color: transparent;
+  background: rgba(45, 125, 255, 0.32);
+}
