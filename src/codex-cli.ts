@@ -105,8 +105,8 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       finish(new Error(message));
     });
 
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
+    child.stdout!.setEncoding("utf8");
+    child.stdout!.on("data", (chunk: string) => {
       stdoutBuffer += chunk;
       if (stdoutBuffer.length > 1_000_000) {
         terminate();
@@ -118,8 +118,8 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       for (const line of lines) consumeLine(line);
     });
 
-    child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => {
+    child.stderr!.setEncoding("utf8");
+    child.stderr!.on("data", (chunk: string) => {
       stderrTail = (stderrTail + chunk).slice(-8000);
     });
 
@@ -165,9 +165,9 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       finish(undefined, answer);
     });
 
-    child.stdin.once("error", (error: Error) => {
+    child.stdin!.once("error", (error: Error) => {
       if (!settled) finish(new Error("无法向 Codex CLI 发送提示词：" + error.message));
     });
-    child.stdin.end(prompt + "\n");
+    child.stdin!.end(prompt + "\n");
   });
 }
