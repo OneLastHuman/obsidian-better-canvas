@@ -31,6 +31,7 @@ import { callRemoteTool, listRemoteTools } from "./mcp";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
 import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 import { PdfAnnotationManager } from "./pdf-annotations";
+import { extractPdfPages } from "./pdf-context";
 import { CanvasPortalManager } from "./canvas-portals";
 
 interface ProviderProfile {
@@ -1202,6 +1203,16 @@ export default class BetterCanvasFeatures {
         const file = this.p.app.vault.getAbstractFileByPath(node.file);
         if (file instanceof TFile && file.extension.toLowerCase() === "md") {
           try { body = await this.p.app.vault.cachedRead(file); } catch { /* retain file path */ }
+        } else if (file instanceof TFile && file.extension.toLowerCase() === "pdf") {
+          try {
+            const pages = await extractPdfPages(this.p.app, file, (node as any).subpath, 3, false);
+            body = "[PDF: " + file.path + "]\n" + pages.map(page =>
+              "Page " + page.pageNumber + ":\n" + (page.text || "(此页没有可提取的文本；可尝试让支持视觉的模型查看页面图像。)")
+            ).join("\n\n");
+          } catch (error) {
+            body = "[PDF: " + file.path + "; page text extraction failed: " +
+              (error instanceof Error ? error.message : String(error)) + "]";
+          }
         }
       }
       sections.push("[Node " + node.id + (id === rootId ? " — selected" : "") + "]\n" + body.slice(0, 3000));
@@ -1222,6 +1233,19 @@ export default class BetterCanvasFeatures {
       const file = this.p.app.vault.getAbstractFileByPath(node.file);
       if (!(file instanceof TFile)) continue;
       const ext = file.extension.toLowerCase();
+      if (ext === "pdf") {
+        try {
+          const pages = await extractPdfPages(this.p.app, file, (node as any).subpath, 1, true);
+          for (const page of pages) {
+            if (page.imageDataUrl) images.push({ type: "image_url", image_url: { url: page.imageDataUrl, detail: "auto" } });
+            if (images.length >= 4) break;
+          }
+        } catch (error) {
+          console.warn("Better Canvas could not prepare PDF page vision context:", file.path, error);
+        }
+        if (images.length >= 4) break;
+        continue;
+      }
       const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg"
         : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif"
         : ext === "svg" ? "image/svg+xml" : ext === "png" ? "image/png" : "";
