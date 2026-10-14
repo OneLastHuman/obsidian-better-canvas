@@ -3,6 +3,7 @@ import {
   bestFloatingSide,
   colorIncidentEdges,
   flipIncidentEdges,
+  normalizeNodeShape,
   reorderNode,
   styleSelectedEdgeArrow,
   styleSelectedEdgePathfinding,
@@ -31,6 +32,22 @@ function makeCanvas(data: CanvasData, selected: any[] = []): any {
     }
   };
 }
+
+describe("flowchart shape normalization", () => {
+  it("maps common aliases to interoperable JSON Canvas shapes", () => {
+    expect(normalizeNodeShape(" terminal ")).toBe("pill");
+    expect(normalizeNodeShape("process")).toBe("rectangle");
+    expect(normalizeNodeShape("decision")).toBe("diamond");
+    expect(normalizeNodeShape("input-output")).toBe("parallelogram");
+    expect(normalizeNodeShape("reference")).toBe("circle");
+    expect(normalizeNodeShape("predefined-process")).toBe("predefined-process");
+  });
+
+  it("rejects unsupported shapes", () => {
+    expect(normalizeNodeShape("unknown-shape")).toBeUndefined();
+    expect(normalizeNodeShape("")).toBeUndefined();
+  });
+});
 
 const fixture: CanvasData = {
   nodes: [
