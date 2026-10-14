@@ -1495,7 +1495,60 @@ export default class BetterCanvasFeatures {
         backgroundColor = probe.style.backgroundColor;
       }
 
-      const full = canvasDataToFullSvg(readCanvasData(canvas), { backgroundColor, margin: 48 });
+      const sourceData = readCanvasData(canvas);
+      const exportData = {
+        ...sourceData,
+        nodes: sourceData.nodes.map((node: CanvasNodeData) => ({ ...node })),
+        edges: sourceData.edges.map((edge: any) => ({ ...edge }))
+      };
+      const mimeByExtension: Record<string, string> = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        gif: "image/gif"
+      };
+      const perImageLimit = 3 * 1024 * 1024;
+      const totalImageLimit = 8 * 1024 * 1024;
+      let embeddedImageBytes = 0;
+      let embeddedImageCount = 0;
+      let skippedImageCount = 0;
+
+      for (const node of exportData.nodes) {
+        if (node.type !== "file" || typeof node.file !== "string") continue;
+        const extension = node.file.split(".").pop()?.toLowerCase() ?? "";
+        const mime = mimeByExtension[extension];
+        if (!mime) continue;
+        const file = this.p.app.vault.getAbstractFileByPath(node.file);
+        if (!(file instanceof TFile)) {
+          skippedImageCount++;
+          continue;
+        }
+        if (file.stat.size > perImageLimit || embeddedImageBytes + file.stat.size > totalImageLimit ||
+            embeddedImageCount >= 20) {
+          skippedImageCount++;
+          continue;
+        }
+        try {
+          const buffer = await this.p.app.vault.readBinary(file);
+          if (buffer.byteLength > perImageLimit || embeddedImageBytes + buffer.byteLength > totalImageLimit) {
+            skippedImageCount++;
+            continue;
+          }
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+            binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+          }
+          (node as any).bcExportImageDataUrl = "data:" + mime + ";base64," + btoa(binary);
+          embeddedImageBytes += buffer.byteLength;
+          embeddedImageCount++;
+        } catch {
+          skippedImageCount++;
+        }
+      }
+
+      const full = canvasDataToFullSvg(exportData, { backgroundColor, margin: 48 });
       const filePath = await this.uniquePath(folder + "/" + baseName + "-full-content", format);
       if (format === "svg") {
         await this.p.app.vault.create(filePath, full.svg);
@@ -1536,7 +1589,13 @@ export default class BetterCanvasFeatures {
         output.height = 0;
       }
       notice.hide();
-      new Notice("已导出整张 Canvas：" + filePath);
+      const mediaSummary = embeddedImageCount
+        ? "；已嵌入 " + embeddedImageCount + " 张图片"
+        : "";
+      const skippedSummary = skippedImageCount
+        ? "；有 " + skippedImageCount + " 张图片因大小、格式或读取问题以标签代替"
+        : "";
+      new Notice("已导出整张 Canvas：" + filePath + mediaSummary + skippedSummary);
     } catch (error) {
       notice.hide();
       new Notice("全内容导出失败：" + (error instanceof Error ? error.message : String(error)), 8000);
