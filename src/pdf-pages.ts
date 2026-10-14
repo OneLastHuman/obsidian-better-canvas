@@ -69,6 +69,14 @@ class PinnedPdfPageEmbed extends Component {
     excerptButton.type = "button";
     excerptButton.className = "bc-pdf-create-excerpt";
     excerptButton.textContent = "从选中文本创建摘录节点";
+    excerptButton.addEventListener("pointerdown", event => {
+      event.stopPropagation();
+    });
+    excerptButton.addEventListener("mousedown", event => {
+      // Keep the text selection anchored when the action button receives focus.
+      event.preventDefault();
+      event.stopPropagation();
+    });
     excerptButton.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
