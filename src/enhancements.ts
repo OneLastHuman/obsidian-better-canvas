@@ -196,6 +196,7 @@ export function resizeNodeToText(canvas: any, nodeId: string): boolean {
   const width = Math.max(220, Math.min(720, Math.round(longest * 7.2 + 52)));
   const wrappedLines = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / Math.max(1, (width - 40) / 7.2))), 0);
   const height = Math.max(100, Math.min(1000, Math.round(wrappedLines * 24 + 44)));
+  if (Math.abs(node.width - width) < 1 && Math.abs(node.height - height) < 1) return true;
   const nodes = data.nodes.map(item => item.id === nodeId ? { ...item, width, height } : item);
   canvas.importData({ ...data, nodes, edges: data.edges });
   canvas.requestSave?.();
