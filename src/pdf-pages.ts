@@ -33,9 +33,13 @@ class PinnedPdfPageEmbed extends Component {
   private file: TFile;
   private subpath?: string;
   private canvas: HTMLCanvasElement | null = null;
+  private textLayerEl: HTMLDivElement | null = null;
   private textDetails: HTMLDetailsElement | null = null;
   private textContentEl: HTMLDivElement | null = null;
   private excerptButton: HTMLButtonElement | null = null;
+  private pageTextItems: any[] = [];
+  private pageViewport: any = null;
+  private textResizeObserver: ResizeObserver | null = null;
   private cancelled = false;
 
   constructor(plugin: any, context: any, file: TFile, subpath?: string) {
@@ -55,6 +59,13 @@ class PinnedPdfPageEmbed extends Component {
     canvas.setAttribute("aria-label", "Pinned PDF page");
     container.appendChild(canvas);
     this.canvas = canvas;
+
+    // A transparent selectable text layer sits directly over the rendered page.
+    const textLayer = document.createElement("div");
+    textLayer.className = "bc-pdf-text-layer";
+    textLayer.setAttribute("aria-label", "Selectable PDF text overlay");
+    container.appendChild(textLayer);
+    this.textLayerEl = textLayer;
 
     const details = document.createElement("details");
     details.className = "bc-pdf-text-selection";
@@ -91,6 +102,70 @@ class PinnedPdfPageEmbed extends Component {
     this.textDetails = details;
     this.textContentEl = textContent;
     this.excerptButton = excerptButton;
+    this.textResizeObserver = new ResizeObserver(() => this.renderSelectableTextLayer());
+    this.textResizeObserver.observe(container);
+  }
+
+  private renderSelectableTextLayer(): void {
+    const layer = this.textLayerEl;
+    const canvas = this.canvas;
+    const viewport = this.pageViewport;
+    if (!layer || !canvas || !viewport) return;
+    layer.replaceChildren();
+    if (!this.pageTextItems.length) return;
+
+    const cssScale = canvas.width > 0 && canvas.clientWidth > 0
+      ? canvas.clientWidth / canvas.width
+      : 1;
+    const pdfjs = (window as any).pdfjsLib;
+    const measureCanvas = document.createElement("canvas");
+    const measure = measureCanvas.getContext("2d");
+
+    for (const item of this.pageTextItems) {
+      const text = typeof item?.str === "string" ? item.str : "";
+      if (!text || !Array.isArray(item.transform)) continue;
+      let transform = item.transform as number[];
+      try {
+        if (typeof pdfjs?.Util?.transform === "function") {
+          transform = pdfjs.Util.transform(viewport.transform, item.transform);
+        } else {
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (transform.length < 6 || !transform.slice(0, 6).every(Number.isFinite)) continue;
+
+      const fontSize = Math.max(1, Math.hypot(transform[2], transform[3]));
+      const angle = Math.atan2(transform[1], transform[0]) * 180 / Math.PI;
+      const left = transform[4] * cssScale;
+      const top = (transform[5] - fontSize) * cssScale;
+      const targetWidth = Math.max(1, Number(item.width ?? 0) * viewport.scale * cssScale);
+      const span = document.createElement("span");
+      span.className = "bc-pdf-selectable-text-run";
+      span.textContent = text;
+      span.style.left = left + "px";
+      span.style.top = top + "px";
+      span.style.fontSize = fontSize * cssScale + "px";
+      span.style.height = Math.max(fontSize * 1.15 * cssScale, 2) + "px";
+      span.style.width = targetWidth + "px";
+      span.style.transform = "rotate(" + angle + "deg)";
+      span.style.transformOrigin = "top left";
+
+      if (measure) {
+        measure.font = fontSize * cssScale + "px sans-serif";
+        const naturalWidth = measure.measureText(text).width;
+        if (naturalWidth > 0) {
+          const scaleX = Math.max(0.35, Math.min(3, targetWidth / naturalWidth));
+          span.style.transform += " scaleX(" + scaleX + ")";
+        }
+      }
+
+      for (const eventName of ["pointerdown", "pointerup", "mousedown", "mouseup", "dblclick"]) {
+        span.addEventListener(eventName, event => event.stopPropagation());
+      }
+      layer.appendChild(span);
+    }
   }
 
   async loadFile(): Promise<void> {
@@ -128,14 +203,15 @@ class PinnedPdfPageEmbed extends Component {
       // collapsed by default so the page preview remains compact.
       try {
         const textContent = await page.getTextContent();
-        const selectableText = Array.isArray(textContent?.items)
-          ? textContent.items
-              .map((item: any) => typeof item?.str === "string" ? item.str : "")
-              .filter(Boolean)
-              .join(" ")
-              .replace(/\\s+/g, " ")
-              .trim()
-          : "";
+        this.pageTextItems = Array.isArray(textContent?.items) ? textContent.items : [];
+        this.pageViewport = viewport;
+        this.renderSelectableTextLayer();
+        const selectableText = this.pageTextItems
+          .map((item: any) => typeof item?.str === "string" ? item.str : "")
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
         if (this.textContentEl) {
           this.textContentEl.textContent = selectableText || "此页没有可提取的文本。扫描版页面需要 OCR 后才能选择文字。";
           this.textContentEl.dataset.extracted = String(Boolean(selectableText));
@@ -165,8 +241,14 @@ class PinnedPdfPageEmbed extends Component {
 
   onunload(): void {
     this.cancelled = true;
+    this.textResizeObserver?.disconnect();
+    this.textResizeObserver = null;
     this.canvas?.remove();
     this.canvas = null;
+    this.textLayerEl?.remove();
+    this.textLayerEl = null;
+    this.pageTextItems = [];
+    this.pageViewport = null;
     this.textDetails?.remove();
     this.textDetails = null;
     this.textContentEl = null;
