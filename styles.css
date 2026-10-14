@@ -61,3 +61,25 @@
 .better-canvas-node-embed > :last-child {
   margin-bottom: 0;
 }
+
+.canvas-node[data-bc-shape="ellipse"] {
+  border-radius: 50% !important;
+}
+.canvas-node[data-bc-shape="pentagon"] {
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+.canvas-node[data-bc-shape="octagon"] {
+  clip-path: polygon(28% 0%, 72% 0%, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0% 72%, 0% 28%);
+}
+.canvas-node[data-bc-shape="triangle"] {
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="trapezoid"] {
+  clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="chevron"] {
+  clip-path: polygon(0% 0%, 78% 0%, 100% 50%, 78% 100%, 0% 100%, 22% 50%);
+}
+.canvas-node[data-bc-shape="cloud"] {
+  clip-path: polygon(22% 18%, 28% 5%, 44% 8%, 55% 2%, 69% 13%, 84% 11%, 94% 27%, 90% 43%, 100% 55%, 88% 72%, 84% 87%, 66% 91%, 53% 100%, 38% 91%, 22% 94%, 12% 78%, 0% 70%, 7% 51%, 2% 35%, 12% 20%);
+}
