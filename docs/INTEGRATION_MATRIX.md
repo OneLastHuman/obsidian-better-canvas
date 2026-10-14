@@ -36,7 +36,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Align nodes to grid | Implemented | Grid size is configurable |
 | Per-node zoom breakpoints | Implemented, basic | Supports a stored per-node threshold and the `--variable-breakpoint` CSS variable |
 | Canvas read-only / interaction lock | Implemented, basic | Blocks node/edge interaction but leaves the Canvas surface available; verify panning and zooming on desktop |
-| Collapse / expand group | Partial | Stores contained nodes/edges as extension data; nested groups, cross-boundary edge handling and clipboard semantics need additional tests |
+| Collapse / expand group | Implemented, basic | Stores contained nodes and incident edges as extension data; restores node geometry and boundary edges, preserves already-collapsed nested groups, and skips restoring edges whose endpoints were deleted while collapsed. Clipboard semantics and complex overlapping groups still need manual testing |
 | Encapsulate selection into a new Canvas | Implemented | Re-bases moved nodes near the child Canvas origin, preserves internal edges and reconnects crossing edges to the new file node |
 | Export JSON Canvas | Implemented | Saves a separate .canvas file in the Vault |
 | Export PNG / SVG | Implemented, configurable | Uses html-to-image against the Canvas DOM; PNG/SVG scale is configurable from 1x to 4x and a transparent or CSS-color background can be selected. Embeds/fonts/very large canvases may need manual testing |
