@@ -42,6 +42,8 @@ interface BetterCanvasSettings {
   model: string;
   imageModel: string;
   systemPrompt: string;
+  backend: "api" | "opencode-acp";
+  opencodeBinaryPath: string;
   direction: LayoutDirection;
   gapX: number;
   gapY: number;
@@ -55,6 +57,8 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   model: "gpt-4o-mini",
   imageModel: "gpt-image-1",
   systemPrompt: "You are a precise assistant helping the user reason from their Obsidian notes. Preserve uncertainty and do not invent facts.",
+  backend: "api",
+  opencodeBinaryPath: "opencode",
   direction: "LR",
   gapX: 100,
   gapY: 44,
@@ -775,12 +779,35 @@ class BetterCanvasSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "Better Canvas" });
     containerEl.createEl("p", {
-      text: "Canvas 增强和思维导图功能无需配置 AI。AI 请求通过下方兼容 OpenAI 的端点发送。API Key 仅保存于当前 Vault 的插件数据中。"
+      text: "Canvas 增强和思维导图功能无需配置 AI。文本 AI 可使用 API 端点或本机 OpenCode ACP；图片生成仍使用下方 API 配置。API Key 仅保存于当前 Vault 的插件数据中。"
     });
 
     new Setting(containerEl)
+      .setName("文本 AI 后端")
+      .setDesc("API 模式使用下面的服务商配置；OpenCode ACP 使用本机 OpenCode 的登录状态和模型配置。")
+      .addDropdown(dropdown => dropdown
+        .addOption("api", "API / 模型端点")
+        .addOption("opencode-acp", "本机 OpenCode ACP")
+        .setValue(this.plugin.settings.backend)
+        .onChange(async value => {
+          this.plugin.settings.backend = value === "opencode-acp" ? "opencode-acp" : "api";
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    if (this.plugin.settings.backend === "opencode-acp") {
+      new Setting(containerEl)
+        .setName("OpenCode CLI 可执行文件")
+        .setDesc("默认使用 PATH 中的 opencode；如果 Obsidian 找不到它，请填写可执行文件的绝对路径。")
+        .addText(text => text.setPlaceholder("opencode").setValue(this.plugin.settings.opencodeBinaryPath).onChange(async value => {
+          this.plugin.settings.opencodeBinaryPath = value.trim() || "opencode";
+          await this.plugin.saveSettings();
+        }));
+    }
+
+    new Setting(containerEl)
       .setName("API Base URL")
-      .setDesc("例如 https://api.openai.com/v1；不要在 URL 中放入 API Key。")
+      .setDesc("API 模式的文本请求及图片生成使用此端点；不要在 URL 中放入 API Key。")
       .addText(text => text.setPlaceholder("https://api.openai.com/v1").setValue(this.plugin.settings.baseUrl).onChange(async value => {
         this.plugin.settings.baseUrl = value.trim();
         await this.plugin.saveSettings();
@@ -799,7 +826,7 @@ class BetterCanvasSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Chat model")
-      .setDesc("用于问答和复习闪卡的模型名称。")
+      .setDesc("API 模式的文本模型；OpenCode ACP 会使用 OpenCode 自己配置的模型。图片模型未填写时也会回退到此值。")
       .addText(text => text.setPlaceholder("gpt-4o-mini").setValue(this.plugin.settings.model).onChange(async value => {
         this.plugin.settings.model = value.trim();
         await this.plugin.saveSettings();
