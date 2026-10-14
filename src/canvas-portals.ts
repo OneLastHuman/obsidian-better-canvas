@@ -1,5 +1,6 @@
 import { ItemView, Notice, TFile } from "obsidian";
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
+import { findContainingPortal } from "./portal-adoption";
 
 const PORTAL_PREFIX = "bcportal||";
 const PORTAL_DELIMITER = "||";
@@ -489,16 +490,8 @@ export class CanvasPortalManager {
       const ownerByCreatedId = new Map<string, CanvasNodeData>();
 
       for (const node of createdNodes) {
-        const centerX = node.x + node.width / 2;
-        const centerY = node.y + node.height / 2;
-        const matches = portals.filter((portal: CanvasNodeData) => {
-          if (portal.id === node.id || portal.file === view.file?.path) return false;
-          return centerX >= portal.x + 8 && centerX <= portal.x + portal.width - 8 &&
-            centerY >= portal.y + 8 && centerY <= portal.y + portal.height - 8;
-        }).sort((a: CanvasNodeData, b: CanvasNodeData) =>
-          a.width * a.height - b.width * b.height
-        );
-        if (matches[0]) ownerByCreatedId.set(node.id, matches[0]);
+        const owner = findContainingPortal(node, portals, view.file?.path, 8);
+        if (owner) ownerByCreatedId.set(node.id, owner);
       }
       if (!ownerByCreatedId.size) return;
 
