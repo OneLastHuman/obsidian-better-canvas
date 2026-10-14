@@ -301,6 +301,7 @@ export default class BetterCanvasFeatures {
     add("bc-select-outgoing-edges", "选择从节点发出的连线", () => this.selectEdges("outgoing"));
     add("bc-style-selected-edges", "设置当前选中连线样式", () => this.edgeStyle());
     add("bc-set-edge-pathfinding", "设置选中连线路径算法", () => this.edgePathfinding());
+    add("bc-edit-canvas-frontmatter", "编辑当前 Canvas frontmatter 属性", () => this.editCanvasFrontmatter());
     add("bc-front-node", "将节点置于最前", () => this.reorder(true));
     add("bc-align-selection-grid", "将所选节点对齐到网格", () => this.alignSelectionToGrid());
     add("bc-toggle-readonly", "切换 Canvas 只读模式", () => this.toggleReadonly());
@@ -1038,6 +1039,75 @@ export default class BetterCanvasFeatures {
           "\n\n请直接分析附带的公开视频内容。优先给出关键事件的时间戳；如果无法读取视频，请明确说明，不要假装已经看过。";
         void this.runAI(selected.node.id, task, undefined, undefined, url.toString());
       }, "总结视频内容、关键观点与时间戳");
+    });
+  }
+
+  private editCanvasFrontmatter(): void {
+    const view = this.activeCanvasView();
+    const file = view?.file;
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas") {
+      new Notice("请先打开一个已保存的 .canvas 文件。");
+      return;
+    }
+
+    this.input("编辑 Canvas frontmatter", "属性名，例如 project / status / tags", keyInput => {
+      const key = keyInput.trim();
+      if (!key || ["__proto__", "prototype", "constructor"].includes(key)) {
+        new Notice("属性名无效。");
+        return;
+      }
+      void (async () => {
+        try {
+          const raw = await this.p.app.vault.cachedRead(file);
+          const parsed = JSON.parse(raw);
+          const existingMetadata = parsed?.metadata && typeof parsed.metadata === "object"
+            ? parsed.metadata : {};
+          const currentFrontmatter = existingMetadata.frontmatter && typeof existingMetadata.frontmatter === "object"
+            ? existingMetadata.frontmatter : {};
+          const currentValue = Object.prototype.hasOwnProperty.call(currentFrontmatter, key)
+            ? JSON.stringify(currentFrontmatter[key], null, 2) : "";
+          this.input(
+            "设置属性值：" + key,
+            "输入 JSON 值；输入 __DELETE__ 可删除此属性",
+            valueInput => {
+              void (async () => {
+                try {
+                  const latestRaw = await this.p.app.vault.cachedRead(file);
+                  const latest = JSON.parse(latestRaw);
+                  const latestMetadata = latest?.metadata && typeof latest.metadata === "object" ? latest.metadata : {};
+                  const frontmatter = { ...(latestMetadata.frontmatter && typeof latestMetadata.frontmatter === "object" ? latestMetadata.frontmatter : {}) };
+                  if (valueInput.trim() === "__DELETE__") {
+                    delete frontmatter[key];
+                  } else {
+                    try {
+                      frontmatter[key] = JSON.parse(valueInput);
+                    } catch {
+                      frontmatter[key] = valueInput;
+                    }
+                  }
+                  const metadata = {
+                    ...latestMetadata,
+                    version: latestMetadata.version ?? "1.0-1.0",
+                    frontmatter
+                  };
+                  latest.metadata = metadata;
+                  await this.p.app.vault.modify(file, JSON.stringify(latest, null, 2));
+                  if (view?.canvas) view.canvas.metadata = metadata;
+                  this.metadataIndexer?.refreshAll();
+                  new Notice(valueInput.trim() === "__DELETE__"
+                    ? "已删除 Canvas 属性：" + key
+                    : "已更新 Canvas 属性：" + key);
+                } catch (error) {
+                  new Notice("保存 Canvas 属性失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+                }
+              })();
+            },
+            currentValue
+          );
+        } catch (error) {
+          new Notice("读取 Canvas 元数据失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+        }
+      })();
     });
   }
 
