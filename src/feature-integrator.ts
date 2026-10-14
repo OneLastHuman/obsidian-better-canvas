@@ -12,7 +12,7 @@ import {
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
-import { readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { createId, readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
   decorateCanvas,
@@ -27,7 +27,7 @@ import {
   toggleGroupCollapse
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
-import { callRemoteTool, listRemoteTools } from "./mcp";
+import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
 import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 import { PdfAnnotationManager } from "./pdf-annotations";
@@ -1180,6 +1180,93 @@ export default class BetterCanvasFeatures {
     }
   }
 
+  private async saveMcpResult(
+    toolName: string,
+    result: RemoteMcpResult,
+    canvas: any,
+    source?: CanvasNodeData
+  ): Promise<void> {
+    if (!canvas) throw new Error("MCP 工具已返回结果，但当前没有打开的 Canvas。");
+    const latest = readCanvasData(canvas);
+    const parent = source
+      ? latest.nodes.find((node: CanvasNodeData) => node.id === source.id) ?? source
+      : undefined;
+    const images = Array.isArray(result.images) ? result.images : [];
+    const text = String(result.text ?? "").trim();
+    const body = "# MCP: " + toolName + "\n\n" +
+      (text || (images.length ? "工具返回了 " + images.length + " 张图片。" : "工具已执行，但没有返回文本内容。"));
+    const output = makeTextNode(
+      body.slice(0, 12000),
+      parent ? parent.x + parent.width + 100 : 0,
+      parent ? parent.y : 0,
+      { width: 440, height: Math.max(200, Math.min(440, Math.ceil(body.length / 42) * 24)) }
+    );
+    insertCanvasNode(canvas, output, parent?.id);
+
+    if (!images.length) return;
+    const attachmentFolder = String(this.settings().attachmentFolder || "Better Canvas MCP Results");
+    await this.ensureFolder(attachmentFolder);
+    const imageYStart = output.y + output.height + 36;
+    let savedImages = 0;
+    const skipped: string[] = [];
+
+    for (const [index, image] of images.entries()) {
+      let mime = String(image.mimeType || "").toLowerCase().split(";")[0].trim();
+      let encoded = String(image.data || "").trim();
+      const dataUrl = encoded.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
+      if (dataUrl) {
+        mime = dataUrl[1].toLowerCase();
+        encoded = dataUrl[2];
+      }
+      const extByMime: Record<string, string> = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/webp": "webp",
+        "image/gif": "gif"
+      };
+      const extension = extByMime[mime];
+      if (!extension) {
+        skipped.push("第 " + (index + 1) + " 张图片的 MIME 类型不受支持：" + (mime || "unknown"));
+        continue;
+      }
+      if (!encoded || encoded.length > 28_000_000 || !/^[A-Za-z0-9+/=\r\n]+$/.test(encoded)) {
+        skipped.push("第 " + (index + 1) + " 张图片数据为空、格式无效或过大。");
+        continue;
+      }
+
+      try {
+        const binary = atob(encoded.replace(/\s/g, ""));
+        const buffer = new ArrayBuffer(binary.length);
+        const bytes = new Uint8Array(buffer);
+        for (let offset = 0; offset < binary.length; offset++) bytes[offset] = binary.charCodeAt(offset);
+        const safeToolName = toolName.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 32) || "tool";
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const path = await this.uniquePath(
+          attachmentFolder + "/mcp-" + safeToolName + "-" + stamp + "-" + (index + 1),
+          extension
+        );
+        await this.p.app.vault.createBinary(path, buffer);
+        const imageNode: CanvasNodeData = {
+          id: createId(),
+          type: "file",
+          file: path,
+          x: output.x + output.width + 54,
+          y: imageYStart + savedImages * 260,
+          width: 300,
+          height: 230
+        };
+        insertCanvasNode(canvas, imageNode, output.id);
+        savedImages += 1;
+      } catch (error) {
+        skipped.push("第 " + (index + 1) + " 张图片保存失败：" + (error instanceof Error ? error.message : String(error)));
+      }
+    }
+
+    if (savedImages) new Notice("MCP 图片结果已保存为 " + savedImages + " 个关联画布节点。");
+    if (skipped.length) new Notice(skipped.join("\n"), 8000);
+  }
+
   private askGeminiAboutYoutube(): void {
     const selected = this.selected();
     if (!selected) return;
@@ -1826,10 +1913,7 @@ export default class BetterCanvasFeatures {
             const canvas = this.canvas();
             if (canvas) {
               const selection = this.selected(canvas);
-              const node = makeTextNode("# MCP: " + tool.name + "\n\n" + result,
-                selection ? selection.node.x + selection.node.width + 100 : 0,
-                selection ? selection.node.y : 0, { width: 420, height: 260 });
-              insertCanvasNode(canvas, node, selection?.node.id);
+              await this.saveMcpResult(tool.name, result, canvas, selection?.node);
             }
             notice.hide();
           } catch (error) {
@@ -1920,14 +2004,7 @@ export default class BetterCanvasFeatures {
             const canvas = this.canvas();
             if (canvas) {
               const current = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === selection.node.id);
-              const source = current ?? selection.node;
-              const output = makeTextNode(
-                "# MCP: " + approved.toolName + "\n\n" + String(result).slice(0, 12000),
-                source.x + source.width + 100,
-                source.y,
-                { width: 440, height: 280 }
-              );
-              insertCanvasNode(canvas, output, source.id);
+              await this.saveMcpResult(approved.toolName, result, canvas, current ?? selection.node);
             }
             running.hide();
             new Notice("MCP 调用完成；结果已保存为新节点。");
