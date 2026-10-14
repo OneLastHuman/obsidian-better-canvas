@@ -102,11 +102,11 @@ class SseMcpConnection {
       throw new Error("MCP SSE endpoint 必须使用 HTTP 或 HTTPS。");
     }
 
-    const response = await fetch(parsed.toString(), {
+    const response = await this.waitFor(fetch(parsed.toString(), {
       method: "GET",
       headers: this.headers("text/event-stream"),
       signal: this.controller.signal
-    });
+    }), 15_000, "MCP SSE 连接请求超时。");
     if (!response.ok) {
       const detail = (await response.text().catch(() => "")).slice(0, 1000);
       throw new Error("MCP SSE 连接失败（HTTP " + response.status + "）" + (detail ? "：" + detail : ""));
@@ -155,6 +155,9 @@ class SseMcpConnection {
   }
 
   private handleFrame(frame: SseFrame): void {
+    if (frame.event === "error") {
+      throw new Error("MCP SSE 服务报告错误：" + frame.data.slice(0, 1000));
+    }
     if (frame.event === "endpoint") {
       try {
         this.postUrl = resolveSsePostUrl(this.streamUrl, frame.data);
