@@ -53,7 +53,7 @@ This matrix records the current implementation in Better Canvas. “Implemented�
 | PDF pen / highlighter / eraser / undo | Implemented, basic | Red/blue pens, yellow highlighter, path eraser, undo-last-stroke and clear-all; stored in Canvas JSON. Selection, resize, touch input and rotated pages need manual tests |
 | Full PDF annotation tools (highlighter, text selection, multipage toolbar) | Partial | Pinned pages render a transparent selectable text layer and create quoted excerpt nodes; the new “对所选 PDF 页面执行 AI OCR” command transcribes a selected/pinned page through a vision-capable model. Persistent PDF-native highlight annotations, automatic batch OCR for whole documents and a full multipage annotation toolbar remain incomplete |
 | Canvas frontmatter property editor | Implemented, basic | Command adds/updates/deletes one JSON-valued frontmatter property at a time; a richer multi-property editor and schema validation remain |
-| Alternative text renderer / remaining advanced export settings | Partial | PNG/SVG scale and background are configurable; a separate markdown text renderer and full-canvas-content crop independent of the current Canvas viewport still need renderer-specific work |
+| Alternative text renderer / remaining advanced export settings | Partial, expanded | Viewport PNG/SVG scale and background are configurable. New full-content SVG/PNG export uses the union of all node bounds and renders common shapes, text and edges without using the current viewport. Media/PDF file contents and live HTML previews render as labels, not embedded content; a separate Markdown renderer and full parity with Obsidian's DOM renderer remain incomplete |
 
 ## AI Canvas
 
