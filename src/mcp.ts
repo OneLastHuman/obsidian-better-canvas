@@ -6,6 +6,16 @@ export interface RemoteMcpTool {
   inputSchema?: Record<string, unknown>;
 }
 
+export interface RemoteMcpImage {
+  data: string;
+  mimeType: string;
+}
+
+export interface RemoteMcpResult {
+  text: string;
+  images: RemoteMcpImage[];
+}
+
 function parseResponse(response: any): any {
   if (response?.json && typeof response.json === "object") return response.json;
   const body = String(response?.text ?? "");
@@ -83,7 +93,7 @@ export async function callRemoteTool(
   apiKey: string,
   name: string,
   args: Record<string, unknown>
-): Promise<string> {
+): Promise<RemoteMcpResult> {
   if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
   if (!name.trim()) throw new Error("MCP tool 名称不能为空。");
   const init = await initialize(endpoint, apiKey);
@@ -94,11 +104,26 @@ export async function callRemoteTool(
   const value = result.body;
   if (value?.isError) throw new Error("MCP 工具执行失败: " + JSON.stringify(value.content ?? value));
   if (Array.isArray(value?.content)) {
-    return value.content.map((part: any) => {
-      if (typeof part?.text === "string") return part.text;
-      if (part?.type === "image") return "[MCP 返回图片内容，当前版本不支持直接渲染此结果]";
-      return JSON.stringify(part);
-    }).join("\n");
+    const text = value.content
+      .filter((part: any) => typeof part?.text === "string")
+      .map((part: any) => part.text as string)
+      .join("\n");
+    const images: RemoteMcpImage[] = value.content
+      .filter((part: any) =>
+        part?.type === "image" &&
+        typeof part?.data === "string" &&
+        part.data.length > 0 &&
+        typeof part?.mimeType === "string"
+      )
+      .map((part: any) => ({ data: part.data, mimeType: part.mimeType }));
+    const other = value.content
+      .filter((part: any) => part?.type !== "text" && part?.type !== "image")
+      .map((part: any) => JSON.stringify(part))
+      .join("\n");
+    return { text: [text, other].filter(Boolean).join("\n"), images };
   }
-  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  return {
+    text: typeof value === "string" ? value : JSON.stringify(value, null, 2),
+    images: []
+  };
 }
