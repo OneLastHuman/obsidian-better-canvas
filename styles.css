@@ -248,3 +248,32 @@
 .canvas-node[data-bc-shape="reference"] {
   border-radius: 50% !important;
 }
+
+/* Canvas link/backlink explorer */
+.bc-link-explorer-modal {
+  width: min(900px, 90vw);
+}
+.bc-link-explorer-section {
+  margin-top: 1rem;
+}
+.bc-link-explorer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 30vh;
+  overflow: auto;
+}
+.bc-link-explorer-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+}
+.bc-link-explorer-entry small {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
