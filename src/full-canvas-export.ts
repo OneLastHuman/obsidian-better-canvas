@@ -186,7 +186,19 @@ function renderNode(node: CanvasNodeData, index: number): string {
 
   const text = wrapNodeText(node, clipId);
   const clipPath = '<clipPath id="' + clipId + '"><rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="5"/></clipPath>';
-  return clipPath + '<g class="bc-full-node">' + geometry + text + "</g>";
+  const imageDataUrl = typeof (node as any).bcExportImageDataUrl === "string"
+    ? String((node as any).bcExportImageDataUrl)
+    : "";
+  const imageMarkup = imageDataUrl.startsWith("data:image/") && node.type === "file"
+    ? '<image x="' + (x + 6) + '" y="' + (y + 6) + '" width="' + Math.max(1, width - 12) +
+      '" height="' + Math.max(1, height - 30) + '" href="' + xml(imageDataUrl) +
+      '" preserveAspectRatio="xMidYMid meet" clip-path="url(#' + clipId + ')"/>'
+    : "";
+  const displayedText = imageMarkup && typeof node.file === "string"
+    ? '<text x="' + (x + 8) + '" y="' + (y + height - 8) + '" font-family="Inter,Arial,sans-serif" font-size="11" fill="#5b6470">' +
+      xml(node.file.split("/").pop() ?? node.file) + "</text>"
+    : text;
+  return clipPath + '<g class="bc-full-node">' + geometry + imageMarkup + displayedText + "</g>";
 }
 
 /**
