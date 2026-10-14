@@ -1,7 +1,7 @@
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
 
 export type NodeShape = "default" | "pill" | "diamond" | "parallelogram" | "hexagon";
-export type BorderStyle = "solid" | "dashed" | "dotted" | "double";
+export type BorderStyle = "solid" | "dashed" | "dotted" | "double" | "invisible";
 
 const CANONICAL_NODE_SHAPES: Record<string, string> = {
   default: "rectangle",
