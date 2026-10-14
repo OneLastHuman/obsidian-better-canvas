@@ -635,16 +635,42 @@ export default class BetterCanvasPlugin extends Plugin {
       new Notice("请先打开一个 Obsidian Canvas。");
       return;
     }
-    const slides = readCanvasData(canvas).nodes
-      .filter(node => node.type !== "group")
-      .slice()
-      .sort((a, b) => a.x - b.x || a.y - b.y)
-      .map(node => ({
-        title: typeof node.text === "string" && node.text.trim()
-          ? node.text.split("\n")[0].slice(0, 100)
-          : (node.file ?? node.url ?? node.type),
-        body: simpleNodeText(node)
-      }));
+    const data = readCanvasData(canvas);
+    const nodes = data.nodes.filter(node => node.type !== "group");
+    const nodeMap = new Map(nodes.map(node => [node.id, node] as [string, CanvasNodeData]));
+    const outgoing = new Map<string, string[]>();
+    const incoming = new Set<string>();
+    for (const edge of data.edges) {
+      if (!nodeMap.has(edge.fromNode) || !nodeMap.has(edge.toNode)) continue;
+      const children = outgoing.get(edge.fromNode) ?? [];
+      children.push(edge.toNode);
+      outgoing.set(edge.fromNode, children);
+      incoming.add(edge.toNode);
+    }
+    const spatialOrder = (a: CanvasNodeData, b: CanvasNodeData) => a.x - b.x || a.y - b.y;
+    for (const [id, children] of outgoing.entries()) {
+      children.sort((a, b) => spatialOrder(nodeMap.get(a)!, nodeMap.get(b)!));
+      outgoing.set(id, children);
+    }
+    const roots = nodes.filter(node => !incoming.has(node.id)).slice().sort(spatialOrder);
+    const ordered: CanvasNodeData[] = [];
+    const visited = new Set<string>();
+    const visit = (id: string): void => {
+      if (visited.has(id)) return;
+      const node = nodeMap.get(id);
+      if (!node) return;
+      visited.add(id);
+      ordered.push(node);
+      for (const childId of outgoing.get(id) ?? []) visit(childId);
+    };
+    for (const root of roots) visit(root.id);
+    for (const node of nodes.slice().sort(spatialOrder)) visit(node.id);
+    const slides = ordered.map(node => ({
+      title: typeof node.text === "string" && node.text.trim()
+        ? node.text.split("\n")[0].slice(0, 100)
+        : (node.file ?? node.url ?? node.type),
+      body: simpleNodeText(node)
+    }));
     new PresentationModal(this.app, slides).open();
   }
 }
