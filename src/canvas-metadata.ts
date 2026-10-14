@@ -16,6 +16,10 @@ export class CanvasMetadataIndexer {
   private enabled: () => boolean;
   private indexing = new Set<string>();
   private stopped = false;
+  private backlinkScanDepth = 0;
+  private originalGetMarkdownFiles: ((...args: any[]) => any) | null = null;
+  private getMarkdownFilesWrapper: ((...args: any[]) => any) | null = null;
+  private backlinkWrappers = new Map<any, { original: (...args: any[]) => any; wrapped: (...args: any[]) => any }>();
 
   constructor(app: any, plugin: any, enabled: () => boolean) {
     this.app = app;
@@ -40,6 +44,7 @@ export class CanvasMetadataIndexer {
       return original.call(this, path, ...args);
     };
     this.cache.getCache = this.getCacheWrapper;
+    this.installBacklinkBridge();
 
     this.plugin.register(() => this.stop());
     this.plugin.registerEvent(this.app.vault.on("create", (file: any) => this.queueIfCanvas(file)));
@@ -58,7 +63,12 @@ export class CanvasMetadataIndexer {
       delete this.cache.unresolvedLinks?.[file.path];
       if (this.cache.fileCache) delete this.cache.fileCache[file.path];
     }));
-    this.app.workspace.onLayoutReady(() => this.refreshAll());
+    this.plugin.registerEvent(this.app.workspace.on("layout-change", () => this.patchBacklinkViews()));
+    this.plugin.registerEvent(this.app.workspace.on("active-leaf-change", () => this.patchBacklinkViews()));
+    this.app.workspace.onLayoutReady(() => {
+      this.patchBacklinkViews();
+      this.refreshAll();
+    });
   }
 
   stop(): void {
@@ -68,12 +78,77 @@ export class CanvasMetadataIndexer {
     }
     this.getCacheWrapper = null;
     this.originalGetCache = null;
+    const vault = this.app?.vault as any;
+    if (vault && this.originalGetMarkdownFiles && vault.getMarkdownFiles === this.getMarkdownFilesWrapper) {
+      vault.getMarkdownFiles = this.originalGetMarkdownFiles;
+    }
+    this.originalGetMarkdownFiles = null;
+    this.getMarkdownFilesWrapper = null;
+    for (const [target, patch] of this.backlinkWrappers) {
+      if (target.recomputeBacklink === patch.wrapped) target.recomputeBacklink = patch.original;
+    }
+    this.backlinkWrappers.clear();
   }
 
   refreshAll(): void {
     if (this.stopped || !this.enabled()) return;
     const files = this.app.vault.getFiles().filter((file: TFile) => this.isCanvasPath(file.path));
     for (const file of files) void this.index(file);
+  }
+
+  private installBacklinkBridge(): void {
+    const vault = this.app?.vault as any;
+    if (!vault || typeof vault.getMarkdownFiles !== "function") return;
+    this.originalGetMarkdownFiles = vault.getMarkdownFiles;
+    const original = this.originalGetMarkdownFiles!;
+    const self = this;
+    this.getMarkdownFilesWrapper = function (...args: any[]) {
+      const files = original.apply(this, args) as TFile[];
+      if (self.backlinkScanDepth <= 0) return files;
+      const canvases = self.app.vault.getFiles().filter((file: TFile) => self.isCanvasPath(file.path));
+      const unique = new Map<string, TFile>();
+      for (const file of [...files, ...canvases]) unique.set(file.path, file);
+      return [...unique.values()];
+    };
+    vault.getMarkdownFiles = this.getMarkdownFilesWrapper;
+  }
+
+  private patchBacklinkViews(): void {
+    if (this.stopped || !this.enabled()) return;
+    let leaves: any[] = [];
+    try {
+      leaves = this.app.workspace.getLeavesOfType("backlink") ?? [];
+    } catch {
+      return;
+    }
+    for (const leaf of leaves) {
+      const view = leaf?.view;
+      const targets = [view?.backlink, view].filter(Boolean);
+      for (const target of targets) {
+        if (typeof target.recomputeBacklink !== "function" || this.backlinkWrappers.has(target)) continue;
+        const original = target.recomputeBacklink;
+        const self = this;
+        const wrapped = function (...args: any[]) {
+          self.backlinkScanDepth += 1;
+          let result: any;
+          try {
+            result = original.apply(this, args);
+          } catch (error) {
+            self.backlinkScanDepth = Math.max(0, self.backlinkScanDepth - 1);
+            throw error;
+          }
+          if (result && typeof result.then === "function") {
+            return result.finally(() => {
+              self.backlinkScanDepth = Math.max(0, self.backlinkScanDepth - 1);
+            });
+          }
+          self.backlinkScanDepth = Math.max(0, self.backlinkScanDepth - 1);
+          return result;
+        };
+        target.recomputeBacklink = wrapped;
+        this.backlinkWrappers.set(target, { original, wrapped });
+      }
+    }
   }
 
   private isCanvasPath(path: unknown): boolean {
