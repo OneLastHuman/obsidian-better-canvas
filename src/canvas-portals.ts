@@ -416,8 +416,10 @@ export class CanvasPortalManager {
       }, 50);
     };
 
+    let mutationScanTimer: number | undefined;
     const observer = new MutationObserver(() => {
-      window.setTimeout(async () => {
+      if (mutationScanTimer !== undefined) window.clearTimeout(mutationScanTimer);
+      mutationScanTimer = window.setTimeout(async () => {
         const canvas = view?.canvas;
         if (!canvas) return;
         const currentIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
@@ -441,6 +443,7 @@ export class CanvasPortalManager {
       container.removeEventListener("pointerup", onPointerUp, true);
       container.removeEventListener("pointercancel", onPointerUp, true);
       observer.disconnect();
+      if (mutationScanTimer !== undefined) window.clearTimeout(mutationScanTimer);
       this.lastNodeIds.delete(container);
       this.boundViews.delete(container);
     });
@@ -560,6 +563,7 @@ export class CanvasPortalManager {
 
           const sourceEdges = [...source.edges];
           const existingEdgeIds = new Set(sourceEdges.map((edge: CanvasEdgeData) => edge.id));
+          const localEdgesThisPortal = new Set<string>();
           for (const edge of data.edges) {
             const includesCreated = idMap.has(edge.fromNode) || idMap.has(edge.toNode);
             if (!includesCreated) continue;
@@ -578,7 +582,7 @@ export class CanvasPortalManager {
               fromNode: fromNodeId,
               toNode: toNodeId
             } as CanvasEdgeData);
-            localEdgeIds.add(edge.id);
+            localEdgesThisPortal.add(edge.id);
           }
 
           this.writingFiles.set(file.path, view);
@@ -588,6 +592,7 @@ export class CanvasPortalManager {
               nodes: [...source.nodes, ...sourceNodes],
               edges: sourceEdges
             }, null, 2));
+            for (const edgeId of localEdgesThisPortal) localEdgeIds.add(edgeId);
           } finally {
             this.writingFiles.delete(file.path);
           }
