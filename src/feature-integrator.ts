@@ -439,13 +439,22 @@ export default class BetterCanvasFeatures {
   private setNodeShape(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.input("设置节点形状", "default / pill / ellipse / diamond / parallelogram / hexagon / pentagon / octagon / triangle / trapezoid / chevron / cloud", value => {
+    this.input("设置节点形状", "default / rectangle / pill / ellipse / circle / diamond / parallelogram / predefined-process / document / database / hexagon / pentagon / octagon / triangle / trapezoid / chevron / cloud", value => {
       const shape = value.toLowerCase();
-      if (!["default", "pill", "ellipse", "diamond", "parallelogram", "hexagon", "pentagon", "octagon", "triangle", "trapezoid", "chevron", "cloud"].includes(shape)) {
+      if (!["default", "rectangle", "pill", "ellipse", "circle", "diamond", "parallelogram", "predefined-process", "document", "database", "hexagon", "pentagon", "octagon", "triangle", "trapezoid", "chevron", "cloud"].includes(shape)) {
         new Notice("形状无效。");
         return;
       }
-      patchNode(selection.canvas, selection.node.id, { bcShape: shape });
+      const standardShapes = new Set(["rectangle", "pill", "diamond", "parallelogram", "circle", "predefined-process", "document", "database"]);
+      const normalizedShape = shape === "default" ? "rectangle" : shape === "ellipse" ? "circle" : shape;
+      const priorAttributes = (selection.node as any).styleAttributes ?? {};
+      patchNode(selection.canvas, selection.node.id, {
+        bcShape: shape,
+        styleAttributes: {
+          ...priorAttributes,
+          ...(standardShapes.has(normalizedShape) ? { shape: normalizedShape } : {})
+        }
+      });
       this.decorate(selection.canvas);
     });
   }
@@ -459,7 +468,11 @@ export default class BetterCanvasFeatures {
         new Notice("边框样式无效。");
         return;
       }
-      patchNode(selection.canvas, selection.node.id, { bcBorderStyle: style });
+      const priorAttributes = (selection.node as any).styleAttributes ?? {};
+      patchNode(selection.canvas, selection.node.id, {
+        bcBorderStyle: style,
+        styleAttributes: { ...priorAttributes, border: style === "double" ? "solid" : style }
+      });
       this.decorate(selection.canvas);
     });
   }
@@ -532,7 +545,11 @@ export default class BetterCanvasFeatures {
         new Notice("对齐方式无效。");
         return;
       }
-      patchNode(selection.canvas, selection.node.id, { bcTextAlign: align });
+      const priorAttributes = (selection.node as any).styleAttributes ?? {};
+      patchNode(selection.canvas, selection.node.id, {
+        bcTextAlign: align,
+        styleAttributes: { ...priorAttributes, textAlign: ["left", "center", "right"].includes(align) ? align : "left" }
+      });
       this.decorate(selection.canvas);
     }, String((selection.node as any).bcTextAlign ?? "left"));
   }
