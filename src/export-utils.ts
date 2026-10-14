@@ -18,7 +18,7 @@ export function scaleSvgIntrinsicDimensions(svg: string, scale: number): string 
   const fallbackHeight = viewBoxValues?.length === 4 && Number.isFinite(viewBoxValues[3]) ? viewBoxValues[3] : NaN;
 
   const scaleDimension = (name: "width" | "height", fallback: number): void => {
-    const attribute = new RegExp("(^|\\\\s)" + name + "\\\\s*=\\\\s*([\\"'])([^\\"']*)\\\\2", "i");
+    const attribute = new RegExp("(^|\\s)" + name + "\\s*=\\s*([\"'])([^\"']*)\\2", "i");
     const match = attributes.match(attribute);
     const raw = match?.[3] ?? "";
     const numeric = raw.match(/^([0-9]+(?:\.[0-9]+)?)(px|pt|pc|mm|cm|in)?$/i);
