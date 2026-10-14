@@ -239,7 +239,7 @@ CI 会检查类型、测试和构建产物，但不会启动 Obsidian 图形界�
 
 ## 已知限制
 
-- **Portal 已有单层可编辑实现。** 选择“创建 Canvas Portal”并选择另一个 `.canvas` 后，会显示被引用画布的镜像节点/连线；节点更改和删除会同步回源文件，跨 Portal 连线会映射到 Portal 框。还可以运行“在选中 Canvas Portal 中创建文本节点”，把新节点和连线写入 Portal 的源画布。任意点击新建节点还不会自动加入 Portal，嵌套 Portal 仍未支持；请先在测试 Vault 验证同步行为。
+- **Portal 已有单层可编辑实现。** 选择“创建 Canvas Portal”并选择另一个 `.canvas` 后，会显示被引用画布的镜像节点/连线；节点更改和删除会同步回源文件，跨 Portal 连线会映射到 Portal 框。现在也会检测在打开的 Portal 内创建的新普通节点，并尝试将其和同一 Portal 内的连线写回源画布；保留“在选中 Canvas Portal 中创建文本节点”作为显式创建命令。嵌套 Portal、分组框的自动归属及复杂跨 Portal 连线仍需完善；由于使用 Obsidian 内部 Canvas 接口，请先在测试 Vault 验证后再用于重要数据。
 - **PDF 功能仍在完善。** 固定分页支持文本提取与选择、从选中文本创建关联摘录节点、页面图像上下文、红/蓝笔、荧光笔、橡皮擦和撤销；“对所选 PDF 页面执行 AI OCR”会将所选页图像交给支持视觉的模型转录。它仍不是完整 PDF 编辑器，尚不支持 PDF 页面上的原生文字高亮对象、整份文档的自动批量 OCR 或多页批注工具栏。
 - **部分功能依赖内部 API 或 DOM。** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由及节点样式可能随 Obsidian 版本变化。插件自带的链接浏览器会扫描 Markdown 元数据和其他 Canvas JSON；CI 不运行 Obsidian GUI，仍需桌面端实测。
 - **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini API profile 支持模型端点发现和手动指定模型；桌面端还支持本机 Codex CLI 与 OpenCode ACP 文本后端。两种本地后端均需要预先安装和登录，提示词会交给各自配置的模型服务，并不保证离线处理；OpenCode ACP 当前仅支持文本输入，遇到图片/文件上下文会提示切回 API 后端。批量 Prompt 每次最多处理 20 篇 Markdown；网页和 YouTube 内容获取、图像生成及 MCP 工具调用受服务 API、权限和内容可访问性影响。HTML 预览在沙盒 iframe 中运行，不授予同源权限，但仍应只预览可信或已检查的代码。
