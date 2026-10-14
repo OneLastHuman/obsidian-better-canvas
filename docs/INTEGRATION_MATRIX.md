@@ -24,8 +24,8 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Node templates | Implemented | Reusable text-node templates preserve dimensions, colors, Advanced JSON Canvas styleAttributes, shape, border, text alignment, custom class, zoom breakpoint and auto-resize settings |
 | Presentation mode | Implemented, basic | Traverses edge-connected nodes, then spatially sorts remaining nodes |
 | Node colors / custom palette | Implemented | Includes configurable color slots |
-| Node shapes | Implemented, expanded flowchart set | Supports standard shapes plus Advanced Canvas aliases for terminal, process, decision, input/output and reference; aliases are saved as canonical JSON Canvas `styleAttributes.shape` values. Some CSS-rendered clip-path shapes may affect node content interaction |
-| Borders / text alignment / custom CSS class | Implemented, basic | Stored on Canvas data and reflected in the plugin's DOM decoration |
+| Node shapes | Implemented, expanded flowchart set | Supports standard shapes plus aliases for terminal, process, decision, input/output and reference; default rectangles omit the non-standard shape attribute, while supported shapes are saved under JSON Canvas `styleAttributes.shape`. Some CSS clip-path shapes may affect node content interaction |
+| Borders / text alignment / custom CSS class | Implemented, expanded | Supports solid, dashed, dotted, double and invisible borders; the invisible-border effect is CSS-rendered, while standard border values and text alignment are persisted on Canvas data |
 | Edge colors / solid, dashed, dotted path / custom arrow styles | Implemented, basic | Writes both standard `color` / `styleAttributes` and extension fallbacks; exact arrow geometry varies by renderer |
 | Flip incident edge direction | Implemented | Reverses edges touching the selected node |
 | Select incident edges | Implemented | Supports all, incoming and outgoing edge selection |
