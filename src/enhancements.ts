@@ -3,6 +3,36 @@ import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } 
 export type NodeShape = "default" | "pill" | "diamond" | "parallelogram" | "hexagon";
 export type BorderStyle = "solid" | "dashed" | "dotted" | "double";
 
+const CANONICAL_NODE_SHAPES: Record<string, string> = {
+  default: "rectangle",
+  rectangle: "rectangle",
+  process: "rectangle",
+  pill: "pill",
+  terminal: "pill",
+  diamond: "diamond",
+  decision: "diamond",
+  parallelogram: "parallelogram",
+  "input-output": "parallelogram",
+  circle: "circle",
+  ellipse: "circle",
+  reference: "circle",
+  "predefined-process": "predefined-process",
+  document: "document",
+  database: "database",
+  hexagon: "hexagon",
+  pentagon: "pentagon",
+  octagon: "octagon",
+  triangle: "triangle",
+  trapezoid: "trapezoid",
+  chevron: "chevron",
+  cloud: "cloud"
+};
+
+/** Map user-facing flowchart aliases to interoperable Canvas shape names. */
+export function normalizeNodeShape(shape: string): string | undefined {
+  return CANONICAL_NODE_SHAPES[shape.trim().toLowerCase()];
+}
+
 export function patchNode(canvas: any, nodeId: string, patch: Record<string, unknown>): boolean {
   const data = readCanvasData(canvas);
   let found = false;
