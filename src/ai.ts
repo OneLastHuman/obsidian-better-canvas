@@ -5,6 +5,7 @@ export type AIProtocol = "openai" | "anthropic" | "gemini";
 export type ChatMessageContent = string | Array<
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string; detail?: "auto" | "low" | "high" } }
+  | { type: "file_data"; file_data: { file_uri: string; mime_type?: string } }
 >;
 
 export interface AISettings {
@@ -96,6 +97,9 @@ function anthropicContent(content: ChatMessageContent): any {
   if (typeof content === "string") return content;
   return content.map(part => {
     if (part.type === "text") return { type: "text", text: part.text };
+    if (part.type === "file_data") {
+      return { type: "text", text: "[Video URL omitted: native URL video context is supported only by the Gemini adapter]" };
+    }
     const image = imageDataUrl(part.image_url.url);
     if (!image) return { type: "text", text: "[Image omitted: Anthropic native API currently accepts only base64 data URLs in this adapter]" };
     return {
@@ -111,6 +115,15 @@ function geminiParts(content: ChatMessageContent): any[] {
   for (const part of content) {
     if (part.type === "text") {
       result.push({ text: part.text });
+      continue;
+    }
+    if (part.type === "file_data") {
+      result.push({
+        fileData: {
+          fileUri: part.file_data.file_uri,
+          ...(part.file_data.mime_type ? { mimeType: part.file_data.mime_type } : {})
+        }
+      });
       continue;
     }
     const image = imageDataUrl(part.image_url.url);
