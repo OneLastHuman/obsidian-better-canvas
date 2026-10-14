@@ -74,6 +74,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | PDF page context for AI | Implemented, basic | Extracts selectable text from up to three pages and sends pinned-page raster images to visual models; scanned PDFs without OCR text depend on visual input and model support |
 | Gemini-native public YouTube video context | Implemented, provider-dependent | Command sends `fileData.fileUri` directly to the active Gemini profile; the video must be public and the selected model/account must support it |
 | Provider model discovery and per-node model picker | Implemented, provider-dependent | Queries OpenAI-compatible `/models`, Anthropic `/models`, or Gemini `/models`; falls back to manual model entry when the endpoint is unavailable |
+| Local Codex CLI | Implemented, desktop-only | Runs the configured executable with `codex exec --json --ephemeral --skip-git-repo-check --sandbox read-only -`; uses a temporary working directory, no shell wrapper, timeout and cancel support. Requires an installed/logged-in CLI and uses the provider configured in Codex |
 | Batch prompt for a folder | Implemented, capped | Recursively processes up to 20 Markdown files per invocation; displays each result as a file-linked Canvas node. File text is sent to the configured provider only after the user selects a folder and submits a prompt |
 | Sandboxed interactive HTML preview | Implemented, basic | HTML fenced blocks expose a toggleable sandbox iframe without `allow-same-origin`, forms, popups, or top navigation. Remote-resource behavior and very complex demos still require manual checks |
 | All upstream model/provider SDKs, rich model picker and automatic tool routing | Partial | Model discovery is available for three API protocol families; the plugin does not embed every upstream AI SDK or automatically route arbitrary tool calls |
@@ -82,5 +83,5 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 
 - GitHub Actions runs `npm install`, `npm run typecheck`, `npm test` and `npm run build` on pushes and pull requests to `main`.
 - CI verifies TypeScript, helper tests and the production bundle.
-- Recent additions include provider model-list normalization tests and HTML-fence extraction tests; a passing CI run still does not replace Obsidian GUI/device verification.
+- Recent additions include provider model-list normalization, HTML-fence extraction and Codex JSONL event parser tests; a passing CI run still does not replace Obsidian GUI/device verification.
 - CI does not run Obsidian itself. Before releasing, manually test Canvas persistence, keyboard shortcuts, native menus, metadata/backlinks, PDF annotations, image export and real provider requests on the intended desktop/mobile versions.
