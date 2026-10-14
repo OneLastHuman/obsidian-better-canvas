@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeModelNames } from "./model-discovery";
+import { normalizeModelNames } from "./model-list";
 
 describe("provider model-list normalization", () => {
   it("normalizes OpenAI-compatible model IDs and removes duplicates", () => {
