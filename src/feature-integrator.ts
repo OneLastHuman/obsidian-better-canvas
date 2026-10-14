@@ -28,6 +28,7 @@ import {
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { callRemoteTool, listRemoteTools } from "./mcp";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
+import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 
 interface ProviderProfile {
   id: string;
@@ -113,6 +114,7 @@ export default class BetterCanvasFeatures {
   private resizeObservers = new WeakSet<HTMLElement>();
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private metadataIndexer: CanvasMetadataIndexer | null = null;
+  private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
   private p: any;
 
   constructor(plugin: any) {
@@ -123,6 +125,8 @@ export default class BetterCanvasFeatures {
     this.migrateSettings();
     this.metadataIndexer = new CanvasMetadataIndexer(this.p.app, this.p, () => Boolean(this.settings().canvasMetadataEnabled));
     this.metadataIndexer.start();
+    this.pdfPageRenderer = new PinnedPdfPageRenderer(this.p);
+    this.pdfPageRenderer.start();
     this.p.register(() => this.cleanup());
     this.registerCommands();
     this.registerCanvasMenus();
@@ -1449,7 +1453,7 @@ export default class BetterCanvasFeatures {
           id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
           type: "file",
           file: String(node.file),
-          subpath: "#page=" + page,
+          subpath: pinnedPdfSubpath(page),
           pinned: true,
           x: node.x + node.width + 100,
           y: node.y + (page - 1) * 300,
@@ -1461,7 +1465,7 @@ export default class BetterCanvasFeatures {
           pageNode.x + pageNode.width + 50, pageNode.y, { width: 300, height: 230 });
         insertCanvasNode(canvas, annotationNode, pageNode.id);
       }
-      new Notice("已创建 " + count + " 个页面卡片和对应批注节点。此工作区提供手动批注，不包含 PDF 区域标注覆盖层。");
+      new Notice("已创建 " + count + " 个固定渲染页面和对应批注节点。页面批注仍以关联文本节点为主，尚不支持在 PDF 页图上直接绘制标记。");
     }, "10");
   }
   private splitPdfPages(): void {
@@ -1478,7 +1482,7 @@ export default class BetterCanvasFeatures {
           id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
           type: "file",
           file: String(selection.node.file),
-          subpath: "#page=" + page,
+          subpath: pinnedPdfSubpath(page),
           pinned: true,
           x: selection.node.x + selection.node.width + 100,
           y: selection.node.y + (page - 1) * 260,
@@ -1487,7 +1491,7 @@ export default class BetterCanvasFeatures {
         };
         insertCanvasNode(selection.canvas, node, selection.node.id);
       }
-      new Notice("已创建 " + count + " 个 PDF 页面节点。请验证当前 Obsidian 版本对 PDF 子路径的支持。");
+      new Notice("已创建 " + count + " 个固定渲染的 PDF 页面节点。");
     }, "10");
   }
 
