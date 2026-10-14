@@ -39,7 +39,7 @@ This matrix records the current implementation in Better Canvas. “Implemented�
 | Collapse / expand group | Partial | Stores contained nodes/edges as extension data; nested groups, cross-boundary edge handling and clipboard semantics need additional tests |
 | Encapsulate selection into a new Canvas | Implemented | Re-bases moved nodes near the child Canvas origin, preserves internal edges and reconnects crossing edges to the new file node |
 | Export JSON Canvas | Implemented | Saves a separate .canvas file in the Vault |
-| Export PNG / SVG | Implemented, basic | Uses html-to-image against the Canvas DOM; embeds/fonts/very large canvases may need manual testing |
+| Export PNG / SVG | Implemented, configurable | Uses html-to-image against the Canvas DOM; PNG/SVG scale is configurable from 1x to 4x and a transparent or CSS-color background can be selected. Embeds/fonts/very large canvases may need manual testing |
 | Copy node Wikilink / embed Canvas node in Markdown | Partial | Supports `[[file.canvas#node-id]]` and an embed-style preview using a Markdown post-processor |
 | Auto edges from file-node frontmatter | Implemented, basic | Reads a configurable key, default `canvas-edges` |
 | Metadata cache for .canvas | Implemented, opt-in / internal API | Indexes text-node links, file nodes and Canvas frontmatter for cache/resolved-link consumers. Obsidian upgrade testing required |
@@ -47,13 +47,13 @@ This matrix records the current implementation in Better Canvas. “Implemented�
 | Direct / square / A-star edge pathfinding | Implemented, basic | Writes standard `styleAttributes.pathfindingMethod`, draws custom SVG paths and caches routes; complex nested/group endpoints and all native drag-time behavior need manual testing |
 | Floating-side routing | Implemented, basic | Floating endpoints are re-docked to the side facing the other node; recomputation occurs after Canvas interaction |
 | Every custom arrow geometry | Partial | Basic arrow styles are rendered; every Advanced Canvas geometry detail is not fully replicated |
-| Full Advanced JSON Canvas style-attribute compatibility | Partial | Common node/edge settings are stored, but the entire upstream format and all style renderers are not covered |
+| Full Advanced JSON Canvas style-attribute compatibility | Partial, extensible | A raw JSON editor can preserve arbitrary `styleAttributes` on a selected node or edge; only attributes supported by the active Obsidian renderer will affect appearance, and the entire upstream format is not covered |
 | Editable Canvas Portal | Implemented, basic / single level | Mirrors nodes/edges from another `.canvas` with isolated IDs, syncs edits/deletions back to the source, and maps cross-portal edges to the frame. The command `在选中 Canvas Portal 中创建文本节点` adds a new text node and edge directly to the source Canvas, then refreshes mirrors. Arbitrary nodes created by clicking inside the Portal are not automatically assigned to it; nested Portal expansion is still deferred. Source sync uses Obsidian internal view serialization and needs desktop validation |
 | PDF page splitting / fixed page rendering | Implemented, basic | Pinned PDF pages are rendered into Canvas file nodes through Obsidian's PDF embed registry |
 | PDF pen / highlighter / eraser / undo | Implemented, basic | Red/blue pens, yellow highlighter, path eraser, undo-last-stroke and clear-all; stored in Canvas JSON. Selection, resize, touch input and rotated pages need manual tests |
 | Full PDF annotation tools (highlighter, text selection, multipage toolbar) | Not yet complete | Current overlay is a freehand layer, not a full PDF editor |
 | Canvas frontmatter property editor | Implemented, basic | Command adds/updates/deletes one JSON-valued frontmatter property at a time; a richer multi-property editor and schema validation remain |
-| Alternative text renderer / all advanced export settings | Not yet complete | Needs further renderer-specific work |
+| Alternative text renderer / remaining advanced export settings | Partial | PNG/SVG scale and background are configurable; a separate markdown text renderer and full-canvas-content crop independent of the current Canvas viewport still need renderer-specific work |
 
 ## AI Canvas
 
