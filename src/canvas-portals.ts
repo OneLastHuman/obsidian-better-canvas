@@ -220,13 +220,22 @@ export class CanvasPortalManager {
 
     // Reconcile live cross-portal connections with the source data embedded
     // on each portal node. Then remove synthetic data before rebuilding it.
+    const readyPortalIds = this.readyPortalIds.get(view) ?? new Set<string>();
     for (const portalNode of canonical.nodes.filter(isCanvasFileNode)) {
       if (portalNode.portal !== true && !loadedPortalIds.has(portalNode.id)) continue;
       const previous = storedCrossEdges.get(portalNode.id) ?? [];
       const observed = currentCrossEdges.get(portalNode.id) ?? [];
       const merged = new Map<string, CanvasEdgeData>();
-      for (const edge of previous) merged.set(edge.id, deepClone(edge));
+
+      // Before a portal has loaded, the live scene may contain only the frame
+      // node, so preserve stored crossings until the source graph is mirrored.
+      // After loading, the live edge list is authoritative: omissions mean the
+      // user deleted that edge, and stale cached crossings must not reappear.
+      if (!readyPortalIds.has(portalNode.id)) {
+        for (const edge of previous) merged.set(edge.id, deepClone(edge));
+      }
       for (const edge of observed) merged.set(edge.id, deepClone(edge));
+
       if (portalNode.portal === true) {
         if (merged.size) (portalNode as any).bcPortalEdges = [...merged.values()];
         else delete (portalNode as any).bcPortalEdges;
