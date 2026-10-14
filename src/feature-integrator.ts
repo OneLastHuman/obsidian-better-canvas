@@ -21,6 +21,7 @@ import {
   reorderNode,
   resizeNodeToText,
   styleSelectedEdges,
+  styleSelectedEdgeArrow,
   toggleGroupCollapse
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
@@ -239,6 +240,8 @@ export default class BetterCanvasFeatures {
     add("bc-set-node-color", "设置节点颜色", () => this.setNodeColor());
     add("bc-set-node-shape", "设置节点形状", () => this.setNodeShape());
     add("bc-set-node-border", "设置节点边框样式", () => this.setNodeBorder());
+    add("bc-set-node-text-align", "设置所选节点文字对齐", () => this.setNodeTextAlign());
+    add("bc-set-edge-arrow", "设置所选连线箭头样式", () => this.edgeArrowStyle());
     add("bc-resize-node", "根据文字自动调整节点尺寸", () => this.resizeNode());
     add("bc-toggle-auto-resize", "切换所选节点自动调整尺寸", () => this.toggleAutoResize());
     add("bc-flip-edges", "翻转节点关联的连线", () => this.flipEdges());
@@ -276,6 +279,7 @@ export default class BetterCanvasFeatures {
       if (!menu?.addItem || !node?.id) return;
       const actions: Array<[string, string, () => void]> = [
         ["设置节点形状", "shapes", () => this.setNodeShape()],
+        ["设置节点文字对齐", "align-center", () => this.setNodeTextAlign()],
         ["设置节点颜色", "palette", () => this.setNodeColor()],
         ["复制节点 Wikilink", "link", () => void this.copyNodeLink()],
         ["翻转关联连线", "git-compare", () => this.flipEdges()],
@@ -363,9 +367,9 @@ export default class BetterCanvasFeatures {
   private setNodeShape(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.input("设置节点形状", "default / pill / diamond / parallelogram / hexagon", value => {
+    this.input("设置节点形状", "default / pill / ellipse / diamond / parallelogram / hexagon / pentagon / octagon / triangle / trapezoid / chevron / cloud", value => {
       const shape = value.toLowerCase();
-      if (!["default", "pill", "diamond", "parallelogram", "hexagon"].includes(shape)) {
+      if (!["default", "pill", "ellipse", "diamond", "parallelogram", "hexagon", "pentagon", "octagon", "triangle", "trapezoid", "chevron", "cloud"].includes(shape)) {
         new Notice("形状无效。");
         return;
       }
@@ -388,6 +392,32 @@ export default class BetterCanvasFeatures {
     });
   }
 
+  private setNodeTextAlign(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    this.input("设置节点文字对齐", "left / center / right / justify", value => {
+      const align = value.trim().toLowerCase();
+      if (!["left", "center", "right", "justify"].includes(align)) {
+        new Notice("对齐方式无效。");
+        return;
+      }
+      patchNode(selection.canvas, selection.node.id, { bcTextAlign: align });
+      this.decorate(selection.canvas);
+    }, String((selection.node as any).bcTextAlign ?? "left"));
+  }
+
+  private edgeArrowStyle(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    this.input("设置连线箭头样式", "default / triangle-outline / half-triangle / thin-triangle / diamond / diamond-outline / circle / circle-outline / blunt / none", value => {
+      const allowed = ["default", "triangle-outline", "half-triangle", "thin-triangle", "diamond", "diamond-outline", "circle", "circle-outline", "blunt", "none"];
+      const style = value.trim().toLowerCase();
+      if (!allowed.includes(style)) { new Notice("箭头样式无效。"); return; }
+      const count = styleSelectedEdgeArrow(canvas, style as any);
+      this.decorate(canvas);
+      new Notice(count ? "已设置 " + count + " 条连线的箭头样式。" : "请先选择一条或多条连线。");
+    }, "default");
+  }
   private resizeNode(): void {
     const selection = this.selected();
     if (!selection) return;
