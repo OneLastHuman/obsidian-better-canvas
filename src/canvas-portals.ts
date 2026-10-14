@@ -632,6 +632,7 @@ export class CanvasPortalManager {
     const ready = this.readyPortalIds.get(view) ?? new Set<string>();
     for (const portalNode of portalNodes) {
       if (!ready.has(portalNode.id)) continue;
+      if (typeof portalNode.file !== "string" || !portalNode.file) continue;
       if (this.writingFiles.has(portalNode.file)) continue;
       if (typeof view?.file?.path === "string" && portalNode.file === view.file.path) continue;
       const file = this.plugin.app.vault.getAbstractFileByPath(portalNode.file);
