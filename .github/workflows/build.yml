@@ -18,3 +18,15 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Package installable plugin
+        run: |
+          mkdir -p dist/obsidian-better-canvas
+          cp main.js manifest.json styles.css dist/obsidian-better-canvas/
+          (cd dist && zip -qr obsidian-better-canvas.zip obsidian-better-canvas)
+      - name: Upload install package
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-better-canvas-install
+          path: dist/obsidian-better-canvas.zip
+          if-no-files-found: error
+          retention-days: 14

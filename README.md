@@ -73,11 +73,27 @@ AI 能力取决于所配置服务的 API、模型、账号权限和内容可访�
 
 ## 安装
 
-目前可按开发版方式构建和安装。
+### 直接安装（推荐）
 
-### 1. 构建插件
+1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)，下载对应版本的 `obsidian-better-canvas.zip`。
+2. 将 ZIP 解压到 Vault 的插件目录 `<Vault>/.obsidian/plugins/`。压缩包内已包含 `obsidian-better-canvas/` 文件夹，确认最终结构如下：
 
-需要安装 Node.js 和 npm。在终端运行：
+   ```text
+   <Vault>/.obsidian/plugins/obsidian-better-canvas/
+   ├── main.js
+   ├── manifest.json
+   └── styles.css
+   ```
+
+3. 打开 Obsidian 的 **设置 → 社区插件**，重新加载插件列表并启用 **Better Canvas**。
+
+Releases 会提供 ZIP 安装包和 `main.js`、`manifest.json`、`styles.css` 三个独立文件。若要手动安装独立文件，请先创建 `<Vault>/.obsidian/plugins/obsidian-better-canvas/`，再将三个文件都放入该目录。
+
+**尚未发布正式版本时：** 可以在 GitHub 的 **Actions → Build** 中打开最近一次成功的构建，下载 `obsidian-better-canvas-install` 工件。解压工件后，再解压其中的 `obsidian-better-canvas.zip` 到 `<Vault>/.obsidian/plugins/`。工件会保留 14 天；正式发布后建议改用 Releases 中的版本包。
+
+### 从源码构建
+
+需要安装 Node.js 22 和 npm。在终端运行：
 
 ```bash
 git clone https://github.com/OneLastHuman/obsidian-better-canvas.git
@@ -86,25 +102,11 @@ npm install
 npm run build
 ```
 
-### 2. 复制插件文件
-
-将生成或项目中的以下文件复制到 Vault 的插件目录：
-
-- `main.js`
-- `manifest.json`
-- `styles.css`
-
-目标目录：
+构建完成后，将生成的 `main.js` 与项目中的 `manifest.json`、`styles.css` 一起复制到：
 
 ```text
 <Vault>/.obsidian/plugins/obsidian-better-canvas/
 ```
-
-如果目录不存在，请先创建。
-
-### 3. 在 Obsidian 中启用
-
-打开 **设置 → 社区插件**，刷新或重新加载插件列表，然后启用 **Better Canvas**。如果插件未出现，请确认目录名称为 `obsidian-better-canvas`，且上述三个文件都位于该目录的根部。
 
 ## MCP 工具配置
 
