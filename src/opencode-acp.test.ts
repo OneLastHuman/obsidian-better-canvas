@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildACPUserPrompt, textFromACPUpdate } from "./opencode-acp";
+import { buildACPUserPrompt, hasUnsupportedACPContent, textFromACPUpdate } from "./opencode-acp";
 
 describe("buildACPUserPrompt", () => {
   it("preserves system, user, and assistant boundaries", () => {
@@ -45,5 +45,27 @@ describe("textFromACPUpdate", () => {
         sessionUpdate: "tool_call_update", content: { type: "text", text: "not answer text" }
       } }
     }, "session-1")).toBe("");
+  });
+});
+
+
+describe("hasUnsupportedACPContent", () => {
+  it("allows text-only messages", () => {
+    expect(hasUnsupportedACPContent([
+      { role: "system", content: "Be concise" },
+      { role: "user", content: [{ type: "text", text: "Summarize this" }] }
+    ])).toBe(false);
+  });
+
+  it("requires API backend when messages contain images or files", () => {
+    expect(hasUnsupportedACPContent([
+      { role: "user", content: [
+        { type: "text", text: "Read this page" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,AA==" } }
+      ] }
+    ])).toBe(true);
+    expect(hasUnsupportedACPContent([
+      { role: "user", content: [{ type: "file_data", file_data: { file_uri: "vault.pdf" } }] }
+    ])).toBe(true);
   });
 });
