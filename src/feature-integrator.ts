@@ -2975,5 +2975,15 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
           await this.features.save();
         });
       });
+
+    new Setting(c).setName("Local Codex CLI executable")
+      .setDesc("桌面端可选功能。留空使用 PATH 中的 codex；若 Obsidian 无法继承终端 PATH，请填写 codex 可执行文件的绝对路径。需要预先安装并完成 Codex CLI 登录。提示词发送到你在 Codex CLI 中配置的模型供应商；命令以只读沙盒运行。")
+      .addText(text => text
+        .setPlaceholder("codex 或 /absolute/path/to/codex")
+        .setValue(String(s.codexBinaryPath ?? ""))
+        .onChange(async value => {
+          s.codexBinaryPath = value.trim();
+          await this.features.save();
+        }));
   }
 }
