@@ -48,7 +48,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Full Advanced JSON Canvas style-attribute compatibility | Partial | Common node/edge settings are stored, but the entire upstream format and all style renderers are not covered |
 | Editable Canvas Portal | Implemented, basic / single level | Mirrors nodes/edges from another `.canvas` with isolated IDs, syncs edits/deletions back to the source, and maps cross-portal edges to the frame. Adding new nodes from inside a Portal and nested Portal expansion are not yet implemented; source sync uses Obsidian internal view serialization and needs desktop validation |
 | PDF page splitting / fixed page rendering | Implemented, basic | Pinned PDF pages are rendered into Canvas file nodes through Obsidian's PDF embed registry |
-| Freehand PDF page annotations | Implemented, basic | Strokes persist in Canvas JSON; selection, resize, touch input and PDF page rotations require manual tests |
+| PDF pen / highlighter / eraser / undo | Implemented, basic | Red/blue pens, yellow highlighter, path eraser, undo-last-stroke and clear-all; stored in Canvas JSON. Selection, resize, touch input and rotated pages need manual tests |
 | Full PDF annotation tools (highlighter, text selection, multipage toolbar) | Not yet complete | Current overlay is a freehand layer, not a full PDF editor |
 | Canvas frontmatter property editor | Implemented, basic | Command adds/updates/deletes one JSON-valued frontmatter property at a time; a richer multi-property editor and schema validation remain |
 | Alternative text renderer / all advanced export settings | Not yet complete | Needs further renderer-specific work |
@@ -62,14 +62,14 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Regenerate response | Implemented | Requires Better Canvas generation metadata on the response node |
 | Per-node provider / model overrides | Implemented | Stores provider and model identifiers on the node |
 | Multiple provider profiles | Implemented | Native OpenAI-compatible, Anthropic Messages and Gemini adapters; providers with unsupported APIs may need a compatible gateway |
-| Connected image vision context | Implemented, basic | Sends up to four connected local image files under a size limit; remote images and PDFs are not fully handled |
+| Connected image / pinned PDF page vision context | Implemented, basic | Sends up to four connected local image files or rasterized pinned PDF pages. Remote image URLs are not fetched automatically |
 | Image generation to Vault | Implemented, provider-dependent | OpenAI-compatible Images endpoint or compatible Gemini image model; not every gateway supports it |
 | Related research questions / title generation / idea expansion | Implemented | Uses model-produced structured responses |
 | Flashcard generation | Implemented | Can create flashcard nodes; does not directly create a spaced-repetition deck |
 | Webpage text ingestion | Implemented, best-effort | JavaScript-only, login-gated and anti-bot pages may fail |
 | YouTube caption ingestion | Implemented, best-effort | Requires accessible captions; videos without retrievable captions cannot be transcribed |
 | MCP remote tools | Implemented, remote Streamable HTTP | Does not support stdio or SSE-only MCP servers; endpoint/tool arguments are user-configured |
-| PDF page context for AI | Partial | PDF is rendered and can be freehand annotated in a pinned page node, but AI context does not yet extract the PDF page's text or pixels |
+| PDF page context for AI | Implemented, basic | Extracts selectable text from up to three pages and sends pinned-page raster images to visual models; scanned PDFs without OCR text depend on visual input and model support |
 | Gemini-native public YouTube video context | Implemented, provider-dependent | Command sends `fileData.fileUri` directly to the active Gemini profile; the video must be public and the selected model/account must support it |
 | All upstream model/provider SDKs, rich model picker and automatic tool routing | Partial | Core profiles and manual MCP tool calls work; not every upstream provider feature is replicated |
 
