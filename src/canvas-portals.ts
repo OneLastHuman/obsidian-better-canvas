@@ -93,6 +93,7 @@ export class CanvasPortalManager {
   private signatures = new WeakMap<object, string>();
   private writingFiles = new Map<string, any>();
   private lastPortalPositions = new WeakMap<object, Map<string, { x: number; y: number }>>();
+  private readyPortalIds = new WeakMap<object, Set<string>>();
   private stopped = false;
 
   constructor(plugin: any) {
@@ -280,6 +281,9 @@ export class CanvasPortalManager {
       }
     }
     this.signatures.set(view, nextSignature);
+    // A portal may write back only after its source graph has been loaded into mirrors.
+    // This prevents a save event during the initial open from wiping the source file.
+    this.readyPortalIds.set(view, new Set(snapshots.map(snapshot => snapshot.portalId)));
     const positions = new Map<string, { x: number; y: number }>();
     for (const portalNode of portalNodes) positions.set(portalNode.id, { x: portalNode.x, y: portalNode.y });
     this.lastPortalPositions.set(view, positions);
@@ -425,7 +429,9 @@ export class CanvasPortalManager {
     if (!canvas || this.stopped) return;
     const data = readCanvasData(canvas);
     const portalNodes = data.nodes.filter((node: any) => isCanvasFileNode(node) && node.portal === true);
+    const ready = this.readyPortalIds.get(view) ?? new Set<string>();
     for (const portalNode of portalNodes) {
+      if (!ready.has(portalNode.id)) continue;
       if (typeof view?.file?.path === "string" && portalNode.file === view.file.path) continue;
       const file = this.plugin.app.vault.getAbstractFileByPath(portalNode.file);
       if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas") continue;
