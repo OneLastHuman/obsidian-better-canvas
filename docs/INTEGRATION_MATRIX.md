@@ -10,6 +10,8 @@ This matrix distinguishes code included in Better Canvas from features that stil
 | Create sibling node | Implemented | Enter / command palette; requires a parent edge |
 | Create floating node | Implemented | Command palette and Ctrl/Cmd + arrow |
 | Create directional child node | Implemented | Ctrl/Cmd + Shift + arrow |
+| AI-generated mind map | Implemented, basic | Builds connected nodes from a structured AI JSON response; malformed references are skipped |
+| AI-generated standalone flashcards | Implemented | Builds one question/answer node per card; output schema depends on the configured model |
 | Navigate adjacent nodes | Implemented | Alt + arrow |
 | Tree selection | Implemented | Command selects descendants of a selected root |
 | LR / RL / TB / BT tree layout | Implemented | Current layout algorithm handles cycles by avoiding repeated nodes |
