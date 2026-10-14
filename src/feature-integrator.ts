@@ -814,34 +814,88 @@ export default class BetterCanvasFeatures {
       new Notice("请先选择要封装的节点。");
       return;
     }
-    const edges = data.edges.filter((edge: any) => ids.has(edge.fromNode) && ids.has(edge.toNode));
+    const childEdges = data.edges.filter((edge: any) => ids.has(edge.fromNode) && ids.has(edge.toNode));
     this.input("封装选区", "新 Canvas 文件名（不需要扩展名）", async name => {
       const base = name.replace(/[\\/:*?"<>|]/g, "-").trim();
       if (!base) return;
-      const view = this.activeCanvasView();
-      const folder = view?.file?.parent?.path ?? "";
-      const pathBase = (folder ? folder + "/" : "") + base;
-      const filePath = await this.uniquePath(pathBase, "canvas");
-      const selectedCenterX = nodes.reduce((sum: number, node: CanvasNodeData) => sum + node.x + node.width / 2, 0) / nodes.length;
-      const selectedCenterY = nodes.reduce((sum: number, node: CanvasNodeData) => sum + node.y + node.height / 2, 0) / nodes.length;
-      await this.p.app.vault.create(filePath, JSON.stringify({ nodes, edges }, null, 2));
-      const fileNode: CanvasNodeData = {
-        id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
-        type: "file",
-        file: filePath,
-        x: selectedCenterX - 150,
-        y: selectedCenterY - 100,
-        width: 300,
-        height: 200
-      };
-      canvas.importData({
-        ...data,
-        nodes: [...data.nodes.filter((node: CanvasNodeData) => !ids.has(node.id)), fileNode],
-        edges: data.edges.filter((edge: any) => !ids.has(edge.fromNode) && !ids.has(edge.toNode))
-      });
-      canvas.requestSave?.();
-      canvas.requestFrame?.();
-      new Notice("选区已移动到 " + filePath);
+      try {
+        const view = this.activeCanvasView();
+        const folder = view?.file?.parent?.path ?? "";
+        const pathBase = (folder ? folder + "/" : "") + base;
+        const filePath = await this.uniquePath(pathBase, "canvas");
+
+        // Rebase the moved subgraph so that it opens around the Canvas origin.
+        const minX = Math.min(...nodes.map((node: CanvasNodeData) => node.x));
+        const minY = Math.min(...nodes.map((node: CanvasNodeData) => node.y));
+        const maxX = Math.max(...nodes.map((node: CanvasNodeData) => node.x + node.width));
+        const maxY = Math.max(...nodes.map((node: CanvasNodeData) => node.y + node.height));
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const movedNodes = nodes.map((node: CanvasNodeData) => ({
+          ...node,
+          x: node.x - centerX,
+          y: node.y - centerY
+        }));
+        await this.p.app.vault.create(filePath, JSON.stringify({ nodes: movedNodes, edges: childEdges }, null, 2));
+
+        const fileNode: CanvasNodeData = {
+          id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
+          type: "file",
+          file: filePath,
+          x: centerX - 150,
+          y: centerY - 100,
+          width: 300,
+          height: 200
+        };
+
+        const outerEdges = data.edges.flatMap((edge: any) => {
+          const fromSelected = ids.has(edge.fromNode);
+          const toSelected = ids.has(edge.toNode);
+          if (fromSelected && toSelected) return [];
+          if (!fromSelected && !toSelected) return [edge];
+
+          const outsideId = fromSelected ? edge.toNode : edge.fromNode;
+          const outsideNode = data.nodes.find((node: CanvasNodeData) => node.id === outsideId);
+          if (!outsideNode) return [];
+
+          const fromNode = fromSelected ? fileNode : outsideNode;
+          const toNode = toSelected ? fileNode : outsideNode;
+          const fromCenterX = fromNode.x + fromNode.width / 2;
+          const fromCenterY = fromNode.y + fromNode.height / 2;
+          const toCenterX = toNode.x + toNode.width / 2;
+          const toCenterY = toNode.y + toNode.height / 2;
+          const dx = toCenterX - fromCenterX;
+          const dy = toCenterY - fromCenterY;
+          let fromSide: string;
+          let toSide: string;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            fromSide = dx >= 0 ? "right" : "left";
+            toSide = dx >= 0 ? "left" : "right";
+          } else {
+            fromSide = dy >= 0 ? "bottom" : "top";
+            toSide = dy >= 0 ? "top" : "bottom";
+          }
+
+          return [{
+            ...edge,
+            fromNode: fromSelected ? fileNode.id : edge.fromNode,
+            toNode: toSelected ? fileNode.id : edge.toNode,
+            fromSide,
+            toSide
+          }];
+        });
+
+        canvas.importData({
+          ...data,
+          nodes: [...data.nodes.filter((node: CanvasNodeData) => !ids.has(node.id)), fileNode],
+          edges: outerEdges
+        });
+        canvas.requestSave?.();
+        canvas.requestFrame?.();
+        new Notice("选区已移动到 " + filePath + "；跨越选区边界的连线已连接到新 Canvas 节点。");
+      } catch (error) {
+        new Notice("封装选区失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+      }
     });
   }
 
