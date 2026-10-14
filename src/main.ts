@@ -174,7 +174,7 @@ class PresentationModal extends Modal {
 }
 
 export default class BetterCanvasPlugin extends Plugin {
-  settings: BetterCanvasSettings;
+  declare settings: BetterCanvasSettings;
   private boundContainers = new WeakSet<HTMLElement>();
 
   async onload(): Promise<void> {
