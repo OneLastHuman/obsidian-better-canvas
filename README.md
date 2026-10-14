@@ -15,6 +15,27 @@ Better Canvas 是一款面向 Obsidian Canvas 的增强插件，整合节点与�
 
 > **项目状态：** 当前项目仍在持续整合和验证中。部分功能依赖 Obsidian 的内部 API 或特定渲染行为，代码已实现不代表已在所有 Obsidian 版本、桌面端和移动端完成验证。请参考[功能整合矩阵](docs/INTEGRATION_MATRIX.md)了解具体覆盖状态。
 
+## 界面预览
+
+以下预览使用本地渲染环境制作，依据插件当前的功能范围展示 Canvas 节点样式、思维导图布局与 AI 节点工作流。**它们是界面示意图，并非从 Obsidian 实际运行中截取的截图**；实际外观会受到 Obsidian 版本、主题和服务配置影响。
+
+<p align="center">
+  <img src="docs/screenshots/canvas-enhancements.svg" alt="Canvas 节点颜色、连线和样式控制界面预览" width="100%" />
+</p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>思维导图与自动布局</strong><br />
+      <img src="docs/screenshots/mind-map.svg" alt="思维导图分支、节点关系和布局方向界面预览" width="100%" />
+    </td>
+    <td width="50%" valign="top">
+      <strong>AI 辅助工作流</strong><br />
+      <img src="docs/screenshots/ai-workflow.svg" alt="AI 上下文、生成回答与关联节点界面预览" width="100%" />
+    </td>
+  </tr>
+</table>
+
 ## 功能概览
 
 ### Canvas 增强
