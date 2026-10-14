@@ -547,15 +547,49 @@ export default class BetterCanvasFeatures {
       const node = canvas.nodes?.get?.(item.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
       if (!(element instanceof HTMLElement)) continue;
-      if (typeof (item as any).bcNodeColor === "string") element.style.borderColor = String((item as any).bcNodeColor);
-      element.dataset.bcShape = typeof (item as any).bcShape === "string" ? String((item as any).bcShape) : "default";
-      element.dataset.bcBorder = typeof (item as any).bcBorderStyle === "string" ? String((item as any).bcBorderStyle) : "solid";
-      const previousClass = element.dataset.bcCustomClass;
-      if (previousClass) element.classList.remove("bc-user-" + previousClass);
+      const host = (element.closest(".canvas-node") as HTMLElement | null) ?? element;
+      if (typeof (item as any).bcNodeColor === "string") host.style.borderColor = String((item as any).bcNodeColor);
+      host.dataset.bcShape = typeof (item as any).bcShape === "string" ? String((item as any).bcShape) : "default";
+      host.dataset.bcBorder = typeof (item as any).bcBorderStyle === "string" ? String((item as any).bcBorderStyle) : "solid";
+      const previousClass = host.dataset.bcCustomClass;
+      if (previousClass) host.classList.remove("bc-user-" + previousClass);
       const nextClass = typeof (item as any).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item as any).bcCustomClass))
         ? String((item as any).bcCustomClass) : "";
-      if (nextClass) element.classList.add("bc-user-" + nextClass);
-      element.dataset.bcCustomClass = nextClass;
+      if (nextClass) host.classList.add("bc-user-" + nextClass);
+      host.dataset.bcCustomClass = nextClass;
+
+      if (canvas?.wrapperEl?.classList?.contains("bc-readonly") || item.type === "group") {
+        host.querySelector(":scope > .bc-card-toolbar")?.remove();
+        host.classList.remove("bc-has-card-toolbar");
+        continue;
+      }
+      if (!host.querySelector(":scope > .bc-card-toolbar")) {
+        const toolbar = host.createDiv({ cls: "bc-card-toolbar" });
+        const actions: Array<{ label: string; title: string; run: () => void }> = [
+          { label: "AI", title: "向此节点提问", run: () => this.askSelectedNode(item.id) },
+          { label: "Img", title: "根据此节点生成图片", run: () => this.generateImageFromSelection(item.id) },
+          { label: "卡片", title: "从此节点生成复习闪卡", run: () => this.generateFlashcardsFromSelection(item.id) },
+          { label: "模型", title: "为此节点选择 AI 模型", run: () => { this.selectNode(canvas, item.id); this.setNodeModel(); } }
+        ];
+        if ((item as any).bcGenerated) {
+          actions.push({ label: "↻", title: "重新生成此 AI 节点", run: () => { this.selectNode(canvas, item.id); void this.regenerate(); } });
+        }
+        for (const action of actions) {
+          const button = toolbar.createEl("button", {
+            cls: "bc-card-action",
+            text: action.label,
+            attr: { type: "button", "aria-label": action.title, title: action.title }
+          });
+          button.addEventListener("pointerdown", event => event.stopPropagation());
+          button.addEventListener("mousedown", event => event.stopPropagation());
+          button.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            action.run();
+          });
+        }
+        host.classList.add("bc-has-card-toolbar");
+      }
     }
     this.applyFocus(canvas);
   }
@@ -1461,7 +1495,60 @@ export default class BetterCanvasFeatures {
         backgroundColor = probe.style.backgroundColor;
       }
 
-      const full = canvasDataToFullSvg(readCanvasData(canvas), { backgroundColor, margin: 48 });
+      const sourceData = readCanvasData(canvas);
+      const exportData = {
+        ...sourceData,
+        nodes: sourceData.nodes.map((node: CanvasNodeData) => ({ ...node })),
+        edges: sourceData.edges.map((edge: any) => ({ ...edge }))
+      };
+      const mimeByExtension: Record<string, string> = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        gif: "image/gif"
+      };
+      const perImageLimit = 3 * 1024 * 1024;
+      const totalImageLimit = 8 * 1024 * 1024;
+      let embeddedImageBytes = 0;
+      let embeddedImageCount = 0;
+      let skippedImageCount = 0;
+
+      for (const node of exportData.nodes) {
+        if (node.type !== "file" || typeof node.file !== "string") continue;
+        const extension = node.file.split(".").pop()?.toLowerCase() ?? "";
+        const mime = mimeByExtension[extension];
+        if (!mime) continue;
+        const file = this.p.app.vault.getAbstractFileByPath(node.file);
+        if (!(file instanceof TFile)) {
+          skippedImageCount++;
+          continue;
+        }
+        if (file.stat.size > perImageLimit || embeddedImageBytes + file.stat.size > totalImageLimit ||
+            embeddedImageCount >= 20) {
+          skippedImageCount++;
+          continue;
+        }
+        try {
+          const buffer = await this.p.app.vault.readBinary(file);
+          if (buffer.byteLength > perImageLimit || embeddedImageBytes + buffer.byteLength > totalImageLimit) {
+            skippedImageCount++;
+            continue;
+          }
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+            binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+          }
+          (node as any).bcExportImageDataUrl = "data:" + mime + ";base64," + btoa(binary);
+          embeddedImageBytes += buffer.byteLength;
+          embeddedImageCount++;
+        } catch {
+          skippedImageCount++;
+        }
+      }
+
+      const full = canvasDataToFullSvg(exportData, { backgroundColor, margin: 48 });
       const filePath = await this.uniquePath(folder + "/" + baseName + "-full-content", format);
       if (format === "svg") {
         await this.p.app.vault.create(filePath, full.svg);
@@ -1502,7 +1589,13 @@ export default class BetterCanvasFeatures {
         output.height = 0;
       }
       notice.hide();
-      new Notice("已导出整张 Canvas：" + filePath);
+      const mediaSummary = embeddedImageCount
+        ? "；已嵌入 " + embeddedImageCount + " 张图片"
+        : "";
+      const skippedSummary = skippedImageCount
+        ? "；有 " + skippedImageCount + " 张图片因大小、格式或读取问题以标签代替"
+        : "";
+      new Notice("已导出整张 Canvas：" + filePath + mediaSummary + skippedSummary);
     } catch (error) {
       notice.hide();
       new Notice("全内容导出失败：" + (error instanceof Error ? error.message : String(error)), 8000);
