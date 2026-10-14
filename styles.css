@@ -233,3 +233,18 @@
   color: transparent;
   background: rgba(45, 125, 255, 0.32);
 }
+
+/* Common Advanced Canvas flowchart aliases; canonical JSON shapes are stored
+   separately in styleAttributes so exported files remain interoperable. */
+.canvas-node[data-bc-shape="terminal"] {
+  border-radius: 999px !important;
+}
+.canvas-node[data-bc-shape="decision"] {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.canvas-node[data-bc-shape="input-output"] {
+  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="reference"] {
+  border-radius: 50% !important;
+}
