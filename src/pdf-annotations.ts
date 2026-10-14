@@ -219,8 +219,8 @@ export class PdfAnnotationManager {
         }
 
         const excerptIndex = latest.nodes.filter((node: any) => node.bcPdfExcerptSource === source.id).length;
-        const quoted = selectedText.slice(0, 10000).split(/\\r?\\n/).map(line => "> " + line).join("\\n");
-        const body = "PDF 摘录\\n\\n" + quoted + (selectedText.length > 10000 ? "\\n\\n（摘录已截断至 10,000 个字符）" : "") + "\\n\\n批注：";
+        const quoted = selectedText.slice(0, 10000).split(/\r?\n/).map(line => "> " + line).join("\n");
+        const body = "PDF 摘录\n\n" + quoted + (selectedText.length > 10000 ? "\n\n（摘录已截断至 10,000 个字符）" : "") + "\n\n批注：";
         const note = makeTextNode(
           body,
           source.x + source.width + 70,
