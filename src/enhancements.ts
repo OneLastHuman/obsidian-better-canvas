@@ -124,7 +124,11 @@ export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" |
     const edgeIds = new Set(data.edges.map(edge => edge.id));
     const nodes = [
       ...data.nodes,
-      ...hiddenNodes.filter(node => !nodeIds.has(node.id))
+      ...hiddenNodes.filter(node => !nodeIds.has(node.id)).map(node => ({
+        ...node,
+        x: group.x + node.x,
+        y: group.y + node.y
+      }))
     ];
     const edges = [
       ...data.edges,
@@ -162,7 +166,7 @@ export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" |
   const nodes = data.nodes
     .filter(node => !containedIds.has(node.id))
     .map(node => node.id === groupId
-      ? { ...node, bcCollapsed: true, bcCollapsedNodes: containedNodes, bcCollapsedEdges: hiddenEdges }
+      ? { ...node, bcCollapsed: true, bcCollapsedNodes: containedNodes.map(child => ({ ...child, x: child.x - group.x, y: child.y - group.y })), bcCollapsedEdges: hiddenEdges }
       : node
     );
   const edges = data.edges.filter(edge => !hiddenEdges.some(hidden => hidden.id === edge.id));
