@@ -5,6 +5,7 @@ import {
   MarkdownPostProcessorContext,
   MarkdownRenderer,
   Notice,
+  Platform,
   PluginSettingTab,
   Setting,
   SuggestModal,
@@ -39,6 +40,7 @@ import { scaleSvgIntrinsicDimensions } from "./export-utils";
 import { extractWikiLinks } from "./canvas-links";
 import { discoverModels } from "./model-discovery";
 import { syncHtmlPreviews } from "./html-preview";
+import { runLocalCodex } from "./codex-cli";
 
 interface ProviderProfile {
   id: string;
@@ -65,6 +67,7 @@ interface FeatureSettings {
   canvasMetadataEnabled: boolean;
   exportPixelRatio: number;
   exportBackgroundColor: string;
+  codexBinaryPath: string;
 }
 
 const DEFAULT_PROFILES: ProviderProfile[] = [{
@@ -323,6 +326,7 @@ export default class BetterCanvasFeatures {
     if (typeof s.customCss !== "string") s.customCss = "";
     if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
     if (typeof s.exportBackgroundColor !== "string") s.exportBackgroundColor = "";
+    if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
     void this.save();
   }
 
@@ -452,6 +456,7 @@ export default class BetterCanvasFeatures {
     add("bc-set-node-model", "为节点指定 AI 模型（自动发现）", () => this.setNodeModel());
     add("bc-run-prompt-folder", "对文件夹批量运行 AI Prompt", () => this.runPromptFolder());
     add("bc-ask-custom-model", "指定模型并向 AI 提问", () => this.askWithModel());
+    add("bc-ask-local-codex", "使用本地 Codex CLI 分析所选节点", () => this.askLocalCodex());
     add("bc-test-provider", "测试当前 AI 供应商连接", () => void this.testProvider());
     add("bc-related-questions", "生成后续研究问题节点", () => void this.generateRelatedQuestions());
     add("bc-generate-title", "生成节点标题或分组名称", () => void this.generateTitleOrGroupName());
@@ -1709,6 +1714,104 @@ export default class BetterCanvasFeatures {
       this.input("向 AI 提问", "例如：总结笔记并指出不确定之处", question =>
         void this.runAI(selection.node.id, question, model), "");
     });
+  }
+
+  private askLocalCodex(): void {
+    if (!Platform.isDesktopApp) {
+      new Notice("本地 Codex CLI 仅支持 Obsidian 桌面版。");
+      return;
+    }
+    const selection = this.selected();
+    if (!selection) return;
+    this.input(
+      "使用本地 Codex CLI",
+      "输入问题或分析任务。提示词与所选节点上下文会交给你的 Codex CLI 配置。",
+      instruction => void this.runLocalCodexForNode(selection.canvas, selection.node, instruction)
+    );
+  }
+
+  private async runLocalCodexForNode(canvas: any, originalNode: CanvasNodeData, instruction: string): Promise<void> {
+    if (!Platform.isDesktopApp) {
+      new Notice("本地 Codex CLI 仅支持 Obsidian 桌面版。");
+      return;
+    }
+
+    const latest = readCanvasData(canvas).nodes.find(node => node.id === originalNode.id);
+    if (!latest) {
+      new Notice("找不到所选节点。");
+      return;
+    }
+    const previous = this.activeGenerations.get(canvas);
+    if (previous) previous.controller.abort();
+
+    const controller = new AbortController();
+    this.activeGenerations.set(canvas, { controller, nodeId: latest.id });
+    const notice = new Notice("正在准备本地 Codex CLI 上下文…", 0);
+
+    try {
+      const context = await this.getNodeContext(canvas, latest.id);
+      if (controller.signal.aborted) {
+        const stopped = new Error("Local Codex generation was cancelled.");
+        stopped.name = "AbortError";
+        throw stopped;
+      }
+      const prompt = [
+        "请分析以下 Obsidian Canvas 节点上下文，并完成用户的任务。",
+        "你运行在 Codex CLI 的 read-only sandbox 中。不要尝试修改、创建或删除文件，也不要声称已经修改 Vault。",
+        "只使用以下提供的上下文。明确区分事实、推论和不确定点。",
+        "",
+        "用户任务：",
+        instruction,
+        "",
+        "Canvas 上下文：",
+        context
+      ].join("\n");
+
+      const answer = await runLocalCodex(prompt, {
+        binaryPath: String(this.settings().codexBinaryPath ?? ""),
+        signal: controller.signal,
+        timeoutMs: 300_000,
+        onProgress: message => notice.setMessage(message)
+      });
+
+      if (controller.signal.aborted) {
+        const stopped = new Error("Local Codex generation was cancelled.");
+        stopped.name = "AbortError";
+        throw stopped;
+      }
+
+      const source = readCanvasData(canvas).nodes.find(node => node.id === latest.id) ?? latest;
+      const responseNode = makeTextNode(
+        answer,
+        source.x + source.width + 100,
+        source.y,
+        {
+          width: Math.max(300, source.width),
+          height: Math.max(180, Math.min(500, Math.ceil(answer.length / 42) * 24))
+        }
+      );
+      (responseNode as any).bcGenerated = true;
+      (responseNode as any).bcSourceNode = source.id;
+      (responseNode as any).bcPrompt = instruction;
+      (responseNode as any).bcAIProvider = "codex-cli";
+      (responseNode as any).bcAIModel = "configured-local-codex";
+      (responseNode as any).bcLocalCLI = true;
+      insertCanvasNode(canvas, responseNode, source.id);
+
+      notice.hide();
+      new Notice("Codex 回复已添加为关联节点。");
+    } catch (error) {
+      notice.hide();
+      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+        new Notice("Codex 任务已停止。");
+      } else {
+        new Notice(error instanceof Error ? error.message : String(error), 8000);
+      }
+    } finally {
+      if (this.activeGenerations.get(canvas)?.controller === controller) {
+        this.activeGenerations.delete(canvas);
+      }
+    }
   }
 
   private runPromptFolder(): void {
