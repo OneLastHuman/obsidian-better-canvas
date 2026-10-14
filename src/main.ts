@@ -27,6 +27,13 @@ interface NodeTemplate {
   width: number;
   height: number;
   color?: string;
+  styleAttributes?: Record<string, unknown>;
+  bcShape?: string;
+  bcBorderStyle?: string;
+  bcTextAlign?: string;
+  bcCustomClass?: string;
+  bcZoomBreakpoint?: number;
+  bcAutoResize?: boolean;
 }
 
 interface BetterCanvasSettings {
@@ -616,12 +623,29 @@ export default class BetterCanvasPlugin extends Plugin {
     if (!selected) return;
     const { node } = selected;
     new PromptModal(this.app, "保存节点模板", "模板名称", async name => {
+      const source = node as CanvasNodeData & {
+        styleAttributes?: Record<string, unknown>;
+        bcShape?: string;
+        bcBorderStyle?: string;
+        bcTextAlign?: string;
+        bcCustomClass?: string;
+        bcZoomBreakpoint?: number;
+        bcAutoResize?: boolean;
+      };
       this.settings.templates.push({
         name,
         text: typeof node.text === "string" ? node.text : "",
         width: node.width,
         height: node.height,
-        ...(typeof node.color === "string" ? { color: node.color } : {})
+        ...(typeof node.color === "string" ? { color: node.color } : {}),
+        ...(source.styleAttributes && typeof source.styleAttributes === "object"
+          ? { styleAttributes: JSON.parse(JSON.stringify(source.styleAttributes)) as Record<string, unknown> } : {}),
+        ...(typeof source.bcShape === "string" ? { bcShape: source.bcShape } : {}),
+        ...(typeof source.bcBorderStyle === "string" ? { bcBorderStyle: source.bcBorderStyle } : {}),
+        ...(typeof source.bcTextAlign === "string" ? { bcTextAlign: source.bcTextAlign } : {}),
+        ...(typeof source.bcCustomClass === "string" ? { bcCustomClass: source.bcCustomClass } : {}),
+        ...(typeof source.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: source.bcZoomBreakpoint } : {}),
+        ...(typeof source.bcAutoResize === "boolean" ? { bcAutoResize: source.bcAutoResize } : {})
       });
       await this.saveSettings();
       new Notice(`已保存模板“${name}”。`);
@@ -640,10 +664,19 @@ export default class BetterCanvasPlugin extends Plugin {
     }
     const selected = this.getSelectedRecord(canvas);
     new TemplatePickerModal(this.app, this.settings.templates, template => {
-      const node = makeTextNode(template.text,
-        selected ? selected.x + selected.width + this.settings.gapX : 0,
-        selected ? selected.y : 0,
-        { width: template.width, height: template.height, ...(template.color ? { color: template.color } : {}) });
+      const node = {
+        ...makeTextNode(template.text,
+          selected ? selected.x + selected.width + this.settings.gapX : 0,
+          selected ? selected.y : 0,
+          { width: template.width, height: template.height, ...(template.color ? { color: template.color } : {}) }),
+        ...(template.styleAttributes ? { styleAttributes: JSON.parse(JSON.stringify(template.styleAttributes)) } : {}),
+        ...(template.bcShape ? { bcShape: template.bcShape } : {}),
+        ...(template.bcBorderStyle ? { bcBorderStyle: template.bcBorderStyle } : {}),
+        ...(template.bcTextAlign ? { bcTextAlign: template.bcTextAlign } : {}),
+        ...(template.bcCustomClass ? { bcCustomClass: template.bcCustomClass } : {}),
+        ...(typeof template.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: template.bcZoomBreakpoint } : {}),
+        ...(typeof template.bcAutoResize === "boolean" ? { bcAutoResize: template.bcAutoResize } : {})
+      };
       insertCanvasNode(canvas, node, selected?.id);
     }).open();
   }
