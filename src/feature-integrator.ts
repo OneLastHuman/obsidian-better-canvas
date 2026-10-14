@@ -1187,9 +1187,14 @@ export default class BetterCanvasFeatures {
     source?: CanvasNodeData
   ): Promise<void> {
     if (!canvas) throw new Error("MCP 工具已返回结果，但当前没有打开的 Canvas。");
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      throw new Error("当前 Canvas 处于只读模式，MCP 结果尚未写入。请解除只读后重试。");
+    }
     const latest = readCanvasData(canvas);
+    // If the source node was removed while the remote request was running,
+    // create a standalone result rather than writing an edge to a missing ID.
     const parent = source
-      ? latest.nodes.find((node: CanvasNodeData) => node.id === source.id) ?? source
+      ? latest.nodes.find((node: CanvasNodeData) => node.id === source.id)
       : undefined;
     const images = Array.isArray(result.images) ? result.images : [];
     const text = String(result.text ?? "").trim();
@@ -1885,7 +1890,11 @@ export default class BetterCanvasFeatures {
 
   private async runMcpTool(): Promise<void> {
     const canvasForWrite = this.canvas();
-    if (canvasForWrite?.wrapperEl?.classList?.contains("bc-readonly")) {
+    if (!canvasForWrite) {
+      new Notice("请先打开一个 Canvas，再调用 MCP 工具以保存结果。");
+      return;
+    }
+    if (canvasForWrite.wrapperEl?.classList?.contains("bc-readonly")) {
       new Notice("当前 Canvas 处于只读模式。请先解除只读模式再写入 MCP 结果。");
       return;
     }
@@ -1907,14 +1916,11 @@ export default class BetterCanvasFeatures {
           } catch (error) {
             return new Notice(error instanceof Error ? error.message : "参数 JSON 无效");
           }
+          const sourceSelection = this.selected(canvasForWrite);
           const notice = new Notice("正在调用 MCP 工具…", 0);
           try {
             const result = await callRemoteTool(s.mcpEndpoint, s.mcpApiKey, tool.name, args);
-            const canvas = this.canvas();
-            if (canvas) {
-              const selection = this.selected(canvas);
-              await this.saveMcpResult(tool.name, result, canvas, selection?.node);
-            }
+            await this.saveMcpResult(tool.name, result, canvasForWrite, sourceSelection?.node);
             notice.hide();
           } catch (error) {
             notice.hide();
@@ -2001,11 +2007,9 @@ export default class BetterCanvasFeatures {
               approved.toolName,
               approved.arguments as Record<string, unknown>
             );
-            const canvas = this.canvas();
-            if (canvas) {
-              const current = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === selection.node.id);
-              await this.saveMcpResult(approved.toolName, result, canvas, current ?? selection.node);
-            }
+            const canvas = selection.canvas;
+            const current = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === selection.node.id);
+            await this.saveMcpResult(approved.toolName, result, canvas, current);
             running.hide();
             new Notice("MCP 调用完成；结果已保存为新节点。");
           } catch (error) {
