@@ -268,11 +268,16 @@ export function decorateCanvas(canvas: any): void {
     const node = canvas?.nodes?.get?.(nodeData.id);
     const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
     if (!(element instanceof HTMLElement)) continue;
-    const shape = typeof nodeData.bcShape === "string" ? nodeData.bcShape : "default";
-    const borderStyle = typeof nodeData.bcBorderStyle === "string" ? nodeData.bcBorderStyle : "solid";
+    const styleAttributes = (nodeData as any).styleAttributes ?? {};
+    const storedShape = typeof nodeData.bcShape === "string" ? nodeData.bcShape
+      : typeof styleAttributes.shape === "string" ? styleAttributes.shape : "default";
+    const shape = storedShape === "rectangle" ? "default" : storedShape === "circle" ? "circle" : storedShape;
+    const borderStyle = typeof nodeData.bcBorderStyle === "string" ? nodeData.bcBorderStyle
+      : typeof styleAttributes.border === "string" ? styleAttributes.border : "solid";
     element.dataset.bcShape = shape;
     element.dataset.bcBorder = borderStyle;
-    element.dataset.bcTextAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign : "left";
+    element.dataset.bcTextAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign
+      : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left";
     element.style.textAlign = element.dataset.bcTextAlign;
     element.style.borderStyle = borderStyle;
     const contents = element.querySelectorAll<HTMLElement>(".canvas-node-content, .canvas-node-container, .canvas-node-iframe");
@@ -284,13 +289,24 @@ export function decorateCanvas(canvas: any): void {
   for (const edgeData of data.edges as Array<CanvasEdgeData & { bcColor?: string; bcPathStyle?: string; bcArrowStyle?: EdgeArrowStyle }>) {
     const edge = canvas?.edges?.get?.(edgeData.id);
     const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
+    const styleAttributes = (edgeData as any).styleAttributes ?? {};
+    const storedPath = edgeData.bcPathStyle
+      ?? (styleAttributes.path === "short-dashed" || styleAttributes.path === "long-dashed" ? "dashed"
+        : styleAttributes.path === "dotted" ? "dotted" : "solid");
+    const styleColor = typeof edgeData.bcColor === "string" ? edgeData.bcColor
+      : typeof edgeData.color === "string" && /^#[0-9a-f]{3,8}$/i.test(edgeData.color) ? edgeData.color : "";
     if (path instanceof SVGElement) {
-      if (edgeData.bcColor) path.style.stroke = edgeData.bcColor;
-      path.style.strokeDasharray = edgeData.bcPathStyle === "dashed" ? "8 5"
-        : edgeData.bcPathStyle === "dotted" ? "2 5" : "";
+      if (styleColor) path.style.stroke = styleColor;
+      path.style.strokeDasharray = storedPath === "dashed" ? "8 5"
+        : storedPath === "dotted" ? "2 5" : "";
     }
 
-    if (!edgeData.bcArrowStyle) continue;
+    const storedArrow = edgeData.bcArrowStyle
+      ?? (typeof styleAttributes.arrow === "string"
+        ? styleAttributes.arrow === "halved-triangle" ? "half-triangle"
+        : styleAttributes.arrow === "triangle" ? "default" : styleAttributes.arrow
+        : undefined);
+    if (!storedArrow) continue;
     const points: Record<string, string> = {
       "default": "0,0 6.5,10.4 -6.5,10.4",
       "triangle-outline": "0,0 6.5,10.4 -6.5,10.4",
@@ -305,20 +321,20 @@ export function decorateCanvas(canvas: any): void {
     for (const lineEnd of [edge?.fromLineEnd, edge?.toLineEnd]) {
       const polygon = lineEnd?.el?.querySelector?.("polygon");
       if (!(polygon instanceof SVGElement)) continue;
-      if (edgeData.bcArrowStyle === "none") {
+      if (storedArrow === "none") {
         polygon.style.display = "none";
         continue;
       }
       polygon.style.display = "";
-      polygon.setAttribute("points", points[edgeData.bcArrowStyle] ?? points.default);
-      if (edgeData.bcColor) {
+      polygon.setAttribute("points", points[storedArrow] ?? points.default);
+      if (styleColor) {
         polygon.style.stroke = edgeData.bcColor;
       } else {
         polygon.style.removeProperty("stroke");
       }
-      if (edgeData.bcArrowStyle.endsWith("-outline") || edgeData.bcArrowStyle === "thin-triangle") {
+      if (edgeData.bcArrowStyle.endsWith("-outline") || storedArrow === "thin-triangle") {
         polygon.style.fill = "var(--background-primary)";
-      } else if (edgeData.bcColor && ["diamond", "circle", "half-triangle", "default"].includes(edgeData.bcArrowStyle)) {
+      } else if (styleColor && ["diamond", "circle", "half-triangle", "default"].includes(storedArrow)) {
         polygon.style.fill = edgeData.bcColor;
       } else {
         polygon.style.removeProperty("fill");
