@@ -311,6 +311,7 @@ export default class BetterCanvasFeatures {
     add("bc-export-svg", "导出 Canvas SVG", () => void this.export("svg"));
     add("bc-ingest-web", "导入网页正文", () => this.input("导入网页正文", "完整 URL", value => void this.ingest(value, false)));
     add("bc-ingest-youtube", "导入 YouTube 字幕", () => this.input("导入 YouTube 字幕", "YouTube 视频 URL", value => void this.ingest(value, true)));
+    add("bc-gemini-youtube-video", "用 Gemini 直接分析 YouTube 视频", () => this.askGeminiAboutYoutube());
     add("bc-set-node-provider", "为节点指定 AI 供应商", () => this.setNodeProvider());
     add("bc-set-node-model", "为节点指定 AI 模型", () => this.setNodeModel());
     add("bc-ask-custom-model", "指定模型并向 AI 提问", () => this.askWithModel());
@@ -900,6 +901,42 @@ export default class BetterCanvasFeatures {
     }
   }
 
+  private askGeminiAboutYoutube(): void {
+    const selected = this.selected();
+    if (!selected) return;
+    const provider = this.currentProvider(selected.node);
+    if (provider.protocol !== "gemini") {
+      new Notice("该功能需要将当前 AI 供应商切换为 protocol=gemini 的 Gemini profile。");
+      return;
+    }
+
+    this.input("Gemini 原生视频上下文", "公开视频的 YouTube URL", rawUrl => {
+      let url: URL;
+      try {
+        url = new URL(rawUrl.trim());
+      } catch {
+        new Notice("URL 格式无效。");
+        return;
+      }
+      const hostname = url.hostname.toLowerCase();
+      const allowedHost = hostname === "youtu.be" || hostname === "youtube.com" ||
+        hostname.endsWith(".youtube.com");
+      if ((url.protocol !== "https:" && url.protocol !== "http:") || !allowedHost) {
+        new Notice("这里只接受 youtube.com 或 youtu.be 的公开视频链接。");
+        return;
+      }
+      if (url.hostname === "youtu.be" && !url.pathname.replace(/^\/+/, "")) {
+        new Notice("URL 中未发现视频 ID。");
+        return;
+      }
+      this.input("分析 YouTube 视频", "例如：总结主要论点，列出关键时间戳和待验证结论", question => {
+        const task = question +
+          "\n\n请直接分析附带的公开视频内容。优先给出关键事件的时间戳；如果无法读取视频，请明确说明，不要假装已经看过。";
+        void this.runAI(selected.node.id, task, undefined, undefined, url.toString());
+      }, "总结视频内容、关键观点与时间戳");
+    });
+  }
+
   private async ingest(raw: string, youtube: boolean): Promise<void> {
     const canvas = this.canvas();
     if (!canvas) {
@@ -1212,7 +1249,7 @@ export default class BetterCanvasFeatures {
       new Notice(error instanceof Error ? error.message : String(error), 8000);
     }
   }
-  private async runAI(nodeId: string, instruction: string, modelOverride?: string, replaceNodeId?: string): Promise<void> {
+  private async runAI(nodeId: string, instruction: string, modelOverride?: string, replaceNodeId?: string, nativeVideoUrl?: string): Promise<void> {
     const canvas = this.canvas();
     if (!canvas) return;
     const data = readCanvasData(canvas);
@@ -1237,9 +1274,12 @@ export default class BetterCanvasFeatures {
       const images = await this.getConnectedImages(canvas, nodeId);
       if (controller.signal.aborted) throw new DOMException("The AI request was aborted.", "AbortError");
       const prompt = "请基于所给 Obsidian Canvas 笔记回答，不要声称读取了未提供的来源。\n\n任务：" + instruction + "\n\n画布上下文：\n" + context;
-      const content: ChatMessageContent = images.length
-        ? [{ type: "text", text: prompt }, ...images]
-        : prompt;
+      const contentParts: Exclude<ChatMessageContent, string> = [
+        { type: "text", text: prompt },
+        ...images,
+        ...(nativeVideoUrl ? [{ type: "file_data" as const, file_data: { file_uri: nativeVideoUrl, mime_type: "video/*" } }] : [])
+      ];
+      const content: ChatMessageContent = images.length || nativeVideoUrl ? contentParts : prompt;
 
       const fresh = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === nodeId) ?? source;
       const placeholder: CanvasNodeData = {
