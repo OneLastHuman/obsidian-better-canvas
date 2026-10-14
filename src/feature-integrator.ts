@@ -35,6 +35,7 @@ import { PdfAnnotationManager } from "./pdf-annotations";
 import { extractPdfPages } from "./pdf-context";
 import { CanvasPortalManager } from "./canvas-portals";
 import { scaleSvgIntrinsicDimensions } from "./export-utils";
+import { extractWikiLinks } from "./canvas-links";
 
 interface ProviderProfile {
   id: string;
@@ -111,6 +112,61 @@ class FeaturePromptModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+  }
+}
+
+interface CanvasLinkExplorerEntry {
+  title: string;
+  detail: string;
+  target: string;
+  sourcePath: string;
+  external?: boolean;
+}
+
+class CanvasLinkExplorerModal extends Modal {
+  constructor(
+    app: App,
+    private readonly sourcePath: string,
+    private readonly outgoing: CanvasLinkExplorerEntry[],
+    private readonly incoming: CanvasLinkExplorerEntry[]
+  ) {
+    super(app);
+    this.modalEl.addClass("bc-link-explorer-modal");
+  }
+
+  onOpen(): void {
+    this.contentEl.empty();
+    this.contentEl.createEl("h2", { text: "Canvas 链接与反向链接" });
+    this.contentEl.createEl("p", {
+      text: "从当前画布节点解析内部链接、文件节点和网页节点，并扫描 Markdown / Canvas 文件中指向当前画布的引用。"
+    });
+    this.renderSection("当前画布的外链与文件链接", this.outgoing, "当前画布中没有可识别的链接。");
+    this.renderSection("反向链接", this.incoming, "Vault 中未发现指向此 Canvas 的链接。");
+    const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
+    footer.createEl("button", { text: "关闭" }).addEventListener("click", () => this.close());
+  }
+
+  private renderSection(title: string, entries: CanvasLinkExplorerEntry[], emptyMessage: string): void {
+    const section = this.contentEl.createDiv({ cls: "bc-link-explorer-section" });
+    section.createEl("h3", { text: title });
+    if (entries.length === 0) {
+      section.createEl("p", { text: emptyMessage });
+      return;
+    }
+    const list = section.createDiv({ cls: "bc-link-explorer-list" });
+    for (const entry of entries) {
+      const button = list.createEl("button", { cls: "bc-link-explorer-entry" });
+      button.createEl("span", { text: entry.title });
+      button.createEl("small", { text: entry.detail });
+      button.addEventListener("click", () => {
+        this.close();
+        if (entry.external) {
+          window.open(entry.target, "_blank", "noopener,noreferrer");
+        } else {
+          void this.app.workspace.openLinkText(entry.target, entry.sourcePath, false);
+        }
+      });
+    }
   }
 }
 
