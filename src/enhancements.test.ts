@@ -156,6 +156,26 @@ describe("collapsible Canvas groups", () => {
     expect(canvas.data.nodes.find((node: any) => node.id === "group")).not.toHaveProperty("bcCollapsedNodes");
   });
 
+  it("does not restore a hidden edge after its outside endpoint is deleted", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "group", x: 0, y: 0, width: 300, height: 220, type: "group" } as any,
+        { id: "inside", x: 30, y: 40, width: 100, height: 80, type: "text", text: "Inside" },
+        { id: "outside", x: 500, y: 50, width: 100, height: 80, type: "text", text: "Outside" }
+      ],
+      edges: [
+        { id: "cross-boundary", fromNode: "inside", fromSide: "right", toNode: "outside", toSide: "left" }
+      ]
+    };
+    const canvas = makeCanvas(data);
+
+    expect(toggleGroupCollapse(canvas, "group")).toBe("collapsed");
+    canvas.data.nodes = canvas.data.nodes.filter((node: any) => node.id !== "outside");
+    expect(toggleGroupCollapse(canvas, "group")).toBe("expanded");
+    expect(canvas.data.nodes.map((node: any) => node.id).sort()).toEqual(["group", "inside"]);
+    expect(canvas.data.edges).toEqual([]);
+  });
+
   it("preserves a collapsed nested group when its outer group is collapsed", () => {
     const data: CanvasData = {
       nodes: [
