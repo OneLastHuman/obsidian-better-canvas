@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bestFloatingSide,
   colorIncidentEdges,
   flipIncidentEdges,
   reorderNode,
@@ -47,6 +48,17 @@ const fixture: CanvasData = {
     }
   ]
 };
+
+describe("floating edge side selection", () => {
+  const box = { minX: 0, minY: 0, maxX: 100, maxY: 80 };
+
+  it("chooses the side facing the other node", () => {
+    expect(bestFloatingSide(box, { x: 300, y: 40 })).toBe("right");
+    expect(bestFloatingSide(box, { x: -100, y: 40 })).toBe("left");
+    expect(bestFloatingSide(box, { x: 50, y: 200 })).toBe("bottom");
+    expect(bestFloatingSide(box, { x: 50, y: -100 })).toBe("top");
+  });
+});
 
 describe("Canvas edge helpers", () => {
   it("flips endpoints, sides, floating settings, and arrow endpoints", () => {
