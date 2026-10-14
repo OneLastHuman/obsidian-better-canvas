@@ -1191,7 +1191,7 @@ export default class BetterCanvasFeatures {
         element.createEl("small", { text: file.path });
       }
       onChooseSuggestion(file: TFile): void {
-        const text = "![[\"" + file.path + "\"]]";
+        const text = "![[" + file.path + "]]";
         const node = makeTextNode(text, selection ? selection.node.x + selection.node.width + 100 : 0, selection ? selection.node.y : 0, { width: 500, height: 360 });
         insertCanvasNode(canvas, node, selection?.node.id);
         new Notice("已插入 Canvas 嵌入卡片。交互嵌入效果取决于当前 Obsidian 版本。");
