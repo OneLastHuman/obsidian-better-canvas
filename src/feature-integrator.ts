@@ -27,6 +27,7 @@ import {
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { callRemoteTool, listRemoteTools } from "./mcp";
+import { CanvasMetadataIndexer } from "./canvas-metadata";
 
 interface ProviderProfile {
   id: string;
@@ -50,6 +51,7 @@ interface FeatureSettings {
   defaultNodeHeight: number;
   mcpEndpoint: string;
   mcpApiKey: string;
+  canvasMetadataEnabled: boolean;
 }
 
 const DEFAULT_PROFILES: ProviderProfile[] = [{
@@ -110,6 +112,7 @@ export default class BetterCanvasFeatures {
   private boundContainers = new WeakSet<HTMLElement>();
   private resizeObservers = new WeakSet<HTMLElement>();
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
+  private metadataIndexer: CanvasMetadataIndexer | null = null;
   private p: any;
 
   constructor(plugin: any) {
@@ -118,6 +121,8 @@ export default class BetterCanvasFeatures {
 
   init(): void {
     this.migrateSettings();
+    this.metadataIndexer = new CanvasMetadataIndexer(this.p.app, this.p, () => Boolean(this.settings().canvasMetadataEnabled));
+    this.metadataIndexer.start();
     this.p.register(() => this.cleanup());
     this.registerCommands();
     this.registerCanvasMenus();
@@ -135,6 +140,10 @@ export default class BetterCanvasFeatures {
 
   async save(): Promise<void> {
     await this.p.saveSettings();
+  }
+
+  refreshMetadataCache(): void {
+    this.metadataIndexer?.refreshAll();
   }
 
   private cleanup(): void {
@@ -173,6 +182,7 @@ export default class BetterCanvasFeatures {
     if (!Number.isFinite(s.defaultNodeHeight) || s.defaultNodeHeight < 80 || s.defaultNodeHeight > 1000) s.defaultNodeHeight = 140;
     if (typeof s.mcpEndpoint !== "string") s.mcpEndpoint = "";
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
+    if (typeof s.canvasMetadataEnabled !== "boolean") s.canvasMetadataEnabled = true;
     if (typeof s.customCss !== "string") s.customCss = "";
     void this.save();
   }
@@ -1582,6 +1592,14 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
     const s = this.features.settings();
     c.createEl("h2", { text: "Better Canvas — Integration Features" });
     c.createEl("p", { text: "这些扩展直接与当前 Vault 的 Canvas 数据交互。不同 AI profile 通过 OpenAI-compatible Chat Completions / Images API 调用；API Key 保存于本地插件数据。" });
+
+    new Setting(c).setName("Canvas metadata cache / backlinks")
+      .setDesc("尝试将 .canvas 节点文本中的 Wikilinks、文件节点和画布 frontmatter 注册到 Obsidian metadata cache / graph。使用的是 Obsidian 内部接口；如果升级后遇到索引异常，可关闭此选项。")
+      .addToggle(toggle => toggle.setValue(Boolean(s.canvasMetadataEnabled)).onChange(async value => {
+        s.canvasMetadataEnabled = value;
+        await this.features.save();
+        if (value) this.features.refreshMetadataCache();
+      }));
 
     new Setting(c).setName("Active AI Provider")
       .setDesc("选择用于新 AI 请求的供应商 profile；单个节点可覆盖供应商与模型。")
