@@ -111,6 +111,7 @@ export default class BetterCanvasFeatures {
 
   init(): void {
     this.migrateSettings();
+    this.p.register(() => this.cleanup());
     this.registerCommands();
     this.registerCanvasMenus();
     this.registerMarkdownNodeEmbeds();
@@ -127,6 +128,13 @@ export default class BetterCanvasFeatures {
 
   async save(): Promise<void> {
     await this.p.saveSettings();
+  }
+
+  private cleanup(): void {
+    for (const active of this.activeGenerations.values()) active.controller.abort();
+    this.activeGenerations.clear();
+    this.paletteStyle?.remove();
+    this.paletteStyle = null;
   }
 
   private migrateSettings(): void {
