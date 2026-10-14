@@ -566,10 +566,15 @@ export default class BetterCanvasFeatures {
           new Notice("形状无效。请选择受支持的流程图形状。");
           return;
         }
-        const priorAttributes = (selection.node as any).styleAttributes ?? {};
+        const priorAttributes = { ...((selection.node as any).styleAttributes ?? {}) };
+        // Advanced Canvas uses a null/default value rather than a literal
+        // "rectangle" style. Keep our visual alias separately and omit the
+        // non-standard value so other renderers fall back to the default box.
+        if (normalizedShape === "rectangle") delete priorAttributes.shape;
+        else priorAttributes.shape = normalizedShape;
         patchNode(selection.canvas, selection.node.id, {
           bcShape: shape,
-          styleAttributes: { ...priorAttributes, shape: normalizedShape }
+          styleAttributes: priorAttributes
         });
         this.decorate(selection.canvas);
       },
@@ -580,9 +585,9 @@ export default class BetterCanvasFeatures {
   private setNodeBorder(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.input("设置节点边框", "solid / dashed / dotted / double", value => {
-      const style = value.toLowerCase();
-      if (!["solid", "dashed", "dotted", "double"].includes(style)) {
+    this.input("设置节点边框", "solid / dashed / dotted / double / invisible", value => {
+      const style = value.trim().toLowerCase();
+      if (!["solid", "dashed", "dotted", "double", "invisible"].includes(style)) {
         new Notice("边框样式无效。");
         return;
       }
