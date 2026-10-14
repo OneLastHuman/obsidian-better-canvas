@@ -31,6 +31,7 @@ import { callRemoteTool, listRemoteTools } from "./mcp";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
 import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 import { PdfAnnotationManager } from "./pdf-annotations";
+import { CanvasPortalManager } from "./canvas-portals";
 
 interface ProviderProfile {
   id: string;
@@ -119,6 +120,7 @@ export default class BetterCanvasFeatures {
   private metadataIndexer: CanvasMetadataIndexer | null = null;
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
   private pdfAnnotations: PdfAnnotationManager | null = null;
+  private portalManager: CanvasPortalManager | null = null;
   private p: any;
 
   constructor(plugin: any) {
@@ -133,6 +135,8 @@ export default class BetterCanvasFeatures {
     this.pdfPageRenderer.start();
     this.pdfAnnotations = new PdfAnnotationManager(this.p);
     this.pdfAnnotations.start();
+    this.portalManager = new CanvasPortalManager(this.p);
+    this.portalManager.start();
     this.p.register(() => this.cleanup());
     this.registerCommands();
     this.registerCanvasMenus();
@@ -1651,22 +1655,41 @@ export default class BetterCanvasFeatures {
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
     if (canvas.wrapperEl?.classList?.contains("bc-readonly")) { new Notice("当前 Canvas 处于只读模式。"); return; }
     const selection = this.selected(canvas);
-    const canvasFiles = this.p.app.vault.getFiles().filter((file: TFile) => file.extension.toLowerCase() === "canvas");
-    if (!canvasFiles.length) { new Notice("Vault 中还没有其他 Canvas 文件。"); return; }
+    const currentPath = this.activeCanvasView()?.file?.path;
+    const canvasFiles = this.p.app.vault.getFiles().filter((file: TFile) =>
+      file.extension.toLowerCase() === "canvas" && file.path !== currentPath
+    );
+    if (!canvasFiles.length) { new Notice("Vault 中没有可用的其他 Canvas 文件。"); return; }
+
+    const thisManager = this;
     const ModalClass = class extends SuggestModal<TFile> {
       getSuggestions(query: string): TFile[] {
         const needle = query.trim().toLocaleLowerCase();
-        return canvasFiles.filter((file: TFile) => !needle || file.path.toLocaleLowerCase().includes(needle) || file.basename.toLocaleLowerCase().includes(needle)).slice(0, 100);
+        return canvasFiles
+          .filter((file: TFile) => !needle || file.path.toLocaleLowerCase().includes(needle) || file.basename.toLocaleLowerCase().includes(needle))
+          .slice(0, 100);
       }
       renderSuggestion(file: TFile, element: HTMLElement): void {
         element.createEl("div", { text: file.basename });
         element.createEl("small", { text: file.path });
       }
       onChooseSuggestion(file: TFile): void {
-        const text = "![[" + file.path + "]]";
-        const node = makeTextNode(text, selection ? selection.node.x + selection.node.width + 100 : 0, selection ? selection.node.y : 0, { width: 500, height: 360 });
+        const x = selection ? selection.node.x + selection.node.width + 100 : 0;
+        const y = selection ? selection.node.y : 0;
+        const node: CanvasNodeData = {
+          id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
+          type: "file",
+          file: file.path,
+          portal: true,
+          x,
+          y,
+          width: 360,
+          height: 260
+        };
         insertCanvasNode(canvas, node, selection?.node.id);
-        new Notice("已插入 Canvas 嵌入卡片。交互嵌入效果取决于当前 Obsidian 版本。");
+        const view = thisManager.activeCanvasView();
+        if (view) void thisManager.portalManager?.refreshView(view, true);
+        new Notice("已创建并打开可编辑 Canvas Portal。请确认子画布内容同步正常。");
       }
     };
     new ModalClass(this.p.app).open();
