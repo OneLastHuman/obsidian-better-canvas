@@ -157,7 +157,7 @@ function renderNode(node: CanvasNodeData, index: number): string {
   const dash = borderStyle.includes("dash") ? ' stroke-dasharray="8 5"' : borderStyle.includes("dot") ? ' stroke-dasharray="2 5"' : "";
   const stroke = borderStyle === "invisible" ? "none" : border;
   const clipId = "bc-clip-" + index;
-  const clip = '<clipPath id="' + clipId + '"><rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="5"/></clipPath>';
+  const clip = "";
 
   let geometry: string;
   if (node.type === "group") {
@@ -215,17 +215,12 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
     return { ...edge, fromNode: fromInfo?.id ?? edge.fromNode, toNode: toInfo?.id ?? edge.toNode };
   });
 
-  const defs = '<defs><marker id="bc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8794"/></marker>' +
-    translatedNodes.map((node, index) => {
-      const x = number(node.x), y = number(node.y), width = Math.max(1, number(node.width, 280)), height = Math.max(1, number(node.height, 140));
-      return '<clipPath id="bc-clip-' + index + '"><rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="5"/></clipPath>';
-    }).join("") + "</defs>";
+  const defs = '<defs><marker id="bc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8794"/></marker></defs>';
   const background = options.backgroundColor
     ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + xml(options.backgroundColor) + '"/>'
     : "";
   const nodeMap = new Map(translatedNodes.map(node => [node.id, node]));
   const edgeMarkup = translatedEdges.map((edge, index) => renderEdge(edge, nodeMap, index)).join("");
-  // renderNode includes per-node clip paths, so do not duplicate them in defs.
   const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index)).join("");
 
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height +
