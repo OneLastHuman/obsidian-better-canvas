@@ -16,7 +16,7 @@ describe("findContainingPortal", () => {
   });
 
   it("returns no owner when the center lies outside a Portal's inset", () => {
-    const candidate = node("outside", 970, 10, 40, 40);
+    const candidate = node("outside", 985, 10, 40, 40);
     expect(findContainingPortal(candidate, [large])).toBeUndefined();
   });
 
