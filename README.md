@@ -106,6 +106,35 @@ npm run build
 
 打开 **设置 → 社区插件**，刷新或重新加载插件列表，然后启用 **Better Canvas**。如果插件未出现，请确认目录名称为 `obsidian-better-canvas`，且上述三个文件都位于该目录的根部。
 
+## MCP 工具配置
+
+在设置的 **Integration Features** 中选择 **MCP transport**：
+
+- **Remote Streamable HTTP**：填写标准 MCP Streamable HTTP endpoint。
+- **Remote SSE (legacy)**：填写旧式 SSE 事件流 URL（通常是服务提供的 `/sse` 地址）。可选 Bearer Token 通过 HTTPS 请求发送；插件会拒绝与配置的 SSE URL 不同 origin 的消息 endpoint。
+- **Local stdio (desktop)**：填写 JSON 配置，以无 shell 的方式启动本地服务进程。示例：
+
+```json
+{
+  "command": "/absolute/path/to/node",
+  "args": ["/absolute/path/to/mcp-server.js", "--safe-mode"],
+  "cwd": "/absolute/path/to/server",
+  "env": {
+    "MCP_API_TOKEN": "YOUR_LOCAL_TOKEN"
+  }
+}
+```
+
+`command` 是可执行文件路径，`args` 必须是字符串数组，`env` 是可选环境变量对象，`cwd` 是可选工作目录。服务列表与工具调用会各自启动一个新进程，因此 MCP 服务应能在每次启动时完成初始化。不要配置不可信的 MCP 程序：stdio 服务可以访问它自身用户权限允许的本地文件和网络。远程端点应使用可信服务器与 HTTPS。
+
+直接调用工具前会让你检查名称和参数；使用 AI 建议工具时也必须在执行前确认。工具调用可能会修改外部系统，建议先检查参数，并仅启用你信任的服务器。
+
+## 本地 Codex CLI
+
+桌面版 Obsidian 可选用 **Better Canvas: 使用本地 Codex CLI 分析所选节点** 命令。需要提前安装并登录 Codex CLI；设置中的 **Local Codex CLI executable** 留空时使用 `PATH` 中的 `codex`，如果 Obsidian 找不到它，请填写绝对路径。任务在临时工作目录中以只读沙盒运行，支持“停止当前 AI 生成”取消任务。
+
+Codex CLI 使用自己的本地配置和模型供应商。节点内容与提示词会交给该配置所选的模型；这项功能不保证离线处理，也不应当被视为对本地其他文件的绝对访问隔离。
+
 ## AI 服务配置
 
 在 Better Canvas 的设置中配置 AI 服务。非 AI 的 Canvas 和思维导图功能无需 API Key。
