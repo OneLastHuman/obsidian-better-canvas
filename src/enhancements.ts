@@ -281,7 +281,7 @@ export function decorateCanvas(canvas: any): void {
     element.dataset.bcBorder = borderStyle;
     element.dataset.bcTextAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left";
-    element.style.textAlign = element.dataset.bcTextAlign;
+    element.style.textAlign = element.dataset.bcTextAlign ?? "left";
     element.style.borderStyle = borderStyle;
     const contents = element.querySelectorAll<HTMLElement>(".canvas-node-content, .canvas-node-container, .canvas-node-iframe");
     contents.forEach(child => {
