@@ -82,3 +82,26 @@
 ## 功能覆盖状态
 
 请查看 [整合功能矩阵](docs/INTEGRATION_MATRIX.md)，了解三个上游项目的已实现、部分实现和待迁移项。该矩阵区分代码已存在与已在 Obsidian 实际运行验证，避免将构建通过误认为所有运行时功能均已验证。
+
+
+## 原生 AI 协议配置
+
+在 Integration Features 的 Provider Profiles JSON 中，profile 可设置 protocol：
+
+- "openai"：OpenAI-compatible Chat Completions / Images API；也适用于 Ollama 和其他兼容网关。
+- "anthropic"：Anthropic Messages API，支持文本与连接图片上下文；原生 Anthropic API 本身不提供图像生成接口。
+- "gemini"：Google Gemini generateContent / streamGenerateContent，并尝试通过支持图像生成的 Gemini 模型返回图片。
+
+Gemini 示例 profile：
+
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "protocol": "gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "apiKey": "YOUR_KEY",
+      "model": "gemini-2.5-flash",
+      "imageModel": "gemini-2.5-flash-image"
+    }
+
+可用模型取决于你所使用的账号、区域、模型发布状态及接口权限。请填入自己能调用的模型名称，不要把真实 API Key 提交进仓库。
