@@ -305,6 +305,5 @@ export function decorateCanvas(canvas: any): void {
         polygon.style.removeProperty("fill");
       }
     }
-    }
   }
 }
