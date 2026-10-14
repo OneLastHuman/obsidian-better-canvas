@@ -1,4 +1,5 @@
 import { requestUrl } from "obsidian";
+import { runOpenCodeACP } from "./opencode-acp";
 
 export type AIProtocol = "openai" | "anthropic" | "gemini";
 
@@ -14,6 +15,10 @@ export interface AISettings {
   model: string;
   imageModel: string;
   systemPrompt: string;
+  /** Text-generation backend; image generation remains on the configured API endpoint. */
+  backend?: "api" | "opencode-acp";
+  /** Optional absolute path to the OpenCode CLI; defaults to opencode on PATH. */
+  opencodeBinaryPath?: string;
   protocol?: AIProtocol;
 }
 
@@ -187,6 +192,9 @@ export async function chatCompletion(
   settings: AISettings,
   messages: ChatMessage[]
 ): Promise<string> {
+  if (settings.backend === "opencode-acp") {
+    return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath });
+  }
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
   const protocol = protocolOf(settings);
   let response: any;
@@ -226,6 +234,9 @@ export async function chatCompletionStream(
   signal: AbortSignal,
   onDelta: (delta: string) => void
 ): Promise<string> {
+  if (settings.backend === "opencode-acp") {
+    return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, signal, onDelta });
+  }
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
   const protocol = protocolOf(settings);
   const streamingUrl = protocol === "gemini"
