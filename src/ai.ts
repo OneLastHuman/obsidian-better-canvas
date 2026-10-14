@@ -1,5 +1,5 @@
 import { requestUrl } from "obsidian";
-import { runOpenCodeACP } from "./opencode-acp";
+import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
 
 export type AIProtocol = "openai" | "anthropic" | "gemini";
 
@@ -193,6 +193,9 @@ export async function chatCompletion(
   messages: ChatMessage[]
 ): Promise<string> {
   if (settings.backend === "opencode-acp") {
+    if (hasUnsupportedACPContent(messages)) {
+      throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
+    }
     return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath });
   }
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
@@ -235,6 +238,9 @@ export async function chatCompletionStream(
   onDelta: (delta: string) => void
 ): Promise<string> {
   if (settings.backend === "opencode-acp") {
+    if (hasUnsupportedACPContent(messages)) {
+      throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
+    }
     return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, signal, onDelta });
   }
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
