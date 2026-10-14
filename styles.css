@@ -149,3 +149,18 @@
 .bc-pdf-annotation-overlay .bc-pdf-annotation-preview {
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
 }
+
+/* Shapes defined by the Advanced JSON Canvas styleAttributes schema. */
+.canvas-node[data-bc-shape="circle"] {
+  border-radius: 50% !important;
+}
+.canvas-node[data-bc-shape="predefined-process"] {
+  border-left: 4px double var(--background-modifier-border) !important;
+  border-right: 4px double var(--background-modifier-border) !important;
+}
+.canvas-node[data-bc-shape="document"] {
+  clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%);
+}
+.canvas-node[data-bc-shape="database"] {
+  border-radius: 50% / 12% !important;
+}
