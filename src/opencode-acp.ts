@@ -52,6 +52,14 @@ export function buildACPUserPrompt(messages: ACPChatMessage[]): string {
   }).filter(Boolean).join("\n\n");
 }
 
+/** True when text-only ACP would silently lose image or file context. */
+export function hasUnsupportedACPContent(messages: ACPChatMessage[]): boolean {
+  return messages.some(message =>
+    Array.isArray(message.content) &&
+    message.content.some((part: any) => part && typeof part === "object" && part.type !== "text")
+  );
+}
+
 /** Extract user-visible answer chunks; ignore tool progress and unrelated sessions. */
 export function textFromACPUpdate(value: unknown, expectedSessionId?: string): string {
   const message = value as JsonRpcMessage | null;
