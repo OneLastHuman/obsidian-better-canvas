@@ -57,6 +57,8 @@ interface FeatureSettings {
   mcpEndpoint: string;
   mcpApiKey: string;
   canvasMetadataEnabled: boolean;
+  exportPixelRatio: number;
+  exportBackgroundColor: string;
 }
 
 const DEFAULT_PROFILES: ProviderProfile[] = [{
@@ -231,6 +233,8 @@ export default class BetterCanvasFeatures {
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
     if (typeof s.canvasMetadataEnabled !== "boolean") s.canvasMetadataEnabled = true;
     if (typeof s.customCss !== "string") s.customCss = "";
+    if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
+    if (typeof s.exportBackgroundColor !== "string") s.exportBackgroundColor = "";
     void this.save();
   }
 
@@ -1050,9 +1054,26 @@ export default class BetterCanvasFeatures {
     if (!(container instanceof HTMLElement)) { new Notice("无法获取 Canvas DOM。"); return; }
     const notice = new Notice("正在导出 " + format.toUpperCase() + "…", 0);
     try {
+      const settings = this.settings();
+      const pixelRatio = Math.max(1, Math.min(4, Number(settings.exportPixelRatio) || 2));
+      const requestedBackground = String(settings.exportBackgroundColor ?? "").trim();
+      let backgroundColor: string | undefined;
+      if (requestedBackground) {
+        const probe = document.createElement("span");
+        probe.style.backgroundColor = requestedBackground;
+        if (!probe.style.backgroundColor) {
+          throw new Error("导出背景色无效；请留空使用透明背景，或输入有效 CSS 颜色。");
+        }
+        backgroundColor = probe.style.backgroundColor;
+      }
+      const exportOptions: any = {
+        cacheBust: true,
+        pixelRatio,
+        ...(backgroundColor ? { backgroundColor } : {})
+      };
       const dataUrl = format === "png"
-        ? await toPng(container, { cacheBust: true, pixelRatio: 2 })
-        : await toSvg(container, { cacheBust: true });
+        ? await toPng(container, exportOptions)
+        : await toSvg(container, exportOptions);
       const filePath = await this.uniquePath(folder + "/" + baseName + "-export", format);
       const payload = dataUrl.slice(dataUrl.indexOf(",") + 1);
       if (format === "svg") {
@@ -2200,6 +2221,29 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
       .setDesc("语言代码，如 en、zh-Hans、ja。只有公开字幕可读取时才可导入。")
       .addText(text => text.setValue(String(s.youtubeLanguage)).onChange(async value => {
         s.youtubeLanguage = value.trim() || "en";
+        await this.features.save();
+      }));
+
+    new Setting(c).setName("PNG / SVG export scale")
+      .setDesc("导出像素比例 1x 至 4x；值越高，图像清晰度和文件体积通常越大。")
+      .addDropdown(dropdown => {
+        for (const ratio of [1, 1.5, 2, 3, 4]) dropdown.addOption(String(ratio), ratio + "x");
+        dropdown.setValue(String(Number(s.exportPixelRatio) || 2)).onChange(async value => {
+          s.exportPixelRatio = Number(value);
+          await this.features.save();
+        });
+      });
+
+    new Setting(c).setName("PNG / SVG export background")
+      .setDesc("留空保留透明背景；也可输入 CSS 颜色，例如 #ffffff 或 rgba(255,255,255,0.9)。")
+      .addText(text => text.setPlaceholder("透明背景（留空）").setValue(String(s.exportBackgroundColor ?? "")).onChange(async value => {
+        const candidate = value.trim();
+        if (candidate) {
+          const probe = document.createElement("span");
+          probe.style.backgroundColor = candidate;
+          if (!probe.style.backgroundColor) return;
+        }
+        s.exportBackgroundColor = candidate;
         await this.features.save();
       }));
 
