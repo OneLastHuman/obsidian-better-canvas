@@ -73,6 +73,8 @@ interface FeatureSettings {
   exportPixelRatio: number;
   exportBackgroundColor: string;
   codexBinaryPath: string;
+  backend: "api" | "opencode-acp";
+  opencodeBinaryPath: string;
 }
 
 const DEFAULT_PROFILES: ProviderProfile[] = [{
@@ -334,6 +336,8 @@ export default class BetterCanvasFeatures {
     if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
     if (typeof s.exportBackgroundColor !== "string") s.exportBackgroundColor = "";
     if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
+    if (s.backend !== "opencode-acp" && s.backend !== "api") s.backend = "api";
+    if (typeof s.opencodeBinaryPath !== "string") s.opencodeBinaryPath = "opencode";
     void this.save();
   }
 
@@ -370,7 +374,9 @@ export default class BetterCanvasFeatures {
       model: modelOverride || (typeof (node as any)?.bcAIModel === "string" ? String((node as any).bcAIModel) : profile.model),
       imageModel: profile.imageModel,
       protocol: profile.protocol || "openai",
-      systemPrompt: s.systemPrompt || "Answer accurately and preserve uncertainty."
+      systemPrompt: s.systemPrompt || "Answer accurately and preserve uncertainty.",
+      backend: s.backend === "opencode-acp" ? "opencode-acp" : "api",
+      opencodeBinaryPath: String(s.opencodeBinaryPath || "opencode")
     };
   }
 
