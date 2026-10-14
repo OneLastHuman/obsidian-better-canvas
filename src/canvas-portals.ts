@@ -304,6 +304,8 @@ export class CanvasPortalManager {
       }
 
       const owners = [...new Set([fromInfo?.portalId, toInfo?.portalId].filter((id): id is string => Boolean(id)))];
+      // If a portal frame was deleted, never persist an edge to its missing node ID.
+      if (owners.some(owner => !portalNodeIds.has(owner))) continue;
       for (const owner of owners) {
         if (!openIds.has(owner) || !portalNodeIds.has(owner)) continue;
         const list = boundary.get(owner) ?? [];
