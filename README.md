@@ -43,7 +43,7 @@ Better Canvas 是一款面向 Obsidian Canvas 的增强插件，整合节点与�
 - **节点样式：** 自定义颜色、形状、边框、文本对齐和 CSS 类。
 - **连线控制：** 设置颜色、线型和箭头样式，翻转关联边的方向，自动重定位 floating edges，并为选中连线选择 direct、square 或 A-star 路径。
 - **布局与专注：** 网格对齐、文本节点自动调整尺寸、层级排序、焦点模式、交互锁定及基础路径路由。
-- **日常工作流：** 搜索画布中的文本、文件路径和链接；保存节点模板；按节点顺序进入演示模式。
+- **日常工作流：** 搜索画布中的文本、文件路径和链接；打开“查看当前 Canvas 链接与反向链接”面板；保存节点模板；按节点顺序进入演示模式。
 - **组织与导出：** 创建独立分组、折叠/展开分组、将选区封装为独立 Canvas，并导出 JSON Canvas、PNG 或 SVG。节点模板可保存样式属性并重复使用。
 
 部分样式、分组行为和导出结果可能因画布复杂度或 Obsidian 渲染版本而异，详见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。
@@ -170,7 +170,7 @@ CI 可检查类型、测试和构建产物，但不会启动 Obsidian 图形界�
 
 - **Portal 已有单层可编辑实现。** 选择“创建 Canvas Portal”并选择另一个 `.canvas` 后，会显示被引用画布的镜像节点/连线；节点更改和删除会同步回源文件，跨 Portal 连线会映射到 Portal 框。还可以运行“在选中 Canvas Portal 中创建文本节点”，把新节点和连线写入 Portal 的源画布。任意点击新建节点还不会自动加入 Portal，嵌套 Portal 仍未支持；请先在测试 Vault 验证同步行为。
 - **PDF 功能仍在完善。** 固定分页支持文本提取与选择、从选中文本创建关联摘录节点、页面图像上下文、红/蓝笔、荧光笔、橡皮擦和撤销；它仍不是完整 PDF 编辑器，尚不支持 PDF 页面上的原生文字高亮对象、多页批注工具栏或扫描版 PDF 的 OCR。
-- **部分功能依赖内部 API 或 DOM。** Portal 文件同步、元数据缓存、反向链接桥接、PDF 单页渲染、特定连线路由及节点样式可能随 Obsidian 版本变化。CI 不运行 Obsidian GUI，仍需桌面端实测。
+- **部分功能依赖内部 API 或 DOM。** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由及节点样式可能随 Obsidian 版本变化。插件自带的链接浏览器会扫描 Markdown 元数据和其他 Canvas JSON；CI 不运行 Obsidian GUI，仍需桌面端实测。
 - **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini profile 已接入；Gemini profile 还可把公开视频 URL 作为原生视频上下文发送。图像生成、流式取消、网页和 YouTube 内容获取，以及 MCP 工具调用都受远端 API、权限和内容可访问性影响。
 - **MCP 结果处理。** 远程 Streamable HTTP MCP 工具的文本结果会生成关联文本节点；PNG/JPEG/WebP/GIF 图片结果会写入 Vault 并生成关联文件节点。stdio 与仅 SSE 的 MCP 服务尚未接入。
 
