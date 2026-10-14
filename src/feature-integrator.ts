@@ -23,6 +23,7 @@ import {
   resizeNodeToText,
   styleSelectedEdges,
   styleSelectedEdgeArrow,
+  styleSelectedEdgePathfinding,
   toggleGroupCollapse
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
@@ -298,6 +299,7 @@ export default class BetterCanvasFeatures {
     add("bc-select-incoming-edges", "选择指向节点的连线", () => this.selectEdges("incoming"));
     add("bc-select-outgoing-edges", "选择从节点发出的连线", () => this.selectEdges("outgoing"));
     add("bc-style-selected-edges", "设置当前选中连线样式", () => this.edgeStyle());
+    add("bc-set-edge-pathfinding", "设置选中连线路径算法", () => this.edgePathfinding());
     add("bc-front-node", "将节点置于最前", () => this.reorder(true));
     add("bc-align-selection-grid", "将所选节点对齐到网格", () => this.alignSelectionToGrid());
     add("bc-toggle-readonly", "切换 Canvas 只读模式", () => this.toggleReadonly());
@@ -553,6 +555,22 @@ export default class BetterCanvasFeatures {
       });
       this.decorate(selection.canvas);
     }, String((selection.node as any).bcTextAlign ?? "left"));
+  }
+
+  private edgePathfinding(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    this.input("设置连线路径算法", "bezier / direct / square / a-star", value => {
+      const method = value.trim().toLowerCase();
+      const allowed = ["bezier", "direct", "square", "a-star"];
+      if (!allowed.includes(method)) {
+        new Notice("路径算法无效。请选择 bezier、direct、square 或 a-star。");
+        return;
+      }
+      const count = styleSelectedEdgePathfinding(canvas, method as "bezier" | "direct" | "square" | "a-star");
+      this.decorate(canvas);
+      new Notice(count ? "已更新 " + count + " 条连线的路径算法。" : "请先选择一条或多条连线。");
+    }, "square");
   }
 
   private edgeArrowStyle(): void {
