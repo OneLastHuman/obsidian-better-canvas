@@ -106,8 +106,8 @@ class PinnedPdfPageEmbed extends Component {
             ? ancestor as Element
             : ancestor.parentElement;
           if (element && this.textLayerEl.contains(element)) {
-            const bounds = container.getBoundingClientRect();
-            if (bounds.width > 0 && bounds.height > 0) {
+            const bounds = this.canvas?.getBoundingClientRect();
+            if (bounds && bounds.width > 0 && bounds.height > 0) {
               for (const rect of Array.from(range.getClientRects())) {
                 const x = (rect.left - bounds.left) / bounds.width;
                 const y = (rect.top - bounds.top) / bounds.height;
