@@ -88,7 +88,9 @@ export class CanvasMetadataIndexer {
 
   private async hash(bytes: Uint8Array): Promise<string> {
     try {
-      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      const stableBuffer = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(stableBuffer).set(bytes);
+      const digest = await crypto.subtle.digest("SHA-256", stableBuffer);
       return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
     } catch {
       let value = 2166136261;
