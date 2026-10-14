@@ -439,6 +439,12 @@ export default class BetterCanvasFeatures {
     });
   }
 
+  private makeConfiguredTextNode(text: string, x: number, y: number, height?: number): CanvasNodeData {
+    const settings = this.settings();
+    const width = Number(settings.defaultNodeWidth) || 280;
+    const defaultHeight = Number(settings.defaultNodeHeight) || 140;
+    return makeTextNode(text, x, y, { width, height: height ?? defaultHeight });
+  }
   private setNodeCustomClass(): void {
     const selection = this.selected();
     if (!selection) return;
@@ -961,7 +967,7 @@ export default class BetterCanvasFeatures {
         notice.hide();
         new Notice("已将分组名称更新为：" + title);
       } else {
-        const suggestion = makeTextNode("标题建议\n" + title, node.x + node.width + 100, node.y, { width: 280, height: 100 });
+        const suggestion = this.makeConfiguredTextNode("标题建议\n" + title, node.x + node.width + 100, node.y);
         insertCanvasNode(selected.canvas, suggestion, node.id);
         notice.hide();
         new Notice("已创建标题建议节点；原节点内容未修改。");
@@ -987,9 +993,9 @@ export default class BetterCanvasFeatures {
         : [];
       if (!questions.length) throw new Error("AI 没有返回有效的问题列表。");
       for (let i = 0; i < questions.length; i++) {
-        const node = makeTextNode("研究问题：" + questions[i],
-          selected.node.x + selected.node.width + 100, selected.node.y + i * 135,
-          { width: 330, height: 110 });
+        const defaultHeight = Number(this.settings().defaultNodeHeight) || 140;
+        const node = this.makeConfiguredTextNode("研究问题：" + questions[i],
+          selected.node.x + selected.node.width + 100, selected.node.y + i * (defaultHeight + 20));
         insertCanvasNode(selected.canvas, node, selected.node.id);
       }
       notice.hide();
@@ -1037,7 +1043,7 @@ export default class BetterCanvasFeatures {
         for (let i = 0; i < rootItems.length; i++) {
           const item = rootItems[i];
           if (!fallbackRoot) {
-            rootNode = makeTextNode(String(item.text).trim(), baseX, baseY, { width: 320, height: 150 });
+            rootNode = this.makeConfiguredTextNode(String(item.text).trim(), baseX, baseY);
             insertCanvasNode(canvas, rootNode);
           }
           const itemId = String(item.id ?? "root");
