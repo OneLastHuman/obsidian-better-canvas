@@ -313,6 +313,7 @@ export default class BetterCanvasFeatures {
     add("bc-back-node", "将节点置于最后", () => this.reorder(false));
     add("bc-focus", "切换专注模式", () => this.focus());
     add("bc-collapse-group", "折叠/展开所选分组", () => this.collapseGroup());
+    add("bc-create-standalone-group", "创建独立分组", () => this.createStandaloneGroup());
     add("bc-encapsulate", "将选区移动到新 Canvas", () => void this.encapsulate());
     add("bc-copy-node-link", "复制节点 Wikilink", () => void this.copyNodeLink());
     add("bc-export-json", "导出 Canvas JSON", () => void this.export("canvas"));
@@ -336,7 +337,7 @@ export default class BetterCanvasFeatures {
     add("bc-ai-mcp-tool", "让 AI 建议 MCP 工具调用（执行前确认）", () => void this.runAIMcpTool());
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
     add("bc-pdf-review-board", "为 PDF 创建分页批注工作区", () => this.createPdfReviewBoard());
-    add("bc-create-canvas-portal", "插入 Canvas 嵌入卡片", () => this.createCanvasPortal());
+    add("bc-create-canvas-portal", "创建可编辑 Canvas Portal", () => this.createCanvasPortal());
   }
 
   private registerCanvasMenus(): void {
@@ -828,6 +829,46 @@ export default class BetterCanvasFeatures {
       const related = Boolean(root) && (edgeData.fromNode === root || edgeData.toNode === root);
       if (path instanceof SVGElement) path.classList.toggle("bc-focus-dimmed", Boolean(root) && !related);
     }
+  }
+
+  private createStandaloneGroup(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) { new Notice("当前 Canvas 处于只读模式。"); return; }
+    const selected = this.selected(canvas);
+    const data = readCanvasData(canvas);
+    let x = 0;
+    let y = 0;
+    if (selected) {
+      x = selected.node.x + selected.node.width + 100;
+      y = selected.node.y;
+    } else if (data.nodes.length) {
+      const rightmost = Math.max(...data.nodes.map((node: CanvasNodeData) => node.x + node.width));
+      const topmost = Math.min(...data.nodes.map((node: CanvasNodeData) => node.y));
+      x = rightmost + 100;
+      y = topmost;
+    }
+    const group: CanvasNodeData = {
+      id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
+      type: "group",
+      x,
+      y,
+      width: 640,
+      height: 420,
+      label: "新建分组",
+      color: "2"
+    };
+    canvas.importData({ ...data, nodes: [...data.nodes, group], edges: data.edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    window.setTimeout(() => {
+      const internal = canvas.nodes?.get?.(group.id);
+      if (internal) {
+        canvas.selectOnly?.(internal);
+        canvas.zoomToSelection?.();
+      }
+    }, 0);
+    new Notice("已创建独立分组。拖动或调整大小即可将相关节点归入其中。");
   }
 
   private collapseGroup(): void {
