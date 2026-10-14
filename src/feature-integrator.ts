@@ -149,6 +149,38 @@ export default class BetterCanvasFeatures {
     this.p.app.workspace.onLayoutReady(() => this.refresh());
   }
 
+  /**
+   * Public bridges used by the base plugin commands and node context menus.
+   * All AI entry points route through this integration layer so provider
+   * profiles, streaming, cancellation, multimodal context and node metadata
+   * behave consistently.
+   */
+  askSelectedNode(nodeId?: string): void {
+    const canvas = this.canvas();
+    if (!canvas) {
+      new Notice("请先打开一个 Canvas。");
+      return;
+    }
+    if (nodeId) this.selectNode(canvas, nodeId);
+    const selection = this.selected(canvas);
+    if (!selection) return;
+    this.input(
+      "向 AI 提问",
+      "例如：总结这些笔记、指出不确定之处，并给出下一步研究问题",
+      value => void this.runAI(selection.node.id, value)
+    );
+  }
+
+  generateFlashcardsFromSelection(nodeId?: string): void {
+    if (nodeId) this.selectNode(this.canvas(), nodeId);
+    void this.generateFlashcardNodes();
+  }
+
+  generateImageFromSelection(nodeId?: string): void {
+    if (nodeId) this.selectNode(this.canvas(), nodeId);
+    void this.generateImageForNode();
+  }
+
   settings(): any {
     return this.p.settings as any;
   }
