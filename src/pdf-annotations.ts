@@ -233,20 +233,67 @@ export class PdfAnnotationManager {
     if (!this.excerptContainers.has(container)) {
       this.excerptContainers.add(container);
       const onCreateExcerpt = (event: Event) => {
-        const custom = event as CustomEvent<{ text?: string }>;
+        const custom = event as CustomEvent<{
+          text?: string;
+          action?: "excerpt" | "highlight";
+          rects?: PdfRect[];
+        }>;
         const selectedText = String(custom.detail?.text ?? "").trim();
+        const action = custom.detail?.action === "highlight" ? "highlight" : "excerpt";
         if (!selectedText) {
-          new Notice("请先在 PDF 文本面板中选择一段文字，再点击创建摘录。");
+          new Notice(action === "highlight"
+            ? "请先在 PDF 页面上选择文字，再点击持久化高亮。"
+            : "请先在 PDF 文本面板或页面上选择一段文字，再点击创建摘录。");
           return;
         }
         if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-          new Notice("当前 Canvas 处于只读模式，不能添加 PDF 摘录。");
+          new Notice("当前 Canvas 处于只读模式，不能添加 PDF 批注。");
           return;
         }
         const latest = readCanvasData(canvas);
         const source = latest.nodes.find((node: any) => node.id === nodeData.id);
         if (!source) {
-          new Notice("找不到 PDF 页面节点，无法创建摘录。");
+          new Notice("找不到 PDF 页面节点，无法创建批注。");
+          return;
+        }
+
+        if (action === "highlight") {
+          const rawRects = Array.isArray(custom.detail?.rects) ? custom.detail.rects : [];
+          const rects: PdfRect[] = rawRects
+            .filter((rect: PdfRect) =>
+              Number.isFinite(rect?.x) && Number.isFinite(rect?.y) &&
+              Number.isFinite(rect?.width) && Number.isFinite(rect?.height) &&
+              rect.width > 0 && rect.height > 0
+            )
+            .map((rect: PdfRect) => {
+              const x = Math.max(0, Math.min(1, rect.x));
+              const y = Math.max(0, Math.min(1, rect.y));
+              return {
+                x,
+                y,
+                width: Math.max(0, Math.min(1 - x, rect.width)),
+                height: Math.max(0, Math.min(1 - y, rect.height))
+              };
+            })
+            .filter((rect: PdfRect) => rect.width > 0 && rect.height > 0);
+          if (!rects.length) {
+            new Notice("没有取得页面上的文字选区位置。请在 PDF 页面文字层上选择文字；文本面板中的纯文本选择只能创建摘录。");
+            return;
+          }
+
+          const highlights = Array.isArray(source.bcPdfTextHighlights)
+            ? source.bcPdfTextHighlights as PdfTextHighlight[]
+            : [];
+          highlights.push({
+            text: selectedText.slice(0, 5000),
+            rects,
+            color: "#ffeb3b",
+            opacity: 0.36,
+            createdAt: Date.now()
+          });
+          patchNode(canvas, source.id, { bcPdfTextHighlights: highlights });
+          this.refresh();
+          new Notice("已在 Canvas 中保存文字高亮；它会随 .canvas 文件保存，但不会修改 PDF 原文件。");
           return;
         }
 
