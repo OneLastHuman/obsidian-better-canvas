@@ -273,6 +273,7 @@ export default class BetterCanvasFeatures {
     add("bc-set-edge-arrow", "设置所选连线箭头样式", () => this.edgeArrowStyle());
     add("bc-resize-node", "根据文字自动调整节点尺寸", () => this.resizeNode());
     add("bc-toggle-auto-resize", "切换所选节点自动调整尺寸", () => this.toggleAutoResize());
+    add("bc-set-zoom-breakpoint", "设置所选节点缩放断点", () => this.setZoomBreakpoint());
     add("bc-flip-edges", "翻转节点关联的连线", () => this.flipEdges());
     add("bc-color-edges", "设置节点关联连线颜色", () => this.colorEdges());
     add("bc-select-edges", "选择节点关联的连线", () => this.selectEdges("all"));
@@ -351,6 +352,7 @@ export default class BetterCanvasFeatures {
       this.observeAutoResize(view, view.canvas);
       this.bindMindMapShortcuts(view, view.canvas);
       this.decorate(view.canvas);
+      this.applyZoomBreakpoints(view.canvas);
       this.applyFocus(view.canvas);
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
     }
@@ -449,6 +451,45 @@ export default class BetterCanvasFeatures {
     const width = Number(settings.defaultNodeWidth) || 280;
     const defaultHeight = Number(settings.defaultNodeHeight) || 140;
     return makeTextNode(text, x, y, { width, height: height ?? defaultHeight });
+  }
+  private setZoomBreakpoint(): void {
+    const selected = this.selected();
+    if (!selected) return;
+    this.input("设置缩放断点", "输入缩放比例（例如 0.6）；输入 off 清除", value => {
+      if (value.trim().toLowerCase() === "off") {
+        patchNode(selected.canvas, selected.node.id, { bcZoomBreakpoint: null });
+        this.applyZoomBreakpoints(selected.canvas);
+        new Notice("已清除节点缩放断点。");
+        return;
+      }
+      const breakpoint = Number(value);
+      if (!Number.isFinite(breakpoint) || breakpoint < 0.05 || breakpoint > 5) {
+        new Notice("请输入 0.05 到 5 之间的缩放比例，或输入 off。");
+        return;
+      }
+      patchNode(selected.canvas, selected.node.id, { bcZoomBreakpoint: breakpoint });
+      this.applyZoomBreakpoints(selected.canvas);
+      new Notice("已设置缩放断点：" + breakpoint);
+    }, typeof (selected.node as any).bcZoomBreakpoint === "number" ? String((selected.node as any).bcZoomBreakpoint) : "off");
+  }
+
+  private applyZoomBreakpoints(canvas: any): void {
+    const zoom = Number(canvas?.zoom);
+    if (!Number.isFinite(zoom)) return;
+    for (const nodeData of readCanvasData(canvas).nodes) {
+      const node = canvas?.nodes?.get?.(nodeData.id);
+      const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
+      if (!(element instanceof HTMLElement)) continue;
+      const stored = (nodeData as any).bcZoomBreakpoint;
+      const cssValue = window.getComputedStyle(element).getPropertyValue("--variable-breakpoint").trim();
+      const cssBreakpoint = cssValue ? Number.parseFloat(cssValue) : NaN;
+      const breakpoint = typeof stored === "number" && Number.isFinite(stored) ? stored : cssBreakpoint;
+      if (!Number.isFinite(breakpoint)) {
+        delete element.dataset.bcBreakpointHidden;
+        continue;
+      }
+      element.dataset.bcBreakpointHidden = String(zoom <= breakpoint);
+    }
   }
   private setNodeCustomClass(): void {
     const selection = this.selected();
@@ -558,9 +599,10 @@ export default class BetterCanvasFeatures {
             resizeNodeToText(canvas, node.id);
           }
         }
+        this.applyZoomBreakpoints(canvas);
       }, 220);
     });
-    observer.observe(container, { subtree: true, childList: true, characterData: true });
+    observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "transform", "class"] });
     this.p.register(() => observer.disconnect());
   }
 
