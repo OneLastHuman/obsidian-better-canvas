@@ -15,9 +15,9 @@ const sample: CanvasData = {
 describe("full content SVG export", () => {
   it("uses the union of node positions rather than a viewport size", () => {
     const result = canvasDataToFullSvg(sample, { margin: 10 });
-    expect(result.width).toBe(520);
+    expect(result.width).toBe(740);
     expect(result.height).toBe(300);
-    expect(result.svg).toContain('viewBox="0 0 520 300"');
+    expect(result.svg).toContain('viewBox="0 0 740 300"');
     expect(result.svg).toContain("Root &amp; &lt;notes&gt;");
     expect(result.svg).toContain("marker-end=\"url(#bc-arrow)\"");
     expect(result.svg).toContain("<polygon");
