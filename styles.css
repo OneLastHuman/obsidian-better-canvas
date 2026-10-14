@@ -191,11 +191,14 @@
   user-select: text;
   cursor: text;
 }
-.bc-pdf-create-excerpt {
+.bc-pdf-create-excerpt,
+.bc-pdf-highlight-selection {
+  display: block;
   margin-top: 0.4rem;
   width: 100%;
 }
-.bc-pdf-create-excerpt:disabled {
+.bc-pdf-create-excerpt:disabled,
+.bc-pdf-highlight-selection:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
