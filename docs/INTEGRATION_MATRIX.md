@@ -59,7 +59,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 
 | Feature | Status | Notes |
 |---|---|---|
-| Ask AI from a selected node | Implemented | Adds a progressively updated response node connected to the source |
+| Ask AI from a selected node | Implemented, command/menu/card toolbar | Adds a progressively updated response node connected to the source; hover toolbar exposes Ask AI, image generation, flashcards and per-node model selection, with regenerate on generated cards |
 | Stop in-flight generation | Implemented, transport-dependent | Uses AbortController for streaming fetch; a fallback non-streaming request may not be cancellable |
 | Regenerate response | Implemented | Requires Better Canvas generation metadata on the response node |
 | Per-node provider / model overrides | Implemented | Stores provider and model identifiers on the node |
