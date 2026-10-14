@@ -54,6 +54,12 @@ export class CanvasMetadataIndexer {
         delete this.cache.resolvedLinks?.[oldPath];
         delete this.cache.unresolvedLinks?.[oldPath];
         if (this.cache.fileCache) delete this.cache.fileCache[oldPath];
+        const oldName = oldPath.split("/").pop()?.toLowerCase();
+        try {
+          if (oldName) this.cache.uniqueFileLookup?.remove?.(oldName, file);
+        } catch {
+          // Keep the cache patch working even if this Obsidian version uses a different lookup API.
+        }
       }
       this.queueIfCanvas(file);
     }));
@@ -62,6 +68,11 @@ export class CanvasMetadataIndexer {
       delete this.cache.resolvedLinks?.[file.path];
       delete this.cache.unresolvedLinks?.[file.path];
       if (this.cache.fileCache) delete this.cache.fileCache[file.path];
+      try {
+        if (file?.name) this.cache.uniqueFileLookup?.remove?.(String(file.name).toLowerCase(), file);
+      } catch {
+        // Internal lookup cleanup is best-effort across Obsidian versions.
+      }
     }));
     this.plugin.registerEvent(this.app.workspace.on("layout-change", () => this.patchBacklinkViews()));
     this.plugin.registerEvent(this.app.workspace.on("active-leaf-change", () => this.patchBacklinkViews()));
