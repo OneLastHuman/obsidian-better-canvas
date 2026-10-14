@@ -63,16 +63,17 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       return;
     }
 
-    const removeListeners = () => {
+    const removeListeners = (keepForceKill = false) => {
       if (timeout) clearTimeout(timeout);
-      if (forceKill) clearTimeout(forceKill);
+      if (forceKill && !keepForceKill) clearTimeout(forceKill);
       options.signal.removeEventListener("abort", onAbort);
     };
 
     const finish = (error?: Error, output?: string) => {
       if (settled) return;
       settled = true;
-      removeListeners();
+      // On abort/timeout keep the escalation timer alive until the child exits.
+      removeListeners(Boolean(error && forceKill));
       if (error) reject(error);
       else resolve(String(output ?? ""));
     };
@@ -81,7 +82,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       if (settled) return;
       try { child.kill("SIGTERM"); } catch { /* child may have exited */ }
       forceKill = setTimeout(() => {
-        if (!settled) {
+        if (child.exitCode === null && child.signalCode === null) {
           try { child.kill("SIGKILL"); } catch { /* ignore */ }
         }
       }, 1500);
@@ -139,6 +140,10 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
     };
 
     child.once("close", (code: number | null, signalName: string | null) => {
+      if (forceKill) {
+        clearTimeout(forceKill);
+        forceKill = undefined;
+      }
       if (settled) return;
       if (stdoutBuffer.trim()) consumeLine(stdoutBuffer);
       if (settled) return;
