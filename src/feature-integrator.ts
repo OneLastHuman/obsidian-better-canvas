@@ -771,7 +771,6 @@ export default class BetterCanvasFeatures {
       };
       responseNodeId = placeholder.id;
       insertCanvasNode(canvas, placeholder, nodeId);
-      notice.setMessage?.("Better Canvas：AI 正在生成；可使用“停止当前 AI 生成”命令中止。");
 
       const answer = await chatCompletionStream(
         this.aiSettings(source, modelOverride),
