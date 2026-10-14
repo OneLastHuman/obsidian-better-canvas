@@ -2217,8 +2217,57 @@ export default class BetterCanvasFeatures {
           preview.className = "better-canvas-node-embed";
           preview.dataset.source = file.path + "#" + node.id;
           item.replaceWith(preview);
-          if (node.type === "text") await MarkdownRenderer.renderMarkdown(body, preview, context.sourcePath, this.p);
-          else preview.createEl("p", { text: body });
+          if (node.type === "text") {
+            await MarkdownRenderer.renderMarkdown(body, preview, context.sourcePath, this.p);
+          } else if (node.type === "link" && typeof node.url === "string") {
+            try {
+              const url = new URL(node.url);
+              if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Unsupported URL protocol");
+              const anchor = preview.createEl("a", {
+                text: node.url,
+                href: url.toString(),
+                attr: { target: "_blank", rel: "noopener noreferrer" }
+              });
+              anchor.setAttribute("aria-label", "Open linked website");
+            } catch {
+              preview.createEl("p", { text: node.url });
+            }
+          } else if (node.type === "file" && typeof node.file === "string") {
+            const embeddedFile = this.p.app.vault.getAbstractFileByPath(node.file);
+            if (!(embeddedFile instanceof TFile)) {
+              preview.createEl("p", { text: node.file });
+            } else {
+              const ext = embeddedFile.extension.toLowerCase();
+              if (ext === "md" || ext === "markdown") {
+                const markdown = await this.p.app.vault.cachedRead(embeddedFile);
+                await MarkdownRenderer.renderMarkdown(markdown, preview, embeddedFile.path, this.p);
+              } else if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(ext)) {
+                const image = preview.createEl("img", {
+                  attr: { src: this.p.app.vault.getResourcePath(embeddedFile), alt: embeddedFile.basename, loading: "lazy" }
+                });
+                image.style.display = "block";
+                image.style.maxWidth = "100%";
+                image.style.maxHeight = "28rem";
+                image.style.objectFit = "contain";
+              } else if (["mp3", "wav", "m4a", "ogg", "flac", "mp4", "webm", "mov"].includes(ext)) {
+                const isVideo = ["mp4", "webm", "mov"].includes(ext);
+                const media = document.createElement(isVideo ? "video" : "audio");
+                media.controls = true;
+                media.preload = "none";
+                media.src = this.p.app.vault.getResourcePath(embeddedFile);
+                media.style.maxWidth = "100%";
+                preview.appendChild(media);
+              } else {
+                const anchor = preview.createEl("a", { text: embeddedFile.path, href: "#" });
+                anchor.addEventListener("click", event => {
+                  event.preventDefault();
+                  void this.p.app.workspace.openLinkText(embeddedFile.path, context.sourcePath, false);
+                });
+              }
+            }
+          } else {
+            preview.createEl("p", { text: String(node.label ?? body) });
+          }
         } else {
           item.textContent = body.split("\n")[0] || file.basename;
           item.setAttribute("title", body.slice(0, 500));
