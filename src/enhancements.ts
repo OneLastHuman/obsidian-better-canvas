@@ -105,6 +105,31 @@ export function styleSelectedEdges(canvas: any, color: string, pathStyle: "solid
   return count;
 }
 
+export type EdgeArrowStyle = "default" | "triangle-outline" | "half-triangle" | "thin-triangle" | "diamond" | "diamond-outline" | "circle" | "circle-outline" | "blunt" | "none";
+
+export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle): number {
+  const selected = canvas?.selection;
+  if (!selected || typeof selected.values !== "function") return 0;
+  const ids = new Set<string>();
+  for (const item of selected.values()) {
+    const data = item?.getData?.();
+    const id = data?.id ?? item?.id;
+    if (typeof id === "string") ids.add(id);
+  }
+  const data = readCanvasData(canvas);
+  let count = 0;
+  const edges = data.edges.map(edge => {
+    if (!ids.has(edge.id)) return edge;
+    count += 1;
+    return { ...edge, bcArrowStyle: arrowStyle };
+  });
+  if (count > 0) {
+    canvas.importData({ ...data, nodes: data.nodes, edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+  }
+  return count;
+}
 export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" | "expanded" | "missing" | "not-group" {
   const data = readCanvasData(canvas);
   const group = data.nodes.find(node => node.id === groupId);
@@ -237,12 +262,40 @@ export function decorateCanvas(canvas: any): void {
     });
   }
 
-  for (const edgeData of data.edges as Array<CanvasEdgeData & { bcColor?: string; bcPathStyle?: string }>) {
+  for (const edgeData of data.edges as Array<CanvasEdgeData & { bcColor?: string; bcPathStyle?: string; bcArrowStyle?: EdgeArrowStyle }>) {
     const edge = canvas?.edges?.get?.(edgeData.id);
     const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
-    if (!(path instanceof SVGElement)) continue;
-    if (edgeData.bcColor) path.style.stroke = edgeData.bcColor;
-    path.style.strokeDasharray = edgeData.bcPathStyle === "dashed" ? "8 5"
-      : edgeData.bcPathStyle === "dotted" ? "2 5" : "";
+    if (path instanceof SVGElement) {
+      if (edgeData.bcColor) path.style.stroke = edgeData.bcColor;
+      path.style.strokeDasharray = edgeData.bcPathStyle === "dashed" ? "8 5"
+        : edgeData.bcPathStyle === "dotted" ? "2 5" : "";
+    }
+
+    if (!edgeData.bcArrowStyle || edgeData.bcArrowStyle === "default") continue;
+    const points: Record<string, string> = {
+      "triangle-outline": "0,0 6.5,10.4 -6.5,10.4",
+      "half-triangle": "-2,0 7.5,12 -2,12",
+      "thin-triangle": "0,0 7,10 0,0 0,10 0,0 -7,10",
+      "diamond": "0,0 5,10 0,20 -5,10",
+      "diamond-outline": "0,0 5,10 0,20 -5,10",
+      "circle": "0,0 4.95,1.8 7.5,6.45 6.6,11.7 2.7,15 -2.7,15 -6.6,11.7 -7.5,6.45 -4.95,1.8",
+      "circle-outline": "0,0 4.95,1.8 7.5,6.45 6.6,11.7 2.7,15 -2.7,15 -6.6,11.7 -7.5,6.45 -4.95,1.8",
+      "blunt": "-10,8 10,8 10,6 -10,6"
+    };
+    for (const lineEnd of [edge?.fromLineEnd, edge?.toLineEnd]) {
+      const polygon = lineEnd?.el?.querySelector?.("polygon");
+      if (!(polygon instanceof SVGElement)) continue;
+      if (edgeData.bcArrowStyle === "none") {
+        polygon.style.display = "none";
+      } else {
+        polygon.style.display = "";
+        polygon.setAttribute("points", points[edgeData.bcArrowStyle] ?? points.default ?? "0,0 6.5,10.4 -6.5,10.4");
+        if (edgeData.bcColor) {
+          polygon.style.stroke = edgeData.bcColor;
+          if (edgeData.bcArrowStyle === "diamond" || edgeData.bcArrowStyle === "circle") polygon.style.fill = edgeData.bcColor;
+        }
+        if (edgeData.bcArrowStyle.endsWith("-outline")) polygon.style.fill = "var(--background-primary)";
+      }
+    }
   }
 }
