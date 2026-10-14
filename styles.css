@@ -1,0 +1,18 @@
+/* Better Canvas currently uses Obsidian's native modal and setting styles. */
+.better-canvas-presentation {
+  min-width: min(680px, 80vw);
+}
+.better-canvas-presentation .better-canvas-slide {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 10rem;
+  padding: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+.better-canvas-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
