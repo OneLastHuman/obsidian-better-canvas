@@ -12,6 +12,17 @@ export function patchNode(canvas: any, nodeId: string, patch: Record<string, unk
     return { ...node, ...patch };
   });
   if (!found) return false;
+  const internal = canvas?.nodes?.get?.(nodeId);
+  if (internal && typeof internal.setData === "function" && typeof internal.getData === "function") {
+    try {
+      internal.setData({ ...internal.getData(), ...patch });
+      canvas.requestSave?.();
+      canvas.requestFrame?.();
+      return true;
+    } catch {
+      // Fall back to importData when the internal Node API is unavailable.
+    }
+  }
   canvas.importData({ ...data, nodes, edges: data.edges });
   canvas.requestSave?.();
   canvas.requestFrame?.();
