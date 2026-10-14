@@ -1,9 +1,7 @@
 # Better Canvas
 
 <p align="center">
-  <strong>让 Obsidian Canvas 成为更完整的知识工作空间。</strong>
-  <br />
-  画布增强、思维导图与 AI 工作流，一站式整合。
+  <strong>为 Obsidian Canvas 增加节点编辑、思维导图和 AI 工作流。</strong>
 </p>
 
 <p align="center">
@@ -11,13 +9,27 @@
   <img alt="License" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue" />
 </p>
 
-Better Canvas 是一款面向 Obsidian Canvas 的增强插件，整合节点与连线编辑、思维导图、知识关联，以及可配置的 AI 辅助工作流。你可以在画布中组织想法、构建关系、整理资料，并将 AI 生成的内容继续沉淀为可编辑的节点。
+Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、知识关联和可配置的 AI 工作流。你可以在画布中整理资料、建立节点关系，并将 AI 生成的内容保存为可继续编辑的节点。
 
 > **项目状态：** 当前项目仍在持续整合和验证中。部分功能依赖 Obsidian 的内部 API 或特定渲染行为，代码已实现不代表已在所有 Obsidian 版本、桌面端和移动端完成验证。请参考[功能整合矩阵](docs/INTEGRATION_MATRIX.md)了解具体覆盖状态。
 
+## 目录
+
+- [界面预览](#界面预览)
+- [功能概览](#功能概览)
+- [安装](#安装)
+- [MCP 工具配置](#mcp-工具配置)
+- [本地 Codex CLI](#本地-codex-cli)
+- [AI 服务配置](#ai-服务配置)
+- [快捷键](#快捷键)
+- [开发与验证](#开发与验证)
+- [已知限制](#已知限制)
+- [上游项目与致谢](#上游项目与致谢)
+- [许可证](#许可证)
+
 ## 界面预览
 
-以下预览使用本地渲染环境制作，依据插件当前的功能范围展示 Canvas 节点样式、思维导图布局与 AI 节点工作流。**它们是界面示意图，并非从 Obsidian 实际运行中截取的截图**；实际外观会受到 Obsidian 版本、主题和服务配置影响。
+以下图片是根据当前功能范围制作的界面示意图，并非 Obsidian 实际运行截图。实际外观可能因 Obsidian 版本、主题和服务配置而异。
 
 <p align="center">
   <img src="docs/screenshots/canvas-enhancements.svg" alt="Canvas 节点颜色、连线和样式控制界面预览" width="100%" />
@@ -69,7 +81,7 @@ Better Canvas 是一款面向 Obsidian Canvas 的增强插件，整合节点与�
 - 识别 AI 或手写节点中的 HTML 代码块，可通过按钮在隔离的 sandbox iframe 中预览交互页面。
 - 可把固定 PDF 页面提取为 AI 文本上下文，并将页面栅格图像发送给支持视觉输入的模型；Gemini profile 支持对公开视频进行原生视频上下文分析。
 
-AI 能力取决于所配置服务的 API、模型、账号权限和内容可访问性。网页反爬、登录限制、不可访问的字幕及不受支持的供应商接口都可能导致操作失败。
+AI 功能受服务 API、模型、账号权限和内容可访问性影响。网页反爬、登录限制、缺失字幕或不受支持的接口都可能导致操作失败。
 
 ## 安装
 
@@ -199,7 +211,7 @@ npm run build
 - `npm test`：运行单元测试。
 - `npm run build`：生成生产构建。
 
-CI 可检查类型、测试和构建产物，但不会启动 Obsidian 图形界面。发布前仍应在目标版本中手动验证 Canvas 保存、键盘操作、菜单交互、节点布局、导入导出、PDF 标注，以及真实 AI 服务请求。
+CI 会检查类型、测试和构建产物，但不会启动 Obsidian 图形界面。发布前请在目标 Obsidian 版本中手动验证 Canvas 保存、键盘操作、菜单、节点布局、导入导出、PDF 标注和实际 AI 请求。
 
 ## 已知限制
 
@@ -209,7 +221,7 @@ CI 可检查类型、测试和构建产物，但不会启动 Obsidian 图形界�
 - **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini profile 已接入，并支持模型端点发现和手动指定模型。可选的本地 Codex CLI 只在桌面端运行，需要安装、登录并正确配置 Codex；提示词发送给 Codex 当前所配置的模型供应商，并非保证离线处理。批量 Prompt 每次最多处理 20 篇 Markdown；网页和 YouTube 内容获取、图像生成及 MCP 工具调用都受远端 API、权限和内容可访问性影响。HTML 预览在沙盒 iframe 中运行，不授予同源权限，但仍应只预览可信或已检查的代码。
 - **MCP 结果处理。** 远程 Streamable HTTP、旧式 SSE 与本地 stdio MCP 工具的文本结果会生成关联文本节点；PNG/JPEG/WebP/GIF 图片结果会写入 Vault 并生成关联文件节点。stdio 服务可以访问其进程用户与操作系统权限允许的本地资源；请只连接可信服务。
 
-详细的已实现、部分实现和待完善项目请查看[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。我们会尽量区分“代码已实现”和“已在 Obsidian 实际验证”，避免把构建通过等同于完整的运行时兼容性。
+各功能的实现与验证状态见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。代码已实现不代表已在 Obsidian 中验证；构建通过也不代表所有运行时行为都兼容。
 
 ## 上游项目与致谢
 
