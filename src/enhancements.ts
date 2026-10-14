@@ -1,0 +1,232 @@
+import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
+
+export type NodeShape = "default" | "pill" | "diamond" | "parallelogram" | "hexagon";
+export type BorderStyle = "solid" | "dashed" | "dotted" | "double";
+
+export function patchNode(canvas: any, nodeId: string, patch: Record<string, unknown>): boolean {
+  const data = readCanvasData(canvas);
+  let found = false;
+  const nodes = data.nodes.map(node => {
+    if (node.id !== nodeId) return node;
+    found = true;
+    return { ...node, ...patch };
+  });
+  if (!found) return false;
+  canvas.importData({ ...data, nodes, edges: data.edges });
+  canvas.requestSave?.();
+  canvas.requestFrame?.();
+  return true;
+}
+
+export function reorderNode(canvas: any, nodeId: string, bringToFront: boolean): boolean {
+  const data = readCanvasData(canvas);
+  const node = data.nodes.find(item => item.id === nodeId);
+  if (!node) return false;
+  const remaining = data.nodes.filter(item => item.id !== nodeId);
+  const nodes = bringToFront ? [...remaining, node] : [node, ...remaining];
+  canvas.importData({ ...data, nodes, edges: data.edges });
+  canvas.requestSave?.();
+  canvas.requestFrame?.();
+  return true;
+}
+
+export function flipIncidentEdges(canvas: any, nodeId: string): number {
+  const data = readCanvasData(canvas);
+  let count = 0;
+  const edges = data.edges.map(edge => {
+    if (edge.fromNode !== nodeId && edge.toNode !== nodeId) return edge;
+    count += 1;
+    return {
+      ...edge,
+      fromNode: edge.toNode,
+      toNode: edge.fromNode,
+      fromSide: edge.toSide,
+      toSide: edge.fromSide,
+      ...(edge.fromFloating !== undefined || edge.toFloating !== undefined
+        ? { fromFloating: edge.toFloating, toFloating: edge.fromFloating }
+        : {})
+    };
+  });
+  if (count > 0) {
+    canvas.importData({ ...data, nodes: data.nodes, edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+  }
+  return count;
+}
+
+export function colorIncidentEdges(canvas: any, nodeId: string, color: string): number {
+  const data = readCanvasData(canvas);
+  let count = 0;
+  const edges = data.edges.map(edge => {
+    if (edge.fromNode !== nodeId && edge.toNode !== nodeId) return edge;
+    count += 1;
+    return { ...edge, bcColor: color };
+  });
+  if (count > 0) {
+    canvas.importData({ ...data, nodes: data.nodes, edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+  }
+  return count;
+}
+
+export function styleSelectedEdges(canvas: any, color: string, pathStyle: "solid" | "dashed" | "dotted"): number {
+  const selected = canvas?.selection;
+  if (!selected || typeof selected.values !== "function") return 0;
+  const ids = new Set<string>();
+  for (const item of selected.values()) {
+    const id = item?.id ?? item?.getData?.()?.id;
+    if (typeof id === "string") ids.add(id);
+  }
+  const data = readCanvasData(canvas);
+  let count = 0;
+  const edges = data.edges.map(edge => {
+    if (!ids.has(edge.id)) return edge;
+    count += 1;
+    return { ...edge, bcColor: color, bcPathStyle: pathStyle };
+  });
+  if (count > 0) {
+    canvas.importData({ ...data, nodes: data.nodes, edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+  }
+  return count;
+}
+
+export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" | "expanded" | "missing" | "not-group" {
+  const data = readCanvasData(canvas);
+  const group = data.nodes.find(node => node.id === groupId);
+  if (!group) return "missing";
+  if (group.type !== "group") return "not-group";
+
+  const extended = group as CanvasNodeData & {
+    bcCollapsed?: boolean;
+    bcCollapsedNodes?: CanvasNodeData[];
+    bcCollapsedEdges?: CanvasEdgeData[];
+  };
+
+  if (extended.bcCollapsed) {
+    const hiddenNodes = Array.isArray(extended.bcCollapsedNodes) ? extended.bcCollapsedNodes : [];
+    const hiddenEdges = Array.isArray(extended.bcCollapsedEdges) ? extended.bcCollapsedEdges : [];
+    const nodeIds = new Set(data.nodes.map(node => node.id));
+    const edgeIds = new Set(data.edges.map(edge => edge.id));
+    const nodes = [
+      ...data.nodes,
+      ...hiddenNodes.filter(node => !nodeIds.has(node.id))
+    ];
+    const edges = [
+      ...data.edges,
+      ...hiddenEdges.filter(edge => !edgeIds.has(edge.id))
+    ];
+    const updatedGroup = { ...extended, bcCollapsed: false };
+    delete updatedGroup.bcCollapsedNodes;
+    delete updatedGroup.bcCollapsedEdges;
+    canvas.importData({
+      ...data,
+      nodes: nodes.map(node => node.id === groupId ? updatedGroup : node),
+      edges
+    });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    return "expanded";
+  }
+
+  const left = group.x;
+  const top = group.y;
+  const right = group.x + group.width;
+  const bottom = group.y + group.height;
+  const containedNodes = data.nodes.filter(node =>
+    node.id !== groupId &&
+    node.x >= left && node.y >= top &&
+    node.x + node.width <= right &&
+    node.y + node.height <= bottom
+  );
+  if (containedNodes.length === 0) return "collapsed";
+
+  const containedIds = new Set(containedNodes.map(node => node.id));
+  const hiddenEdges = data.edges.filter(edge =>
+    containedIds.has(edge.fromNode) || containedIds.has(edge.toNode)
+  );
+  const nodes = data.nodes
+    .filter(node => !containedIds.has(node.id))
+    .map(node => node.id === groupId
+      ? { ...node, bcCollapsed: true, bcCollapsedNodes: containedNodes, bcCollapsedEdges: hiddenEdges }
+      : node
+    );
+  const edges = data.edges.filter(edge => !hiddenEdges.some(hidden => hidden.id === edge.id));
+  canvas.importData({ ...data, nodes, edges });
+  canvas.requestSave?.();
+  canvas.requestFrame?.();
+  return "collapsed";
+}
+
+export function moveSelectionEdgesToTop(canvas: any, direction: "all" | "incoming" | "outgoing" = "all"): number {
+  const selection = canvas?.selection;
+  if (!selection || typeof selection.values !== "function") return 0;
+  const ids = new Set<string>();
+  for (const item of selection.values()) {
+    const data = item?.getData?.();
+    if (data?.type !== "group" && item?.id) ids.add(item.id);
+  }
+  const canvasData = readCanvasData(canvas);
+  const edgeIds = canvasData.edges.filter(edge => {
+    const fromSelected = ids.has(edge.fromNode);
+    const toSelected = ids.has(edge.toNode);
+    if (direction === "incoming") return toSelected && !fromSelected;
+    if (direction === "outgoing") return fromSelected && !toSelected;
+    return fromSelected || toSelected;
+  }).map(edge => edge.id);
+  if (!edgeIds.length || typeof canvas.select !== "function") return 0;
+  canvas.deselectAll?.();
+  for (const id of edgeIds) {
+    const edge = canvas.edges?.get?.(id);
+    if (edge) canvas.select(edge);
+  }
+  return edgeIds.length;
+}
+
+export function resizeNodeToText(canvas: any, nodeId: string): boolean {
+  const data = readCanvasData(canvas);
+  const node = data.nodes.find(item => item.id === nodeId);
+  if (!node || node.type !== "text" || typeof node.text !== "string") return false;
+
+  const lines = node.text.split("\n");
+  const longest = Math.max(1, ...lines.map(line => line.length));
+  const width = Math.max(220, Math.min(720, Math.round(longest * 7.2 + 52)));
+  const wrappedLines = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / Math.max(1, (width - 40) / 7.2))), 0);
+  const height = Math.max(100, Math.min(1000, Math.round(wrappedLines * 24 + 44)));
+  const nodes = data.nodes.map(item => item.id === nodeId ? { ...item, width, height } : item);
+  canvas.importData({ ...data, nodes, edges: data.edges });
+  canvas.requestSave?.();
+  canvas.requestFrame?.();
+  return true;
+}
+
+export function decorateCanvas(canvas: any): void {
+  const data = readCanvasData(canvas);
+  for (const nodeData of data.nodes) {
+    const node = canvas?.nodes?.get?.(nodeData.id);
+    const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
+    if (!(element instanceof HTMLElement)) continue;
+    const shape = typeof nodeData.bcShape === "string" ? nodeData.bcShape : "default";
+    const borderStyle = typeof nodeData.bcBorderStyle === "string" ? nodeData.bcBorderStyle : "solid";
+    element.dataset.bcShape = shape;
+    element.dataset.bcBorder = borderStyle;
+    element.dataset.bcTextAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign : "left";
+    element.style.borderStyle = borderStyle;
+    const contents = element.querySelectorAll<HTMLElement>(".canvas-node-content, .canvas-node-container, .canvas-node-iframe");
+    contents.forEach(child => {
+      child.style.textAlign = element.dataset.bcTextAlign ?? "left";
+    });
+  }
+
+  for (const edgeData of data.edges as Array<CanvasEdgeData & { bcColor?: string; bcPathStyle?: string }>) {
+    const edge = canvas?.edges?.get?.(edgeData.id);
+    const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
+    if (!(path instanceof SVGElement)) continue;
+    if (edgeData.bcColor) path.style.stroke = edgeData.bcColor;
+    path.style.strokeDasharray = edgeData.bcPathStyle === "dashed" ? "8 5"
+      : edgeData.bcPathStyle === "dotted" ? "2 5" : "";
+  }
+}

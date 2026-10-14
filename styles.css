@@ -16,3 +16,48 @@
   flex-direction: column;
   gap: 0.5rem;
 }
+
+/* Better Canvas persisted node/edge enhancements */
+.canvas-node[data-bc-shape="pill"] {
+  border-radius: 999px !important;
+}
+.canvas-node[data-bc-shape="diamond"] {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.canvas-node[data-bc-shape="parallelogram"] {
+  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="hexagon"] {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+.canvas-node[data-bc-border="dashed"] {
+  border-style: dashed !important;
+}
+.canvas-node[data-bc-border="dotted"] {
+  border-style: dotted !important;
+}
+.canvas-node[data-bc-border="double"] {
+  border-style: double !important;
+}
+.canvas-node.bc-focus-dimmed {
+  opacity: 0.12 !important;
+  filter: blur(0.5px);
+  transition: opacity 100ms ease;
+}
+.canvas-edges path.bc-focus-dimmed,
+.bc-focus-mode .canvas-edges path.bc-focus-dimmed {
+  opacity: 0.1 !important;
+}
+.better-canvas-node-embed {
+  margin: 0.6rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+.better-canvas-node-embed > :first-child {
+  margin-top: 0;
+}
+.better-canvas-node-embed > :last-child {
+  margin-bottom: 0;
+}

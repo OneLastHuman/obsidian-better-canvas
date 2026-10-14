@@ -7,12 +7,16 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
     "esbuild": "^0.25.4",
     "obsidian": "latest",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.13"
   }
 }

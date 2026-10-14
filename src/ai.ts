@@ -1,5 +1,10 @@
 import { requestUrl } from "obsidian";
 
+export type ChatMessageContent = string | Array<
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "auto" | "low" | "high" } }
+>;
+
 export interface AISettings {
   baseUrl: string;
   apiKey: string;
@@ -29,7 +34,7 @@ function errorMessage(response: any, body: any): string {
 
 export async function chatCompletion(
   settings: AISettings,
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>
+  messages: Array<{ role: "system" | "user" | "assistant"; content: ChatMessageContent }>
 ): Promise<string> {
   if (!settings.apiKey.trim()) throw new Error("请先在 Better Canvas 设置中填写 API Key。");
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
