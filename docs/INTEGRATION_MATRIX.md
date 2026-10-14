@@ -70,7 +70,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Flashcard generation | Implemented | Can create flashcard nodes; does not directly create a spaced-repetition deck |
 | Webpage text ingestion | Implemented, best-effort | JavaScript-only, login-gated and anti-bot pages may fail |
 | YouTube caption ingestion | Implemented, best-effort | Requires accessible captions; videos without retrievable captions cannot be transcribed |
-| MCP remote tools | Implemented, remote Streamable HTTP | Direct tool picker plus AI-proposed tool/arguments with an explicit review/confirmation step; does not support stdio or SSE-only servers |
+| MCP remote tools | Implemented, remote Streamable HTTP | Direct tool picker plus AI-proposed tool/arguments with an explicit review/confirmation step. Text results become linked nodes; PNG/JPEG/WebP/GIF image results are saved into the Vault and added as linked file nodes. Does not support stdio or SSE-only servers; unsupported image MIME types are reported and skipped |
 | PDF page context for AI | Implemented, basic | Extracts selectable text from up to three pages and sends pinned-page raster images to visual models; scanned PDFs without OCR text depend on visual input and model support |
 | Gemini-native public YouTube video context | Implemented, provider-dependent | Command sends `fileData.fileUri` directly to the active Gemini profile; the video must be public and the selected model/account must support it |
 | All upstream model/provider SDKs, rich model picker and automatic tool routing | Partial | Core profiles and manual MCP tool calls work; not every upstream provider feature is replicated |
