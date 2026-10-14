@@ -4,6 +4,7 @@ import {
   flipIncidentEdges,
   reorderNode,
   styleSelectedEdgeArrow,
+  styleSelectedEdgePathfinding,
   styleSelectedEdges
 } from "./enhancements";
 import type { CanvasData } from "./canvas";
@@ -78,6 +79,17 @@ describe("Canvas edge helpers", () => {
       bcPathStyle: "dotted",
       styleAttributes: { path: "dotted" }
     });
+  });
+
+  it("stores selected edge pathfinding in standard styleAttributes", () => {
+    const canvas = makeCanvas(fixture, [{ id: "ab" }]);
+    expect(styleSelectedEdgePathfinding(canvas, "a-star")).toBe(1);
+    expect(canvas.data.edges[0]).toMatchObject({
+      bcPathfindingMethod: "a-star",
+      styleAttributes: { pathfindingMethod: "a-star" }
+    });
+    expect(styleSelectedEdgePathfinding(canvas, "bezier")).toBe(1);
+    expect(canvas.data.edges[0].styleAttributes).not.toHaveProperty("pathfindingMethod");
   });
 
   it("maps custom arrow names to JSON Canvas schema names", () => {
