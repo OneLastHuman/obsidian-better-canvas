@@ -12,7 +12,7 @@ import {
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
-import { readCanvasData, makeTextNode, insertCanvasNode, CanvasNodeData } from "./canvas";
+import { readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
   decorateCanvas,
