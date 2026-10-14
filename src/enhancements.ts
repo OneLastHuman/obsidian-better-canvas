@@ -265,6 +265,197 @@ export function resizeNodeToText(canvas: any, nodeId: string): boolean {
   return true;
 }
 
+type RoutePoint = { x: number; y: number };
+type RouteBox = { minX: number; minY: number; maxX: number; maxY: number };
+
+function normalizeBBox(value: any): RouteBox | null {
+  if (!value || typeof value !== "object") return null;
+  const minX = Number(value.minX ?? value.x);
+  const minY = Number(value.minY ?? value.y);
+  const maxX = Number(value.maxX ?? (Number(value.x) + Number(value.width)));
+  const maxY = Number(value.maxY ?? (Number(value.y) + Number(value.height)));
+  if (![minX, minY, maxX, maxY].every(Number.isFinite) || maxX < minX || maxY < minY) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+function bboxSideCenter(box: RouteBox, side: string): RoutePoint {
+  if (side === "left") return { x: box.minX, y: (box.minY + box.maxY) / 2 };
+  if (side === "right") return { x: box.maxX, y: (box.minY + box.maxY) / 2 };
+  if (side === "top") return { x: (box.minX + box.maxX) / 2, y: box.minY };
+  return { x: (box.minX + box.maxX) / 2, y: box.maxY };
+}
+
+function sideVector(side: string): RoutePoint {
+  if (side === "left") return { x: -1, y: 0 };
+  if (side === "right") return { x: 1, y: 0 };
+  if (side === "top") return { x: 0, y: -1 };
+  return { x: 0, y: 1 };
+}
+
+function compactPath(points: RoutePoint[]): RoutePoint[] {
+  const output: RoutePoint[] = [];
+  for (const point of points) {
+    const previous = output[output.length - 1];
+    if (previous && Math.abs(previous.x - point.x) < 0.01 && Math.abs(previous.y - point.y) < 0.01) continue;
+    while (output.length >= 2) {
+      const a = output[output.length - 2];
+      const b = output[output.length - 1];
+      const cross = (b.x - a.x) * (point.y - b.y) - (b.y - a.y) * (point.x - b.x);
+      if (Math.abs(cross) > 0.01) break;
+      output.pop();
+    }
+    output.push(point);
+  }
+  return output;
+}
+
+function pointsToSvgPath(points: RoutePoint[]): string {
+  return compactPath(points).map((point, index) =>
+    (index === 0 ? "M " : "L ") + point.x.toFixed(2) + " " + point.y.toFixed(2)
+  ).join(" ");
+}
+
+function directRoute(start: RoutePoint, end: RoutePoint): RoutePoint[] {
+  return [start, end];
+}
+
+function squareRoute(start: RoutePoint, end: RoutePoint, fromSide: string, toSide: string): RoutePoint[] {
+  const sourceHorizontal = fromSide === "left" || fromSide === "right";
+  const targetHorizontal = toSide === "left" || toSide === "right";
+  if (sourceHorizontal && targetHorizontal) {
+    const midX = (start.x + end.x) / 2;
+    return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+  }
+  if (!sourceHorizontal && !targetHorizontal) {
+    const midY = (start.y + end.y) / 2;
+    return [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+  }
+  if (sourceHorizontal) return [start, { x: end.x, y: start.y }, end];
+  return [start, { x: start.x, y: end.y }, end];
+}
+
+function aStarGridRoute(
+  start: RoutePoint,
+  goal: RoutePoint,
+  fromSide: string,
+  toSide: string,
+  obstacleBoxes: RouteBox[],
+  step = 32
+): RoutePoint[] | null {
+  const fromVector = sideVector(fromSide);
+  const toVector = sideVector(toSide);
+  const startEscape = { x: start.x + fromVector.x * step, y: start.y + fromVector.y * step };
+  const goalEscape = { x: goal.x + toVector.x * step, y: goal.y + toVector.y * step };
+  const startCell = { x: Math.round(startEscape.x / step), y: Math.round(startEscape.y / step) };
+  const goalCell = { x: Math.round(goalEscape.x / step), y: Math.round(goalEscape.y / step) };
+  const key = (point: { x: number; y: number }) => point.x + "," + point.y;
+  const startKey = key(startCell);
+  const goalKey = key(goalCell);
+  const corridor = 28;
+  const minX = Math.min(startCell.x, goalCell.x) - corridor;
+  const maxX = Math.max(startCell.x, goalCell.x) + corridor;
+  const minY = Math.min(startCell.y, goalCell.y) - corridor;
+  const maxY = Math.max(startCell.y, goalCell.y) + corridor;
+  const blocked = (cell: { x: number; y: number }): boolean => {
+    if (key(cell) === startKey || key(cell) === goalKey) return false;
+    const x = cell.x * step;
+    const y = cell.y * step;
+    return obstacleBoxes.some(box =>
+      x >= box.minX - 12 && x <= box.maxX + 12 &&
+      y >= box.minY - 12 && y <= box.maxY + 12
+    );
+  };
+
+  const open = new Map<string, { x: number; y: number; f: number }>();
+  const cameFrom = new Map<string, string>();
+  const gScore = new Map<string, number>([[startKey, 0]]);
+  open.set(startKey, { ...startCell, f: Math.abs(startCell.x - goalCell.x) + Math.abs(startCell.y - goalCell.y) });
+  const directions = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+  let visited = 0;
+
+  while (open.size && visited < 12000) {
+    let currentKey = "";
+    let current: { x: number; y: number; f: number } | null = null;
+    for (const [candidateKey, candidate] of open) {
+      if (!current || candidate.f < current.f) {
+        current = candidate;
+        currentKey = candidateKey;
+      }
+    }
+    if (!current) break;
+    if (currentKey === goalKey) {
+      const cells: RoutePoint[] = [];
+      let cursor = goalKey;
+      while (cursor !== startKey) {
+        const [x, y] = cursor.split(",").map(Number);
+        cells.push({ x: x * step, y: y * step });
+        const parent = cameFrom.get(cursor);
+        if (!parent) return null;
+        cursor = parent;
+      }
+      cells.push({ x: startCell.x * step, y: startCell.y * step });
+      cells.reverse();
+      return compactPath([start, startEscape, ...cells, goalEscape, goal]);
+    }
+    open.delete(currentKey);
+    visited += 1;
+    const baseCost = gScore.get(currentKey) ?? Infinity;
+    for (const direction of directions) {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      if (next.x < minX || next.x > maxX || next.y < minY || next.y > maxY || blocked(next)) continue;
+      const nextKey = key(next);
+      const tentative = baseCost + 1;
+      if (tentative >= (gScore.get(nextKey) ?? Infinity)) continue;
+      cameFrom.set(nextKey, currentKey);
+      gScore.set(nextKey, tentative);
+      const heuristic = Math.abs(next.x - goalCell.x) + Math.abs(next.y - goalCell.y);
+      open.set(nextKey, { ...next, f: tentative + heuristic });
+    }
+  }
+  return null;
+}
+
+function setSvgPath(target: any, path: string): void {
+  if (typeof target?.setAttr === "function") target.setAttr("d", path);
+  else if (typeof target?.setAttribute === "function") target.setAttribute("d", path);
+}
+
+function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes: CanvasNodeData[]): void {
+  const method = edgeData?.styleAttributes?.pathfindingMethod;
+  if (!["direct", "square", "a-star"].includes(method)) return;
+  const fromNode = edge?.from?.node;
+  const toNode = edge?.to?.node;
+  if (!fromNode || !toNode) return;
+
+  const fromBox = normalizeBBox(fromNode.getBBox?.()) ?? normalizeBBox(allNodes.find(node => node.id === edgeData.fromNode));
+  const toBox = normalizeBBox(toNode.getBBox?.()) ?? normalizeBBox(allNodes.find(node => node.id === edgeData.toNode));
+  if (!fromBox || !toBox) return;
+  const fromSide = String(edge?.from?.side ?? edgeData.fromSide ?? "right");
+  const toSide = String(edge?.to?.side ?? edgeData.toSide ?? "left");
+  const sourceSideCenter = bboxSideCenter(fromBox, fromSide);
+  const targetSideCenter = bboxSideCenter(toBox, toSide);
+  const start = edge?.from?.end === "none" ? sourceSideCenter : edge?.bezier?.from ?? sourceSideCenter;
+  const end = edge?.to?.end === "none" ? targetSideCenter : edge?.bezier?.to ?? targetSideCenter;
+
+  let points: RoutePoint[];
+  if (method === "direct") {
+    points = directRoute(start, end);
+  } else if (method === "square") {
+    points = squareRoute(start, end, fromSide, toSide);
+  } else {
+    const obstacles = allNodes
+      .filter(node => node.id !== edgeData.fromNode && node.id !== edgeData.toNode && node.type !== "group")
+      .map(normalizeBBox)
+      .filter((box): box is RouteBox => Boolean(box));
+    points = aStarGridRoute(start, end, fromSide, toSide, obstacles) ?? squareRoute(start, end, fromSide, toSide);
+  }
+
+  const svgPath = pointsToSvgPath(points);
+  edge.center = points[Math.floor(points.length / 2)] ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+  setSvgPath(edge.path?.interaction, svgPath);
+  setSvgPath(edge.path?.display, svgPath);
+}
+
 export function decorateCanvas(canvas: any): void {
   const data = readCanvasData(canvas);
   for (const nodeData of data.nodes) {
@@ -291,6 +482,7 @@ export function decorateCanvas(canvas: any): void {
 
   for (const edgeData of data.edges as Array<CanvasEdgeData & { bcColor?: string; bcPathStyle?: string; bcArrowStyle?: EdgeArrowStyle }>) {
     const edge = canvas?.edges?.get?.(edgeData.id);
+    applyConfiguredEdgePath(canvas, edge, edgeData, data.nodes);
     const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
     const styleAttributes = (edgeData as any).styleAttributes ?? {};
     const storedPath = edgeData.bcPathStyle
