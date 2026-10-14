@@ -6,7 +6,8 @@ import {
   reorderNode,
   styleSelectedEdgeArrow,
   styleSelectedEdgePathfinding,
-  styleSelectedEdges
+  styleSelectedEdges,
+  toggleGroupCollapse
 } from "./enhancements";
 import type { CanvasData } from "./canvas";
 
@@ -118,5 +119,64 @@ describe("Canvas edge helpers", () => {
     expect(reorderNode(canvas, "a", true)).toBe(true);
     expect(canvas.data.nodes.map((node: any) => node.id)).toEqual(["b", "a"]);
     expect(canvas.data.edges).toEqual(fixture.edges);
+  });
+});
+
+describe("collapsible Canvas groups", () => {
+  it("hides contained nodes and their edges, then restores geometry and boundary edges", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "group", x: 100, y: 50, width: 320, height: 220, type: "group", label: "Research" } as any,
+        { id: "inside", x: 130, y: 90, width: 110, height: 80, type: "text", text: "Inside" },
+        { id: "outside", x: 520, y: 100, width: 110, height: 80, type: "text", text: "Outside" }
+      ],
+      edges: [
+        { id: "inside-outside", fromNode: "inside", fromSide: "right", toNode: "outside", toSide: "left" },
+        { id: "group-outside", fromNode: "group", fromSide: "right", toNode: "outside", toSide: "left" }
+      ]
+    };
+    const canvas = makeCanvas(data);
+
+    expect(toggleGroupCollapse(canvas, "group")).toBe("collapsed");
+    expect(canvas.data.nodes.map((node: any) => node.id)).toEqual(["group", "outside"]);
+    expect(canvas.data.edges.map((edge: any) => edge.id)).toEqual(["group-outside"]);
+    expect(canvas.data.nodes[0]).toMatchObject({
+      bcCollapsed: true,
+      bcCollapsedNodes: [{ id: "inside", x: 30, y: 40 }]
+    });
+    expect(canvas.data.nodes[0].bcCollapsedEdges).toEqual([data.edges[0]]);
+
+    expect(toggleGroupCollapse(canvas, "group")).toBe("expanded");
+    expect(canvas.data.nodes.find((node: any) => node.id === "inside")).toMatchObject({
+      x: 130,
+      y: 90,
+      text: "Inside"
+    });
+    expect(canvas.data.edges.map((edge: any) => edge.id).sort()).toEqual(["group-outside", "inside-outside"]);
+    expect(canvas.data.nodes.find((node: any) => node.id === "group")).not.toHaveProperty("bcCollapsedNodes");
+  });
+
+  it("preserves a collapsed nested group when its outer group is collapsed", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "outer", x: 0, y: 0, width: 500, height: 400, type: "group" } as any,
+        { id: "inner", x: 30, y: 30, width: 220, height: 180, type: "group", bcCollapsed: true,
+          bcCollapsedNodes: [{ id: "hidden", x: 15, y: 15, width: 60, height: 40, type: "text", text: "Nested" }],
+          bcCollapsedEdges: [] } as any,
+        { id: "visible", x: 300, y: 80, width: 100, height: 80, type: "text", text: "Visible" }
+      ],
+      edges: [{ id: "inner-visible", fromNode: "inner", fromSide: "right", toNode: "visible", toSide: "left" }]
+    };
+    const canvas = makeCanvas(data);
+
+    expect(toggleGroupCollapse(canvas, "outer")).toBe("collapsed");
+    expect(toggleGroupCollapse(canvas, "outer")).toBe("expanded");
+    const restoredInner = canvas.data.nodes.find((node: any) => node.id === "inner");
+    expect(restoredInner).toMatchObject({
+      bcCollapsed: true,
+      bcCollapsedNodes: [{ id: "hidden", text: "Nested" }]
+    });
+    expect(canvas.data.nodes.find((node: any) => node.id === "visible")).toBeTruthy();
+    expect(canvas.data.edges).toEqual(data.edges);
   });
 });
