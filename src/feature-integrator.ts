@@ -101,6 +101,7 @@ class FeaturePromptModal extends Modal {
 export default class BetterCanvasFeatures {
   private focusedCanvases = new Map<any, string>();
   private paletteStyle: HTMLStyleElement | null = null;
+  private customCssStyle: HTMLStyleElement | null = null;
   private boundContainers = new WeakSet<HTMLElement>();
   private resizeObservers = new WeakSet<HTMLElement>();
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
@@ -136,6 +137,8 @@ export default class BetterCanvasFeatures {
     this.activeGenerations.clear();
     this.paletteStyle?.remove();
     this.paletteStyle = null;
+    this.customCssStyle?.remove();
+    this.customCssStyle = null;
   }
 
   private migrateSettings(): void {
@@ -161,6 +164,7 @@ export default class BetterCanvasFeatures {
     if (typeof s.youtubeLanguage !== "string") s.youtubeLanguage = "en";
     if (typeof s.mcpEndpoint !== "string") s.mcpEndpoint = "";
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
+    if (typeof s.customCss !== "string") s.customCss = "";
     void this.save();
   }
 
@@ -250,6 +254,7 @@ export default class BetterCanvasFeatures {
     add("bc-set-node-shape", "设置节点形状", () => this.setNodeShape());
     add("bc-set-node-border", "设置节点边框样式", () => this.setNodeBorder());
     add("bc-set-node-text-align", "设置所选节点文字对齐", () => this.setNodeTextAlign());
+    add("bc-set-node-class", "设置节点自定义样式类", () => this.setNodeCustomClass());
     add("bc-set-edge-arrow", "设置所选连线箭头样式", () => this.edgeArrowStyle());
     add("bc-resize-node", "根据文字自动调整节点尺寸", () => this.resizeNode());
     add("bc-toggle-auto-resize", "切换所选节点自动调整尺寸", () => this.toggleAutoResize());
@@ -322,6 +327,7 @@ export default class BetterCanvasFeatures {
 
   private refresh(): void {
     this.applyPalette();
+    this.applyUserCss();
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as any;
       if (!view?.canvas) continue;
@@ -347,6 +353,15 @@ export default class BetterCanvasFeatures {
     this.applyFocus(canvas);
   }
 
+  applyUserCss(): void {
+    this.customCssStyle?.remove();
+    const css = String(this.settings().customCss ?? "");
+    if (!css.trim()) { this.customCssStyle = null; return; }
+    this.customCssStyle = document.createElement("style");
+    this.customCssStyle.dataset.owner = "obsidian-better-canvas";
+    this.customCssStyle.textContent = css;
+    document.head.appendChild(this.customCssStyle);
+  }
   private applyPalette(): void {
     this.paletteStyle?.remove();
     const s = this.settings();
@@ -406,6 +421,20 @@ export default class BetterCanvasFeatures {
     });
   }
 
+  private setNodeCustomClass(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    this.input("设置节点自定义样式类", "输入 class 名（字母、数字、下划线和连字符）；留空可清除", value => {
+      const token = value.trim();
+      if (token && !/^[a-zA-Z0-9_-]{1,50}$/.test(token)) {
+        new Notice("class 名只能包含字母、数字、下划线和连字符（最多 50 个字符）。");
+        return;
+      }
+      patchNode(selection.canvas, selection.node.id, { bcCustomClass: token || undefined });
+      this.decorate(selection.canvas);
+      new Notice(token ? "已应用样式类 bc-user-" + token : "已清除节点自定义样式类。");
+    }, String((selection.node as any).bcCustomClass ?? ""));
+  }
   private setNodeTextAlign(): void {
     const selection = this.selected();
     if (!selection) return;
@@ -1509,6 +1538,18 @@ class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
         await this.features.save();
       }));
 
+    new Setting(c).setName("Custom node CSS")
+      .setDesc("输入仅在本地加载的 CSS。先给节点设置自定义 class，再用 .bc-user-your-class 作为选择器；注意 CSS 可以引用远程资源。")
+      .addTextArea(text => {
+        text.inputEl.rows = 12;
+        text.inputEl.style.width = "100%";
+        text.setValue(String(s.customCss ?? ""));
+        text.onChange(async value => {
+          s.customCss = value;
+          await this.features.save();
+          this.features.applyUserCss();
+        });
+      });
     new Setting(c).setName("Custom canvas colors")
       .setDesc("以逗号分隔，例如 #d14d41, #438c7a, #5c6bc0；作为画布颜色 7、8、9…")
       .addText(text => text.setValue((s.customColors as string[]).join(", ")).onChange(async value => {
