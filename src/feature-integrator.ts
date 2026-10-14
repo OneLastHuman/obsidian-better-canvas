@@ -60,7 +60,7 @@ class FeaturePromptModal extends Modal {
     app: App,
     private titleText: string,
     private placeholderText: string,
-    private onSubmitValue: (value: string) => void | Promise<void>,
+    private onSubmitValue: (value: string) => unknown,
     private initialValue = ""
   ) {
     super(app);
@@ -226,7 +226,7 @@ export default class BetterCanvasFeatures {
     canvas.zoomToSelection?.();
   }
 
-  private input(title: string, placeholder: string, cb: (value: string) => void | Promise<void>, initial = ""): void {
+  private input(title: string, placeholder: string, cb: (value: string) => unknown, initial = ""): void {
     new FeaturePromptModal(this.p.app, title, placeholder, cb, initial).open();
   }
 
