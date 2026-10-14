@@ -1,5 +1,5 @@
 import { ItemView, Notice, TFile } from "obsidian";
-import { CanvasData, CanvasEdgeData, CanvasNodeData, readCanvasData } from "./canvas";
+import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
 
 const PORTAL_PREFIX = "bcportal||";
 const PORTAL_DELIMITER = "||";
@@ -494,6 +494,117 @@ export class CanvasPortalManager {
       } finally {
         this.writingFiles.delete(file.path);
       }
+    }
+  }
+
+  /**
+   * Add a real text node to the source canvas backing a Portal. New content is
+   * written to the source .canvas file, then the live Portal mirrors are rebuilt.
+   * This avoids confusing arbitrary nodes in the parent canvas with Portal-owned
+   * nodes and gives users an explicit, reversible creation path.
+   */
+  async addTextNodeToPortal(text: string, portalNodeId?: string): Promise<void> {
+    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
+    const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
+    if (!canvas || !view) {
+      new Notice("请先打开包含 Canvas Portal 的画布。");
+      return;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。");
+      return;
+    }
+
+    const selection = canvas.selection;
+    const selectedId = portalNodeId ?? (selection?.size === 1 ? selection.values().next().value?.id : undefined);
+    if (typeof selectedId !== "string") {
+      new Notice("请只选择一个指向 .canvas 文件的节点。");
+      return;
+    }
+
+    const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
+    if (!isCanvasFileNode(portalNode)) {
+      new Notice("所选节点不是 Canvas 文件节点。");
+      return;
+    }
+    if (view.file?.path === portalNode.file) {
+      new Notice("不能向当前画布自身的 Portal 写入节点。");
+      return;
+    }
+
+    const content = text.trim();
+    if (!content) return;
+    if (content.length > 20000) {
+      new Notice("节点内容最多 20,000 个字符。");
+      return;
+    }
+
+    const file = this.plugin.app.vault.getAbstractFileByPath(portalNode.file);
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas") {
+      new Notice("找不到 Portal 对应的 Canvas 文件。");
+      return;
+    }
+
+    try {
+      const raw = await this.plugin.app.vault.cachedRead(file);
+      const source = parseCanvasJson(raw);
+      const usableNodes = source.nodes.filter((node: CanvasNodeData) => node.type !== "group");
+      const parent = usableNodes.slice().sort((a: CanvasNodeData, b: CanvasNodeData) =>
+        (b.x + b.width) - (a.x + a.width) || a.y - b.y
+      )[0];
+
+      const node: CanvasNodeData = {
+        id: createId(),
+        type: "text",
+        text: content,
+        x: parent ? parent.x + parent.width + 100 : 0,
+        y: parent ? parent.y : 0,
+        width: 300,
+        height: Math.max(140, Math.min(420, Math.ceil(content.length / 38) * 24))
+      };
+      const edges = [...source.edges];
+      if (parent) {
+        const [fromSide, toSide] = edgeSides(parent, node);
+        edges.push({
+          id: createId(),
+          fromNode: parent.id,
+          fromSide,
+          toNode: node.id,
+          toSide
+        });
+      }
+
+      const latest = readCanvasData(canvas);
+      canvas.importData({
+        ...latest,
+        nodes: latest.nodes.map((item: CanvasNodeData) =>
+          item.id === portalNode.id ? { ...item, portal: true } : item
+        ),
+        edges: latest.edges
+      });
+      canvas.requestSave?.();
+      canvas.requestFrame?.();
+
+      this.writingFiles.set(file.path, view);
+      try {
+        await this.plugin.app.vault.modify(file, JSON.stringify({
+          ...source,
+          nodes: [...source.nodes, node],
+          edges
+        }, null, 2));
+      } finally {
+        this.writingFiles.delete(file.path);
+      }
+
+      await this.refreshView(view, true);
+      const mirrored = canvas.nodes?.get?.(mirrorId(portalNode.id, node.id));
+      if (mirrored) {
+        canvas.selectOnly?.(mirrored);
+        canvas.zoomToSelection?.();
+      }
+      new Notice("已在 Portal 源画布中创建节点，并刷新 Portal。");
+    } catch (error) {
+      new Notice("无法在 Portal 中创建节点：" + (error instanceof Error ? error.message : String(error)), 8000);
     }
   }
 
