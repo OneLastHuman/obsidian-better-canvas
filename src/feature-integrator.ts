@@ -704,6 +704,10 @@ export default class BetterCanvasFeatures {
       new Notice("请先打开 Canvas。");
       return;
     }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再封装选区。");
+      return;
+    }
     const data = readCanvasData(canvas);
     const ids = new Set<string>();
     for (const item of canvas.selection?.values?.() ?? []) {
@@ -823,6 +827,10 @@ export default class BetterCanvasFeatures {
     const canvas = this.canvas();
     if (!canvas) {
       new Notice("请先打开 Canvas。");
+      return;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再导入内容。");
       return;
     }
     const selection = this.selected(canvas);
@@ -1301,6 +1309,11 @@ export default class BetterCanvasFeatures {
   }
 
   private async runMcpTool(): Promise<void> {
+    const canvasForWrite = this.canvas();
+    if (canvasForWrite?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再写入 MCP 结果。");
+      return;
+    }
     const s = this.settings();
     if (!s.mcpEndpoint) { new Notice("请先在设置中填写 MCP Streamable HTTP endpoint。"); return; }
     try {
@@ -1345,6 +1358,7 @@ export default class BetterCanvasFeatures {
   private createCanvasPortal(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) { new Notice("当前 Canvas 处于只读模式。"); return; }
     const selection = this.selected(canvas);
     const canvasFiles = this.p.app.vault.getFiles().filter((file: TFile) => file.extension.toLowerCase() === "canvas");
     if (!canvasFiles.length) { new Notice("Vault 中还没有其他 Canvas 文件。"); return; }
@@ -1426,6 +1440,7 @@ export default class BetterCanvasFeatures {
   }
 
   private syncAutoEdges(canvas: any, canvasFile: TFile): void {
+    if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) return;
     const s = this.settings();
     if (!s.autoFileNodeEdgesEnabled) return;
     const data = readCanvasData(canvas);
