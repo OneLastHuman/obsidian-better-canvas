@@ -185,7 +185,8 @@ function renderNode(node: CanvasNodeData, index: number): string {
   }
 
   const text = wrapNodeText(node, clipId);
-  return clip + '<g class="bc-full-node">' + geometry + text + "</g>";
+  const clipPath = '<clipPath id="' + clipId + '"><rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="5"/></clipPath>';
+  return clipPath + '<g class="bc-full-node">' + geometry + text + "</g>";
 }
 
 /**
