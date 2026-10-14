@@ -70,7 +70,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Flashcard generation | Implemented | Can create flashcard nodes; does not directly create a spaced-repetition deck |
 | Webpage text ingestion | Implemented, best-effort | JavaScript-only, login-gated and anti-bot pages may fail |
 | YouTube caption ingestion | Implemented, best-effort | Requires accessible captions; videos without retrievable captions cannot be transcribed |
-| MCP remote tools | Implemented, remote Streamable HTTP | Direct tool picker plus AI-proposed tool/arguments with an explicit review/confirmation step. Text results become linked nodes; PNG/JPEG/WebP/GIF image results are saved into the Vault and added as linked file nodes. Does not support stdio or SSE-only servers; unsupported image MIME types are reported and skipped |
+| MCP tools | Implemented, Streamable HTTP and local stdio | Direct tool picker plus AI-proposed tool/arguments with an explicit review/confirmation step. Text results become linked nodes; PNG/JPEG/WebP/GIF image results are saved into the Vault and added as linked file nodes. Local stdio uses a configured executable/args/env/cwd, starts a fresh process per list/call operation, and requires a trusted server. Remote SSE-only transport remains unsupported; unsupported image MIME types are skipped |
 | PDF page context for AI | Implemented, basic | Extracts selectable text from up to three pages and sends pinned-page raster images to visual models; scanned PDFs without OCR text depend on visual input and model support |
 | Gemini-native public YouTube video context | Implemented, provider-dependent | Command sends `fileData.fileUri` directly to the active Gemini profile; the video must be public and the selected model/account must support it |
 | Provider model discovery and per-node model picker | Implemented, provider-dependent | Queries OpenAI-compatible `/models`, Anthropic `/models`, or Gemini `/models`; falls back to manual model entry when the endpoint is unavailable |
@@ -83,5 +83,5 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 
 - GitHub Actions runs `npm install`, `npm run typecheck`, `npm test` and `npm run build` on pushes and pull requests to `main`.
 - CI verifies TypeScript, helper tests and the production bundle.
-- Recent additions include provider model-list normalization, HTML-fence extraction and Codex JSONL event parser tests; a passing CI run still does not replace Obsidian GUI/device verification.
+- Recent additions include provider model-list normalization, HTML-fence extraction, Codex JSONL event parsing and local MCP stdio configuration validation tests; a passing CI run still does not replace Obsidian GUI/device verification.
 - CI does not run Obsidian itself. Before releasing, manually test Canvas persistence, keyboard shortcuts, native menus, metadata/backlinks, PDF annotations, image export and real provider requests on the intended desktop/mobile versions.
