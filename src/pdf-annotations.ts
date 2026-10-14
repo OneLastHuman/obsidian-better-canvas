@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { ItemView, Notice } from "obsidian";
 import { readCanvasData } from "./canvas";
 import { patchNode } from "./enhancements";
 
@@ -62,7 +62,7 @@ export class PdfAnnotationManager {
   }
 
   private activeCanvas(): any | null {
-    const view = this.plugin.app.workspace.getActiveViewOfType((require("obsidian") as any).ItemView) as any;
+    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
     return view?.getViewType?.() === "canvas" ? view.canvas ?? null : null;
   }
 
