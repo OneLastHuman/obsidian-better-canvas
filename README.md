@@ -19,6 +19,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - [功能概览](#功能概览)
 - [安装](#安装)
 - [MCP 工具配置](#mcp-工具配置)
+- [本地 OpenCode ACP](#本地-opencode-acp)
 - [本地 Codex CLI](#本地-codex-cli)
 - [AI 服务配置](#ai-服务配置)
 - [快捷键](#快捷键)
@@ -56,7 +57,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - **连线控制：** 设置颜色、线型和箭头样式，翻转关联边的方向，自动重定位 floating edges，并为选中连线选择 direct、square 或 A-star 路径。
 - **布局与专注：** 网格对齐、文本节点自动调整尺寸、层级排序、焦点模式、交互锁定及基础路径路由。
 - **日常工作流：** 搜索画布中的文本、文件路径和链接；打开“查看当前 Canvas 链接与反向链接”面板；保存节点模板；按节点顺序进入演示模式。
-- **组织与导出：** 创建独立分组、折叠/展开分组、将选区封装为独立 Canvas，并导出 JSON Canvas、视口 PNG/SVG，以及按所有节点边界导出的全内容 PNG/SVG。后者使用静态 SVG 渲染常见节点形状、文本和连线，并将体积受限的 PNG/JPEG/WebP/GIF 附件嵌入导出结果；PDF 附件与交互 HTML 仍以标签表示，不会作为原生嵌入内容栅格化。节点模板可保存样式属性并重复使用。
+- **组织与导出：** 创建独立分组、折叠/展开分组、将选区封装为独立 Canvas，并导出 JSON Canvas、视口 PNG/SVG，以及按所有节点边界导出的全内容 PNG/SVG。后者使用静态 SVG 渲染常见节点形状、文本和连线；图片/PDF 附件与交互 HTML 以标签表示，不会作为原生嵌入内容栅格化。节点模板可保存样式属性并重复使用。
 
 部分样式、分组行为和导出结果可能因画布复杂度或 Obsidian 渲染版本而异，详见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。
 
@@ -77,6 +78,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - 支持远程 **MCP Streamable HTTP**、旧式远程 **SSE** 和本地 MCP **stdio** 工具调用；也可让 AI 根据可用工具描述提出工具和参数建议，用户检查并确认后才执行。stdio 通过单独配置的 command/args/env/cwd 启动本地进程，请只配置可信服务。
 - 可从 OpenAI-compatible、Anthropic 和 Gemini 的模型端点发现可用模型，并为单个节点选择模型；接口不支持列出模型时仍可手动输入。
 - 桌面端可调用已安装并登录的 Codex CLI，在只读沙盒中分析选中节点和相邻上下文；任务可由“停止当前 AI 生成”中断，结果保存为关联节点。
+- 文本 AI 可选本机 OpenCode ACP：通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode 使用的模型与登录配置，不需要单独填写文本 API Key。
 - 可选择 Vault 文件夹，对最多 20 篇 Markdown 顺序执行同一条 Prompt，逐篇创建源文件节点与结果节点；正文发送给当前 AI 供应商前会要求用户选择文件夹并确认任务。
 - 识别 AI 或手写节点中的 HTML 代码块，可通过按钮在隔离的 sandbox iframe 中预览交互页面。
 - 可把固定 PDF 页面提取为 AI 文本上下文，并将页面栅格图像发送给支持视觉输入的模型；Gemini profile 支持对公开视频进行原生视频上下文分析。
@@ -143,6 +145,12 @@ npm run build
 
 直接调用工具前会让你检查名称和参数；使用 AI 建议工具时也必须在执行前确认。工具调用可能会修改外部系统，建议先检查参数，并仅启用你信任的服务器。
 
+## 本地 OpenCode ACP
+
+在 Better Canvas 设置的 **文本 AI 后端** 中选择 **本机 OpenCode ACP**。默认启动 `opencode acp`；如果 Obsidian 找不到命令，可在 **OpenCode CLI 可执行文件** 中填写绝对路径。请先在终端完成 OpenCode 安装及登录，模型与额度使用 OpenCode 自己的配置。
+
+ACP 文本任务在系统临时目录中创建会话，不将 Vault 作为 OpenCode 工作区。此模式用于文本问答和闪卡；图片生成仍使用 API Base URL、API Key 和 Image model 配置。当前集成不会批准 ACP 请求的工具或文件操作权限。此模式要求桌面版 Obsidian 和本机 OpenCode CLI。
+
 ## 本地 Codex CLI
 
 桌面版 Obsidian 可选用 **Better Canvas: 使用本地 Codex CLI 分析所选节点** 命令。需要提前安装并登录 Codex CLI；设置中的 **Local Codex CLI executable** 留空时使用 `PATH` 中的 `codex`，如果 Obsidian 找不到它，请填写绝对路径。任务在临时工作目录中以只读沙盒运行，支持“停止当前 AI 生成”取消任务。
@@ -178,22 +186,6 @@ Codex CLI 使用自己的本地配置和模型供应商。节点内容与提示�
 ```
 
 不同供应商可能使用不同的模型名称、图像生成接口和权限策略。请填写当前账号实际有权调用的模型；不使用图像生成功能时，可按服务要求省略或留空 `imageModel`。
-
-例如，若已在本机运行 Ollama，可添加以下 OpenAI-compatible profile：
-
-```json
-{
-  "id": "ollama",
-  "name": "Ollama Local",
-  "protocol": "openai",
-  "baseUrl": "http://localhost:11434/v1",
-  "apiKey": "",
-  "model": "qwen2.5:7b",
-  "imageModel": ""
-}
-```
-
-将 `model` 替换成 `ollama list` 中已有的模型名称。该配置可用于本地文本问答；图像生成取决于本地服务是否实现兼容的 Images API。远程 OpenRouter、Groq、Azure-compatible 网关等也可使用 `openai` profile，但必须填写该服务兼容的 Base URL、模型和认证配置。
 
 **密钥与隐私提示**
 
