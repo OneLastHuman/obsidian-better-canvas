@@ -174,10 +174,10 @@ export async function runOpenCodeACP(
       const rejectOption = choices.find((item: any) =>
         typeof item?.optionId === "string" && (item.kind === "reject_once" || item.kind === "reject_always")
       );
-      // OpenCode ACP uses protocol v1 and its flat selected/cancelled outcome shape.
+      // ACP v1 wraps the selected/cancelled outcome in an outcome object.
       const result = rejectOption
-        ? { outcome: "selected", optionId: rejectOption.optionId }
-        : { outcome: "cancelled" };
+        ? { outcome: { outcome: "selected", optionId: rejectOption.optionId } }
+        : { outcome: { outcome: "cancelled" } };
       try { send({ jsonrpc: "2.0", id: message.id, result }); } catch { /* process is terminating */ }
     };
 
