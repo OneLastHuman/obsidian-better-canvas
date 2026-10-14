@@ -94,6 +94,8 @@ export class CanvasPortalManager {
   private writingFiles = new Map<string, any>();
   private lastPortalPositions = new WeakMap<object, Map<string, { x: number; y: number }>>();
   private readyPortalIds = new WeakMap<object, Set<string>>();
+  private lastNodeIds = new WeakMap<object, Set<string>>();
+  private adoptionInFlight = new WeakSet<object>();
   private stopped = false;
 
   constructor(plugin: any) {
@@ -290,6 +292,7 @@ export class CanvasPortalManager {
       }
     }
     this.signatures.set(view, nextSignature);
+    this.lastNodeIds.set(view.containerEl, new Set(nextData.nodes.map((node: CanvasNodeData) => node.id)));
     // A portal may write back only after its source graph has been loaded into mirrors.
     // This prevents a save event during the initial open from wiping the source file.
     this.readyPortalIds.set(view, new Set(snapshots.map(snapshot => snapshot.portalId)));
@@ -376,10 +379,12 @@ export class CanvasPortalManager {
     if (!(container instanceof HTMLElement) || this.boundViews.has(container)) return;
     this.boundViews.add(container);
     let pendingPortalMove: { id: string; x: number; y: number } | null = null;
+    let pointerDownNodeIds = new Set<string>();
 
     const onPointerDown = () => {
       pendingPortalMove = null;
       const canvas = view?.canvas;
+      pointerDownNodeIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
       const selection = canvas?.selection;
       if (!selection || selection.size !== 1) return;
       const selected = selection.values().next().value;
@@ -395,6 +400,9 @@ export class CanvasPortalManager {
       window.setTimeout(async () => {
         const canvas = view?.canvas;
         if (!canvas) return;
+        const liveIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
+        const createdIds = new Set([...liveIds].filter(id => !pointerDownNodeIds.has(id) && !mirrorInfo(id)));
+        if (createdIds.size) await this.adoptCreatedNodesInsidePortals(view, createdIds);
         const movedPortal = pendingPortalMove && readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === pendingPortalMove?.id);
         if (pendingPortalMove && movedPortal &&
             (Math.abs(movedPortal.x - pendingPortalMove.x) > 0.5 || Math.abs(movedPortal.y - pendingPortalMove.y) > 0.5)) {
@@ -403,9 +411,27 @@ export class CanvasPortalManager {
           await this.syncPortalFiles(view);
           await this.refreshView(view);
         }
+        pointerDownNodeIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
         pendingPortalMove = null;
       }, 50);
     };
+
+    const observer = new MutationObserver(() => {
+      window.setTimeout(async () => {
+        const canvas = view?.canvas;
+        if (!canvas) return;
+        const currentIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
+        const previousIds = this.lastNodeIds.get(container);
+        if (!previousIds) {
+          this.lastNodeIds.set(container, currentIds);
+          return;
+        }
+        const createdIds = new Set([...currentIds].filter(id => !previousIds.has(id) && !mirrorInfo(id)));
+        this.lastNodeIds.set(container, currentIds);
+        if (createdIds.size) await this.adoptCreatedNodesInsidePortals(view, createdIds);
+      }, 80);
+    });
+    observer.observe(container, { childList: true, subtree: true });
 
     container.addEventListener("pointerdown", onPointerDown, true);
     container.addEventListener("pointerup", onPointerUp, true);
@@ -414,6 +440,8 @@ export class CanvasPortalManager {
       container.removeEventListener("pointerdown", onPointerDown, true);
       container.removeEventListener("pointerup", onPointerUp, true);
       container.removeEventListener("pointercancel", onPointerUp, true);
+      observer.disconnect();
+      this.lastNodeIds.delete(container);
       this.boundViews.delete(container);
     });
   }
@@ -433,6 +461,164 @@ export class CanvasPortalManager {
     return JSON.stringify(signature);
   }
 
+  /**
+   * When a newly-created Canvas node's center lies inside an open Portal frame,
+   * move it into the Portal's source canvas and rebuild the mirrored node. This
+   * covers pointer-created nodes as well as keyboard-created nodes detected by
+   * the container MutationObserver. Existing nodes are never adopted implicitly.
+   */
+  private async adoptCreatedNodesInsidePortals(view: any, createdIds: Set<string>): Promise<void> {
+    if (!view?.canvas || !view?.containerEl || !createdIds.size || this.stopped ||
+        this.adoptionInFlight.has(view)) return;
+    this.adoptionInFlight.add(view);
+    try {
+      const canvas = view.canvas;
+      if (canvas.wrapperEl?.classList?.contains("bc-readonly")) return;
+      const data = readCanvasData(canvas);
+      const createdNodes = data.nodes.filter((node: CanvasNodeData) =>
+        createdIds.has(node.id) && !isMirrorNode(node) && node.type !== "group"
+      );
+      if (!createdNodes.length) return;
+
+      const portals = data.nodes.filter((node: any) =>
+        isCanvasFileNode(node) && node.portal === true && node.id !== ""
+      ) as CanvasNodeData[];
+      const ownerByCreatedId = new Map<string, CanvasNodeData>();
+
+      for (const node of createdNodes) {
+        const centerX = node.x + node.width / 2;
+        const centerY = node.y + node.height / 2;
+        const matches = portals.filter((portal: CanvasNodeData) => {
+          if (portal.id === node.id || portal.file === view.file?.path) return false;
+          return centerX >= portal.x + 8 && centerX <= portal.x + portal.width - 8 &&
+            centerY >= portal.y + 8 && centerY <= portal.y + portal.height - 8;
+        }).sort((a: CanvasNodeData, b: CanvasNodeData) =>
+          a.width * a.height - b.width * b.height
+        );
+        if (matches[0]) ownerByCreatedId.set(node.id, matches[0]);
+      }
+      if (!ownerByCreatedId.size) return;
+
+      const adoptedMap = new Map<string, { portalId: string; sourceId: string }>();
+      const localEdgeIds = new Set<string>();
+
+      const byPortal = new Map<string, CanvasNodeData[]>();
+      for (const node of createdNodes) {
+        const owner = ownerByCreatedId.get(node.id);
+        if (!owner) continue;
+        const list = byPortal.get(owner.id) ?? [];
+        list.push(node);
+        byPortal.set(owner.id, list);
+      }
+
+      for (const [portalId, nodesForPortal] of byPortal) {
+        const portal = portals.find((node: CanvasNodeData) => node.id === portalId);
+        if (!portal || (typeof view.file?.path === "string" && portal.file === view.file.path)) continue;
+        const file = this.plugin.app.vault.getAbstractFileByPath(portal.file);
+        if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas" || this.writingFiles.has(file.path)) continue;
+
+        try {
+          const source = parseCanvasJson(await this.plugin.app.vault.cachedRead(file));
+          const bounds = bbox(source.nodes);
+          const offsetX = portal.x + PORTAL_PADDING - bounds.minX;
+          const offsetY = portal.y + PORTAL_PADDING - bounds.minY;
+          const sourceIds = new Set(source.nodes.map((node: CanvasNodeData) => node.id));
+          const idMap = new Map<string, string>();
+          for (const node of nodesForPortal) {
+            let newId = createId();
+            while (sourceIds.has(newId)) newId = createId();
+            sourceIds.add(newId);
+            idMap.set(node.id, newId);
+            adoptedMap.set(node.id, { portalId, sourceId: newId });
+          }
+
+          const sourceNodes = nodesForPortal.map((node: CanvasNodeData) => {
+            const copy: any = {
+              ...deepClone(node),
+              id: idMap.get(node.id),
+              x: node.x - offsetX,
+              y: node.y - offsetY
+            };
+            // Nested portal expansion is not yet supported; keep Canvas file nodes
+            // as ordinary file nodes in the source Canvas.
+            if (isCanvasFileNode(copy)) delete copy.portal;
+            return copy as CanvasNodeData;
+          });
+
+          const ownerOfEndpoint = (id: string): string | undefined => {
+            const created = adoptedMap.get(id);
+            if (created) return created.portalId;
+            const mirror = mirrorInfo(id);
+            return mirror?.portalId;
+          };
+          const sourceIdOfEndpoint = (id: string): string | undefined => {
+            const created = idMap.get(id);
+            if (created) return created;
+            const mirror = mirrorInfo(id);
+            return mirror?.portalId === portalId ? mirror.childId : undefined;
+          };
+
+          const sourceEdges = [...source.edges];
+          const existingEdgeIds = new Set(sourceEdges.map((edge: CanvasEdgeData) => edge.id));
+          for (const edge of data.edges) {
+            const includesCreated = idMap.has(edge.fromNode) || idMap.has(edge.toNode);
+            if (!includesCreated) continue;
+            const fromOwner = ownerOfEndpoint(edge.fromNode);
+            const toOwner = ownerOfEndpoint(edge.toNode);
+            if (fromOwner !== portalId || toOwner !== portalId) continue;
+            const fromNodeId = sourceIdOfEndpoint(edge.fromNode);
+            const toNodeId = sourceIdOfEndpoint(edge.toNode);
+            if (!fromNodeId || !toNodeId) continue;
+            let edgeId = createId();
+            while (existingEdgeIds.has(edgeId)) edgeId = createId();
+            existingEdgeIds.add(edgeId);
+            sourceEdges.push({
+              ...deepClone(edge),
+              id: edgeId,
+              fromNode: fromNodeId,
+              toNode: toNodeId
+            } as CanvasEdgeData);
+            localEdgeIds.add(edge.id);
+          }
+
+          this.writingFiles.set(file.path, view);
+          try {
+            await this.plugin.app.vault.modify(file, JSON.stringify({
+              ...source,
+              nodes: [...source.nodes, ...sourceNodes],
+              edges: sourceEdges
+            }, null, 2));
+          } finally {
+            this.writingFiles.delete(file.path);
+          }
+        } catch (error) {
+          for (const node of nodesForPortal) adoptedMap.delete(node.id);
+          console.warn("Better Canvas could not adopt nodes into Portal:", portal.file, error);
+        }
+      }
+
+      if (!adoptedMap.size) return;
+
+      const newNodes = data.nodes.filter((node: CanvasNodeData) => !adoptedMap.has(node.id));
+      const newEdges = data.edges.filter((edge: CanvasEdgeData) => !localEdgeIds.has(edge.id)).map((edge: CanvasEdgeData) => {
+        const copy = { ...edge } as CanvasEdgeData;
+        const from = adoptedMap.get(edge.fromNode);
+        const to = adoptedMap.get(edge.toNode);
+        if (from) (copy as any).fromNode = mirrorId(from.portalId, from.sourceId);
+        if (to) (copy as any).toNode = mirrorId(to.portalId, to.sourceId);
+        return copy;
+      });
+      canvas.importData({ ...data, nodes: newNodes, edges: newEdges });
+      canvas.requestSave?.();
+      canvas.requestFrame?.();
+      this.lastNodeIds.set(view.containerEl, new Set(newNodes.map((node: CanvasNodeData) => node.id)));
+      await this.refreshView(view, true);
+      new Notice("已将 " + adoptedMap.size + " 个新节点加入对应 Canvas Portal。");
+    } finally {
+      this.adoptionInFlight.delete(view);
+    }
+  }
+
   private async syncPortalFiles(view: any): Promise<void> {
     const canvas = view?.canvas;
     if (!canvas || this.stopped) return;
@@ -441,6 +627,7 @@ export class CanvasPortalManager {
     const ready = this.readyPortalIds.get(view) ?? new Set<string>();
     for (const portalNode of portalNodes) {
       if (!ready.has(portalNode.id)) continue;
+      if (this.writingFiles.has(portalNode.file)) continue;
       if (typeof view?.file?.path === "string" && portalNode.file === view.file.path) continue;
       const file = this.plugin.app.vault.getAbstractFileByPath(portalNode.file);
       if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas") continue;
