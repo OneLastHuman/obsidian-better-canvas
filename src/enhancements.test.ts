@@ -127,7 +127,23 @@ describe("Canvas edge helpers", () => {
     expect(styleSelectedEdgeArrow(canvas, "half-triangle")).toBe(1);
     expect(canvas.data.edges[0]).toMatchObject({
       bcArrowStyle: "half-triangle",
+      fromEnd: "arrow",
+      toEnd: "arrow",
       styleAttributes: { arrow: "halved-triangle" }
+    });
+
+    expect(styleSelectedEdgeArrow(canvas, "none")).toBe(1);
+    expect(canvas.data.edges[0]).toMatchObject({
+      bcArrowStyle: "none",
+      fromEnd: "none",
+      toEnd: "none"
+    });
+
+    expect(styleSelectedEdgeArrow(canvas, "diamond")).toBe(1);
+    expect(canvas.data.edges[0]).toMatchObject({
+      bcArrowStyle: "diamond",
+      fromEnd: "arrow",
+      toEnd: "arrow"
     });
   });
 
