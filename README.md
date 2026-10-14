@@ -1,109 +1,168 @@
-# Obsidian Better Canvas
+# Better Canvas
 
-把画布增强、思维导图工作流和 AI 辅助思考集中到一个 Obsidian 插件中。
+<p align="center">
+  <strong>让 Obsidian Canvas 成为更完整的知识工作空间。</strong>
+  <br />
+  画布增强、思维导图与 AI 工作流，一站式整合。
+</p>
 
-> 当前版本是可继续扩展的第一版，不代表三个上游项目所有功能都已逐项达到完全兼容。代码以独立实现为主，优先稳定接入统一的 Canvas 数据层。
+<p align="center">
+  <img alt="Obsidian" src="https://img.shields.io/badge/Obsidian-1.5.0%2B-7C3AED" />
+  <img alt="License" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue" />
+</p>
 
-## 当前实现
+Better Canvas 是一款面向 Obsidian Canvas 的增强插件，整合节点与连线编辑、思维导图、知识关联，以及可配置的 AI 辅助工作流。你可以在画布中组织想法、构建关系、整理资料，并将 AI 生成的内容继续沉淀为可编辑的节点。
+
+> **项目状态：** 当前项目仍在持续整合和验证中。部分功能依赖 Obsidian 的内部 API 或特定渲染行为，代码已实现不代表已在所有 Obsidian 版本、桌面端和移动端完成验证。请参考[功能整合矩阵](docs/INTEGRATION_MATRIX.md)了解具体覆盖状态。
+
+## 功能概览
 
 ### Canvas 增强
-- 通过命令面板和节点右键菜单触发常用操作。
-- 搜索当前画布中的文本、文件路径和链接。
-- 保存/插入节点模板。
-- 简易演示模式，可按节点顺序逐张查看。
+
+- **节点样式：** 自定义颜色、形状、边框、文本对齐和 CSS 类。
+- **连线控制：** 设置颜色、线型和箭头样式，翻转关联边的方向，并选择入边、出边或全部关联边。
+- **布局与专注：** 网格对齐、文本节点自动调整尺寸、层级排序、焦点模式、交互锁定及基础路径路由。
+- **日常工作流：** 搜索画布中的文本、文件路径和链接；保存节点模板；按节点顺序进入演示模式。
+- **组织与导出：** 折叠分组、将选区封装为独立 Canvas，并导出 JSON Canvas、PNG 或 SVG。
+
+部分样式、分组行为和导出结果可能因画布复杂度或 Obsidian 渲染版本而异，详见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。
 
 ### 思维导图
+
 - 创建子节点、同级节点和游离节点。
-- `Tab` 创建子节点，`Enter` 创建同级节点；方向键导航使用 `Alt + ↑/↓/←/→`。
-- 将所选 Markdown 文件的 H1 标题拆分为关联节点。
-- 对所选节点及其后代执行 LR、RL、TB、BT 自动布局。
+- 将 Markdown 文件中的 H1 标题拆分为关联节点。
+- 选择节点树，并按 LR、RL、TB 或 BT 方向执行基础自动布局。
+- 使用键盘快捷键快速创建节点、浏览相邻节点。
+- 生成思维导图结构和复习闪卡节点；生成结果应在使用前检查。
 
-### AI 工作流
-- 基于所选节点及直接连接的节点提问，并把回答保存为新的关联节点。
-- 生成复习闪卡内容。
-- 通过兼容 OpenAI Chat Completions / Images API 的端点进行文本和图像生成。
-- 图片保存到 Vault 中配置的附件目录，再作为文件节点连接到原节点。
-- API 地址、模型、密钥和系统提示词均在插件设置中配置。密钥只保存在本地 Obsidian 插件设置中，不写入仓库。
+### AI 辅助工作流
 
-## 安装（开发版）
+- 根据选中节点及其相邻关联内容提问，并将回答保存为连接到原节点的新节点。
+- 支持流式生成、停止生成、重新生成，以及按节点覆盖模型或服务配置。
+- 通过配置的服务生成图片，并将图片保存到 Vault 的附件目录后插入画布。
+- 导入网页正文和可访问的 YouTube 字幕，作为后续整理与分析的素材。
+- 支持远程 **MCP Streamable HTTP** 工具调用。
 
-1. 克隆仓库：`git clone https://github.com/OneLastHuman/obsidian-better-canvas.git`
-2. 在项目目录执行 `npm install`。
-3. 执行 `npm run build`。
-4. 将生成的 `main.js`、`manifest.json` 和 `styles.css` 放到 Vault 的 `.obsidian/plugins/obsidian-better-canvas/` 目录。
-5. 在 Obsidian 的社区插件设置中启用 **Better Canvas**。
+AI 能力取决于所配置服务的 API、模型、账号权限和内容可访问性。网页反爬、登录限制、不可访问的字幕及不受支持的供应商接口都可能导致操作失败。
 
-## AI 配置
+## 安装
 
-在 **设置 → Better Canvas** 中配置兼容 OpenAI 的 API 地址和模型，例如：
+目前可按开发版方式构建和安装。
 
-- Base URL：`https://api.openai.com/v1`
-- Chat model：`gpt-4o-mini`
-- Image model：填入所使用服务支持的图像模型
+### 1. 构建插件
 
-不同服务对图像生成接口、请求格式及模型名称的支持可能不同。若只用画布和思维导图功能，可以不配置 API Key。
+需要安装 Node.js 和 npm。在终端运行：
+
+```bash
+git clone https://github.com/OneLastHuman/obsidian-better-canvas.git
+cd obsidian-better-canvas
+npm install
+npm run build
+```
+
+### 2. 复制插件文件
+
+将生成或项目中的以下文件复制到 Vault 的插件目录：
+
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+目标目录：
+
+```text
+<Vault>/.obsidian/plugins/obsidian-better-canvas/
+```
+
+如果目录不存在，请先创建。
+
+### 3. 在 Obsidian 中启用
+
+打开 **设置 → 社区插件**，刷新或重新加载插件列表，然后启用 **Better Canvas**。如果插件未出现，请确认目录名称为 `obsidian-better-canvas`，且上述三个文件都位于该目录的根部。
+
+## AI 服务配置
+
+在 Better Canvas 的设置中配置 AI 服务。非 AI 的 Canvas 和思维导图功能无需 API Key。
+
+插件支持以下协议类型：
+
+| `protocol` | 说明 |
+| --- | --- |
+| `openai` | OpenAI-compatible Chat Completions / Images API，也可用于兼容网关或其他兼容服务。 |
+| `anthropic` | Anthropic Messages API；原生 Anthropic API 不提供图像生成接口。 |
+| `gemini` | Google Gemini `generateContent` / `streamGenerateContent`；图像生成取决于所用模型和服务支持。 |
+
+在 **Integration Features → Provider Profiles JSON** 中添加服务配置。以下为 OpenAI-compatible 服务的示例，请按实际服务替换模型、地址和密钥：
+
+```json
+[
+  {
+    "id": "openai",
+    "name": "OpenAI-compatible",
+    "protocol": "openai",
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKey": "YOUR_API_KEY",
+    "model": "YOUR_CHAT_MODEL",
+    "imageModel": "YOUR_IMAGE_MODEL"
+  }
+]
+```
+
+不同供应商可能使用不同的模型名称、图像生成接口和权限策略。请填写当前账号实际有权调用的模型；不使用图像生成功能时，可按服务要求省略或留空 `imageModel`。
+
+**密钥与隐私提示**
+
+- 不要将真实 API Key 提交到 Git 仓库、Issue 或截图中。
+- API 密钥保存在本地 Obsidian 插件设置中；使用 AI 功能时，相关提示词、所选节点内容及所需上下文会发送给你配置的服务。
+- 请根据服务商的数据处理政策，决定是否向其发送敏感或私人笔记内容。
 
 ## 快捷键
 
-- `Tab`：选中节点后创建子节点
-- `Enter`：选中节点后创建同级节点
-- `Alt + ↑/↓/←/→`：沿空间位置选择相邻节点
+| 快捷键 | 操作 |
+| --- | --- |
+| `Tab` | 为选中节点创建子节点 |
+| `Enter` | 为选中节点创建同级节点 |
+| `Alt + ↑ / ↓ / ← / →` | 根据空间位置选择相邻节点 |
+| `Ctrl/Cmd + Shift + 方向键` | 按指定方向创建子节点 |
 
-编辑节点文字时这些快捷键不会被插件拦截。快捷键行为使用 Obsidian Canvas 内部接口，因此 Obsidian 大版本升级后需回归测试。
+快捷键在节点处于选中状态时生效；编辑节点文本时，插件不会拦截这些按键。快捷键和部分画布交互使用 Obsidian 内部接口，升级 Obsidian 后可能需要重新验证。
+
+## 开发与验证
+
+```bash
+npm install
+npm run dev
+npm run typecheck
+npm test
+npm run build
+```
+
+- `npm run dev`：开发构建。
+- `npm run typecheck`：运行 TypeScript 类型检查。
+- `npm test`：运行单元测试。
+- `npm run build`：生成生产构建。
+
+CI 可检查类型、测试和构建产物，但不会启动 Obsidian 图形界面。发布前仍应在目标版本中手动验证 Canvas 保存、键盘操作、菜单交互、节点布局、导入导出、PDF 标注，以及真实 AI 服务请求。
+
+## 已知限制
+
+- **功能覆盖并非完全等同于上游项目。** Canvas Portal 尚未实现为可同步编辑另一画布节点的原生 Portal。
+- **PDF 功能仍在完善。** 当前批注以自由手绘覆盖层为主，不是完整 PDF 编辑器；AI 上下文目前也不会从 PDF 节点提取完整文本或页面图像。
+- **部分功能依赖内部 API 或 DOM。** 元数据缓存、反向链接桥接、特定连线路由及节点样式可能随 Obsidian 版本变化。
+- **AI 支持存在服务差异。** 图像生成、流式取消、网页和 YouTube 内容获取，以及 MCP 工具调用都受远端 API、权限和内容可访问性影响。
+
+详细的已实现、部分实现和待完善项目请查看[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。我们会尽量区分“代码已实现”和“已在 Obsidian 实际验证”，避免把构建通过等同于完整的运行时兼容性。
 
 ## 上游项目与致谢
 
-本项目的功能方向参考了以下项目；此仓库当前采用独立实现，没有直接复制它们的实现代码：
+本项目的功能方向参考了以下开源项目；当前以独立实现为主，功能方向参考不代表已完整兼容上游能力。
 
-- [Advanced Canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas) — Canvas 增强、节点样式、工作流工具。上游声明 GPL-3.0。
-- [Canvas MindMap](https://github.com/Quorafind/Obsidian-Canvas-MindMap) — 子节点/同级节点、方向导航和树布局。其 `package.json` 声明 MIT；检查时仓库根目录未发现 LICENSE 文件。
-- [Obsidian AI Canvas](https://github.com/testy-cool/obsidian-ai-canvas) — 在 Canvas 上进行 AI 问答及图像生成。上游 LICENSE 声明 MIT。
+- [Advanced Canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas)：Canvas 增强与工作流工具。上游声明 GPL-3.0。
+- [Canvas MindMap](https://github.com/Quorafind/Obsidian-Canvas-MindMap)：思维导图节点创建、导航和布局。其 `package.json` 声明 MIT；在检查时未发现仓库根目录的 LICENSE 文件。
+- [Obsidian AI Canvas](https://github.com/testy-cool/obsidian-ai-canvas)：Canvas 上的 AI 问答与图像生成。上游 LICENSE 声明 MIT。
 
-该项目当前以 GPL-3.0-or-later 发布。若未来直接引入上游代码或资源，会在引入前逐项核对许可证、保留版权声明并补充第三方许可文件。
+如果未来直接引入上游代码或资源，会在引入前核对适用许可证，并保留必要的版权和许可声明。
 
-## 当前边界 / 下一步
+## 许可证
 
-第一版优先提供单插件框架与上述核心工作流。Advanced Canvas 的元数据缓存/反向链接、PDF 标注、Portal、复杂边样式和导出选项，以及 AI Canvas 的多供应商注册、MCP 工具、YouTube/网页上下文摄取、流式生成和多模态流程，仍需逐项迁移和测试。请通过 GitHub Issues 记录需要优先完成的功能。
-
-## 开发
-
-- `npm run dev`：开发构建
-- `npm run build`：生产构建
-
-提交前请在目标 Obsidian 版本中测试 Canvas 数据保存、键盘操作、节点布局和 AI API 兼容性。
-
-## 更多整合功能
-
-整合版目前包括：节点颜色/形状/边框、可互操作的 JSON Canvas `styleAttributes`、连线颜色/线型/箭头样式、连线方向翻转、前后层级、焦点模式、文本节点自动尺寸、分组折叠、选区封装成独立画布、节点 Wikilink/Markdown 嵌入、JSON Canvas/PNG/SVG 导出、frontmatter 自动连线、网页正文与可访问 YouTube 字幕导入、PDF 固定分页渲染与自由手绘批注、节点级 AI 模型覆盖、多供应商 AI、流式生成与停止、图像上下文、闪卡/思维导图生成，以及远程 MCP Streamable HTTP 工具调用。
-
-Canvas 元数据索引现在可以为画布文本节点、文件节点与 frontmatter 建立基础链接缓存；还加入了受设置开关控制的 Backlinks 扫描桥接。它通过 Obsidian 内部 API 工作，属于兼容性较敏感的功能。
-
-请注意：CI 已通过类型检查、单元测试和生产构建，但没有启动 Obsidian GUI。真实交互仍需在目标桌面版/移动版确认。完整交互式 Canvas Portal、覆盖全部 Advanced Canvas 的复杂边路由算法/全部样式属性、完整的 PDF 文本选择/高亮工具，以及 Gemini 原生视频上下文、所有 AI 供应商特有能力仍未完整迁移。
-
-
-## 功能覆盖状态
-
-请查看 [整合功能矩阵](docs/INTEGRATION_MATRIX.md)，了解三个上游项目的已实现、部分实现和待迁移项。该矩阵区分代码已存在与已在 Obsidian 实际运行验证，避免将构建通过误认为所有运行时功能均已验证。
-
-
-## 原生 AI 协议配置
-
-在 Integration Features 的 Provider Profiles JSON 中，profile 可设置 protocol：
-
-- "openai"：OpenAI-compatible Chat Completions / Images API；也适用于 Ollama 和其他兼容网关。
-- "anthropic"：Anthropic Messages API，支持文本与连接图片上下文；原生 Anthropic API 本身不提供图像生成接口。
-- "gemini"：Google Gemini generateContent / streamGenerateContent，并尝试通过支持图像生成的 Gemini 模型返回图片。
-
-Gemini 示例 profile：
-
-    {
-      "id": "gemini",
-      "name": "Google Gemini",
-      "protocol": "gemini",
-      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
-      "apiKey": "YOUR_KEY",
-      "model": "gemini-2.5-flash",
-      "imageModel": "gemini-2.5-flash-image"
-    }
-
-可用模型取决于你所使用的账号、区域、模型发布状态及接口权限。请填入自己能调用的模型名称，不要把真实 API Key 提交进仓库。
+本项目的许可证见 [LICENSE](LICENSE)。
