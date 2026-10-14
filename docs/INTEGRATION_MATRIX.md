@@ -35,7 +35,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Align nodes to grid | Implemented | Grid size is configurable |
 | Per-node zoom breakpoints | Implemented, basic | Supports a stored per-node threshold and the `--variable-breakpoint` CSS variable |
 | Canvas read-only / interaction lock | Implemented, basic | Blocks node/edge interaction but leaves the Canvas surface available; verify panning and zooming on desktop |
-| Collapse / expand group | Partial | Stores contained nodes/edges as extension data; nested groups and clipboard semantics need additional tests |
+| Collapse / expand group | Partial | Stores contained nodes/edges as extension data; nested groups, cross-boundary edge handling and clipboard semantics need additional tests |
 | Encapsulate selection into a new Canvas | Implemented | Re-bases moved nodes near the child Canvas origin, preserves internal edges and reconnects crossing edges to the new file node |
 | Export JSON Canvas | Implemented | Saves a separate .canvas file in the Vault |
 | Export PNG / SVG | Implemented, basic | Uses html-to-image against the Canvas DOM; embeds/fonts/very large canvases may need manual testing |
@@ -43,9 +43,10 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Auto edges from file-node frontmatter | Implemented, basic | Reads a configurable key, default `canvas-edges` |
 | Metadata cache for .canvas | Implemented, opt-in / internal API | Indexes text-node links, file nodes and Canvas frontmatter for cache/resolved-link consumers. Obsidian upgrade testing required |
 | Graph links / backlinks panel | Partial | Resolved-link cache and a guarded backlink-scan bridge are provided; the built-in Backlinks pane must be verified on desktop |
-| Direct / square / A-star edge pathfinding | Implemented, basic | Writes standard `styleAttributes.pathfindingMethod`, draws custom SVG paths and caches routes; complex nested/group endpoints and all native drag-time behavior need manual testing |\n| Floating-side routing / every custom arrow geometry | Partial | Basic arrow styles are rendered; automatic endpoint-side redocking and every Advanced Canvas geometry detail are not fully replicated |
+| Direct / square / A-star edge pathfinding | Implemented, basic | Writes standard `styleAttributes.pathfindingMethod`, draws custom SVG paths and caches routes; complex nested/group endpoints and all native drag-time behavior need manual testing |
+| Floating-side routing / every custom arrow geometry | Partial | Basic arrow styles are rendered; automatic endpoint-side redocking and every Advanced Canvas geometry detail are not fully replicated |
 | Full Advanced JSON Canvas style-attribute compatibility | Partial | Common node/edge settings are stored, but the entire upstream format and all style renderers are not covered |
-| True interactive Canvas portals | Not yet complete | Current command creates an embedded Canvas reference card; it does not mirror and edit another Canvas's nodes as a native portal |
+| Editable Canvas Portal | Implemented, basic / single level | Mirrors nodes/edges from another `.canvas` with isolated IDs, syncs edits/deletions back to the source, and maps cross-portal edges to the frame. Adding new nodes from inside a Portal and nested Portal expansion are not yet implemented; source sync uses Obsidian internal view serialization and needs desktop validation |
 | PDF page splitting / fixed page rendering | Implemented, basic | Pinned PDF pages are rendered into Canvas file nodes through Obsidian's PDF embed registry |
 | Freehand PDF page annotations | Implemented, basic | Strokes persist in Canvas JSON; selection, resize, touch input and PDF page rotations require manual tests |
 | Full PDF annotation tools (highlighter, text selection, multipage toolbar) | Not yet complete | Current overlay is a freehand layer, not a full PDF editor |
@@ -68,7 +69,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Webpage text ingestion | Implemented, best-effort | JavaScript-only, login-gated and anti-bot pages may fail |
 | YouTube caption ingestion | Implemented, best-effort | Requires accessible captions; videos without retrievable captions cannot be transcribed |
 | MCP remote tools | Implemented, remote Streamable HTTP | Does not support stdio or SSE-only MCP servers; endpoint/tool arguments are user-configured |
-| PDF page context for AI | Partial | PDF page node exists visually; AI context does not yet extract PDF text or pixels from it |
+| PDF page context for AI | Partial | PDF is rendered and can be freehand annotated in a pinned page node, but AI context does not yet extract the PDF page's text or pixels |
 | Gemini-native public YouTube video context | Implemented, provider-dependent | Command sends `fileData.fileUri` directly to the active Gemini profile; the video must be public and the selected model/account must support it |
 | All upstream model/provider SDKs, rich model picker and automatic tool routing | Partial | Core profiles and manual MCP tool calls work; not every upstream provider feature is replicated |
 
