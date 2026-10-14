@@ -21,7 +21,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Feature | Status | Notes |
 |---|---|---|
 | Canvas text / URL / file search | Implemented | Selects the first match |
-| Node templates | Implemented | Reusable text-node templates |
+| Node templates | Implemented | Reusable text-node templates preserve dimensions, colors, Advanced JSON Canvas styleAttributes, shape, border, text alignment, custom class, zoom breakpoint and auto-resize settings |
 | Presentation mode | Implemented, basic | Traverses edge-connected nodes, then spatially sorts remaining nodes |
 | Node colors / custom palette | Implemented | Includes configurable color slots |
 | Node shapes | Implemented, basic | CSS-rendered shapes; complex clip-path styling may affect node content interaction |
@@ -31,6 +31,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Select incident edges | Implemented | Supports all, incoming and outgoing edge selection |
 | Bring node to front / send to back | Implemented, basic | Uses Canvas data ordering; renderer behavior may differ between Obsidian versions |
 | Focus mode / edge emphasis | Implemented, basic | Dims unrelated nodes and edges |
+| Create an independent empty group | Implemented | Creates a standalone group node without requiring a selected node |
 | Auto-resize text nodes | Implemented, opt-in | Uses estimated text dimensions and DOM observers |
 | Align nodes to grid | Implemented | Grid size is configurable |
 | Per-node zoom breakpoints | Implemented, basic | Supports a stored per-node threshold and the `--variable-breakpoint` CSS variable |
@@ -44,7 +45,8 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Metadata cache for .canvas | Implemented, opt-in / internal API | Indexes text-node links, file nodes and Canvas frontmatter for cache/resolved-link consumers. Obsidian upgrade testing required |
 | Graph links / backlinks panel | Partial | Resolved-link cache and a guarded backlink-scan bridge are provided; the built-in Backlinks pane must be verified on desktop |
 | Direct / square / A-star edge pathfinding | Implemented, basic | Writes standard `styleAttributes.pathfindingMethod`, draws custom SVG paths and caches routes; complex nested/group endpoints and all native drag-time behavior need manual testing |
-| Floating-side routing / every custom arrow geometry | Partial | Basic arrow styles are rendered; automatic endpoint-side redocking and every Advanced Canvas geometry detail are not fully replicated |
+| Floating-side routing | Implemented, basic | Floating endpoints are re-docked to the side facing the other node; recomputation occurs after Canvas interaction |
+| Every custom arrow geometry | Partial | Basic arrow styles are rendered; every Advanced Canvas geometry detail is not fully replicated |
 | Full Advanced JSON Canvas style-attribute compatibility | Partial | Common node/edge settings are stored, but the entire upstream format and all style renderers are not covered |
 | Editable Canvas Portal | Implemented, basic / single level | Mirrors nodes/edges from another `.canvas` with isolated IDs, syncs edits/deletions back to the source, and maps cross-portal edges to the frame. Adding new nodes from inside a Portal and nested Portal expansion are not yet implemented; source sync uses Obsidian internal view serialization and needs desktop validation |
 | PDF page splitting / fixed page rendering | Implemented, basic | Pinned PDF pages are rendered into Canvas file nodes through Obsidian's PDF embed registry |
@@ -68,7 +70,7 @@ This matrix records the current implementation in Better Canvas. â€œImplementedâ
 | Flashcard generation | Implemented | Can create flashcard nodes; does not directly create a spaced-repetition deck |
 | Webpage text ingestion | Implemented, best-effort | JavaScript-only, login-gated and anti-bot pages may fail |
 | YouTube caption ingestion | Implemented, best-effort | Requires accessible captions; videos without retrievable captions cannot be transcribed |
-| MCP remote tools | Implemented, remote Streamable HTTP | Does not support stdio or SSE-only MCP servers; endpoint/tool arguments are user-configured |
+| MCP remote tools | Implemented, remote Streamable HTTP | Direct tool picker plus AI-proposed tool/arguments with an explicit review/confirmation step; does not support stdio or SSE-only servers |
 | PDF page context for AI | Implemented, basic | Extracts selectable text from up to three pages and sends pinned-page raster images to visual models; scanned PDFs without OCR text depend on visual input and model support |
 | Gemini-native public YouTube video context | Implemented, provider-dependent | Command sends `fileData.fileUri` directly to the active Gemini profile; the video must be public and the selected model/account must support it |
 | All upstream model/provider SDKs, rich model picker and automatic tool routing | Partial | Core profiles and manual MCP tool calls work; not every upstream provider feature is replicated |
