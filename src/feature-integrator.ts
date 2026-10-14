@@ -18,6 +18,7 @@ import {
   decorateCanvas,
   flipIncidentEdges,
   moveSelectionEdgesToTop,
+  normalizeNodeShape,
   patchNode,
   reorderNode,
   resizeNodeToText,
@@ -498,24 +499,25 @@ export default class BetterCanvasFeatures {
   private setNodeShape(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.input("设置节点形状", "default / rectangle / pill / ellipse / circle / diamond / parallelogram / predefined-process / document / database / hexagon / pentagon / octagon / triangle / trapezoid / chevron / cloud", value => {
-      const shape = value.toLowerCase();
-      if (!["default", "rectangle", "pill", "ellipse", "circle", "diamond", "parallelogram", "predefined-process", "document", "database", "hexagon", "pentagon", "octagon", "triangle", "trapezoid", "chevron", "cloud"].includes(shape)) {
-        new Notice("形状无效。");
-        return;
-      }
-      const standardShapes = new Set(["rectangle", "pill", "diamond", "parallelogram", "circle", "predefined-process", "document", "database"]);
-      const normalizedShape = shape === "default" ? "rectangle" : shape === "ellipse" ? "circle" : shape;
-      const priorAttributes = (selection.node as any).styleAttributes ?? {};
-      patchNode(selection.canvas, selection.node.id, {
-        bcShape: shape,
-        styleAttributes: {
-          ...priorAttributes,
-          ...(standardShapes.has(normalizedShape) ? { shape: normalizedShape } : {})
+    this.input(
+      "设置节点形状",
+      "default / rectangle / process / terminal / pill / decision / diamond / input-output / parallelogram / reference / circle / ellipse / predefined-process / document / database / hexagon / pentagon / octagon / triangle / trapezoid / chevron / cloud",
+      value => {
+        const shape = value.trim().toLowerCase();
+        const normalizedShape = normalizeNodeShape(shape);
+        if (!normalizedShape) {
+          new Notice("形状无效。请选择受支持的流程图形状。");
+          return;
         }
-      });
-      this.decorate(selection.canvas);
-    });
+        const priorAttributes = (selection.node as any).styleAttributes ?? {};
+        patchNode(selection.canvas, selection.node.id, {
+          bcShape: shape,
+          styleAttributes: { ...priorAttributes, shape: normalizedShape }
+        });
+        this.decorate(selection.canvas);
+      },
+      String((selection.node as any).bcShape ?? "default")
+    );
   }
 
   private setNodeBorder(): void {
