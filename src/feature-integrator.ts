@@ -113,6 +113,7 @@ export default class BetterCanvasFeatures {
   private paletteStyle: HTMLStyleElement | null = null;
   private customCssStyle: HTMLStyleElement | null = null;
   private boundContainers = new WeakSet<HTMLElement>();
+  private boundRouteContainers = new WeakSet<HTMLElement>();
   private resizeObservers = new WeakSet<HTMLElement>();
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private metadataIndexer: CanvasMetadataIndexer | null = null;
@@ -372,6 +373,7 @@ export default class BetterCanvasFeatures {
       if (!view?.canvas) continue;
       this.observeAutoResize(view, view.canvas);
       this.bindMindMapShortcuts(view, view.canvas);
+      this.bindCanvasRouteRefresh(view);
       this.decorate(view.canvas);
       this.applyZoomBreakpoints(view.canvas);
       this.applyFocus(view.canvas);
@@ -598,6 +600,36 @@ export default class BetterCanvasFeatures {
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) resizeNodeToText(selection.canvas, selection.node.id);
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
+  }
+
+  private bindCanvasRouteRefresh(view: any): void {
+    const container = view?.containerEl as HTMLElement | undefined;
+    if (!(container instanceof HTMLElement) || this.boundRouteContainers.has(container)) return;
+    this.boundRouteContainers.add(container);
+
+    let queued = false;
+    const schedule = () => {
+      if (queued) return;
+      queued = true;
+      window.requestAnimationFrame(() => {
+        queued = false;
+        const canvas = view?.canvas;
+        if (!canvas) return;
+        this.decorate(canvas);
+        this.applyZoomBreakpoints(canvas);
+      });
+    };
+    container.addEventListener("pointerup", schedule, true);
+    container.addEventListener("pointercancel", schedule, true);
+    container.addEventListener("keyup", schedule, true);
+    container.addEventListener("wheel", schedule, { capture: true, passive: true });
+    this.p.register(() => {
+      container.removeEventListener("pointerup", schedule, true);
+      container.removeEventListener("pointercancel", schedule, true);
+      container.removeEventListener("keyup", schedule, true);
+      container.removeEventListener("wheel", schedule, true);
+      this.boundRouteContainers.delete(container);
+    });
   }
 
   private bindMindMapShortcuts(view: any, canvas: any): void {
