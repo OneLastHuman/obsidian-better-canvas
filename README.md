@@ -187,7 +187,7 @@ Codex CLI 使用自己的本地配置和模型供应商。节点内容与提示�
 
 不同供应商可能使用不同的模型名称、图像生成接口和权限策略。请填写当前账号实际有权调用的模型；不使用图像生成功能时，可按服务要求省略或留空 `imageModel`。
 
-例如，若本机已运行 Ollama，可添加以下 OpenAI-compatible profile：
+例如，若已在本机运行 Ollama，可添加以下 OpenAI-compatible profile：
 
 ```json
 {
@@ -201,7 +201,7 @@ Codex CLI 使用自己的本地配置和模型供应商。节点内容与提示�
 }
 ```
 
-将 `model` 替换成 `ollama list` 中已有的模型名称。该配置用于本地文本问答；图像生成取决于本地服务是否实现兼容的 Images API。OpenRouter、Groq 或其他兼容网关也可使用 `openai` profile，需配置其实际 Base URL、模型和认证方式。
+将 `model` 替换成 `ollama list` 中已有的模型名称。该配置可用于本地文本问答；图像生成取决于本地服务是否实现兼容的 Images API。远程 OpenRouter、Groq、Azure-compatible 网关等也可使用 `openai` profile，但必须填写该服务兼容的 Base URL、模型和认证配置。
 
 **密钥与隐私提示**
 
@@ -242,7 +242,7 @@ CI 会检查类型、测试和构建产物，但不会启动 Obsidian 图形界�
 - **Portal 已有单层可编辑实现。** 选择“创建 Canvas Portal”并选择另一个 `.canvas` 后，会显示被引用画布的镜像节点/连线；节点更改和删除会同步回源文件，跨 Portal 连线会映射到 Portal 框。还可以运行“在选中 Canvas Portal 中创建文本节点”，把新节点和连线写入 Portal 的源画布。任意点击新建节点还不会自动加入 Portal，嵌套 Portal 仍未支持；请先在测试 Vault 验证同步行为。
 - **PDF 功能仍在完善。** 固定分页支持文本提取与选择、从选中文本创建关联摘录节点、页面图像上下文、红/蓝笔、荧光笔、橡皮擦和撤销；“对所选 PDF 页面执行 AI OCR”会将所选页图像交给支持视觉的模型转录。它仍不是完整 PDF 编辑器，尚不支持 PDF 页面上的原生文字高亮对象、整份文档的自动批量 OCR 或多页批注工具栏。
 - **部分功能依赖内部 API 或 DOM。** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由及节点样式可能随 Obsidian 版本变化。插件自带的链接浏览器会扫描 Markdown 元数据和其他 Canvas JSON；CI 不运行 Obsidian GUI，仍需桌面端实测。
-- **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini API profile 支持模型端点发现和手动指定模型；桌面端还支持本机 Codex CLI 与 OpenCode ACP 文本后端。两种本地后端均需要预先安装和登录，提示词会交给各自配置的模型服务，并不保证离线处理；OpenCode ACP 当前仅支持文本输入，遇到图片/文件上下文会提示切回 API 后端。批量 Prompt 每次最多处理 20 篇 Markdown；网页和 YouTube 内容获取、图像生成及 MCP 工具调用受服务 API、权限和内容可访问性影响。HTML 预览在沙盒 iframe 中运行，不授予同源权限，但仍应只预览可信或已检查的代码。
+- **AI 支持存在服务差异。** OpenAI-compatible、Anthropic 与 Gemini profile 已接入，并支持模型端点发现和手动指定模型。可选的本地 Codex CLI 和 OpenCode ACP 均只在桌面端运行，需要安装并登录对应 CLI；提示词会发送给所配置的模型服务，并非保证离线处理。批量 Prompt 每次最多处理 20 篇 Markdown；网页和 YouTube 内容获取、图像生成及 MCP 工具调用都受远端 API、权限和内容可访问性影响。HTML 预览在沙盒 iframe 中运行，不授予同源权限，但仍应只预览可信或已检查的代码。
 - **MCP 结果处理。** 远程 Streamable HTTP、旧式 SSE 与本地 stdio MCP 工具的文本结果会生成关联文本节点；PNG/JPEG/WebP/GIF 图片结果会写入 Vault 并生成关联文件节点。stdio 服务可以访问其进程用户与操作系统权限允许的本地资源；请只连接可信服务。
 
 各功能的实现与验证状态见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。代码已实现不代表已在 Obsidian 中验证；构建通过也不代表所有运行时行为都兼容。
