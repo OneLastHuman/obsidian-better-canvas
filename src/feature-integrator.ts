@@ -474,6 +474,7 @@ export default class BetterCanvasFeatures {
     add("bc-mcp-tool", "调用远程 MCP 工具", () => void this.runMcpTool());
     add("bc-ai-mcp-tool", "让 AI 建议 MCP 工具调用（执行前确认）", () => void this.runAIMcpTool());
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
+    add("bc-pdf-ocr", "对所选 PDF 页面执行 AI OCR", () => this.ocrSelectedPdfPage());
     add("bc-pdf-review-board", "为 PDF 创建分页批注工作区", () => this.createPdfReviewBoard());
     add("bc-create-canvas-portal", "创建可编辑 Canvas Portal", () => this.createCanvasPortal());
     add("bc-portal-add-node", "在选中 Canvas Portal 中创建文本节点", () => this.addTextNodeToPortal());
@@ -2627,6 +2628,27 @@ export default class BetterCanvasFeatures {
       "在 Canvas Portal 中创建文本节点",
       "输入要添加到 Portal 源画布的内容",
       value => void this.portalManager?.addTextNodeToPortal(value, selection.node.id)
+    );
+  }
+
+  private ocrSelectedPdfPage(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    const node = selection.node;
+    if (node.type !== "file" || typeof node.file !== "string" || !node.file.toLowerCase().endsWith(".pdf")) {
+      new Notice("请先选择一个 PDF 文件节点或固定 PDF 页面节点。");
+      return;
+    }
+    const file = this.p.app.vault.getAbstractFileByPath(node.file);
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== "pdf") {
+      new Notice("找不到所选 PDF 文件。");
+      return;
+    }
+    // getConnectedImages rasterizes the selected/pinned PDF page and sends it
+    // to the configured vision-capable provider through the regular AI path.
+    void this.runAI(
+      node.id,
+      "请对所选 PDF 节点对应的页面执行 OCR 转录，而不是总结。逐行提取所有可见文字，尽量保留标题、段落、项目符号、表格和公式结构，使用 Markdown 格式。将无法确定的字符标成 [不清晰]，不要猜测不可见内容。若当前节点没有明确页码，则转录第 1 页。"
     );
   }
 
