@@ -200,7 +200,9 @@ export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle):
         ...((edge as any).styleAttributes ?? {}),
         ...(standardArrow === "none" ? { arrow: "triangle" } : { arrow: standardArrow })
       },
-      ...(standardArrow === "none" ? { toEnd: "none" } : {})
+      ...(standardArrow === "none"
+        ? { fromEnd: "none", toEnd: "none" }
+        : { fromEnd: "arrow", toEnd: "arrow" })
     };
   });
   if (count > 0) {
