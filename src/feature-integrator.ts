@@ -333,6 +333,7 @@ export default class BetterCanvasFeatures {
     add("bc-regenerate", "重新生成所选 AI 节点", () => void this.regenerate());
     add("bc-stop-ai", "停止当前 AI 生成", () => this.stopAI());
     add("bc-mcp-tool", "调用远程 MCP 工具", () => void this.runMcpTool());
+    add("bc-ai-mcp-tool", "让 AI 建议 MCP 工具调用（执行前确认）", () => void this.runAIMcpTool());
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
     add("bc-pdf-review-board", "为 PDF 创建分页批注工作区", () => this.createPdfReviewBoard());
     add("bc-create-canvas-portal", "插入 Canvas 嵌入卡片", () => this.createCanvasPortal());
@@ -1677,6 +1678,107 @@ export default class BetterCanvasFeatures {
         }, "{}");
       }, tools[0].name);
     } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+    }
+  }
+
+  private async runAIMcpTool(): Promise<void> {
+    const selection = this.selected();
+    if (!selection) return;
+    if (selection.canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再写入 MCP 结果。");
+      return;
+    }
+    const settings = this.settings();
+    if (!settings.mcpEndpoint) {
+      new Notice("请先在设置中填写 MCP Streamable HTTP endpoint。");
+      return;
+    }
+
+    const loading = new Notice("正在读取 MCP 工具并让 AI 规划调用…", 0);
+    try {
+      const tools = await listRemoteTools(settings.mcpEndpoint, settings.mcpApiKey);
+      if (!tools.length) throw new Error("MCP 服务未暴露工具。");
+      const context = await this.getNodeContext(selection.canvas, selection.node.id);
+      const menu = tools.slice(0, 80).map(tool => ({
+        name: tool.name,
+        description: (tool.description ?? "").slice(0, 500),
+        inputSchema: tool.inputSchema ?? {}
+      }));
+      const raw = await this.completeStructured(
+        "你可以为用户选择一个 MCP 工具来完成任务。只能从下列 tool 列表中选择 name 完全相同的工具；参数必须符合 inputSchema。\n" +
+        "如果没有合适的工具，返回 {\"toolName\":\"\",\"arguments\":{},\"reason\":\"说明不调用工具的原因\"}。\n" +
+        "必须只返回 JSON，禁止直接执行、禁止声称工具已经执行。\n\n用户任务：" +
+        "请围绕选中的 Canvas 笔记，使用 MCP 工具处理能由外部工具完成的部分。\n\nCanvas 上下文：\n" + context.slice(0, 10000) +
+        "\n\n可用工具：\n" + JSON.stringify(menu),
+        selection.node
+      );
+      const proposal = this.parseJsonPayload<{toolName?: string; arguments?: Record<string, unknown>; reason?: string}>(raw);
+      if (!proposal.toolName || typeof proposal.toolName !== "string") {
+        throw new Error(String(proposal.reason || "AI 没有选择 MCP 工具。"));
+      }
+      const tool = tools.find(item => item.name === proposal.toolName);
+      if (!tool) throw new Error("AI 返回的工具名称不在 MCP 工具列表中。");
+      if (!proposal.arguments || typeof proposal.arguments !== "object" || Array.isArray(proposal.arguments)) {
+        throw new Error("AI 返回的工具参数不是 JSON object。");
+      }
+      loading.hide();
+
+      const suggested = {
+        toolName: tool.name,
+        arguments: proposal.arguments,
+        reason: String(proposal.reason ?? "")
+      };
+      this.input(
+        "确认 MCP 调用：" + tool.name,
+        "请检查参数。按“提交”即会把此 JSON 中的 toolName 与 arguments 发送给你配置的 MCP 服务。",
+        async edited => {
+          let approved: any;
+          try {
+            approved = JSON.parse(edited);
+            if (!approved || typeof approved !== "object" || Array.isArray(approved)) throw new Error("需要 JSON object");
+            if (typeof approved.toolName !== "string" || !tools.some(item => item.name === approved.toolName)) {
+              throw new Error("toolName 必须是当前 MCP 服务公开的工具名称。");
+            }
+            if (!approved.arguments || typeof approved.arguments !== "object" || Array.isArray(approved.arguments)) {
+              throw new Error("arguments 必须是 JSON object。");
+            }
+          } catch (error) {
+            new Notice(error instanceof Error ? error.message : "确认参数无效。");
+            return;
+          }
+
+          const running = new Notice("正在执行已确认的 MCP 工具：" + approved.toolName, 0);
+          try {
+            const result = await callRemoteTool(
+              settings.mcpEndpoint,
+              settings.mcpApiKey,
+              approved.toolName,
+              approved.arguments as Record<string, unknown>
+            );
+            const canvas = this.canvas();
+            if (canvas) {
+              const current = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === selection.node.id);
+              const source = current ?? selection.node;
+              const output = makeTextNode(
+                "# MCP: " + approved.toolName + "\n\n" + String(result).slice(0, 12000),
+                source.x + source.width + 100,
+                source.y,
+                { width: 440, height: 280 }
+              );
+              insertCanvasNode(canvas, output, source.id);
+            }
+            running.hide();
+            new Notice("MCP 调用完成；结果已保存为新节点。");
+          } catch (error) {
+            running.hide();
+            new Notice(error instanceof Error ? error.message : String(error), 8000);
+          }
+        },
+        JSON.stringify(suggested, null, 2)
+      );
+    } catch (error) {
+      loading.hide();
       new Notice(error instanceof Error ? error.message : String(error), 8000);
     }
   }
