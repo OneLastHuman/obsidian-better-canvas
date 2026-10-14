@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^22.15.30",
     "esbuild": "^0.25.4",
     "obsidian": "latest",
     "typescript": "^5.8.3"
