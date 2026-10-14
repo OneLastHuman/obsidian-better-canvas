@@ -24,7 +24,7 @@ describe("MCP result normalization", () => {
       ]
     });
 
-    expect(result.text).toContain('"type": "resource"');
+    expect(result.text).toContain('"type":"resource"');
     expect(result.images).toEqual([]);
   });
 
