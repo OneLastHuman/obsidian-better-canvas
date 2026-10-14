@@ -451,7 +451,16 @@ function setSvgPath(target: any, path: string): void {
 
 function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes: CanvasNodeData[]): void {
   const method = edgeData?.styleAttributes?.pathfindingMethod;
-  if (!["direct", "square", "a-star"].includes(method)) return;
+  const supported = ["direct", "square", "a-star"].includes(method);
+  if (!supported) {
+    // Restore the native Bézier path if a previous custom route was cleared.
+    if (edge?.__bcRouteSignature && typeof edge.updatePath === "function") {
+      edge.center = undefined;
+      edge.updatePath();
+      delete edge.__bcRouteSignature;
+    }
+    return;
+  }
   const fromNode = edge?.from?.node;
   const toNode = edge?.to?.node;
   if (!fromNode || !toNode) return;
@@ -466,20 +475,26 @@ function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes
   const start = edge?.from?.end === "none" ? sourceSideCenter : edge?.bezier?.from ?? sourceSideCenter;
   const end = edge?.to?.end === "none" ? targetSideCenter : edge?.bezier?.to ?? targetSideCenter;
 
+  const obstacles = method === "a-star"
+    ? allNodes
+        .filter(node => node.id !== edgeData.fromNode && node.id !== edgeData.toNode && node.type !== "group")
+        .map(normalizeBBox)
+        .filter((box): box is RouteBox => Boolean(box))
+    : [];
+  const signature = JSON.stringify([method, start, end, fromSide, toSide, obstacles]);
+  if (edge.__bcRouteSignature === signature) return;
+
   let points: RoutePoint[];
   if (method === "direct") {
     points = directRoute(start, end);
   } else if (method === "square") {
     points = squareRoute(start, end, fromSide, toSide);
   } else {
-    const obstacles = allNodes
-      .filter(node => node.id !== edgeData.fromNode && node.id !== edgeData.toNode && node.type !== "group")
-      .map(normalizeBBox)
-      .filter((box): box is RouteBox => Boolean(box));
     points = aStarGridRoute(start, end, fromSide, toSide, obstacles) ?? squareRoute(start, end, fromSide, toSide);
   }
 
   const svgPath = pointsToSvgPath(points);
+  edge.__bcRouteSignature = signature;
   edge.center = points[Math.floor(points.length / 2)] ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
   setSvgPath(edge.path?.interaction, svgPath);
   setSvgPath(edge.path?.display, svgPath);
