@@ -50,7 +50,7 @@ function htmlToText(html: string): { title: string; text: string } {
     ?? "";
   doc.querySelectorAll("script,style,noscript,svg,nav,footer,header,iframe,form,aside").forEach(el => el.remove());
   const candidates = doc.querySelector("article, main, [role='main']") ?? doc.body;
-  const text = (candidates?.innerText ?? candidates?.textContent ?? "")
+  const text = ((candidates as HTMLElement | null)?.innerText ?? candidates?.textContent ?? "")
     .replace(/[ \t]+/g, " ")
     .replace(/\n\s*\n\s*\n/g, "\n\n")
     .trim();
