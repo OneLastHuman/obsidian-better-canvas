@@ -55,6 +55,9 @@ export function flipIncidentEdges(canvas: any, nodeId: string): number {
       toSide: edge.fromSide,
       ...(edge.fromFloating !== undefined || edge.toFloating !== undefined
         ? { fromFloating: edge.toFloating, toFloating: edge.fromFloating }
+        : {}),
+      ...(edge.fromEnd !== undefined || edge.toEnd !== undefined
+        ? { fromEnd: edge.toEnd, toEnd: edge.fromEnd }
         : {})
     };
   });
@@ -328,14 +331,14 @@ export function decorateCanvas(canvas: any): void {
       polygon.style.display = "";
       polygon.setAttribute("points", points[storedArrow] ?? points.default);
       if (styleColor) {
-        polygon.style.stroke = edgeData.bcColor;
+        polygon.style.stroke = styleColor;
       } else {
         polygon.style.removeProperty("stroke");
       }
-      if (edgeData.bcArrowStyle.endsWith("-outline") || storedArrow === "thin-triangle") {
+      if (storedArrow.endsWith("-outline") || storedArrow === "thin-triangle") {
         polygon.style.fill = "var(--background-primary)";
       } else if (styleColor && ["diamond", "circle", "half-triangle", "default"].includes(storedArrow)) {
-        polygon.style.fill = edgeData.bcColor;
+        polygon.style.fill = styleColor;
       } else {
         polygon.style.removeProperty("fill");
       }
