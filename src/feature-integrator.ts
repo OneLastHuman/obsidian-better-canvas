@@ -3037,7 +3037,7 @@ export default class BetterCanvasFeatures {
           cleanupFailed = !removeCanvasNode(canvas, responseNodeId);
           if (cleanupFailed) {
             const message = error instanceof Error ? error.message : String(error);
-            console.warn("Better Canvas could not remove a failed AI placeholder:", responseNodeId, error);
+            console.warn("Better Canvas could not remove a failed AI placeholder; using visible error state.", responseNodeId);
             // A last-resort visible error state is preferable to an empty node
             // that remains marked as permanently generating.
             patchNode(canvas, responseNodeId, {
