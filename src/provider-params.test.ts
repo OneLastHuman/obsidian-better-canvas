@@ -37,6 +37,7 @@ describe("validated provider-specific request parameters", () => {
       '{"max_tokens":100}',
       '{"authorization":"Bearer secret"}',
       '{"api_key":"secret"}',
+      '{"metadata":{"authorization":"Bearer secret"}}',
       '{"constructor":{"prototype":{}}}'
     ]) {
       expect(() => parseProviderParamsJson(raw)).toThrow();
@@ -71,6 +72,8 @@ describe("validated provider-specific request parameters", () => {
     expect(resolveTemperature(undefined)).toBe(0.4);
     expect(resolveTemperature("1.25")).toBe(1.25);
     expect(() => resolveTemperature(2.1)).toThrow(/0 到 2/);
+    expect(() => resolveTemperature(1.1, 0.4, "anthropic")).toThrow(/0 到 1/);
+    expect(resolveTemperature(1, 0.4, "anthropic")).toBe(1);
     expect(() => resolveTemperature(Number.NaN)).toThrow(/0 到 2/);
     expect(resolveMaxOutputTokens(undefined)).toBeUndefined();
     expect(resolveMaxOutputTokens("0")).toBeUndefined();
