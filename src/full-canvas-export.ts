@@ -72,56 +72,6 @@ function nodeText(node: CanvasNodeData): string {
   return node.type === "group" ? "" : "[" + node.type + " node]";
 }
 
-function wrapLines(value: string, maxChars: number, maxLines: number): string[] {
-  const result: string[] = [];
-  const paragraphs = value.replace(/\r/g, "").split("\n");
-  let truncated = false;
-
-  for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
-    let remaining = paragraphs[paragraphIndex];
-    if (!remaining) {
-      if (result.length >= maxLines) {
-        truncated = true;
-        break;
-      }
-      result.push("");
-      continue;
-    }
-
-    while (remaining.length > maxChars) {
-      let breakAt = remaining.lastIndexOf(" ", maxChars);
-      if (breakAt < Math.floor(maxChars * 0.55)) breakAt = maxChars;
-      result.push(remaining.slice(0, breakAt).trimEnd());
-      remaining = remaining.slice(breakAt).trimStart();
-      if (result.length >= maxLines) {
-        truncated = Boolean(remaining) || paragraphIndex < paragraphs.length - 1;
-        break;
-      }
-    }
-    if (truncated) break;
-
-    if (remaining && result.length < maxLines) result.push(remaining);
-    else if (remaining) {
-      truncated = true;
-      break;
-    }
-
-    if (result.length >= maxLines && paragraphIndex < paragraphs.length - 1) {
-      truncated = true;
-      break;
-    }
-  }
-
-  if (result.length === 0) result.push("");
-  if (truncated) {
-    const index = result.length - 1;
-    result[index] = (result[index].length >= maxChars
-      ? result[index].slice(0, Math.max(0, maxChars - 1))
-      : result[index]) + "…";
-  }
-  return result;
-}
-
 function sidePoint(node: CanvasNodeData, side: string, from = false): { x: number; y: number } {
   switch (side) {
     case "left": return { x: node.x, y: node.y + node.height / 2 };
