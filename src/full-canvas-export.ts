@@ -1,6 +1,6 @@
 import type { CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { routePointsForMethod, type CanvasEdgeRouteMethod, type RouteBox } from "./enhancements";
-import { flattenMarkdownForSvg } from "./markdown-export";
+import { layoutMarkdownForSvg, type SvgMarkdownRun } from "./svg-markdown";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -70,56 +70,6 @@ function nodeText(node: CanvasNodeData): string {
   if (typeof node.file === "string") return node.file + (typeof (node as any).subpath === "string" ? String((node as any).subpath) : "");
   if (typeof node.url === "string") return node.url;
   return node.type === "group" ? "" : "[" + node.type + " node]";
-}
-
-function wrapLines(value: string, maxChars: number, maxLines: number): string[] {
-  const result: string[] = [];
-  const paragraphs = value.replace(/\r/g, "").split("\n");
-  let truncated = false;
-
-  for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
-    let remaining = paragraphs[paragraphIndex];
-    if (!remaining) {
-      if (result.length >= maxLines) {
-        truncated = true;
-        break;
-      }
-      result.push("");
-      continue;
-    }
-
-    while (remaining.length > maxChars) {
-      let breakAt = remaining.lastIndexOf(" ", maxChars);
-      if (breakAt < Math.floor(maxChars * 0.55)) breakAt = maxChars;
-      result.push(remaining.slice(0, breakAt).trimEnd());
-      remaining = remaining.slice(breakAt).trimStart();
-      if (result.length >= maxLines) {
-        truncated = Boolean(remaining) || paragraphIndex < paragraphs.length - 1;
-        break;
-      }
-    }
-    if (truncated) break;
-
-    if (remaining && result.length < maxLines) result.push(remaining);
-    else if (remaining) {
-      truncated = true;
-      break;
-    }
-
-    if (result.length >= maxLines && paragraphIndex < paragraphs.length - 1) {
-      truncated = true;
-      break;
-    }
-  }
-
-  if (result.length === 0) result.push("");
-  if (truncated) {
-    const index = result.length - 1;
-    result[index] = (result[index].length >= maxChars
-      ? result[index].slice(0, Math.max(0, maxChars - 1))
-      : result[index]) + "…";
-  }
-  return result;
 }
 
 function sidePoint(node: CanvasNodeData, side: string, from = false): { x: number; y: number } {
@@ -262,9 +212,8 @@ function polygonPoints(x: number, y: number, w: number, h: number, sides: number
 }
 
 function wrapNodeText(node: CanvasNodeData, clipId: string): string {
-  const raw = typeof node.text === "string" && node.text.trim()
-    ? flattenMarkdownForSvg(node.text)
-    : nodeText(node);
+  const hasMarkdownText = typeof node.text === "string" && node.text.trim().length > 0;
+  const raw = hasMarkdownText ? String(node.text) : nodeText(node);
   if (!raw) return "";
   const attrs = (node as any).styleAttributes ?? {};
   const fontSize = Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
@@ -281,14 +230,98 @@ function wrapNodeText(node: CanvasNodeData, clipId: string): string {
   const textColor = xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, "#202124"));
   const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * 0.58)));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
-  const lines = wrapLines(raw, maxChars, maxLines);
+  const lines = layoutMarkdownForSvg(raw, maxChars, maxLines, fontSize);
+
+  const renderRuns = (runs: SvgMarkdownRun[]): string =>
+    runs.map(run => {
+      const style = run.style;
+      const runAttrs: string[] = [];
+      if (style.bold) runAttrs.push('font-weight="bold"');
+      if (style.italic) runAttrs.push('font-style="italic"');
+      if (style.code) runAttrs.push('font-family="ui-monospace,SFMono-Regular,Consolas,monospace"');
+      if (style.link) runAttrs.push('fill="#3467a9"');
+      const decorations: string[] = [];
+      if (textDecoration !== "none") decorations.push(textDecoration);
+      if (style.strike) decorations.push("line-through");
+      if (style.link) decorations.push("underline");
+      if (decorations.length) runAttrs.push('text-decoration="' + decorations.join(" ") + '"');
+      return '<tspan' + (runAttrs.length ? " " + runAttrs.join(" ") : "") + '>' + xml(run.text) + "</tspan>";
+    }).join("");
+
+  // Table rows require geometry, rather than a pipe-delimited text label.
+  // Keep every cell clipped to the Canvas node bounds and use static SVG only.
+  if (lines.some(line => Boolean(line.tableRow))) {
+    let cursorY = node.y + 8;
+    const tableMarkup: string[] = [];
+    const nodeFont = fontFamily;
+    const lineHeight = fontSize * 1.25;
+    const cellPaddingX = 6;
+    const cellPaddingY = 4;
+
+    lines.forEach((line, lineIndex) => {
+      if (line.tableRow) {
+        const row = line.tableRow;
+        const columnCount = Math.max(1, row.cells.length);
+        const columnWidth = node.width / columnCount;
+        const rowHeight = Math.max(1, row.lineCount) * lineHeight + cellPaddingY * 2;
+        row.cells.forEach((cell, columnIndex) => {
+          const cellX = node.x + columnIndex * columnWidth;
+          const anchorForCell = cell.align === "center" ? "middle" : cell.align === "right" ? "end" : "start";
+          const textX = cell.align === "center"
+            ? cellX + columnWidth / 2
+            : cell.align === "right"
+              ? cellX + columnWidth - cellPaddingX
+              : cellX + cellPaddingX;
+          const clipIdForCell = clipId + "-table-" + lineIndex + "-" + columnIndex;
+          tableMarkup.push(
+            '<rect x="' + cellX + '" y="' + cursorY + '" width="' + columnWidth + '" height="' + rowHeight +
+            '" fill="' + (row.isHeader ? "#7b8794" : "none") + '" fill-opacity="' + (row.isHeader ? "0.14" : "1") +
+            '" stroke="#9aa3ad" stroke-width="0.7"/>'
+          );
+          tableMarkup.push(
+            '<defs><clipPath id="' + clipIdForCell + '"><rect x="' + (cellX + 1) + '" y="' + (cursorY + 1) +
+            '" width="' + Math.max(1, columnWidth - 2) + '" height="' + Math.max(1, rowHeight - 2) + '"/></clipPath></defs>'
+          );
+          const cellLines = cell.lines.length ? cell.lines : [[]];
+          const content = cellLines.map((runs, runIndex) =>
+            '<tspan x="' + textX + '" dy="' + (runIndex === 0 ? 0 : lineHeight) + '">' + renderRuns(runs) + "</tspan>"
+          ).join("");
+          tableMarkup.push(
+            '<text clip-path="url(#' + clipIdForCell + ')" x="' + textX + '" y="' + (cursorY + cellPaddingY + fontSize) +
+            '" font-family="' + nodeFont + '" font-size="' + fontSize + '" font-weight="' + (row.isHeader ? "bold" : fontWeight) +
+            '" font-style="' + fontStyle + '" fill="' + textColor + '" text-anchor="' + anchorForCell + '">' + content + "</text>"
+          );
+        });
+        cursorY += rowHeight;
+        return;
+      }
+
+      const lineFontSize = Math.max(8, fontSize * line.fontScale);
+      const lineWeight = line.bold ? "bold" : fontWeight;
+      const lineY = cursorY + lineFontSize;
+      tableMarkup.push(
+        '<text clip-path="url(#' + clipId + ')" x="' + startX + '" y="' + lineY +
+        '" font-family="' + fontFamily + '" font-size="' + lineFontSize + '" font-weight="' + lineWeight +
+        '" font-style="' + fontStyle + '" text-decoration="' + textDecoration +
+        '" fill="' + textColor + '" text-anchor="' + anchor + '">' + renderRuns(line.runs) + "</text>"
+      );
+      cursorY += Math.max(lineHeight, lineFontSize * 1.2);
+    });
+    return '<g clip-path="url(#' + clipId + ')">' + tableMarkup.join("") + "</g>";
+  }
+
   const startY = node.y + 18 + fontSize;
+  const markup = lines.map((line, index) => {
+    const lineFontSize = Math.max(8, fontSize * line.fontScale);
+    const dy = index === 0 ? 0 : Math.max(fontSize * 1.35, lineFontSize * 1.2);
+    const lineWeight = line.bold ? "bold" : fontWeight;
+    return '<tspan x="' + startX + '" dy="' + dy + '" font-size="' + lineFontSize +
+      '" font-weight="' + lineWeight + '">' + renderRuns(line.runs) + "</tspan>";
+  }).join("");
   return '<text clip-path="url(#' + clipId + ')" x="' + startX + '" y="' + startY +
     '" font-family="' + fontFamily + '" font-size="' + fontSize + '" font-weight="' + fontWeight +
     '" font-style="' + fontStyle + '" text-decoration="' + textDecoration + '" fill="' + textColor +
-    '" text-anchor="' + anchor + '">' +
-    lines.map((line, index) => '<tspan x="' + startX + '" dy="' + (index === 0 ? 0 : fontSize * 1.35) + '">' + xml(line) + "</tspan>").join("") +
-    "</text>";
+    '" text-anchor="' + anchor + '">' + markup + "</text>";
 }
 
 function boxPolygonPoints(

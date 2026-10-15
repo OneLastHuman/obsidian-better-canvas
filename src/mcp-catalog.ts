@@ -37,6 +37,8 @@ export function parseMcpPromptArguments(raw: string): Record<string, string> {
 
 export interface McpCatalogPage<T> {
   items: T[];
+  /** Count received from the server before normalization/deduplication. */
+  rawEntryCount?: number;
   nextCursor?: string;
 }
 
@@ -50,7 +52,7 @@ export function normalizeMcpResourcePage(value: unknown): McpCatalogPage<McpReso
       ...(typeof item.description === "string" && item.description.trim() ? { description: item.description.trim() } : {}),
       ...(typeof item.mimeType === "string" && item.mimeType.trim() ? { mimeType: item.mimeType.trim() } : {})
     }));
-  return { items, ...(typeof record.nextCursor === "string" && record.nextCursor ? { nextCursor: record.nextCursor } : {}) };
+  return { items, rawEntryCount: raw.length, ...(typeof record.nextCursor === "string" && record.nextCursor ? { nextCursor: record.nextCursor } : {}) };
 }
 
 export function normalizeMcpPromptPage(value: unknown): McpCatalogPage<McpPrompt> {
@@ -68,36 +70,60 @@ export function normalizeMcpPromptPage(value: unknown): McpCatalogPage<McpPrompt
         ...(typeof arg.required === "boolean" ? { required: arg.required } : {})
       })) : []
     }));
-  return { items, ...(typeof record.nextCursor === "string" && record.nextCursor ? { nextCursor: record.nextCursor } : {}) };
+  return { items, rawEntryCount: raw.length, ...(typeof record.nextCursor === "string" && record.nextCursor ? { nextCursor: record.nextCursor } : {}) };
 }
 
-/** Fetch paged catalogs without looping forever on a broken server cursor. */
+const MCP_CATALOG_MAX_PAGES = 50;
+const MCP_CATALOG_MAX_ENTRIES = 1000;
+
+/** Fetch paged catalogs with hard raw-entry and pagination bounds. */
 export async function collectMcpCatalogPages<T>(
   fetchPage: (cursor?: string) => Promise<McpCatalogPage<T>>,
   keyOf: (item: T) => string,
-  maxPages = 50
+  maxPages = MCP_CATALOG_MAX_PAGES
 ): Promise<T[]> {
+  // Keep the optional lower test limit, but callers cannot raise the hard cap.
+  const pageLimit = Number.isInteger(maxPages) && maxPages > 0
+    ? Math.min(maxPages, MCP_CATALOG_MAX_PAGES)
+    : MCP_CATALOG_MAX_PAGES;
   const output: T[] = [];
   const seenKeys = new Set<string>();
   const seenCursors = new Set<string>();
+  let receivedEntryCount = 0;
   let cursor: string | undefined;
-  for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
+  for (let pageIndex = 0; pageIndex < pageLimit; pageIndex++) {
     if (cursor) {
       if (seenCursors.has(cursor)) throw new Error("MCP catalog returned a repeated pagination cursor.");
       seenCursors.add(cursor);
     }
     const page = await fetchPage(cursor);
+    if (!page || !Array.isArray(page.items)) {
+      throw new Error("MCP catalog returned an invalid page.");
+    }
+
+    const reportedCount = page.rawEntryCount;
+    const pageEntryCount = typeof reportedCount === "number" &&
+      Number.isSafeInteger(reportedCount) && reportedCount >= page.items.length
+      ? reportedCount
+      : page.items.length;
+    receivedEntryCount += pageEntryCount;
+    if (receivedEntryCount > MCP_CATALOG_MAX_ENTRIES) {
+      throw new Error("MCP catalog exceeded the 1000-entry safety limit.");
+    }
+
     for (const item of page.items) {
       const key = keyOf(item);
       if (!key || seenKeys.has(key)) continue;
       seenKeys.add(key);
       output.push(item);
-      if (output.length > 1000) throw new Error("MCP catalog exceeded the 1000-entry safety limit.");
+      if (output.length > MCP_CATALOG_MAX_ENTRIES) {
+        throw new Error("MCP catalog exceeded the 1000-entry safety limit.");
+      }
     }
     if (!page.nextCursor) return output;
     cursor = page.nextCursor;
   }
-  throw new Error("MCP catalog pagination exceeded the " + maxPages + "-page safety limit.");
+  throw new Error("MCP catalog pagination exceeded the " + pageLimit + "-page safety limit.");
 }
 
 export function formatMcpResourceCatalog(resources: ReadonlyArray<McpResource>): string {
