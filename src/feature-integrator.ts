@@ -37,7 +37,8 @@ import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirection } from "./canvas-clone";
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
-import { zoomCanvasToFit } from "./canvas-zoom";
+import { canvasZoomToScale, zoomCanvasToFit } from "./canvas-zoom";
+import { isCanvasReadOnly, shouldSubmitPromptValue } from "./canvas-command-guards";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
 import {
@@ -124,7 +125,8 @@ class FeaturePromptModal extends Modal {
     private titleText: string,
     private placeholderText: string,
     private onSubmitValue: (value: string) => unknown,
-    private initialValue = ""
+    private initialValue = "",
+    private allowEmptySubmission = false
   ) {
     super(app);
   }
@@ -143,7 +145,7 @@ class FeaturePromptModal extends Modal {
     submit.onclick = () => {
       const value = input.value.trim();
       this.close();
-      if (value) void this.onSubmitValue(value);
+      if (shouldSubmitPromptValue(value, this.allowEmptySubmission)) void this.onSubmitValue(value);
     };
     input.addEventListener("keydown", event => {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -516,8 +518,8 @@ export default class BetterCanvasFeatures {
     canvas.zoomToSelection?.();
   }
 
-  private input(title: string, placeholder: string, cb: (value: string) => unknown, initial = ""): void {
-    new FeaturePromptModal(this.p.app, title, placeholder, cb, initial).open();
+  private input(title: string, placeholder: string, cb: (value: string) => unknown, initial = "", allowEmptySubmission = false): void {
+    new FeaturePromptModal(this.p.app, title, placeholder, cb, initial, allowEmptySubmission).open();
   }
 
   private registerCommands(): void {
@@ -888,7 +890,7 @@ export default class BetterCanvasFeatures {
   }
 
   private applyZoomBreakpoints(canvas: any): void {
-    const zoom = Number(canvas?.zoom);
+    const zoom = canvasZoomToScale(Number(canvas?.zoom));
     if (!Number.isFinite(zoom)) return;
     for (const nodeData of readCanvasData(canvas).nodes) {
       const node = canvas?.nodes?.get?.(nodeData.id);
@@ -917,7 +919,7 @@ export default class BetterCanvasFeatures {
       patchNode(selection.canvas, selection.node.id, { bcCustomClass: token || undefined });
       this.decorate(selection.canvas);
       new Notice(token ? "已应用样式类 bc-user-" + token : "已清除节点自定义样式类。");
-    }, String((selection.node as any).bcCustomClass ?? ""));
+    }, String((selection.node as any).bcCustomClass ?? ""), true);
   }
   private setNodeTextAlign(): void {
     const selection = this.selected();
@@ -940,6 +942,7 @@ export default class BetterCanvasFeatures {
   private edgePathfinding(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (isCanvasReadOnly(canvas)) { new Notice("当前 Canvas 处于只读模式。"); return; }
     this.input("设置连线路径算法", "bezier / direct / square / a-star", value => {
       const method = value.trim().toLowerCase();
       const allowed = ["bezier", "direct", "square", "a-star"];
@@ -956,6 +959,7 @@ export default class BetterCanvasFeatures {
   private edgeArrowStyle(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (isCanvasReadOnly(canvas)) { new Notice("当前 Canvas 处于只读模式。"); return; }
     this.input("设置连线箭头样式", "default / triangle-outline / half-triangle / thin-triangle / diamond / diamond-outline / circle / circle-outline / blunt / none", value => {
       const allowed = ["default", "triangle-outline", "half-triangle", "thin-triangle", "diamond", "diamond-outline", "circle", "circle-outline", "blunt", "none"];
       const style = value.trim().toLowerCase();
@@ -1097,6 +1101,7 @@ export default class BetterCanvasFeatures {
 
   private edgeStyle(canvas = this.canvas()): void {
     if (!canvas) return;
+    if (isCanvasReadOnly(canvas)) { new Notice("当前 Canvas 处于只读模式。"); return; }
     this.input("设置选中连线样式", "颜色,solid|dashed|dotted，例如 #5c6bc0,dashed", value => {
       const parts = value.split(",");
       const color = (parts[0] ?? "").trim();
