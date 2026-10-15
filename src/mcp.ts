@@ -1,5 +1,14 @@
 import { requestUrl } from "obsidian";
 import { normalizeMcpToolResult, RemoteMcpResult } from "./mcp-result";
+import {
+  collectMcpCatalogPages,
+  formatMcpPromptResult,
+  formatMcpResourceRead,
+  normalizeMcpPromptPage,
+  normalizeMcpResourcePage,
+  type McpPrompt,
+  type McpResource
+} from "./mcp-catalog";
 export { normalizeMcpToolResult } from "./mcp-result";
 export type { RemoteMcpImage, RemoteMcpResult } from "./mcp-result";
 
@@ -97,4 +106,54 @@ export async function callRemoteTool(
   const value = result.body;
   if (value?.isError) throw new Error("MCP 工具执行失败: " + JSON.stringify(value.content ?? value));
   return normalizeMcpToolResult(value);
+}
+
+
+async function remoteCatalog<T>(
+  endpoint: string,
+  apiKey: string,
+  method: string,
+  normalizePage: (value: unknown) => { items: T[]; nextCursor?: string },
+  keyOf: (item: T) => string
+): Promise<T[]> {
+  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
+  const init = await initialize(endpoint, apiKey);
+  let sessionId = init.sessionId;
+  return await collectMcpCatalogPages(async cursor => {
+    const response = await rpc(endpoint, apiKey, method, cursor ? { cursor } : {}, sessionId);
+    sessionId = response.sessionId;
+    return normalizePage(response.body);
+  }, keyOf);
+}
+
+export async function listRemoteResources(endpoint: string, apiKey: string): Promise<McpResource[]> {
+  return await remoteCatalog(endpoint, apiKey, "resources/list", normalizeMcpResourcePage, item => item.uri);
+}
+
+export async function readRemoteResource(endpoint: string, apiKey: string, uri: string): Promise<RemoteMcpResult> {
+  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
+  if (!uri.trim()) throw new Error("MCP resource URI 不能为空。");
+  const init = await initialize(endpoint, apiKey);
+  const response = await rpc(endpoint, apiKey, "resources/read", { uri: uri.trim() }, init.sessionId);
+  return formatMcpResourceRead(uri.trim(), response.body);
+}
+
+export async function listRemotePrompts(endpoint: string, apiKey: string): Promise<McpPrompt[]> {
+  return await remoteCatalog(endpoint, apiKey, "prompts/list", normalizeMcpPromptPage, item => item.name);
+}
+
+export async function getRemotePrompt(
+  endpoint: string,
+  apiKey: string,
+  name: string,
+  args: Record<string, string>
+): Promise<RemoteMcpResult> {
+  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
+  if (!name.trim()) throw new Error("MCP prompt 名称不能为空。");
+  const init = await initialize(endpoint, apiKey);
+  const response = await rpc(endpoint, apiKey, "prompts/get", {
+    name: name.trim(),
+    arguments: args
+  }, init.sessionId);
+  return formatMcpPromptResult(name.trim(), response.body);
 }
