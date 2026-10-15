@@ -13,6 +13,7 @@ import {
 import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
+import { parseProviderParamsJson } from "./provider-params";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
@@ -73,6 +74,9 @@ interface ProviderProfile {
   apiKey: string;
   model: string;
   imageModel: string;
+  requestParamsJson?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
 }
 
 interface FeatureSettings {
@@ -108,7 +112,10 @@ const DEFAULT_PROFILES: ProviderProfile[] = [{
   baseUrl: "https://api.openai.com/v1",
   apiKey: "",
   model: "gpt-4o-mini",
-  imageModel: "gpt-image-1"
+  imageModel: "gpt-image-1",
+  requestParamsJson: "{}",
+  temperature: 0.4,
+  maxOutputTokens: 0
 }];
 
 class FeaturePromptModal extends Modal {
@@ -335,7 +342,10 @@ export default class BetterCanvasFeatures {
       imageModel: String(profile.imageModel || ""),
       systemPrompt: "You are running a user-requested capability smoke test.",
       protocol: profile.protocol === "anthropic" || profile.protocol === "gemini" ? profile.protocol : "openai",
-      backend: "api"
+      backend: "api",
+      temperature: profile.temperature,
+      maxOutputTokens: profile.maxOutputTokens ? profile.maxOutputTokens : undefined,
+      providerParams: parseProviderParamsJson(String(profile.requestParamsJson || "{}"))
     };
     const report = await probeModelCapabilities(
       { id: profile.id, name: String(profile.name || profile.id) },
@@ -382,11 +392,19 @@ export default class BetterCanvasFeatures {
         baseUrl: s.baseUrl || "https://api.openai.com/v1",
         apiKey: s.apiKey || "",
         model: s.model || "gpt-4o-mini",
-        imageModel: s.imageModel || "gpt-image-1"
+        imageModel: s.imageModel || "gpt-image-1",
+        requestParamsJson: "{}",
+        temperature: 0.4,
+        maxOutputTokens: 0
       }];
     }
     s.providerProfiles = s.providerProfiles.filter((p: any) => p && typeof p.id === "string" && typeof p.baseUrl === "string");
     if (!s.providerProfiles.length) s.providerProfiles = JSON.parse(JSON.stringify(DEFAULT_PROFILES));
+    for (const profile of s.providerProfiles as ProviderProfile[]) {
+      if (typeof profile.requestParamsJson !== "string") profile.requestParamsJson = "{}";
+      if (typeof profile.temperature !== "number" || !Number.isFinite(profile.temperature) || profile.temperature < 0 || profile.temperature > 2) profile.temperature = 0.4;
+      if (typeof profile.maxOutputTokens !== "number" || !Number.isInteger(profile.maxOutputTokens) || profile.maxOutputTokens < 0 || profile.maxOutputTokens > 200_000) profile.maxOutputTokens = 0;
+    }
     if (!s.providerProfiles.some((p: ProviderProfile) => p.id === s.activeProviderId)) {
       s.activeProviderId = s.providerProfiles[0].id;
     }
@@ -447,7 +465,10 @@ export default class BetterCanvasFeatures {
       protocol: profile.protocol || "openai",
       systemPrompt: s.systemPrompt || "Answer accurately and preserve uncertainty.",
       backend: s.backend === "opencode-acp" ? "opencode-acp" : "api",
-      opencodeBinaryPath: String(s.opencodeBinaryPath || "opencode")
+      opencodeBinaryPath: String(s.opencodeBinaryPath || "opencode"),
+      temperature: profile.temperature,
+      maxOutputTokens: profile.maxOutputTokens ? profile.maxOutputTokens : undefined,
+      providerParams: parseProviderParamsJson(String(profile.requestParamsJson || "{}"))
     };
   }
 
