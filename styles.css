@@ -566,3 +566,10 @@
 @media (prefers-reduced-motion: reduce) {
   .bc-settings-nav-button { transition: none; }
 }
+
+.bc-settings-nav-button:focus-visible,
+.bc-settings-button:focus-visible,
+.bc-settings-search input:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
