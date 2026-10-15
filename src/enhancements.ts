@@ -331,8 +331,8 @@ export function resizeNodeToText(canvas: any, nodeId: string): boolean {
   return true;
 }
 
-type RoutePoint = { x: number; y: number };
-type RouteBox = { minX: number; minY: number; maxX: number; maxY: number };
+export type RoutePoint = { x: number; y: number };
+export type RouteBox = { minX: number; minY: number; maxX: number; maxY: number };
 
 export function bestFloatingSide(box: RouteBox, other: RoutePoint): "left" | "right" | "top" | "bottom" {
   const centerX = (box.minX + box.maxX) / 2;
@@ -492,6 +492,23 @@ function aStarGridRoute(
   return null;
 }
 
+export type CanvasEdgeRouteMethod = "direct" | "square" | "a-star";
+
+/** Pure route calculation shared by live Canvas decoration and static export. */
+export function routePointsForMethod(
+  method: CanvasEdgeRouteMethod,
+  start: RoutePoint,
+  end: RoutePoint,
+  fromSide: string,
+  toSide: string,
+  obstacleBoxes: RouteBox[] = []
+): RoutePoint[] {
+  if (method === "direct") return [start, end];
+  if (method === "square") return compactPath(squareRoute(start, end, fromSide, toSide));
+  return aStarGridRoute(start, end, fromSide, toSide, obstacleBoxes)
+    ?? compactPath(squareRoute(start, end, fromSide, toSide));
+}
+
 function setSvgPath(target: any, path: string): void {
   if (typeof target?.setAttr === "function") target.setAttr("d", path);
   else if (typeof target?.setAttribute === "function") target.setAttribute("d", path);
@@ -532,14 +549,14 @@ function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes
   const signature = JSON.stringify([method, start, end, fromSide, toSide, obstacles]);
   if (edge.__bcRouteSignature === signature) return;
 
-  let points: RoutePoint[];
-  if (method === "direct") {
-    points = directRoute(start, end);
-  } else if (method === "square") {
-    points = squareRoute(start, end, fromSide, toSide);
-  } else {
-    points = aStarGridRoute(start, end, fromSide, toSide, obstacles) ?? squareRoute(start, end, fromSide, toSide);
-  }
+  const points = routePointsForMethod(
+    method as CanvasEdgeRouteMethod,
+    start,
+    end,
+    fromSide,
+    toSide,
+    obstacles
+  );
 
   const svgPath = pointsToSvgPath(points);
   edge.__bcRouteSignature = signature;
