@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { loadNodeRuntimeModules } from "./node-runtime";
 
 export interface ACPChatMessage {
   role: string;
@@ -93,10 +94,9 @@ export async function runOpenCodeACP(
   if (!prompt.trim()) throw new Error("没有可发送给 OpenCode ACP 的文本内容。");
   if (options.signal?.aborted) throw abortError();
 
-  const [{ spawn }, { tmpdir }] = await Promise.all([
-    import("node:child_process"),
-    import("node:os")
-  ]);
+  const runtime = await loadNodeRuntimeModules();
+  const { spawn } = runtime.childProcess;
+  const { tmpdir } = runtime.os;
   if (options.signal?.aborted) throw abortError();
 
   const binary = options.binaryPath?.trim() || "opencode";
@@ -110,7 +110,7 @@ export async function runOpenCodeACP(
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
         // OpenCode is commonly installed as opencode.cmd on Windows.
-        shell: process.platform === "win32"
+        shell: runtime.process.platform === "win32"
       }) as ChildProcessWithoutNullStreams;
     } catch (error) {
       reject(error);
