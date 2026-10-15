@@ -1,6 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedPromptProfile } from "./prompt-profiles";
 import { modelCapabilityReportKey, type ModelCapabilityReport } from "./model-capabilities";
+import { parseProviderParamsJson } from "./provider-params";
 
 type SettingSection = {
   id: string;
@@ -372,6 +373,68 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           await this.saveProvider(profile, settings);
         }));
 
+      new Setting(card).setName("Temperature")
+        .setDesc("范围 0 到 2；留空或无效输入不会覆盖上一次有效值。")
+        .addText(text => {
+          text.inputEl.type = "number";
+          text.inputEl.min = "0";
+          text.inputEl.max = "2";
+          text.inputEl.step = "0.1";
+          text.setValue(String(typeof profile.temperature === "number" ? profile.temperature : 0.4))
+            .onChange(async value => {
+              if (!value.trim()) return;
+              const number = Number(value);
+              if (Number.isFinite(number) && number >= 0 && number <= 2) {
+                profile.temperature = number;
+                await this.saveProvider(profile, settings);
+              }
+            });
+        });
+
+      new Setting(card).setName("最大输出 token 数")
+        .setDesc("0 表示使用协议适配器默认值；只限制输出，不是模型上下文长度。")
+        .addText(text => {
+          text.inputEl.type = "number";
+          text.inputEl.min = "0";
+          text.inputEl.max = "200000";
+          text.inputEl.step = "1";
+          text.setValue(String(typeof profile.maxOutputTokens === "number" ? profile.maxOutputTokens : 0))
+            .onChange(async value => {
+              if (!value.trim()) return;
+              const number = Number(value);
+              if (Number.isInteger(number) && number >= 0 && number <= 200000) {
+                profile.maxOutputTokens = number;
+                await this.saveProvider(profile, settings);
+              }
+            });
+        });
+
+      const paramsStatus = card.createEl("p", { cls: "bc-settings-params-status" });
+      new Setting(card).setName("高级请求参数（JSON）")
+        .setDesc("额外参数按协议合并：OpenAI 兼容 / Anthropic 在请求顶层，Gemini 放入 generationConfig。核心字段与认证字段由插件保留。")
+        .addTextArea(text => {
+          text.inputEl.rows = 4;
+          text.inputEl.style.width = "100%";
+          text.setValue(String(profile.requestParamsJson || "{}"));
+          const validate = (value: string): void => {
+            try {
+              const parsed = parseProviderParamsJson(value);
+              paramsStatus.setText("JSON 有效：" + Object.keys(parsed).length + " 个额外字段。");
+              text.inputEl.removeAttribute("aria-invalid");
+            } catch (error) {
+              paramsStatus.setText(error instanceof Error ? error.message : "JSON 无效。");
+              text.inputEl.setAttribute("aria-invalid", "true");
+            }
+          };
+          validate(text.getValue());
+          text.onChange(async value => {
+            profile.requestParamsJson = value;
+            validate(value);
+            await this.saveProvider(profile, settings);
+          });
+        });
+
+
       const effectiveModel = profile.id === "default"
         ? String(settings.model || profile.model || "")
         : String(profile.model || "");
@@ -431,7 +494,10 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         baseUrl: "https://api.openai.com/v1",
         apiKey: "",
         model: "gpt-4o-mini",
-        imageModel: "gpt-image-1"
+        imageModel: "gpt-image-1",
+        requestParamsJson: "{}",
+        temperature: 0.4,
+        maxOutputTokens: 0
       };
       settings.providerProfiles.push(profile);
       settings.activeProviderId = profile.id;
