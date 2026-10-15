@@ -37,7 +37,7 @@ This matrix records Better Canvas implementation and parity gaps against the cur
 | Create an independent empty group | Implemented | Creates a standalone group node without requiring a selected node |
 | Auto-resize text nodes | Implemented, opt-in | Uses estimated text dimensions and DOM observers |
 | Align nodes to grid | Implemented | Grid size is configurable |
-| Per-node zoom breakpoints | Implemented, basic | Supports a stored per-node threshold and the `--variable-breakpoint` CSS variable |
+| Per-node zoom breakpoints | Implemented, corrected | Node and `--variable-breakpoint` thresholds are interpreted as linear zoom scale; Obsidian's logarithmic `canvas.zoom` value is converted with `2 ** zoom` before comparison. A node is hidden only below its threshold and remains visible at exact equality. Unit tests cover representative log/linear mappings; desktop/theme-specific `--variable-breakpoint` behavior still needs regression verification |
 | Canvas read-only / interaction lock | Implemented, basic | Blocks node/edge interaction but leaves the Canvas surface available; verify panning and zooming on desktop |
 | Collapse / expand group | Implemented, basic | Stores contained nodes and incident edges as extension data; restores node geometry and boundary edges, preserves already-collapsed nested groups, and skips restoring edges whose endpoints were deleted while collapsed. Clipboard semantics and complex overlapping groups still need manual testing |
 | Encapsulate selection into a new Canvas | Implemented | Re-bases moved nodes near the child Canvas origin, preserves internal edges and reconnects crossing edges to the new file node |
