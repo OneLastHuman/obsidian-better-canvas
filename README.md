@@ -26,24 +26,34 @@ Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思�
 
 ## 界面预览
 
-下图为功能示意图，不是 Obsidian 实际运行截图；实际界面会因 Obsidian 版本、主题及服务配置而异。
+以下截图在真实 Obsidian 桌面版中运行本插件的生产构建后直接截取，不是示意图。示例内容来自合成测试 Vault，不含真实笔记、凭据或 API Key；AI 截图的回答来自本地 mock 服务，未调用真实模型。采集环境与复现步骤见 [截图说明](docs/screenshots/README.md)。实际界面会因 Obsidian 版本、主题及服务配置而异。
+
+**Canvas 增强：** 节点颜色、形状、边框与文字对齐，以及带标签和颜色的连线。
 
 <p align="center">
-  <img src="docs/screenshots/canvas-enhancements.svg" alt="Canvas 节点样式与连线控制示意" width="100%" />
+  <img src="docs/screenshots/canvas-enhancements.png" alt="Canvas 中带颜色、形状、边框的节点与带标签连线，悬停节点时显示 AI、Img、卡片、模型按钮" width="100%" />
 </p>
 
 <table>
   <tr>
     <td width="50%" valign="top">
       <strong>思维导图</strong><br />
-      <img src="docs/screenshots/mind-map.svg" alt="思维导图创建与布局示意" width="100%" />
+      用“创建子节点 / 创建同级节点”生成节点树后执行“自动整理思维导图”。<br />
+      <img src="docs/screenshots/mind-map.png" alt="自动整理后的思维导图，根节点向右展开为多级分支，右上角提示已整理 9 个节点" width="100%" />
     </td>
     <td width="50%" valign="top">
       <strong>AI 工作流</strong><br />
-      <img src="docs/screenshots/ai-workflow.svg" alt="AI 问答与关联节点示意" width="100%" />
+      对选中节点提问后，回答保存为与来源节点相连的新节点。<br />
+      <img src="docs/screenshots/ai-workflow.png" alt="AI 生成的答案节点通过连线连接到来源节点，节点工具栏显示 AI、Img、卡片、模型与重新生成按钮" width="100%" />
     </td>
   </tr>
 </table>
+
+**导出：** “导出 Canvas 全内容 PNG”按所有节点边界渲染整张画布，不含界面控件，文件写入 Vault 后可在 Obsidian 中直接打开。
+
+<p align="center">
+  <img src="docs/screenshots/export.png" alt="Better Canvas 导出的整张 Canvas PNG，在 Obsidian 中打开后的静态图像结果" width="100%" />
+</p>
 
 ## 安装
 
