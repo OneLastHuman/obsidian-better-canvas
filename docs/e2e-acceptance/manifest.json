@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15T05:45:26.108Z",
+  "generatedAt": "2026-10-15T07:35:50.065Z",
   "testedCommit": "8c693e7530b882564654433eae47cc20f2cf61ba",
   "testedSubject": "build: refresh installable plugin bundle",
   "mainJsSha256": "b229962acc2b2cac2d7bd3cfb541e7f73775d6d11aaf29303e4697ba6cb26240",
@@ -107,6 +107,52 @@
       {
         "file": "02-toggle-closed.png",
         "caption": "执行关闭后镜像仍留在画布上"
+      }
+    ],
+    "79": [
+      {
+        "file": "01-ssrf-guard.png",
+        "caption": "导入网页正文成功绕过内网防护：本地 HTTP 服务被真实请求到，内容写入画布"
+      }
+    ],
+    "84": [
+      {
+        "file": "01-palette-generate-image.png",
+        "caption": "命令面板实际渲染：双层「Better Canvas: 」前缀，且两条完全无法区分的重复条目"
+      },
+      {
+        "file": "02-palette-e7949fe6.png",
+        "caption": "同一现象的复现截图（面板文本提取结果：Better CanvasBetter Canvas: 根据所选节点生成图片 × 2）"
+      }
+    ],
+    "86": [
+      {
+        "file": "01-pinned-pdf-render.png",
+        "caption": "分页卡片为空白页：加载失败状态、错误标题与纯白画布"
+      }
+    ],
+    "88": [
+      {
+        "file": "01-generate-image-invalid-payload.png",
+        "caption": "非图片负载被当作 .png 保存并插入节点，界面只显示成功提示"
+      }
+    ],
+    "89": [
+      {
+        "file": "01-encapsulate-root-path.png",
+        "caption": "Vault 根目录执行封装选区：文件已创建，但节点 file 字段为 //enc-single.canvas，节点打不开"
+      }
+    ],
+    "90": [
+      {
+        "file": "01-mcp-stdio-blocked.png",
+        "caption": "stdio MCP 传输失败：界面只显示内部错误字符串 Failed to fetch dynamically imported module: node:child_process"
+      }
+    ],
+    "91": [
+      {
+        "file": "01-html-preview-file-vs-text.png",
+        "caption": "同一份含 html 围栏的笔记：文本节点有预览（左侧），文件节点完全没有（右侧）"
       }
     ]
   }
