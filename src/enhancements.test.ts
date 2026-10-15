@@ -3,6 +3,7 @@ import {
   bestFloatingSide,
   routePointsForMethod,
   colorIncidentEdges,
+  selectAllCanvasEdges,
   decorateCanvas,
   flipIncidentEdges,
   normalizeNodeShape,
@@ -76,6 +77,30 @@ describe("flowchart shape normalization", () => {
   it("rejects unsupported shapes", () => {
     expect(normalizeNodeShape("unknown-shape")).toBeUndefined();
     expect(normalizeNodeShape("")).toBeUndefined();
+  });
+});
+
+describe("selectAllCanvasEdges", () => {
+  it("selects every live edge after clearing the prior selection", () => {
+    const selected: any[] = [{ id: "old-selection" }];
+    const edgeA = { id: "a" };
+    const edgeB = { id: "b" };
+    let deselected = false;
+    const canvas = {
+      edges: new Map([["a", edgeA], ["b", edgeB]]),
+      deselectAll: () => { deselected = true; selected.length = 0; },
+      select: (edge: any) => { selected.push(edge); }
+    };
+
+    expect(selectAllCanvasEdges(canvas)).toBe(2);
+    expect(deselected).toBe(true);
+    expect(selected).toEqual([edgeA, edgeB]);
+  });
+
+  it("returns zero without changing selection when no edges can be selected", () => {
+    const canvas = { edges: new Map(), select: () => undefined, deselectAll: () => { throw new Error("should not clear"); } };
+    expect(selectAllCanvasEdges(canvas)).toBe(0);
+    expect(selectAllCanvasEdges({ edges: new Map() })).toBe(0);
   });
 });
 
