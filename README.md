@@ -79,7 +79,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - 导入网页正文和可访问的 YouTube 字幕，作为后续整理与分析的素材。
 - 支持远程 **MCP Streamable HTTP**、旧式远程 **SSE** 和本地 MCP **stdio**。除工具调用外，还可浏览分页资源（resources/list）、读取资源（resources/read）、发现提示模板（prompts/list）并带参数解析模板（prompts/get）；结果写入 Canvas 节点，支持的图片内容另存为 Vault 附件。AI 工具建议仍需用户检查并确认；stdio 通过单独配置的 command/args/env/cwd 启动本地进程，按配置复用会话，空闲 5 分钟后关闭，插件卸载时清理；最多缓存 4 个本地服务会话。请只配置可信服务。
 - 可从 OpenAI-compatible、Anthropic 和 Gemini 的模型端点发现可用模型，并为单个节点选择模型；接口不支持列出模型时仍可手动输入。
-- 每个供应商 profile 可单独配置 Temperature、最大输出 token 数与高级请求参数 JSON。额外参数会按协议合并；核心请求字段与认证字段受到保护。输出 token 数不是模型上下文窗口长度，重试策略、上下文限制自动发现和成本限制仍未覆盖。
+- 每个供应商 profile 可单独配置 Temperature、最大输出 token 数与高级请求参数 JSON（仅用于 API 后端文本请求）。额外参数会按协议合并；核心请求字段与认证字段受到保护。输出 token 数不是模型上下文窗口长度，重试策略、上下文限制自动发现和成本限制仍未覆盖。
 - 每个 AI 服务商配置均可手动探测文本和图片输入：需确认后最多发送两次小型 API 请求，并保存当前 provider/model 的结果；图片输入成功只表示请求返回了内容，图片生成、PDF、视频、URL context 和搜索 grounding 等能力仍保持未知。
 - 桌面端可调用已安装并登录的 Codex CLI，在只读沙盒中分析选中节点和相邻上下文；任务可由“停止当前 AI 生成”中断，结果保存为关联节点。
 - 文本 AI 可选本机 OpenCode ACP：通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode 使用的模型与登录配置，不需要单独填写文本 API Key。
