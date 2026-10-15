@@ -14,6 +14,7 @@ import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
+import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
@@ -888,8 +889,10 @@ export default class BetterCanvasFeatures {
   }
 
   private applyZoomBreakpoints(canvas: any): void {
-    const zoom = Number(canvas?.zoom);
-    if (!Number.isFinite(zoom)) return;
+    // Obsidian Canvas exposes zoom in log2 units; plugin/CSS breakpoints use
+    // the human-facing linear scale (1 = 100%, 0.6 = 60%).
+    const scale = canvasScaleFromLogZoom(canvas?.zoom);
+    if (scale === undefined) return;
     for (const nodeData of readCanvasData(canvas).nodes) {
       const node = canvas?.nodes?.get?.(nodeData.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
@@ -902,7 +905,7 @@ export default class BetterCanvasFeatures {
         delete element.dataset.bcBreakpointHidden;
         continue;
       }
-      element.dataset.bcBreakpointHidden = String(zoom <= breakpoint);
+      element.dataset.bcBreakpointHidden = String(isBelowZoomBreakpoint(scale, breakpoint));
     }
   }
   private setNodeCustomClass(): void {
