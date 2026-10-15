@@ -11,10 +11,22 @@ export interface SvgMarkdownRun {
   style: SvgMarkdownRunStyle;
 }
 
+export interface SvgMarkdownTableCell {
+  lines: SvgMarkdownRun[][];
+  align: "left" | "center" | "right";
+}
+
+export interface SvgMarkdownTableRow {
+  cells: SvgMarkdownTableCell[];
+  isHeader: boolean;
+  lineCount: number;
+}
+
 export interface SvgMarkdownLine {
   runs: SvgMarkdownRun[];
   fontScale: number;
   bold: boolean;
+  tableRow?: SvgMarkdownTableRow;
 }
 
 function styleKey(style: SvgMarkdownRunStyle): string {
@@ -158,12 +170,74 @@ function wrapRuns(runs: SvgMarkdownRun[], maxChars: number): SvgMarkdownRun[][] 
   return lines;
 }
 
-interface BlockLine {
-  text: string;
-  fontScale: number;
-  bold: boolean;
-  code: boolean;
-  prefix?: string;
+export function wrapInlineMarkdownForSvg(
+  value: string,
+  maxChars: number,
+  inherited: SvgMarkdownRunStyle = {}
+): SvgMarkdownRun[][] {
+  const runs = parseInlineMarkdownForSvg(value.replace(/\\\|/g, "|"), inherited);
+  return wrapRuns(runs, Math.max(3, Math.floor(maxChars)));
+}
+
+type MarkdownBlock =
+  | {
+      kind: "text";
+      text: string;
+      fontScale: number;
+      bold: boolean;
+      code: boolean;
+      prefix?: string;
+    }
+  | {
+      kind: "table-row";
+      cells: string[];
+      alignments: Array<"left" | "center" | "right">;
+      header: boolean;
+    };
+
+function hasUnescapedTrailingPipe(value: string): boolean {
+  if (!value.endsWith("|")) return false;
+  let precedingBackslashes = 0;
+  for (let index = value.length - 2; index >= 0 && value[index] === "\\"; index -= 1) {
+    precedingBackslashes += 1;
+  }
+  return precedingBackslashes % 2 === 0;
+}
+
+function splitMarkdownTableCells(line: string): string[] {
+  const trimmed = line.trim();
+  let source = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
+  if (hasUnescapedTrailingPipe(source)) source = source.slice(0, -1);
+  const cells: string[] = [];
+  let current = "";
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "\\" && source[index + 1] === "|") {
+      current += "|";
+      index += 1;
+    } else if (char === "|") {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function markdownTableAlignment(separator: string): "left" | "center" | "right" {
+  const token = separator.trim();
+  const left = token.startsWith(":");
+  const right = token.endsWith(":");
+  if (left && right) return "center";
+  if (right) return "right";
+  return "left";
+}
+
+function isMarkdownTableSeparator(line: string): boolean {
+  const cells = splitMarkdownTableCells(line);
+  return cells.length >= 2 && cells.every(cell => /^:?-{3,}:?$/.test(cell));
 }
 
 /**
@@ -181,12 +255,15 @@ export function layoutMarkdownForSvg(
   const width = Math.max(8, Math.floor(maxChars));
   const lineLimit = Math.max(1, Math.floor(maxLines));
   const normalized = value.replace(/\r\n?/g, "\n");
-  const blocks: BlockLine[] = [];
+  const blocks: MarkdownBlock[] = [];
+  const sourceLines = normalized.split("\n");
   let inFence = false;
   let fenceChar = "";
   let fenceLength = 3;
+  let sourceIndex = 0;
 
-  for (const sourceLine of normalized.split("\n")) {
+  while (sourceIndex < sourceLines.length) {
+    const sourceLine = sourceLines[sourceIndex];
     const fence = sourceLine.match(/^\s*(\x60{3,}|~{3,})/);
     if (fence) {
       const marker = fence[1];
@@ -196,11 +273,47 @@ export function layoutMarkdownForSvg(
         fenceLength = marker.length;
       } else if (marker[0] === fenceChar && marker.length >= fenceLength) {
         inFence = false;
+        fenceChar = "";
+        fenceLength = 3;
       }
+      sourceIndex += 1;
       continue;
     }
     if (inFence) {
-      blocks.push({ text: sourceLine.replace(/[ \t]+$/g, ""), fontScale: 1, bold: false, code: true });
+      blocks.push({ kind: "text", text: sourceLine.replace(/[ \t]+$/g, ""), fontScale: 1, bold: false, code: true });
+      sourceIndex += 1;
+      continue;
+    }
+
+    const nextLine = sourceLines[sourceIndex + 1];
+    if (nextLine !== undefined && sourceLine.includes("|") && isMarkdownTableSeparator(nextLine)) {
+      const headerCells = splitMarkdownTableCells(sourceLine);
+      const separators = splitMarkdownTableCells(nextLine);
+      const columnCount = Math.max(headerCells.length, separators.length);
+      const alignments = Array.from({ length: columnCount }, (_, index) =>
+        markdownTableAlignment(separators[index] ?? "---")
+      );
+      while (headerCells.length < columnCount) headerCells.push("");
+      blocks.push({ kind: "table-row", cells: headerCells, alignments, header: true });
+      sourceIndex += 2;
+
+      while (sourceIndex < sourceLines.length) {
+        const rowLine = sourceLines[sourceIndex];
+        if (!rowLine.trim() || !rowLine.includes("|") || /^\s*(?:\x60{3,}|~{3,})/.test(rowLine)) break;
+        if (isMarkdownTableSeparator(rowLine)) {
+          sourceIndex += 1;
+          continue;
+        }
+        const cells = splitMarkdownTableCells(rowLine);
+        while (cells.length < columnCount) cells.push("");
+        blocks.push({
+          kind: "table-row",
+          cells: cells.slice(0, columnCount),
+          alignments,
+          header: false
+        });
+        sourceIndex += 1;
+      }
       continue;
     }
 
@@ -237,12 +350,36 @@ export function layoutMarkdownForSvg(
         }
       }
     }
-    blocks.push({ text: text.replace(/[ \t]+$/g, ""), fontScale, bold, code: false, prefix });
+    blocks.push({ kind: "text", text: text.replace(/[ \t]+$/g, ""), fontScale, bold, code: false, prefix });
+    sourceIndex += 1;
   }
 
   const output: SvgMarkdownLine[] = [];
+  let linesUsed = 0;
   let truncated = false;
   for (const block of blocks) {
+    if (block.kind === "table-row") {
+      const columnCount = Math.max(1, block.cells.length);
+      const cellMaxChars = Math.max(3, Math.floor(width / columnCount) - 2);
+      const cells: SvgMarkdownTableCell[] = block.cells.map((cell, index) => ({
+        lines: wrapInlineMarkdownForSvg(cell, cellMaxChars, block.header ? { bold: true } : {}),
+        align: block.alignments[index] ?? "left"
+      }));
+      const lineCount = Math.max(1, ...cells.map(cell => cell.lines.length));
+      if (linesUsed + lineCount > lineLimit) {
+        truncated = true;
+        break;
+      }
+      output.push({
+        runs: [],
+        fontScale: 1,
+        bold: false,
+        tableRow: { cells, isHeader: block.header, lineCount }
+      });
+      linesUsed += lineCount;
+      continue;
+    }
+
     let wrapped: SvgMarkdownRun[][];
     if (block.code) {
       wrapped = wrapCodeLine(block.text, width);
@@ -253,11 +390,12 @@ export function layoutMarkdownForSvg(
       wrapped = wrapRuns(runs, lineWidth);
     }
     for (const runs of wrapped) {
-      if (output.length >= lineLimit) {
+      if (linesUsed >= lineLimit) {
         truncated = true;
         break;
       }
       output.push({ runs, fontScale: block.fontScale, bold: block.bold });
+      linesUsed += 1;
     }
     if (truncated) break;
   }
@@ -265,9 +403,19 @@ export function layoutMarkdownForSvg(
   if (output.length === 0) return [];
   if (truncated) {
     const last = output[output.length - 1];
-    const lastRun = last.runs[last.runs.length - 1];
-    if (lastRun) lastRun.text = lastRun.text.replace(/\s+$/g, "") + "…";
-    else last.runs.push({ text: "…", style: {} });
+    if (last.tableRow) {
+      const lastCell = last.tableRow.cells[last.tableRow.cells.length - 1];
+      const cellLines = lastCell?.lines ?? [];
+      const lastLine = cellLines[cellLines.length - 1];
+      const lastRun = lastLine?.[lastLine.length - 1];
+      if (lastRun) lastRun.text = lastRun.text.replace(/\s+$/g, "") + "…";
+      else cellLines.push([{ text: "…", style: {} }]);
+      if (lastCell) lastCell.lines = cellLines;
+    } else {
+      const lastRun = last.runs[last.runs.length - 1];
+      if (lastRun) lastRun.text = lastRun.text.replace(/\s+$/g, "") + "…";
+      else last.runs.push({ text: "…", style: {} });
+    }
   }
   return output;
 }
