@@ -31,6 +31,7 @@ import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { readCanvasFrontmatter, replaceCanvasFrontmatter } from "./canvas-frontmatter";
 import { parsePdfPageSelection } from "./pdf-range";
 import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
+import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
@@ -923,7 +924,8 @@ export default class BetterCanvasFeatures {
         : event.key === "ArrowRight" ? "right"
         : event.key === "ArrowUp" ? "up"
         : event.key === "ArrowDown" ? "down" : "";
-      if (!direction || !(event.ctrlKey || event.metaKey)) return;
+      if (!direction || !(event.ctrlKey || event.metaKey) ||
+          !isMindMapShortcutEnabled(this.settings(), "directionalCtrlArrow")) return;
       const selected = this.selected(canvas);
       if (!selected) return;
       event.preventDefault();
