@@ -239,42 +239,102 @@ function wrapNodeText(node: CanvasNodeData, clipId: string): string {
     "</text>";
 }
 
+function boxPolygonPoints(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  points: Array<[number, number]>
+): string {
+  return points.map(([px, py]) => (x + px * width) + "," + (y + py * height)).join(" ");
+}
+
 function renderNode(node: CanvasNodeData, index: number): string {
   const x = number(node.x), y = number(node.y);
   const width = Math.max(1, number(node.width, 280)), height = Math.max(1, number(node.height, 140));
   const attrs = (node as any).styleAttributes ?? {};
-  const shape = String(attrs.shape ?? (node as any).shape ?? "rectangle").toLowerCase();
+  const shape = String(attrs.shape ?? (node as any).bcShape ?? (node as any).shape ?? "rectangle").toLowerCase();
   const fill = nodeColor(node);
   const border = String(attrs.borderColor ?? "#858b93");
-  const borderStyle = String(attrs.borderStyle ?? "");
+  const borderStyle = String((node as any).bcBorderStyle ?? attrs.borderStyle ?? attrs.border ?? "");
   const dash = borderStyle.includes("dash") ? ' stroke-dasharray="8 5"' : borderStyle.includes("dot") ? ' stroke-dasharray="2 5"' : "";
   const stroke = borderStyle === "invisible" ? "none" : border;
   const clipId = "bc-clip-" + index;
   const clip = "";
 
   let geometry: string;
+  const strokeWidth = 1.5;
+  const polygon = (points: Array<[number, number]>): string =>
+    '<polygon points="' + boxPolygonPoints(x, y, width, height, points) + '" fill="' + fill +
+    '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
   if (node.type === "group") {
     geometry = '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height +
       '" rx="4" fill="' + (fill === "none" ? "#9aa3ad" : fill) + '" fill-opacity="0.10" stroke="' + stroke +
       '" stroke-width="1.6"' + dash + "/>";
-  } else if (shape.includes("ellipse") || shape.includes("circle") || shape.includes("terminal")) {
+  } else if (["ellipse", "circle", "reference"].includes(shape)) {
     geometry = '<ellipse cx="' + (x + width / 2) + '" cy="' + (y + height / 2) + '" rx="' + width / 2 +
-      '" ry="' + height / 2 + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"' + dash + "/>";
-  } else if (shape.includes("diamond") || shape.includes("decision")) {
-    geometry = '<polygon points="' + polygonPoints(x, y, width, height, 4, 0) + '" fill="' + fill +
-      '" stroke="' + stroke + '" stroke-width="1.5"' + dash + "/>";
-  } else if (shape.includes("hexagon")) {
-    geometry = '<polygon points="' + polygonPoints(x, y, width, height, 6) + '" fill="' + fill +
-      '" stroke="' + stroke + '" stroke-width="1.5"' + dash + "/>";
-  } else if (shape.includes("parallelogram") || shape.includes("input")) {
-    const inset = Math.min(24, width * 0.16);
-    geometry = '<polygon points="' + (x + inset) + "," + y + " " + (x + width) + "," + y + " " +
-      (x + width - inset) + "," + (y + height) + " " + x + "," + (y + height) +
-      '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"' + dash + "/>";
+      '" ry="' + height / 2 + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
+  } else if (["pill", "terminal"].includes(shape)) {
+    geometry = '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height +
+      '" rx="' + Math.min(width / 2, height / 2) + '" fill="' + fill + '" stroke="' + stroke +
+      '" stroke-width="' + strokeWidth + '"' + dash + "/>";
+  } else if (["diamond", "decision"].includes(shape)) {
+    geometry = polygon([[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]]);
+  } else if (shape === "hexagon") {
+    geometry = polygon([[0.25, 0], [0.75, 0], [1, 0.5], [0.75, 1], [0.25, 1], [0, 0.5]]);
+  } else if (shape === "pentagon") {
+    geometry = polygon([[0.5, 0], [1, 0.38], [0.82, 1], [0.18, 1], [0, 0.38]]);
+  } else if (shape === "octagon") {
+    geometry = polygon([[0.28, 0], [0.72, 0], [1, 0.28], [1, 0.72], [0.72, 1], [0.28, 1], [0, 0.72], [0, 0.28]]);
+  } else if (shape === "triangle") {
+    geometry = polygon([[0.5, 0], [1, 1], [0, 1]]);
+  } else if (shape === "trapezoid") {
+    geometry = polygon([[0.2, 0], [0.8, 0], [1, 1], [0, 1]]);
+  } else if (shape === "chevron") {
+    geometry = polygon([[0, 0], [0.78, 0], [1, 0.5], [0.78, 1], [0, 1], [0.22, 0.5]]);
+  } else if (shape === "cloud") {
+    geometry = polygon([
+      [0.22, 0.18], [0.28, 0.05], [0.44, 0.08], [0.55, 0.02], [0.69, 0.13],
+      [0.84, 0.11], [0.94, 0.27], [0.9, 0.43], [1, 0.55], [0.88, 0.72],
+      [0.84, 0.87], [0.66, 0.91], [0.53, 1], [0.38, 0.91], [0.22, 0.94],
+      [0.12, 0.78], [0, 0.7], [0.07, 0.51], [0.02, 0.35], [0.12, 0.2]
+    ]);
+  } else if (shape === "parallelogram" || shape === "input-output") {
+    geometry = polygon([[0.14, 0], [1, 0], [0.86, 1], [0, 1]]);
+  } else if (shape === "document") {
+    const d = [
+      "M", x, y,
+      "L", x + width, y,
+      "L", x + width, y + height * 0.88,
+      "C", x + width * 0.84, y + height * 0.98, x + width * 0.72, y + height * 0.82, x + width * 0.6, y + height * 0.9,
+      "C", x + width * 0.46, y + height * 0.98, x + width * 0.34, y + height * 0.82, x + width * 0.2, y + height * 0.9,
+      "C", x + width * 0.1, y + height * 0.95, x + width * 0.05, y + height * 0.9, x, y + height * 0.9,
+      "Z"
+    ].join(" ");
+    geometry = '<path d="' + d + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
+  } else if (shape === "database") {
+    const ry = Math.min(height * 0.14, 16);
+    const d = [
+      "M", x, y + ry,
+      "C", x, y - ry, x + width, y - ry, x + width, y + ry,
+      "L", x + width, y + height - ry,
+      "C", x + width, y + height + ry, x, y + height + ry, x, y + height - ry,
+      "Z"
+    ].join(" ");
+    const topArc = ["M", x, y + ry, "C", x, y + ry * 3, x + width, y + ry * 3, x + width, y + ry].join(" ");
+    geometry = '<path d="' + d + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>" +
+      '<path d="' + topArc + '" fill="none" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
+  } else if (shape === "predefined-process") {
+    const inset = Math.min(12, width * 0.12);
+    geometry = '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height +
+      '" rx="4" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>" +
+      '<path d="M ' + (x + inset) + " " + y + " V " + (y + height) + " M " +
+      (x + width - inset) + " " + y + " V " + (y + height) +
+      '" fill="none" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
   } else {
     const radius = shape.includes("round") ? 22 : 7;
     geometry = '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height +
-      '" rx="' + radius + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.5"' + dash + "/>";
+      '" rx="' + radius + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
   }
 
   const text = wrapNodeText(node, clipId);
