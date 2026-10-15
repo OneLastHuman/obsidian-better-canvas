@@ -1249,6 +1249,151 @@ export default class BetterCanvasFeatures {
     });
   }
 
+  private async materializeCanvasLinks(
+    view: any,
+    sourcePath: string,
+    outgoing: CanvasLinkExplorerEntry[],
+    incoming: CanvasLinkExplorerEntry[]
+  ): Promise<void> {
+    const canvas = view?.canvas;
+    if (!canvas || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 不可编辑，未添加链接节点。");
+      return;
+    }
+
+    const latest = readCanvasData(canvas);
+    const resolvePath = (rawPath: string, linkSourcePath: string): string => {
+      const resolved = this.p.app.metadataCache.getFirstLinkpathDest(rawPath, linkSourcePath);
+      if (resolved?.path) return resolved.path;
+      const direct = this.p.app.vault.getAbstractFileByPath(rawPath);
+      return direct instanceof TFile ? direct.path : rawPath;
+    };
+    const normalizeEntry = (entry: CanvasLinkExplorerEntry): CanvasLinkExplorerEntry => {
+      if (entry.external) return { ...entry, target: new URL(entry.target).toString() };
+      const hashIndex = entry.target.indexOf("#");
+      const rawPath = (hashIndex >= 0 ? entry.target.slice(0, hashIndex) : entry.target).trim();
+      const subpath = hashIndex >= 0 ? entry.target.slice(hashIndex + 1).trim() : "";
+      const resolvedPath = resolvePath(rawPath, entry.sourcePath);
+      return { ...entry, target: resolvedPath + (subpath ? "#" + subpath : "") };
+    };
+
+    const existingKeys: string[] = [];
+    for (const node of latest.nodes) {
+      if (node.type === "link" && typeof node.url === "string") {
+        const key = materializableLinkKey(node.url, true);
+        if (key) existingKeys.push(key);
+      } else if (node.type === "file" && typeof node.file === "string") {
+        const path = resolvePath(node.file, sourcePath);
+        const subpath = typeof (node as any).subpath === "string"
+          ? String((node as any).subpath).replace(/^#/, "")
+          : "";
+        const key = materializableLinkKey(path + (subpath ? "#" + subpath : ""));
+        if (key) existingKeys.push(key);
+      }
+    }
+
+    const normalizedEntries: CanvasLinkExplorerEntry[] = [];
+    for (const entry of [...outgoing, ...incoming]) {
+      try {
+        normalizedEntries.push(normalizeEntry(entry));
+      } catch {
+        // Ignore invalid external links instead of creating unsafe URL nodes.
+      }
+    }
+    const unique = dedupeMaterializableCanvasLinks(normalizedEntries, existingKeys);
+    if (!unique.length) {
+      new Notice("没有新的链接可添加：目标可能已存在于画布中，或链接无效。");
+      return;
+    }
+
+    const limit = 100;
+    const selectedId = canvas.selection?.size === 1
+      ? canvas.selection.values().next().value?.id as string | undefined
+      : undefined;
+    const validNodeIds = new Set(latest.nodes.map((node: CanvasNodeData) => node.id));
+    const minY = latest.nodes.length ? Math.min(...latest.nodes.map((node: CanvasNodeData) => node.y)) : 0;
+    const maxX = latest.nodes.length
+      ? Math.max(...latest.nodes.map((node: CanvasNodeData) => node.x + node.width))
+      : 0;
+    const startX = maxX + 100;
+    const newNodes: CanvasNodeData[] = [];
+    const newEdges: CanvasEdgeData[] = [];
+    const planned = unique.slice(0, limit);
+
+    for (let index = 0; index < planned.length; index++) {
+      const entry = planned[index];
+      const x = startX;
+      const y = minY + index * 180;
+      let node: CanvasNodeData;
+      if (entry.external) {
+        const url = new URL(entry.target);
+        if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+        node = {
+          id: createId(),
+          type: "link",
+          url: url.toString(),
+          x, y,
+          width: 300,
+          height: 100
+        } as CanvasNodeData;
+      } else {
+        const hashIndex = entry.target.indexOf("#");
+        const rawPath = hashIndex >= 0 ? entry.target.slice(0, hashIndex) : entry.target;
+        const subpath = hashIndex >= 0 ? entry.target.slice(hashIndex + 1).trim() : "";
+        const resolvedPath = resolvePath(rawPath, sourcePath);
+        const destination = this.p.app.vault.getAbstractFileByPath(resolvedPath);
+        if (destination instanceof TFile) {
+          node = {
+            id: createId(),
+            type: "file",
+            file: destination.path,
+            ...(subpath ? { subpath } : {}),
+            x, y,
+            width: 300,
+            height: 160
+          } as CanvasNodeData;
+        } else {
+          const body = entry.title + "\n\n[[" + entry.target + "]]" +
+            (entry.detail ? "\n\n来源：" + entry.detail : "");
+          node = makeTextNode(body, x, y, {
+            width: 320,
+            height: Math.max(140, Math.min(320, Math.ceil(body.length / 36) * 24))
+          });
+        }
+      }
+      newNodes.push(node);
+
+      const sourceNodeId = entry.sourceNodeId ??
+        (!entry.external && selectedId && !validNodeIds.has(node.id) ? selectedId : undefined);
+      if (sourceNodeId && validNodeIds.has(sourceNodeId)) {
+        newEdges.push({
+          id: createId(),
+          fromNode: sourceNodeId,
+          fromSide: "right",
+          toNode: node.id,
+          toSide: "left"
+        });
+      }
+    }
+
+    if (!newNodes.length) {
+      new Notice("没有可创建的链接节点。");
+      return;
+    }
+    canvas.importData({
+      ...latest,
+      nodes: [...latest.nodes, ...newNodes],
+      edges: [...latest.edges, ...newEdges]
+    });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    new Notice(
+      "已添加 " + newNodes.length + " 个链接节点" +
+      (unique.length > newNodes.length ? "；另外 " + (unique.length - newNodes.length) + " 个链接因无效或单次上限未添加" : "") +
+      "。"
+    );
+  }
+
   private async openCanvasLinkExplorer(materializeLinks = false): Promise<void> {
     const view = this.activeCanvasView();
     const canvas = view?.canvas;
@@ -1402,6 +1547,10 @@ export default class BetterCanvasFeatures {
     }
 
     loading.hide();
+    if (materializeLinks) {
+      await this.materializeCanvasLinks(view, sourcePath, outgoing, incoming.slice(0, 250));
+      return;
+    }
     new CanvasLinkExplorerModal(
       this.p.app,
       sourcePath,
