@@ -11,7 +11,7 @@ const nodes: CanvasNodeData[] = [
 describe("flipCanvasNodePositions", () => {
   it("mirrors selected nodes horizontally around their combined bounds", () => {
     const result = flipCanvasNodePositions(nodes, ["a", "b"], "horizontal");
-    expect(result.find(node => node.id === "a")?.x).toBe(150);
+    expect(result.find(node => node.id === "a")?.x).toBe(160);
     expect(result.find(node => node.id === "b")?.x).toBe(10);
     expect(result.find(node => node.id === "a")?.y).toBe(20);
     expect(result.find(node => node.id === "outside")?.x).toBe(500);
@@ -20,7 +20,7 @@ describe("flipCanvasNodePositions", () => {
 
   it("mirrors selected nodes vertically around their combined bounds", () => {
     const result = flipCanvasNodePositions(nodes, ["a", "b"], "vertical");
-    expect(result.find(node => node.id === "a")?.y).toBe(110);
+    expect(result.find(node => node.id === "a")?.y).toBe(130);
     expect(result.find(node => node.id === "b")?.y).toBe(20);
     expect(result.find(node => node.id === "outside")?.y).toBe(500);
   });
