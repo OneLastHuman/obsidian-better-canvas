@@ -23,6 +23,47 @@ describe("full content SVG export", () => {
     expect(result.svg).toContain("<polygon");
   });
 
+  it("exports custom arrow shapes at both edge ends using the edge color", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [
+        { id: "a", type: "text", x: 0, y: 0, width: 100, height: 80, text: "A" },
+        { id: "b", type: "text", x: 220, y: 0, width: 100, height: 80, text: "B" }
+      ],
+      edges: [{
+        id: "e", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left",
+        color: "#ff0000", bcArrowStyle: "diamond", fromEnd: "arrow", toEnd: "arrow"
+      }]
+    });
+    expect(result.svg).toContain('marker-start="url(#bc-arrow-0-start)"');
+    expect(result.svg).toContain('marker-end="url(#bc-arrow-0-end)"');
+    expect(result.svg).toContain('fill="#ff0000"');
+    expect(result.svg).toContain("M1 6 L6 1 L11 6 L6 11 Z");
+  });
+
+  it("does not render arrow markers when the saved arrow style is none", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [
+        { id: "a", type: "text", x: 0, y: 0, width: 100, height: 80, text: "A" },
+        { id: "b", type: "text", x: 220, y: 0, width: 100, height: 80, text: "B" }
+      ],
+      edges: [{
+        id: "e", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left",
+        bcArrowStyle: "none", styleAttributes: { arrow: "triangle" }, fromEnd: "none", toEnd: "none"
+      }]
+    });
+    expect(result.svg).not.toContain("marker-start");
+    expect(result.svg).not.toContain("marker-end");
+  });
+
+  it("does not append a truncation ellipsis just because words wrap at spaces", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{ id: "a", type: "text", x: 0, y: 0, width: 180, height: 220, text: "alpha beta gamma delta epsilon zeta" }],
+      edges: []
+    });
+    expect(result.svg).toContain("epsilon zeta");
+    expect(result.svg).not.toContain("epsilon zeta…");
+  });
+
   it("embeds a bounded raster image when export data includes a data URL", () => {
     const result = canvasDataToFullSvg({
       nodes: [{

@@ -56,28 +56,50 @@ function nodeText(node: CanvasNodeData): string {
 
 function wrapLines(value: string, maxChars: number, maxLines: number): string[] {
   const result: string[] = [];
-  for (const paragraph of value.replace(/\r/g, "").split("\n")) {
-    if (!paragraph) {
+  const paragraphs = value.replace(/\r/g, "").split("\n");
+  let truncated = false;
+
+  for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
+    let remaining = paragraphs[paragraphIndex];
+    if (!remaining) {
+      if (result.length >= maxLines) {
+        truncated = true;
+        break;
+      }
       result.push("");
       continue;
     }
-    // Character-count wrapping is deterministic and also works reasonably for CJK text.
-    let remaining = paragraph;
+
     while (remaining.length > maxChars) {
       let breakAt = remaining.lastIndexOf(" ", maxChars);
       if (breakAt < Math.floor(maxChars * 0.55)) breakAt = maxChars;
       result.push(remaining.slice(0, breakAt).trimEnd());
       remaining = remaining.slice(breakAt).trimStart();
-      if (result.length >= maxLines) break;
+      if (result.length >= maxLines) {
+        truncated = Boolean(remaining) || paragraphIndex < paragraphs.length - 1;
+        break;
+      }
     }
-    if (result.length < maxLines && remaining) result.push(remaining);
-    if (result.length >= maxLines) break;
+    if (truncated) break;
+
+    if (remaining && result.length < maxLines) result.push(remaining);
+    else if (remaining) {
+      truncated = true;
+      break;
+    }
+
+    if (result.length >= maxLines && paragraphIndex < paragraphs.length - 1) {
+      truncated = true;
+      break;
+    }
   }
+
   if (result.length === 0) result.push("");
-  if (result.length > maxLines) result.length = maxLines;
-  const joined = result.join("\n");
-  if (joined.length < value.length && result.length) {
-    result[result.length - 1] = result[result.length - 1].replace(/.{0,3}$/, "…");
+  if (truncated) {
+    const index = result.length - 1;
+    result[index] = (result[index].length >= maxChars
+      ? result[index].slice(0, Math.max(0, maxChars - 1))
+      : result[index]) + "…";
   }
   return result;
 }
@@ -99,6 +121,53 @@ function edgeSides(from: CanvasNodeData, to: CanvasNodeData): [string, string] {
   return dy >= 0 ? ["bottom", "top"] : ["top", "bottom"];
 }
 
+function arrowStyleFor(edge: CanvasEdgeData): string {
+  const attrs = (edge as any).styleAttributes ?? {};
+  const raw = String((edge as any).bcArrowStyle ?? attrs.arrow ?? "default");
+  if (raw === "triangle") return "default";
+  if (raw === "halved-triangle") return "half-triangle";
+  return [
+    "default", "triangle-outline", "half-triangle", "thin-triangle",
+    "diamond", "diamond-outline", "circle", "circle-outline", "blunt", "none"
+  ].includes(raw) ? raw : "default";
+}
+
+function arrowMarker(id: string, style: string, color: string): string {
+  let path = "M1 1 L11 6 L1 11 Z";
+  let fill = color;
+  let stroke = color;
+  let strokeWidth = 1;
+  if (style === "triangle-outline") {
+    fill = "none";
+    strokeWidth = 1.4;
+  } else if (style === "half-triangle") {
+    path = "M1 1 L11 6 L1 11 Z M1 1 L1 11";
+    strokeWidth = 1.2;
+  } else if (style === "thin-triangle") {
+    path = "M1 1 L11 6 L1 11";
+    fill = "none";
+    strokeWidth = 1.5;
+  } else if (style === "diamond" || style === "diamond-outline") {
+    path = "M1 6 L6 1 L11 6 L6 11 Z";
+    if (style === "diamond-outline") fill = "none";
+  } else if (style === "circle" || style === "circle-outline") {
+    const circle = '<circle cx="6" cy="6" r="4.3" fill="' +
+      (style === "circle-outline" ? "none" : xml(color)) + '" stroke="' + xml(color) +
+      '" stroke-width="' + (style === "circle-outline" ? "1.4" : "1") + '"/>';
+    return '<marker id="' + xml(id) +
+      '" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" viewBox="0 0 12 12" refX="10" refY="6" orient="auto-start-reverse">' +
+      circle + "</marker>";
+  } else if (style === "blunt") {
+    path = "M8 1 L8 11";
+    fill = "none";
+    strokeWidth = 2;
+  }
+  return '<marker id="' + xml(id) +
+    '" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" viewBox="0 0 12 12" refX="10" refY="6" orient="auto-start-reverse">' +
+    '<path d="' + path + '" fill="' + fill + '" stroke="' + xml(stroke) +
+    '" stroke-width="' + strokeWidth + '" stroke-linejoin="round" stroke-linecap="round"/></marker>';
+}
+
 function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, index: number): string {
   const from = nodes.get(edge.fromNode);
   const to = nodes.get(edge.toNode);
@@ -106,14 +175,38 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
   const sides = edgeSides(from, to);
   const start = sidePoint(from, String(edge.fromSide || sides[0]), true);
   const end = sidePoint(to, String(edge.toSide || sides[1]), false);
-  const style = String((edge as any).styleAttributes?.lineStyle ?? (edge as any).style ?? "");
+  const attrs = (edge as any).styleAttributes ?? {};
+  const style = String(attrs.lineStyle ?? (edge as any).style ?? "");
   const dash = style.includes("dot") ? "2 5" : style.includes("dash") ? "8 5" : "";
-  const arrow = String((edge as any).styleAttributes?.endArrowhead ?? (edge as any).toEnd ?? "arrow");
-  const marker = arrow === "none" || arrow === "null" ? "" : ' marker-end="url(#bc-arrow)"';
+  const rawArrowStyle = (edge as any).bcArrowStyle ?? attrs.arrow;
+  const arrowStyle = arrowStyleFor(edge);
+  const noArrows = String(rawArrowStyle ?? "").toLowerCase() === "none";
+  const fromEnd = String((edge as any).fromEnd ?? attrs.startArrowhead ?? "");
+  const toEnd = String((edge as any).toEnd ?? attrs.endArrowhead ?? "");
+  const startVisible = !noArrows && (fromEnd
+    ? fromEnd !== "none" && fromEnd !== "null"
+    : Boolean(rawArrowStyle));
+  const endVisible = !noArrows && (toEnd
+    ? toEnd !== "none" && toEnd !== "null"
+    : true);
+  const color = edgeColor(edge);
+  const markers: string[] = [];
+  const markerAttrs: string[] = [];
+  if (startVisible && arrowStyle !== "none") {
+    const id = "bc-arrow-" + index + "-start";
+    markers.push(arrowMarker(id, arrowStyle, color));
+    markerAttrs.push(' marker-start="url(#' + id + ')"');
+  }
+  if (endVisible && arrowStyle !== "none") {
+    const id = "bc-arrow-" + index + "-end";
+    markers.push(arrowMarker(id, arrowStyle, color));
+    markerAttrs.push(' marker-end="url(#' + id + ')"');
+  }
   const d = "M " + start.x + " " + start.y + " L " + end.x + " " + end.y;
-  return '<path id="bc-edge-' + index + '" d="' + xml(d) + '" fill="none" stroke="' + xml(edgeColor(edge)) +
+  return (markers.length ? "<defs>" + markers.join("") + "</defs>" : "") +
+    '<path id="bc-edge-' + index + '" d="' + xml(d) + '" fill="none" stroke="' + xml(color) +
     '" stroke-width="2" stroke-linecap="round"' +
-    (dash ? ' stroke-dasharray="' + dash + '"' : "") + marker + "/>";
+    (dash ? ' stroke-dasharray="' + dash + '"' : "") + markerAttrs.join("") + "/>";
 }
 
 function polygonPoints(x: number, y: number, w: number, h: number, sides: number, rotate = -Math.PI / 2): string {
