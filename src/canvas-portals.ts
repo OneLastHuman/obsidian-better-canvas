@@ -28,6 +28,22 @@ function isMirrorNode(node: any): boolean {
   return Boolean(mirrorInfo(node?.id));
 }
 
+/** Detect an open Portal whose frame moved before its mirrored coordinates were rebuilt. */
+export function hasMovedOpenPortal(
+  previousPositions: ReadonlyMap<string, { x: number; y: number }> | undefined,
+  nodes: CanvasNodeData[]
+): boolean {
+  if (!previousPositions) return false;
+  return nodes.some(node => {
+    if (!isCanvasFileNode(node) || (node as any).portal !== true) return false;
+    const previous = previousPositions.get(node.id);
+    return Boolean(previous && (
+      Math.abs(node.x - previous.x) > 0.5 ||
+      Math.abs(node.y - previous.y) > 0.5
+    ));
+  });
+}
+
 function isCanvasFileNode(node: any): node is CanvasNodeData {
   return node?.type === "file" && typeof node.file === "string" && node.file.toLowerCase().endsWith(".canvas");
 }
@@ -135,6 +151,7 @@ export class CanvasPortalManager {
   private signatures = new WeakMap<object, string>();
   private writingFiles = new Map<string, any>();
   private lastPortalPositions = new WeakMap<object, Map<string, { x: number; y: number }>>();
+  private portalRefreshInProgress = new WeakSet<object>();
   private readyPortalIds = new WeakMap<object, Set<string>>();
   private lastNodeIds = new WeakMap<object, Set<string>>();
   private adoptionInFlight = new WeakSet<object>();
@@ -163,6 +180,7 @@ export class CanvasPortalManager {
         .setIcon("plus")
         .onClick(() => this.promptForTextNodeInPortal(String(node?.id ?? nodeData.id))));
     }));
+
 
     this.plugin.registerEvent(this.plugin.app.workspace.on("layout-change", () => {
       void this.refreshAll();
@@ -337,13 +355,23 @@ export class CanvasPortalManager {
     };
     const nextSignature = await this.buildSignature(view, nextData.nodes.filter((node: CanvasNodeData) => !isMirrorNode(node)), portalNodes);
     if (JSON.stringify(readCanvasData(view.canvas)) !== JSON.stringify(nextData)) {
+      this.portalRefreshInProgress.add(view);
       try {
         view.canvas.importData(nextData);
+        const positions = new Map<string, { x: number; y: number }>();
+        for (const portalNode of portalNodes) {
+          positions.set(portalNode.id, { x: portalNode.x, y: portalNode.y });
+        }
+        // Update the offset baseline only after the mirror refresh has succeeded,
+        // but before requestSave can invoke the patched serializer.
+        this.lastPortalPositions.set(view, positions);
         view.canvas.requestFrame?.();
         view.canvas.requestSave?.();
       } catch (error) {
         console.warn("Better Canvas portal refresh failed:", error);
         return;
+      } finally {
+        this.portalRefreshInProgress.delete(view);
       }
     }
     this.signatures.set(view, nextSignature);
@@ -433,41 +461,41 @@ export class CanvasPortalManager {
     const container = view?.containerEl as HTMLElement | undefined;
     if (!(container instanceof HTMLElement) || this.boundViews.has(container)) return;
     this.boundViews.add(container);
-    let pendingPortalMove: { id: string; x: number; y: number } | null = null;
     let pointerDownNodeIds = new Set<string>();
+    let pointerDownPortalPositions = new Map<string, { x: number; y: number }>();
 
     const onPointerDown = () => {
-      pendingPortalMove = null;
       const canvas = view?.canvas;
-      pointerDownNodeIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
-      const selection = canvas?.selection;
-      if (!selection || selection.size !== 1) return;
-      const selected = selection.values().next().value;
-      const id = selected?.id;
-      if (typeof id !== "string" || mirrorInfo(id)) return;
-      const node = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === id) as any;
-      if (node && isCanvasFileNode(node) && node.portal === true) {
-        pendingPortalMove = { id, x: node.x, y: node.y };
-      }
+      const data = readCanvasData(canvas);
+      pointerDownNodeIds = new Set(data.nodes.map((node: CanvasNodeData) => node.id));
+      // Snapshot every open Portal, not just the selected node. Obsidian can
+      // drag an unselected Portal frame, so selection is not a reliable guard.
+      pointerDownPortalPositions = new Map(
+        data.nodes
+          .filter((node: any) => isCanvasFileNode(node) && node.portal === true)
+          .map((node: CanvasNodeData): [string, { x: number; y: number }] => [node.id, { x: node.x, y: node.y }])
+      );
     };
 
     const onPointerUp = () => {
       window.setTimeout(async () => {
         const canvas = view?.canvas;
         if (!canvas) return;
-        const liveIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
+        const liveData = readCanvasData(canvas);
+        const liveIds = new Set(liveData.nodes.map((node: CanvasNodeData) => node.id));
         const createdIds = new Set([...liveIds].filter(id => !pointerDownNodeIds.has(id) && !mirrorInfo(id)));
         if (createdIds.size) await this.adoptCreatedNodesInsidePortals(view, createdIds);
-        const movedPortal = pendingPortalMove && readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === pendingPortalMove?.id);
-        if (pendingPortalMove && movedPortal &&
-            (Math.abs(movedPortal.x - pendingPortalMove.x) > 0.5 || Math.abs(movedPortal.y - pendingPortalMove.y) > 0.5)) {
+
+        // If a frame moved, rebuild from the source before any write-back. Using
+        // the new frame offset with old mirror coordinates shifts the source file.
+        if (hasMovedOpenPortal(pointerDownPortalPositions, readCanvasData(canvas).nodes)) {
           await this.refreshView(view, true);
         } else {
           await this.syncPortalFiles(view);
           await this.refreshView(view);
         }
         pointerDownNodeIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
-        pendingPortalMove = null;
+        pointerDownPortalPositions = new Map();
       }, 50);
     };
 
@@ -675,9 +703,15 @@ export class CanvasPortalManager {
 
   private async syncPortalFiles(view: any): Promise<void> {
     const canvas = view?.canvas;
-    if (!canvas || this.stopped) return;
+    if (!canvas || this.stopped || this.portalRefreshInProgress.has(view)) return;
     const data = readCanvasData(canvas);
     const portalNodes = data.nodes.filter((node: any) => isCanvasFileNode(node) && node.portal === true);
+    if (hasMovedOpenPortal(this.lastPortalPositions.get(view), data.nodes)) {
+      // A save may race ahead of pointerup. Never write old mirrored coordinates
+      // using the new frame origin; rebuild the mirrors first, then allow saves.
+      await this.refreshView(view, true);
+      return;
+    }
     const ready = this.readyPortalIds.get(view) ?? new Set<string>();
     for (const portalNode of portalNodes) {
       if (!ready.has(portalNode.id)) continue;
@@ -737,6 +771,166 @@ export class CanvasPortalManager {
         this.writingFiles.delete(file.path);
       }
     }
+  }
+
+  /**
+   * Add a real text node to the source canvas backing a Portal. New content is
+   * written to the source .canvas file, then the live Portal mirrors are rebuilt.
+   * This avoids confusing arbitrary nodes in the parent canvas with Portal-owned
+   * nodes and gives users an explicit, reversible creation path.
+   */
+  async addTextNodeToPortal(text: string, portalNodeId?: string): Promise<void> {
+    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
+    const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
+    if (!canvas || !view) {
+      new Notice("请先打开包含 Canvas Portal 的画布。");
+      return;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。");
+      return;
+    }
+
+    const selection = canvas.selection;
+    const selectedId = portalNodeId ?? (selection?.size === 1 ? selection.values().next().value?.id : undefined);
+    if (typeof selectedId !== "string") {
+      new Notice("请只选择一个指向 .canvas 文件的节点。");
+      return;
+    }
+
+    const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
+    if (!isCanvasFileNode(portalNode)) {
+      new Notice("所选节点不是 Canvas 文件节点。");
+      return;
+    }
+    if (view.file?.path === portalNode.file) {
+      new Notice("不能向当前画布自身的 Portal 写入节点。");
+      return;
+    }
+
+    const content = text.trim();
+    if (!content) return;
+    if (content.length > 20000) {
+      new Notice("节点内容最多 20,000 个字符。");
+      return;
+    }
+
+    const file = this.plugin.app.vault.getAbstractFileByPath(portalNode.file);
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas") {
+      new Notice("找不到 Portal 对应的 Canvas 文件。");
+      return;
+    }
+
+    try {
+      const raw = await this.plugin.app.vault.cachedRead(file);
+      const source = parseCanvasJson(raw);
+      const usableNodes = source.nodes.filter((node: CanvasNodeData) => node.type !== "group");
+      const parent = usableNodes.slice().sort((a: CanvasNodeData, b: CanvasNodeData) =>
+        (b.x + b.width) - (a.x + a.width) || a.y - b.y
+      )[0];
+
+      const node: CanvasNodeData = {
+        id: createId(),
+        type: "text",
+        text: content,
+        x: parent ? parent.x + parent.width + 100 : 0,
+        y: parent ? parent.y : 0,
+        width: 300,
+        height: Math.max(140, Math.min(420, Math.ceil(content.length / 38) * 24))
+      };
+      const edges = [...source.edges];
+      if (parent) {
+        const [fromSide, toSide] = edgeSides(parent, node);
+        edges.push({
+          id: createId(),
+          fromNode: parent.id,
+          fromSide,
+          toNode: node.id,
+          toSide
+        });
+      }
+
+      const latest = readCanvasData(canvas);
+      canvas.importData({
+        ...latest,
+        nodes: latest.nodes.map((item: CanvasNodeData) =>
+          item.id === portalNode.id ? { ...item, portal: true } : item
+        ),
+        edges: latest.edges
+      });
+      canvas.requestSave?.();
+      canvas.requestFrame?.();
+
+      this.writingFiles.set(file.path, view);
+      try {
+        await this.plugin.app.vault.modify(file, JSON.stringify({
+          ...source,
+          nodes: [...source.nodes, node],
+          edges
+        }, null, 2));
+      } finally {
+        this.writingFiles.delete(file.path);
+      }
+
+      await this.refreshView(view, true);
+      const mirrored = canvas.nodes?.get?.(mirrorId(portalNode.id, node.id));
+      if (mirrored) {
+        canvas.selectOnly?.(mirrored);
+        canvas.zoomToSelection?.();
+      }
+      new Notice("已在 Portal 源画布中创建节点，并刷新 Portal。");
+    } catch (error) {
+      new Notice("无法在 Portal 中创建节点：" + (error instanceof Error ? error.message : String(error)), 8000);
+    }
+  }
+
+  private removePortalMirrors(canvas: any, portalId: string): boolean {
+    const belongsToPortal = (id: unknown): boolean => mirrorInfo(id)?.portalId === portalId;
+    const hasArtifacts = (): boolean => {
+      const current = readCanvasData(canvas);
+      return current.nodes.some((item: CanvasNodeData) => belongsToPortal(item.id)) ||
+        current.edges.some((edge: CanvasEdgeData) =>
+          belongsToPortal(edge.id) || belongsToPortal(edge.fromNode) || belongsToPortal(edge.toNode)
+        );
+    };
+    if (!hasArtifacts()) return true;
+
+    const initial = readCanvasData(canvas);
+    const mirrorNodeIds = initial.nodes
+      .filter((item: CanvasNodeData) => belongsToPortal(item.id))
+      .map((item: CanvasNodeData) => item.id);
+
+    // Prefer the live node API because importData() is additive in some
+    // supported Obsidian versions and silently leaves removed nodes on screen.
+    if (typeof canvas?.removeNode === "function") {
+      for (const id of mirrorNodeIds) {
+        const liveNode = canvas?.nodes?.get?.(id);
+        if (!liveNode) continue;
+        try {
+          canvas.removeNode(liveNode);
+        } catch {
+          // Fall back to a verified data-level replacement below.
+        }
+      }
+    }
+    if (!hasArtifacts()) return true;
+
+    const current = readCanvasData(canvas);
+    const cleaned: CanvasData = {
+      ...current,
+      nodes: current.nodes.filter((item: CanvasNodeData) => !belongsToPortal(item.id)),
+      edges: current.edges.filter((edge: CanvasEdgeData) =>
+        !belongsToPortal(edge.id) && !belongsToPortal(edge.fromNode) && !belongsToPortal(edge.toNode)
+      )
+    };
+    if (typeof canvas?.setData === "function") {
+      try {
+        canvas.setData(cleaned);
+      } catch {
+        // Do not claim success unless a subsequent read confirms cleanup.
+      }
+    }
+    return !hasArtifacts();
   }
 
   private promptForTextNodeInPortal(portalNodeId?: string): void {
@@ -879,6 +1073,7 @@ export class CanvasPortalManager {
     }
   }
 
+
   togglePortalForNode(nodeId?: string): void {
     const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
     const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
@@ -907,6 +1102,21 @@ export class CanvasPortalManager {
     }
 
     const nextOpen = node.portal !== true;
+    if (!nextOpen) {
+      let mirrorsRemoved = false;
+      // Removing live nodes may trigger Canvas serialization. Suppress portal
+      // write-back until the closed flag and clean scene state are committed.
+      this.portalRefreshInProgress.add(view);
+      try {
+        mirrorsRemoved = this.removePortalMirrors(canvas, node.id);
+      } finally {
+        this.portalRefreshInProgress.delete(view);
+      }
+      if (!mirrorsRemoved) {
+        new Notice("无法移除 Canvas Portal 的镜像节点；Portal 保持打开状态。", 8000);
+        return;
+      }
+    }
     // Validate the source before persisting the open flag. Otherwise a missing
     // target leaves a broken Portal node behind with no way to tell why it failed.
     // Closing an existing Portal must remain possible even if its source was deleted.
@@ -919,9 +1129,12 @@ export class CanvasPortalManager {
     }
 
     const data = readCanvasData(canvas);
-    const nodes = data.nodes.map((item: CanvasNodeData) => item.id === node.id
-      ? { ...item, portal: nextOpen }
-      : item);
+    const nodes = data.nodes.map((item: CanvasNodeData) => {
+      if (item.id !== node.id) return item;
+      const updated: any = { ...item, portal: nextOpen };
+      if (!nextOpen) delete updated.bcPortalEdges;
+      return updated as CanvasNodeData;
+    });
     canvas.importData({ ...data, nodes, edges: data.edges });
     canvas.requestSave?.();
     canvas.requestFrame?.();
