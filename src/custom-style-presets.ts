@@ -258,7 +258,8 @@ export function cssSnippetVaultPathFromHref(href: string, configDir: string): st
 
   let pathname: string;
   try {
-    pathname = decodeURIComponent(url.pathname).replace(/\\\\/g, "/").replace(/\\/{2,}/g, "/");
+    // URL.pathname is already slash-delimited; decode once for Vault paths with spaces.
+    pathname = decodeURIComponent(url.pathname);
   } catch {
     return null;
   }
