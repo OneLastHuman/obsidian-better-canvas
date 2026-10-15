@@ -212,7 +212,7 @@ export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle):
   }
   return count;
 }
-export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" | "expanded" | "missing" | "not-group" {
+export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" | "expanded" | "empty" | "missing" | "not-group" {
   const data = readCanvasData(canvas);
   const group = data.nodes.find(node => node.id === groupId);
   if (!group) return "missing";
@@ -269,7 +269,7 @@ export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" |
     node.x + node.width <= right &&
     node.y + node.height <= bottom
   );
-  if (containedNodes.length === 0) return "collapsed";
+  if (containedNodes.length === 0) return "empty";
 
   const containedIds = new Set(containedNodes.map(node => node.id));
   const hiddenEdges = data.edges.filter(edge =>
