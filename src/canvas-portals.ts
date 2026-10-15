@@ -1,4 +1,4 @@
-import { ItemView, Notice, TFile } from "obsidian";
+import { App, ItemView, Modal, Notice, TFile } from "obsidian";
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
 import { findContainingPortal, findContainingPortalForGroup } from "./portal-adoption";
 
@@ -87,6 +87,47 @@ interface PortalSnapshot {
   mirroredEdges: CanvasEdgeData[];
 }
 
+class PortalTextPromptModal extends Modal {
+  constructor(app: App, private readonly onSubmitValue: (value: string) => unknown) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.contentEl.empty();
+    this.contentEl.createEl("h2", { text: "在 Canvas Portal 中创建文本节点" });
+    const input = this.contentEl.createEl("textarea", {
+      attr: { rows: "5", placeholder: "输入新节点内容" }
+    });
+    input.style.width = "100%";
+    input.style.resize = "vertical";
+
+    const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
+    const cancel = footer.createEl("button", { text: "取消" });
+    cancel.onclick = () => this.close();
+    const submit = footer.createEl("button", { text: "创建节点", cls: "mod-cta" });
+    submit.onclick = () => {
+      const value = input.value.trim();
+      if (!value) {
+        new Notice("请输入节点内容。");
+        return;
+      }
+      this.close();
+      void this.onSubmitValue(value);
+    };
+    input.addEventListener("keydown", event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        submit.click();
+      }
+    });
+    input.focus();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 export class CanvasPortalManager {
   private plugin: any;
   private viewPatches = new Map<any, ViewPatch>();
@@ -109,6 +150,19 @@ export class CanvasPortalManager {
       name: "Better Canvas: 打开/关闭所选 Canvas Portal",
       callback: () => this.togglePortalForNode()
     });
+    this.plugin.addCommand({
+      id: "bc-create-text-node-in-portal",
+      name: "Better Canvas: 在所选 Portal 中创建文本节点",
+      callback: () => this.promptForTextNodeInPortal()
+    });
+    this.plugin.registerEvent(this.plugin.app.workspace.on("canvas:node-menu", (menu: any, node: any) => {
+      const nodeData = node?.getData?.() ?? node;
+      if (!menu?.addItem || !isCanvasFileNode(nodeData) || nodeData.portal !== true) return;
+      menu.addItem((item: any) => item
+        .setTitle("Better Canvas: 在 Portal 源画布中创建文本节点")
+        .setIcon("plus")
+        .onClick(() => this.promptForTextNodeInPortal(String(node?.id ?? nodeData.id))));
+    }));
 
     this.plugin.registerEvent(this.plugin.app.workspace.on("layout-change", () => {
       void this.refreshAll();
@@ -683,6 +737,35 @@ export class CanvasPortalManager {
         this.writingFiles.delete(file.path);
       }
     }
+  }
+
+  private promptForTextNodeInPortal(portalNodeId?: string): void {
+    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
+    const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
+    if (!canvas || !view) {
+      new Notice("请先打开包含 Canvas Portal 的画布。");
+      return;
+    }
+
+    const selection = canvas.selection;
+    const selectedId = portalNodeId ?? (selection?.size === 1 ? selection.values().next().value?.id : undefined);
+    if (typeof selectedId !== "string") {
+      new Notice("请只选择一个指向 .canvas 文件的节点。");
+      return;
+    }
+    const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
+    if (!isCanvasFileNode(portalNode)) {
+      new Notice("所选节点不是 Canvas 文件节点。");
+      return;
+    }
+    if (portalNode.portal !== true) {
+      new Notice("请先打开 Canvas Portal。");
+      return;
+    }
+
+    new PortalTextPromptModal(this.plugin.app, value => {
+      void this.addTextNodeToPortal(value, portalNode.id);
+    }).open();
   }
 
   /**
