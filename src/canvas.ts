@@ -47,6 +47,63 @@ export function readCanvasData(canvas: any): CanvasData {
   } as CanvasData;
 }
 
+/**
+ * Remove a live Canvas node and its incident edges. Canvas.importData() in some
+ * Obsidian versions only adds/updates items, so verify every removal and fall
+ * back to setData when the node-level API is unavailable or ineffective.
+ */
+export function removeCanvasNode(canvas: any, nodeId: string): boolean {
+  const containsNode = () => readCanvasData(canvas).nodes.some(node => node.id === nodeId);
+  const containsIncidentEdges = () => readCanvasData(canvas).edges.some(edge =>
+    edge.fromNode === nodeId || edge.toNode === nodeId
+  );
+  const isRemoved = () => !containsNode() && !containsIncidentEdges();
+  if (isRemoved()) return true;
+
+  const saveAndRefresh = () => {
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    return true;
+  };
+
+  const liveNode = canvas?.nodes?.get?.(nodeId);
+  if (liveNode && typeof canvas.removeNode === "function") {
+    try {
+      canvas.removeNode(liveNode);
+      if (isRemoved()) return saveAndRefresh();
+    } catch {
+      // Try the data-level APIs below if the internal node API is unavailable.
+    }
+  }
+
+  const current = readCanvasData(canvas);
+  const next: CanvasData = {
+    ...current,
+    nodes: current.nodes.filter(node => node.id !== nodeId),
+    edges: current.edges.filter(edge => edge.fromNode !== nodeId && edge.toNode !== nodeId)
+  };
+
+  if (typeof canvas?.setData === "function") {
+    try {
+      canvas.setData(next);
+      if (isRemoved()) return saveAndRefresh();
+    } catch {
+      // Fall back to importData, then verify rather than assuming it deleted.
+    }
+  }
+
+  if (typeof canvas?.importData === "function") {
+    try {
+      canvas.importData(next);
+      if (isRemoved()) return saveAndRefresh();
+    } catch {
+      // Do not report success unless the live Canvas confirms removal.
+    }
+  }
+
+  return false;
+}
+
 export function selectedNodeIds(canvas: any): string[] {
   const selection = canvas?.selection;
   if (!selection || typeof selection.values !== "function") return [];
