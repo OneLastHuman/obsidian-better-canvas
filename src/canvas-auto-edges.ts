@@ -54,7 +54,7 @@ export function buildAutoFileNodeEdges(
       if (!destinationPath) continue;
 
       for (const target of fileNodes) {
-        if (target.id === source.id || target.file !== destinationPath) continue;
+        if (target.id === source.id || target.file === source.file || target.file !== destinationPath) continue;
         const id = "bc-auto-" + source.id + "-" + target.id;
         if (generated.has(id)) continue;
         generated.set(id, {
