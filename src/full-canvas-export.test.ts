@@ -60,8 +60,9 @@ describe("full content SVG export", () => {
       nodes: [{ id: "a", type: "text", x: 0, y: 0, width: 180, height: 220, text: "alpha beta gamma delta epsilon zeta" }],
       edges: []
     });
-    expect(result.svg).toContain("epsilon zeta");
-    expect(result.svg).not.toContain("epsilon zeta…");
+    expect(result.svg).toContain("epsilon");
+    expect(result.svg).toContain("zeta");
+    expect(result.svg).not.toContain("…");
   });
 
   it("embeds a bounded raster image when export data includes a data URL", () => {
