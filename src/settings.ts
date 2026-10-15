@@ -1,4 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedPromptProfile } from "./prompt-profiles";
 
 type SettingSection = {
   id: string;
@@ -422,6 +423,86 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           await this.features.save();
         });
       });
+
+    const promptProfiles = normalizeNamedPromptProfiles(settings.systemPromptProfiles);
+    settings.systemPromptProfiles = promptProfiles;
+    const activePromptId = String(settings.activeSystemPromptProfile || "");
+    let profileNameInput = promptProfiles.find(profile => profile.id === activePromptId)?.name ?? "";
+
+    new Setting(page).setName("命名系统提示词")
+      .setDesc("保存多套可复用的系统提示词。选择后会替换当前系统提示词；手动修改后可用相同名称覆盖保存。")
+      .addDropdown(dropdown => {
+        dropdown.addOption("", "选择已保存的提示词");
+        for (const profile of promptProfiles) dropdown.addOption(profile.id, profile.name);
+        dropdown.setValue(activePromptId);
+        dropdown.onChange(async id => {
+          const profile = promptProfiles.find(item => item.id === id);
+          if (!profile) {
+            settings.activeSystemPromptProfile = "";
+            await this.features.save();
+            return;
+          }
+          settings.activeSystemPromptProfile = profile.id;
+          settings.systemPrompt = profile.prompt;
+          profileNameInput = profile.name;
+          await this.features.save();
+          this.display();
+        });
+      });
+
+    new Setting(page).setName("保存当前提示词")
+      .setDesc("输入一个名称；已存在同名配置时会更新该配置，不会创建重复项。")
+      .addText(text => text
+        .setPlaceholder("例如：研究助手")
+        .setValue(profileNameInput)
+        .onChange(value => { profileNameInput = value; }))
+      .addButton(button => button
+        .setButtonText("保存")
+        .setCta()
+        .onClick(async () => {
+          try {
+            const updated = upsertNamedPromptProfile(
+              normalizeNamedPromptProfiles(settings.systemPromptProfiles),
+              profileNameInput,
+              String(settings.systemPrompt || ""),
+              "prompt-" + Date.now().toString(36)
+            );
+            settings.systemPromptProfiles = updated;
+            const saved = updated.find(profile =>
+              profile.name.toLocaleLowerCase() === profileNameInput.trim().toLocaleLowerCase()
+            );
+            settings.activeSystemPromptProfile = saved?.id ?? "";
+            await this.features.save();
+            new Notice(saved ? "已保存命名提示词：" + saved.name : "已保存命名提示词。");
+            this.display();
+          } catch (error) {
+            new Notice(error instanceof Error ? error.message : String(error), 6000);
+          }
+        }));
+
+    new Setting(page).setName("删除当前命名提示词")
+      .setDesc("只删除已保存的提示词配置，不会清空当前系统提示词。")
+      .addButton(button => button
+        .setButtonText("删除所选配置")
+        .setWarning()
+        .onClick(async () => {
+          const id = String(settings.activeSystemPromptProfile || "");
+          const selected = normalizeNamedPromptProfiles(settings.systemPromptProfiles)
+            .find(profile => profile.id === id);
+          if (!selected) {
+            new Notice("请先选择要删除的命名提示词。");
+            return;
+          }
+          if (!window.confirm("删除命名提示词“" + selected.name + "”？当前系统提示词文本会保留。")) return;
+          settings.systemPromptProfiles = removeNamedPromptProfile(
+            normalizeNamedPromptProfiles(settings.systemPromptProfiles),
+            selected.id
+          );
+          settings.activeSystemPromptProfile = "";
+          await this.features.save();
+          new Notice("已删除命名提示词：" + selected.name);
+          this.display();
+        }));
 
     new Setting(page).setName("生成图片保存位置")
       .addText(text => text.setPlaceholder("Better Canvas/Generated Images").setValue(String(settings.attachmentFolder || "Better Canvas/Generated Images")).onChange(async value => {
