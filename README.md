@@ -67,7 +67,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - 将 Markdown 文件中的 H1 标题拆分为关联节点。
 - 选择节点树，并按 LR、RL、TB 或 BT 方向执行基础自动布局。
 - 使用键盘快捷键快速创建节点、浏览相邻节点。
-- 生成思维导图结构和复习闪卡节点；生成结果应在使用前检查。
+- 生成思维导图结构和复习闪卡；闪卡默认创建 Canvas 节点，也可在 AI 设置中导出为 Obsidian Spaced Repetition 兼容的 Markdown 卡组。生成结果应在使用前检查。
 
 ### AI 辅助工作流
 
