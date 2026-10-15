@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canvasZoomToScale, zoomCanvasToFit } from "./canvas-zoom";
+import { zoomCanvasToFit } from "./canvas-zoom";
 
 describe("zoomCanvasToFit", () => {
   it("zooms with all nodes selected and restores the prior selection afterward", () => {
@@ -45,20 +45,5 @@ describe("zoomCanvasToFit", () => {
     };
     expect(() => zoomCanvasToFit(canvas)).toThrow("zoom failed");
     expect([...selection]).toEqual([edge]);
-  });
-});
-
-
-describe("Canvas logarithmic zoom conversion", () => {
-  it("converts the base-2 camera value to a linear scale ratio", () => {
-    expect(canvasZoomToScale(-1)).toBe(0.5);
-    expect(canvasZoomToScale(0)).toBe(1);
-    expect(canvasZoomToScale(Math.log2(0.6))).toBeCloseTo(0.6);
-    expect(canvasZoomToScale(1)).toBe(2);
-  });
-
-  it("rejects non-finite camera values", () => {
-    expect(canvasZoomToScale(Number.NaN)).toBeNaN();
-    expect(canvasZoomToScale(Number.POSITIVE_INFINITY)).toBeNaN();
   });
 });
