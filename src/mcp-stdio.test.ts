@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import process from "node:process";
-import { callLocalMcpTool, listLocalMcpTools, parseLocalMcpConfig } from "./mcp-stdio";
+import {
+  callLocalMcpTool,
+  closeAllLocalMcpSessions,
+  getLocalMcpPrompt,
+  listLocalMcpPrompts,
+  listLocalMcpResources,
+  listLocalMcpTools,
+  parseLocalMcpConfig,
+  readLocalMcpResource
+} from "./mcp-stdio";
 
 const serverSource = String.raw`
 const readline = require("node:readline");
@@ -11,11 +20,21 @@ rl.on("line", (line) => {
   if (!message || !message.id) return;
   let result;
   if (message.method === "initialize") {
-    result = { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } };
+    result = { protocolVersion: "2025-03-26", capabilities: { tools: {}, resources: {}, prompts: {} }, serverInfo: { name: "fixture", version: "1" } };
   } else if (message.method === "tools/list") {
     result = { tools: [{ name: "echo", description: "Returns its arguments", inputSchema: { type: "object" } }] };
   } else if (message.method === "tools/call") {
     result = { content: [{ type: "text", text: JSON.stringify(message.params.arguments) }] };
+  } else if (message.method === "resources/list") {
+    result = message.params.cursor
+      ? { resources: [{ uri: "note://second", name: "Second" }] }
+      : { resources: [{ uri: "note://first", name: "First", mimeType: "text/plain" }], nextCursor: "page-2" };
+  } else if (message.method === "resources/read") {
+    result = { contents: [{ uri: message.params.uri, mimeType: "text/plain", text: "resource contents pid:" + process.pid }] };
+  } else if (message.method === "prompts/list") {
+    result = { prompts: [{ name: "review", description: "Review a topic", arguments: [{ name: "topic", required: true }] }] };
+  } else if (message.method === "prompts/get") {
+    result = { description: "Generated prompt", messages: [{ role: "user", content: { type: "text", text: "Topic: " + message.params.arguments.topic + " pid:" + process.pid } }] };
   } else {
     console.log(JSON.stringify({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found" } }));
     return;
@@ -27,6 +46,10 @@ rl.on("line", (line) => {
 function fixtureConfig(): string {
   return JSON.stringify({ command: process.execPath, args: ["-e", serverSource] });
 }
+
+afterAll(() => {
+  closeAllLocalMcpSessions();
+});
 
 
 describe("local MCP stdio config validation", () => {
@@ -82,4 +105,33 @@ describe("local MCP stdio JSON-RPC round trip", () => {
     expect(result.text).toBe(JSON.stringify({ value: "safe" }));
     expect(result.images).toEqual([]);
   }, 15000);
+
+  it("lists resources across pagination pages and reads a resource", async () => {
+    const resources = await listLocalMcpResources(fixtureConfig());
+    expect(resources.map(resource => resource.uri)).toEqual(["note://first", "note://second"]);
+    const result = await readLocalMcpResource(fixtureConfig(), "note://first");
+    expect(result.text).toContain("resource contents");
+    expect(result.text).toContain("note://first");
+  }, 20000);
+
+  it("lists MCP prompts and resolves a named prompt with arguments", async () => {
+    const prompts = await listLocalMcpPrompts(fixtureConfig());
+    expect(prompts).toEqual([{
+      name: "review",
+      description: "Review a topic",
+      arguments: [{ name: "topic", required: true }]
+    }]);
+    const result = await getLocalMcpPrompt(fixtureConfig(), "review", { topic: "science" });
+    expect(result.text).toContain("[user] Topic: science");
+  }, 20000);
+
+  it("reuses the same child process for subsequent operations", async () => {
+    const config = fixtureConfig();
+    const resource = await readLocalMcpResource(config, "note://first");
+    const prompt = await getLocalMcpPrompt(config, "review", { topic: "reuse" });
+    const resourcePid = resource.text.match(/pid:(\d+)/)?.[1];
+    const promptPid = prompt.text.match(/pid:(\d+)/)?.[1];
+    expect(resourcePid).toBeTruthy();
+    expect(promptPid).toBe(resourcePid);
+  }, 20000);
 });
