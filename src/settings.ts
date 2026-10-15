@@ -423,6 +423,37 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         });
       });
 
+    new Setting(page).setName("复习闪卡输出模式")
+      .setDesc("默认创建 Canvas 节点；也可导出为 Obsidian Spaced Repetition 可识别的 Markdown 卡组。")
+      .addDropdown(dropdown => dropdown
+        .addOption("canvas", "Canvas 节点")
+        .addOption("spaced-repetition", "Markdown 复习卡组")
+        .setValue(settings.flashcardOutputMode === "spaced-repetition" ? "spaced-repetition" : "canvas")
+        .onChange(async value => {
+          settings.flashcardOutputMode = value === "spaced-repetition" ? "spaced-repetition" : "canvas";
+          await this.features.save();
+          this.display();
+        }));
+
+    if (settings.flashcardOutputMode === "spaced-repetition") {
+      new Setting(page).setName("复习卡组保存目录")
+        .setDesc("Vault 内的相对目录。已有同名笔记会自动使用新文件名，不会被覆盖。")
+        .addText(text => text.setPlaceholder("Better Canvas/Flashcards")
+          .setValue(String(settings.spacedRepetitionFolder || "Better Canvas/Flashcards"))
+          .onChange(async value => {
+            settings.spacedRepetitionFolder = value.trim() || "Better Canvas/Flashcards";
+            await this.features.save();
+          }));
+      new Setting(page).setName("复习卡组标签")
+        .setDesc("输入主题路径，例如 science/biology；最终标签为 #flashcards/science/biology。")
+        .addText(text => text.setPlaceholder("better-canvas")
+          .setValue(String(settings.spacedRepetitionDeck || "better-canvas"))
+          .onChange(async value => {
+            settings.spacedRepetitionDeck = value.trim() || "better-canvas";
+            await this.features.save();
+          }));
+    }
+
     new Setting(page).setName("生成图片保存位置")
       .addText(text => text.setPlaceholder("Better Canvas/Generated Images").setValue(String(settings.attachmentFolder || "Better Canvas/Generated Images")).onChange(async value => {
         settings.attachmentFolder = value.trim() || "Better Canvas/Generated Images";
