@@ -32,6 +32,7 @@ import { readCanvasFrontmatter, replaceCanvasFrontmatter } from "./canvas-frontm
 import { parsePdfPageSelection } from "./pdf-range";
 import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
+import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirection } from "./canvas-clone";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
@@ -463,6 +464,7 @@ export default class BetterCanvasFeatures {
     add("bc-collapse-group", "折叠/展开所选分组", () => this.collapseGroup());
     add("bc-create-standalone-group", "创建独立分组", () => this.createStandaloneGroup());
     add("bc-encapsulate", "将选区移动到新 Canvas", () => void this.encapsulate());
+    add("bc-clone-node-direction", "克隆所选节点并向指定方向扩展", () => this.cloneNodeInDirection());
     add("bc-copy-node-link", "复制节点 Wikilink", () => void this.copyNodeLink());
     add("bc-open-link-explorer", "查看当前 Canvas 链接与反向链接", () => void this.openCanvasLinkExplorer());
     add("bc-materialize-canvas-links", "将当前 Canvas 链接与反向链接添加为节点", () => void this.openCanvasLinkExplorer(true));
@@ -1559,6 +1561,53 @@ export default class BetterCanvasFeatures {
       outgoing,
       incoming.slice(0, 250)
     ).open();
+  }
+
+  private cloneNodeInDirection(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    const { canvas, node } = selection;
+    this.input(
+      "克隆节点并向指定方向扩展",
+      "输入方向：left / right / up / down",
+      value => {
+        const normalized = value.trim().toLowerCase();
+        const aliases: Record<string, CloneDirection> = {
+          left: "left", right: "right", up: "up", down: "down",
+          左: "left", 右: "right", 上: "up", 下: "down"
+        };
+        const direction = aliases[normalized];
+        if (!direction) {
+          new Notice("方向无效。请输入 left、right、up、down 或对应中文方向。");
+          return;
+        }
+        if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+          new Notice("当前 Canvas 处于只读模式，不能克隆节点。");
+          return;
+        }
+        const latest = readCanvasData(canvas);
+        const source = latest.nodes.find((item: CanvasNodeData) => item.id === node.id);
+        if (!source) {
+          new Notice("原节点已不存在，请重新选择后重试。");
+          return;
+        }
+
+        const horizontal = direction === "left" || direction === "right";
+        const gap = Math.max(0, Number(horizontal ? this.settings().gapX : this.settings().gapY) || 0);
+        const cloned = cloneCanvasNodeInDirection(source, direction, gap, createId());
+        const edge = createNodeExpansionEdge(source.id, cloned.id, createId(), direction);
+        canvas.importData({
+          ...latest,
+          nodes: [...latest.nodes, cloned],
+          edges: [...latest.edges, edge]
+        });
+        canvas.requestSave?.();
+        canvas.requestFrame?.();
+        this.selectNode(canvas, cloned.id);
+        new Notice("已向" + ({ left: "左", right: "右", up: "上", down: "下" }[direction]) + "克隆节点并创建关联边。");
+      },
+      "right"
+    );
   }
 
   private async copyNodeLink(): Promise<void> {
