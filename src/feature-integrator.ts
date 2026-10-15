@@ -31,6 +31,7 @@ import {
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { readCanvasFrontmatter, replaceCanvasFrontmatter } from "./canvas-frontmatter";
+import { parsePdfPageSelection } from "./pdf-range";
 import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
@@ -487,6 +488,7 @@ export default class BetterCanvasFeatures {
     add("bc-ai-mcp-tool", "让 AI 建议 MCP 工具调用（执行前确认）", () => void this.runAIMcpTool());
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
     add("bc-pdf-ocr", "对所选 PDF 页面执行 AI OCR", () => this.ocrSelectedPdfPage());
+    add("bc-pdf-ocr-range", "批量 OCR PDF 页码范围（最多 20 页）", () => this.ocrPdfPageRange());
     add("bc-pdf-review-board", "为 PDF 创建分页批注工作区", () => this.createPdfReviewBoard());
     add("bc-create-canvas-portal", "创建可编辑 Canvas Portal", () => this.createCanvasPortal());
     add("bc-portal-add-node", "在选中 Canvas Portal 中创建文本节点", () => this.addTextNodeToPortal());
@@ -2869,6 +2871,135 @@ export default class BetterCanvasFeatures {
       node.id,
       "请对所选 PDF 节点对应的页面执行 OCR 转录，而不是总结。逐行提取所有可见文字，尽量保留标题、段落、项目符号、表格和公式结构，使用 Markdown 格式。将无法确定的字符标成 [不清晰]，不要猜测不可见内容。若当前节点没有明确页码，则转录第 1 页。"
     );
+  }
+
+  private ocrPdfPageRange(): void {
+    const selection = this.selected();
+    if (!selection) return;
+    const node = selection.node;
+    if (node.type !== "file" || typeof node.file !== "string" || !node.file.toLowerCase().endsWith(".pdf")) {
+      new Notice("请先选择一个 PDF 文件节点。");
+      return;
+    }
+    const file = this.p.app.vault.getAbstractFileByPath(node.file);
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== "pdf") {
+      new Notice("找不到所选 PDF 文件。");
+      return;
+    }
+
+    this.input(
+      "批量 OCR PDF 页码范围",
+      "例如 1-10 或 1-3,5,8-10；每批最多 20 页。",
+      value => {
+        let pages: number[];
+        try {
+          pages = parsePdfPageSelection(value, 20);
+        } catch (error) {
+          new Notice(error instanceof Error ? error.message : String(error), 8000);
+          return;
+        }
+        void this.runPdfPageOcrRange(selection.canvas, node, file, pages);
+      },
+      "1-10"
+    );
+  }
+
+  private async runPdfPageOcrRange(
+    canvas: any,
+    sourceNode: CanvasNodeData,
+    file: TFile,
+    pages: number[]
+  ): Promise<void> {
+    const preparationNotice = new Notice("正在检查 PDF 页码范围…", 0);
+    try {
+      // Preflight the complete selection before creating nodes or making AI calls.
+      for (const page of pages) {
+        const contexts = await extractPdfPages(this.p.app, file, pinnedPdfSubpath(page), 1, false);
+        if (!contexts.length) throw new Error("PDF 不包含第 " + page + " 页；未创建批量任务。");
+      }
+      if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+        throw new Error("当前 Canvas 已切换为只读模式，不能创建批量 OCR 任务。");
+      }
+      const latestSource = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === sourceNode.id);
+      if (!latestSource) throw new Error("原 PDF 节点已不存在，请重新选择 PDF 后重试。");
+
+      const startX = latestSource.x + latestSource.width + 100;
+      const task = makeTextNode(
+        "PDF 批量 OCR 任务\n\n源文件：" + file.path +
+        "\n页码：" + pages.join(", ") +
+        "\n状态：准备运行\n\n每页将生成独立的 OCR 结果节点。",
+        startX,
+        latestSource.y,
+        { width: 380, height: 190 }
+      );
+      (task as any).bcPdfOcrBatch = { source: file.path, pages, state: "running" };
+      insertCanvasNode(canvas, task, latestSource.id);
+
+      const pageNodes: Array<{ node: CanvasNodeData; page: number }> = [];
+      for (let index = 0; index < pages.length; index++) {
+        const page = pages[index];
+        const pageNode: CanvasNodeData = {
+          id: createId(),
+          type: "file",
+          file: file.path,
+          subpath: pinnedPdfSubpath(page),
+          pinned: true,
+          bcPdfOcrBatchPage: page,
+          x: task.x + task.width + 100,
+          y: task.y + index * 260,
+          width: 320,
+          height: 220
+        };
+        insertCanvasNode(canvas, pageNode, task.id);
+        pageNodes.push({ node: pageNode, page });
+      }
+
+      preparationNotice.hide();
+      let completed = 0;
+      let failed = 0;
+      let stopped = false;
+      for (let index = 0; index < pageNodes.length; index++) {
+        const item = pageNodes[index];
+        await this.runAI(
+          item.node.id,
+          "请对 PDF 文件“" + file.path + "”的第 " + item.page +
+          " 页执行 OCR 转录，而不是总结。逐行提取该页所有可见文字，尽量保留标题、段落、项目符号、表格和公式结构，使用 Markdown。将无法确定的字符标成 [不清晰]，不要猜测不可见内容。只转录当前页，不要转录其他页。"
+        );
+        const currentNodes = readCanvasData(canvas).nodes as any[];
+        const output = currentNodes.find(candidate =>
+          candidate.bcSourceNode === item.node.id && candidate.bcGenerated === true
+        );
+        if (output) {
+          completed++;
+        } else {
+          const partial = currentNodes.find(candidate =>
+            candidate.bcSourceNode === item.node.id && candidate.bcStopped === true
+          );
+          if (partial) {
+            stopped = true;
+            break;
+          }
+          failed++;
+        }
+        new Notice("PDF 批量 OCR 进度：" + (index + 1) + " / " + pageNodes.length, 1800);
+      }
+
+      const skipped = pages.length - completed - failed;
+      const state = stopped ? "已停止" : "完成";
+      patchNode(canvas, task.id, {
+        text: "PDF 批量 OCR 任务\n\n源文件：" + file.path +
+          "\n页码：" + pages.join(", ") +
+          "\n状态：" + state +
+          "\n成功：" + completed + " 页\n失败：" + failed + " 页\n未处理：" + skipped + " 页",
+        bcPdfOcrBatchState: stopped ? "stopped" : "completed",
+        bcPdfOcrBatchCompleted: completed,
+        bcPdfOcrBatchFailed: failed
+      });
+      new Notice("PDF 批量 OCR " + state + "：成功 " + completed + " 页，失败 " + failed + " 页，未处理 " + skipped + " 页。", 6000);
+    } catch (error) {
+      preparationNotice.hide();
+      new Notice("无法启动 PDF 批量 OCR：" + (error instanceof Error ? error.message : String(error)), 8000);
+    }
   }
 
   private createPdfReviewBoard(): void {
