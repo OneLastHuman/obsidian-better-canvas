@@ -3,6 +3,7 @@ import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedProm
 import { modelCapabilityReportKey, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
+import { getSettingsSearchMatches } from "./settings-search";
 
 type SettingSection = {
   id: string;
@@ -77,15 +78,23 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       for (const section of sections) {
         const page = pages.get(section.id)!;
         const button = navButtons.get(section.id)!;
-        const rows = Array.from(page.querySelectorAll<HTMLElement>(".setting-item, .bc-settings-provider"));
-        let pageMatches = 0;
+        const rows = Array.from(page.querySelectorAll<HTMLElement>(
+          ".setting-item, .bc-settings-provider, .bc-settings-inline-heading"
+        ));
+        const standaloneButtons = Array.from(page.querySelectorAll<HTMLButtonElement>("button"))
+          .filter(action => !action.closest(".setting-item, .bc-settings-provider"));
+        const searchableElements: HTMLElement[] = [...rows, ...standaloneButtons];
+        const searchResult = getSettingsSearchMatches(
+          query,
+          { title: section.title, description: section.description },
+          searchableElements.map(element => ({ text: element.textContent ?? "" }))
+        );
 
-        for (const row of rows) {
-          const match = !query || (row.textContent ?? "").toLocaleLowerCase().includes(query);
-          row.toggleClass("bc-settings-search-hidden", !match);
-          if (match) pageMatches++;
-        }
+        searchableElements.forEach((element, index) => {
+          element.toggleClass("bc-settings-search-hidden", !searchResult.entryMatches[index]);
+        });
 
+        const pageMatches = searchResult.totalMatches;
         const visible = query ? pageMatches > 0 : section.id === this.activeSection;
         page.style.display = visible ? "" : "none";
         button.toggleClass("is-active", !query && section.id === this.activeSection);
