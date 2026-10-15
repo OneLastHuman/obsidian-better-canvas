@@ -8,6 +8,7 @@ import {
 } from "obsidian";
 import { chatCompletion, generateImage } from "./ai";
 import BetterCanvasFeatures from "./feature-integrator";
+import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import {
   CanvasNodeData,
   LayoutDirection,
@@ -47,6 +48,10 @@ interface BetterCanvasSettings {
   gapY: number;
   attachmentFolder: string;
   templates: NodeTemplate[];
+  mindMapShortcutChildTabEnabled: boolean;
+  mindMapShortcutSiblingEnterEnabled: boolean;
+  mindMapShortcutAltArrowNavigationEnabled: boolean;
+  mindMapShortcutDirectionalCreationEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -61,7 +66,11 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   gapX: 100,
   gapY: 44,
   attachmentFolder: "Better Canvas/Generated Images",
-  templates: []
+  templates: [],
+  mindMapShortcutChildTabEnabled: true,
+  mindMapShortcutSiblingEnterEnabled: true,
+  mindMapShortcutAltArrowNavigationEnabled: true,
+  mindMapShortcutDirectionalCreationEnabled: true
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
@@ -323,13 +332,16 @@ export default class BetterCanvasPlugin extends Plugin {
       if (selectedInternal?.isEditing) return;
       const node = this.getSelectedRecord(canvas);
 
-      if (event.altKey && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+      if (isMindMapShortcutEnabled(this.settings, "navigateAltArrow") &&
+          event.altKey && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
         event.preventDefault();
         this.navigateSelection(canvas, event.key);
-      } else if (node && event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      } else if (node && isMindMapShortcutEnabled(this.settings, "childTab") &&
+          event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         this.createChildNode();
-      } else if (node && event.key === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      } else if (node && isMindMapShortcutEnabled(this.settings, "siblingEnter") &&
+          event.key === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         this.createSiblingNode();
       }
