@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasNodeData } from "./canvas";
-import { findContainingPortal } from "./portal-adoption";
+import { findContainingPortal, findContainingPortalForGroup } from "./portal-adoption";
 
 function node(id: string, x: number, y: number, width: number, height: number, extra: Record<string, unknown> = {}): CanvasNodeData {
   return { id, type: "text", x, y, width, height, ...extra } as CanvasNodeData;
@@ -23,6 +23,23 @@ describe("findContainingPortal", () => {
   it("does not attach a node to the current Canvas file's self-reference", () => {
     const own = node("own-portal", 0, 0, 1000, 800, { type: "file", file: "current.canvas", portal: true });
     expect(findContainingPortal(node("new", 200, 200, 40, 40), [own], "current.canvas")).toBeUndefined();
+  });
+
+  it("adopts a new group only when its full rectangle is inside the Portal", () => {
+    const portal = node("portal", 100, 100, 500, 400, { type: "file", file: "target.canvas", portal: true });
+    const fullyInside = node("group", 140, 150, 220, 180, { type: "group" });
+    const partiallyOutside = node("outside-group", 540, 150, 100, 180, { type: "group" });
+
+    expect(findContainingPortalForGroup(fullyInside, [portal])?.id).toBe("portal");
+    expect(findContainingPortalForGroup(partiallyOutside, [portal])).toBeUndefined();
+  });
+
+  it("prefers the smallest Portal that fully contains a group and avoids self references", () => {
+    const large = node("large", 0, 0, 1000, 800, { type: "file", file: "large.canvas", portal: true });
+    const small = node("small", 200, 100, 400, 350, { type: "file", file: "small.canvas", portal: true });
+    const group = node("group", 240, 140, 160, 120, { type: "group" });
+    expect(findContainingPortalForGroup(group, [large, small])?.id).toBe("small");
+    expect(findContainingPortalForGroup(group, [large], "large.canvas")).toBeUndefined();
   });
 
   it("ignores closed Portal frames and ordinary canvas file nodes", () => {
