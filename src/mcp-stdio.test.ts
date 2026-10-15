@@ -12,39 +12,31 @@ import {
 } from "./mcp-stdio";
 
 const serverSource = String.raw`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-rl.on("line", (line) => {
-  let message;
-  try { message = JSON.parse(line); } catch { process.exit(2); }
-  if (!message || !message.id) return;
-  let result;
-  if (message.method === "initialize") {
-    result = { protocolVersion: "2025-03-26", capabilities: { tools: {}, resources: {}, prompts: {} }, serverInfo: { name: "fixture", version: "1" } };
-  } else if (message.method === "tools/list") {
-    result = { tools: [{ name: "echo", description: "Returns its arguments", inputSchema: { type: "object" } }] };
-  } else if (message.method === "tools/call") {
-    result = { content: [{ type: "text", text: JSON.stringify(message.params.arguments) }] };
-  } else if (message.method === "resources/list") {
-    result = message.params.cursor
-      ? { resources: [{ uri: "note://second", name: "Second" }] }
-      : { resources: [{ uri: "note://first", name: "First", mimeType: "text/plain" }], nextCursor: "page-2" };
-  } else if (message.method === "resources/read") {
-    result = { contents: [{ uri: message.params.uri, mimeType: "text/plain", text: "resource contents pid:" + process.pid }] };
-  } else if (message.method === "prompts/list") {
-    result = { prompts: [{ name: "review", description: "Review a topic", arguments: [{ name: "topic", required: true }] }] };
-  } else if (message.method === "prompts/get") {
-    result = { description: "Generated prompt", messages: [{ role: "user", content: { type: "text", text: "Topic: " + message.params.arguments.topic + " pid:" + process.pid } }] };
-  } else {
-    console.log(JSON.stringify({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found" } }));
-    return;
-  }
-  console.log(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
+const rl=require("node:readline").createInterface({input:process.stdin});
+rl.on("line",line=>{
+ let m;try{m=JSON.parse(line)}catch{process.exit(2)}
+ if(!m||!m.id)return;
+ const q=m.params||{};let result;
+ switch(m.method){
+ case "initialize":result={protocolVersion:"2025-03-26"};break;
+ case "tools/list":result={tools:[{name:"echo",description:"Returns its arguments",inputSchema:{type:"object"}}]};break;
+ case "tools/call":result={content:[{type:"text",text:JSON.stringify(q.arguments)}]};break;
+ case "resources/list":
+ if(process.env.MCP_TOO_MANY_RESOURCES==="1")result={resources:Array.from({length:1001},(_,i)=>({uri:"note://bulk-"+i,name:"Bulk "+i}))};
+ else if(process.env.MCP_TOO_MANY_SECOND_PAGE==="1"&&q.cursor)result={resources:Array.from({length:1000},(_,i)=>({uri:"note://second-"+i,name:"Second "+i}))};
+ else result=q.cursor?{resources:[{uri:"note://second",name:"Second"},{uri:"note://shared",name:"Duplicate"},{uri:"note://third",name:"Third"}]}:{resources:[{uri:"note://first",name:"First",mimeType:"text/plain"},{uri:"note://shared",name:"Shared"}],nextCursor:"page-2"};
+ break;
+ case "resources/read":result={contents:[{uri:q.uri,mimeType:"text/plain",text:"resource contents pid:"+process.pid}]};break;
+ case "prompts/list":result={prompts:[{name:"review",description:"Review a topic",arguments:[{name:"topic",required:true}]}]};break;
+ case "prompts/get":result={description:"Generated prompt",messages:[{role:"user",content:{type:"text",text:"Topic: "+q.arguments.topic+" pid:"+process.pid}}]};break;
+ default:result={};
+ }
+ console.log(JSON.stringify({jsonrpc:"2.0",id:m.id,result}));
 });
 `;
 
-function fixtureConfig(): string {
-  return JSON.stringify({ command: process.execPath, args: ["-e", serverSource] });
+function fixtureConfig(env: Record<string, string> = {}): string {
+  return JSON.stringify({ command: process.execPath, args: ["-e", serverSource], env });
 }
 
 afterAll(() => {
@@ -108,10 +100,22 @@ describe("local MCP stdio JSON-RPC round trip", () => {
 
   it("lists resources across pagination pages and reads a resource", async () => {
     const resources = await listLocalMcpResources(fixtureConfig());
-    expect(resources.map(resource => resource.uri)).toEqual(["note://first", "note://second"]);
+    expect(resources.map(resource => resource.uri)).toEqual([
+      "note://first", "note://shared", "note://second", "note://third"
+    ]);
     const result = await readLocalMcpResource(fixtureConfig(), "note://first");
     expect(result.text).toContain("resource contents");
     expect(result.text).toContain("note://first");
+  }, 20000);
+
+  it("rejects local stdio catalogs above the 1000-entry limit on the first page", async () => {
+    await expect(listLocalMcpResources(fixtureConfig({ MCP_TOO_MANY_RESOURCES: "1" })))
+      .rejects.toThrow(/1000-entry safety limit/);
+  }, 20000);
+
+  it("rejects local stdio catalogs above the 1000-entry limit across pages", async () => {
+    await expect(listLocalMcpResources(fixtureConfig({ MCP_TOO_MANY_SECOND_PAGE: "1" })))
+      .rejects.toThrow(/1000-entry safety limit/);
   }, 20000);
 
   it("lists MCP prompts and resolves a named prompt with arguments", async () => {

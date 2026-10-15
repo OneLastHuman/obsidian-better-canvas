@@ -325,6 +325,35 @@ export function closeAllLocalMcpSessions(): void {
   for (const session of sessions) session.close();
 }
 
+const LOCAL_MCP_CATALOG_MAX_PAGES = 50;
+const LOCAL_MCP_CATALOG_MAX_ENTRIES = 1000;
+
+function catalogEntryKey(
+  item: unknown,
+  catalogKey: "tools" | "resources" | "prompts"
+): string | undefined {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
+  const record = item as Record<string, unknown>;
+  const value = catalogKey === "resources" ? record.uri : record.name;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function deduplicateCatalogEntries(
+  items: unknown[],
+  catalogKey: "tools" | "resources" | "prompts"
+): unknown[] {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const key = catalogEntryKey(item, catalogKey);
+    // Keep malformed entries here so the established catalog normalizers can
+    // discard them consistently after pagination has completed.
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function oneStdioRequest<T>(
   config: LocalMcpServerConfig,
   method: string,
@@ -338,19 +367,32 @@ async function oneStdioRequest<T>(
     if (!result || typeof result !== "object" || !Array.isArray(result[catalogKey])) {
       throw new Error("MCP stdio 没有返回有效的 " + catalogKey + " 数组。");
     }
-    result = { ...result, [catalogKey]: [...result[catalogKey]] };
+    let receivedEntryCount = result[catalogKey].length;
+    if (receivedEntryCount > LOCAL_MCP_CATALOG_MAX_ENTRIES) {
+      throw new Error("MCP stdio catalog exceeded the 1000-entry safety limit.");
+    }
+    result = { ...result, [catalogKey]: deduplicateCatalogEntries([...result[catalogKey]], catalogKey) };
     const cursorSet = new Set<string>();
     let cursor = typeof result.nextCursor === "string" ? result.nextCursor : "";
     let pageCount = 1;
     while (cursor) {
       if (cursorSet.has(cursor)) throw new Error("MCP stdio catalog 返回重复 pagination cursor。");
       cursorSet.add(cursor);
-      if (++pageCount > 50) throw new Error("MCP stdio catalog 超过 50 页安全限制。");
+      if (++pageCount > LOCAL_MCP_CATALOG_MAX_PAGES) {
+        throw new Error("MCP stdio catalog 超过 50 页安全限制。");
+      }
       const page: any = await session.request<any>(method, { ...params, cursor }, timeoutMs);
       if (!Array.isArray(page?.[catalogKey])) {
         throw new Error("MCP stdio 后续页面没有返回有效的 " + catalogKey + " 数组。");
       }
-      result[catalogKey].push(...page[catalogKey]);
+      receivedEntryCount += page[catalogKey].length;
+      if (receivedEntryCount > LOCAL_MCP_CATALOG_MAX_ENTRIES) {
+        throw new Error("MCP stdio catalog exceeded the 1000-entry safety limit.");
+      }
+      result[catalogKey] = deduplicateCatalogEntries(
+        [...result[catalogKey], ...page[catalogKey]],
+        catalogKey
+      );
       cursor = typeof page.nextCursor === "string" ? page.nextCursor : "";
     }
     delete result.nextCursor;
