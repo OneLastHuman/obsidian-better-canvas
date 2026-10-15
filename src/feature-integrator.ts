@@ -41,6 +41,7 @@ import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirection } from "./canvas-clone";
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
+import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 import { isCanvasReadOnly, shouldSubmitPromptValue } from "./canvas-command-guards";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
@@ -668,8 +669,8 @@ export default class BetterCanvasFeatures {
       if (!(element instanceof HTMLElement)) continue;
       const host = (element.closest(".canvas-node") as HTMLElement | null) ?? element;
       if (typeof (item as any).bcNodeColor === "string") host.style.borderColor = String((item as any).bcNodeColor);
-      host.dataset.bcShape = typeof (item as any).bcShape === "string" ? String((item as any).bcShape) : "default";
-      host.dataset.bcBorder = typeof (item as any).bcBorderStyle === "string" ? String((item as any).bcBorderStyle) : "solid";
+      host.dataset.bcShape = resolveCanvasNodeShape(item as any);
+      host.dataset.bcBorder = resolveCanvasNodeBorder(item as any);
       const previousClass = host.dataset.bcCustomClass;
       if (previousClass) host.classList.remove("bc-user-" + previousClass);
       const nextClass = typeof (item as any).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item as any).bcCustomClass))
