@@ -906,9 +906,20 @@ export class CanvasPortalManager {
     }
 
     const nextOpen = node.portal !== true;
-    if (!nextOpen && !this.removePortalMirrors(canvas, node.id)) {
-      new Notice("无法移除 Canvas Portal 的镜像节点；Portal 保持打开状态。", 8000);
-      return;
+    if (!nextOpen) {
+      let mirrorsRemoved = false;
+      // Removing live nodes may trigger Canvas serialization. Suppress portal
+      // write-back until the closed flag and clean scene state are committed.
+      this.portalRefreshInProgress.add(view);
+      try {
+        mirrorsRemoved = this.removePortalMirrors(canvas, node.id);
+      } finally {
+        this.portalRefreshInProgress.delete(view);
+      }
+      if (!mirrorsRemoved) {
+        new Notice("无法移除 Canvas Portal 的镜像节点；Portal 保持打开状态。", 8000);
+        return;
+      }
     }
     // Validate the source before persisting the open flag. Otherwise a missing
     // target leaves a broken Portal node behind with no way to tell why it failed.
