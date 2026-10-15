@@ -225,7 +225,7 @@ function wrapNodeText(node: CanvasNodeData, clipId: string): string {
   if (!raw) return "";
   const attrs = (node as any).styleAttributes ?? {};
   const fontSize = Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
-  const alignRaw = String(attrs.textAlign ?? attrs.textAlignment ?? "left");
+  const alignRaw = String(attrs.textAlign ?? attrs.textAlignment ?? (node as any).bcTextAlign ?? "left");
   const anchor = alignRaw === "center" ? "middle" : alignRaw === "right" ? "end" : "start";
   const startX = anchor === "middle" ? node.x + node.width / 2 : anchor === "end" ? node.x + node.width - 12 : node.x + 12;
   const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * 0.58)));
@@ -335,6 +335,15 @@ function renderNode(node: CanvasNodeData, index: number): string {
     const radius = shape.includes("round") ? 22 : 7;
     geometry = '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height +
       '" rx="' + radius + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
+  }
+
+  if (borderStyle === "double") {
+    const sx = Math.max(0.45, (width - 8) / width);
+    const sy = Math.max(0.45, (height - 8) / height);
+    const tx = (x + width / 2) * (1 - sx);
+    const ty = (y + height / 2) * (1 - sy);
+    const inner = geometry.replace(/fill="[^"]*"/g, 'fill="none"').replace(/stroke-width="[^"]*"/g, 'stroke-width="1"');
+    geometry += '<g transform="translate(' + tx + " " + ty + ') scale(' + sx + " " + sy + ')">' + inner + "</g>";
   }
 
   const text = wrapNodeText(node, clipId);
