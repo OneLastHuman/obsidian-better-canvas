@@ -4,10 +4,13 @@ import {
   Modal,
   Notice,
   Plugin,
+  SuggestModal,
   TFile
 } from "obsidian";
 import BetterCanvasFeatures from "./feature-integrator";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
+import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
+import { decorateCanvas } from "./enhancements";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import type { ModelCapabilityReport } from "./model-capabilities";
 import {
@@ -163,6 +166,43 @@ class TemplatePickerModal extends Modal {
   }
 }
 
+class CustomStylePresetModal extends SuggestModal<CustomStyleChoice> {
+  constructor(
+    app: App,
+    private readonly choices: CustomStyleChoice[],
+    private readonly onChoose: (choice: CustomStyleChoice) => void
+  ) {
+    super(app);
+    this.setPlaceholder("选择 CSS 自定义样式及其值");
+  }
+
+  getSuggestions(query: string): CustomStyleChoice[] {
+    const normalized = query.trim().toLocaleLowerCase();
+    if (!normalized) return this.choices;
+    return this.choices.filter(choice => [
+      choice.definition.label,
+      choice.definition.key,
+      choice.option.label,
+      choice.option.value ?? "null",
+      choice.definition.kind
+    ].join(" ").toLocaleLowerCase().includes(normalized));
+  }
+
+  renderSuggestion(choice: CustomStyleChoice, element: HTMLElement): void {
+    element.createEl("div", {
+      text: choice.definition.label + " — " + choice.option.label
+    });
+    element.createEl("small", {
+      text: (choice.definition.kind === "node" ? "节点" : "连线") + " · " +
+        choice.definition.key + " = " + (choice.option.value === null ? "null（重置）" : choice.option.value)
+    });
+  }
+
+  onChooseSuggestion(choice: CustomStyleChoice, _event: MouseEvent | KeyboardEvent): void {
+    this.onChoose(choice);
+  }
+}
+
 class PresentationModal extends Modal {
   private index = 0;
   private readonly keyHandler = (event: KeyboardEvent): void => {
@@ -310,6 +350,7 @@ export default class BetterCanvasPlugin extends Plugin {
     this.addCommand({ id: "add-web-link", name: "Better Canvas: 在画布中添加网页链接卡片", callback: () => this.addWebLink() });
     this.addCommand({ id: "save-node-template", name: "Better Canvas: 保存所选节点为模板", callback: () => this.saveNodeTemplate() });
     this.addCommand({ id: "insert-node-template", name: "Better Canvas: 插入节点模板", callback: () => this.insertNodeTemplate() });
+    this.addCommand({ id: "apply-css-style-preset", name: "Better Canvas: 应用 CSS 自定义样式预设", callback: () => { void this.applyCustomStylePreset(); } });
     this.addCommand({ id: "search-canvas", name: "Better Canvas: 搜索当前画布", callback: () => this.searchCanvas() });
     this.addCommand({ id: "start-presentation", name: "Better Canvas: 开始画布演示", callback: () => this.startPresentation() });
     this.addCommand({ id: "select-node-tree", name: "Better Canvas: 选择所选节点及其子树", callback: () => this.selectNodeTree() });
@@ -328,8 +369,107 @@ export default class BetterCanvasPlugin extends Plugin {
         this.selectNode(this.getCanvas(), String(node.id));
         this.autoLayout();
       }));
+      menu.addItem((item: any) => item.setTitle("Better Canvas: 应用 CSS 自定义样式预设").setIcon("palette").onClick(() => {
+        const canvas = this.getCanvas();
+        const internalNode = canvas?.nodes?.get?.(String(node.id));
+        if (internalNode) canvas.selectOnly?.(internalNode);
+        void this.applyCustomStylePreset();
+      }));
     });
     this.registerEvent(ref);
+  }
+
+  private async loadedCustomStyleDefinitions(): Promise<CustomStyleDefinition[]> {
+    const cssContents: string[] = [];
+    for (const sheet of Array.from(document.styleSheets)) {
+      const ownerNode = (sheet as CSSStyleSheet & { ownerNode?: Node | null }).ownerNode;
+      const inlineText = ownerNode?.textContent;
+      if (typeof inlineText === "string" && inlineText.trim()) {
+        cssContents.push(inlineText);
+        continue;
+      }
+      if (typeof sheet.href !== "string" || !sheet.href) continue;
+      const snippetPath = cssSnippetVaultPathFromHref(
+        sheet.href,
+        String((this.app.vault as any).configDir ?? "")
+      );
+      if (!snippetPath) continue;
+      try {
+        const text = await this.app.vault.adapter.read(snippetPath);
+        if (text.trim()) cssContents.push(text);
+      } catch {
+        // A snippet may disappear or be inaccessible during reload; keep scanning.
+      }
+    }
+    for (const styleElement of Array.from(document.querySelectorAll("style"))) {
+      const text = styleElement.textContent;
+      if (typeof text === "string" && text.trim()) cssContents.push(text);
+    }
+    return parseCssStyleDefinitions(cssContents.join("\n"));
+  }
+
+  private async applyCustomStylePreset(): Promise<void> {
+    const canvas = this.getCanvas();
+    if (!canvas) {
+      new Notice("请先打开一个 Obsidian Canvas。");
+      return;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，无法更改样式。");
+      return;
+    }
+
+    const selectedItems = Array.from(canvas.selection?.values?.() ?? []) as any[];
+    const selectedIds = [...new Set(selectedItems
+      .map(item => item?.id ?? item?.getData?.()?.id)
+      .filter((id): id is string => typeof id === "string"))];
+    const currentData = readCanvasData(canvas);
+    const selectedSet = new Set(selectedIds);
+    const nodeIds = currentData.nodes.filter(node => selectedSet.has(node.id)).map(node => node.id);
+    const edgeIds = currentData.edges.filter(edge => selectedSet.has(edge.id)).map(edge => edge.id);
+
+    if (nodeIds.length > 0 && edgeIds.length > 0) {
+      new Notice("请只选择节点或只选择连线，再应用 CSS 自定义样式。");
+      return;
+    }
+    const kind: CustomStyleKind | null = nodeIds.length > 0 ? "node" : edgeIds.length > 0 ? "edge" : null;
+    if (!kind) {
+      new Notice("请先选择一个或多个节点，或选择一个或多个连线。");
+      return;
+    }
+    const targetIds = kind === "node" ? nodeIds : edgeIds;
+    const definitions = (await this.loadedCustomStyleDefinitions()).filter(definition => definition.kind === kind);
+    const choices = definitions.flatMap(definition =>
+      definition.options.map(option => ({ definition, option }))
+    );
+    if (choices.length === 0) {
+      new Notice("未找到可用的" + (kind === "node" ? "节点" : "连线") +
+        "样式预设。请在已启用的 CSS snippet 中添加 @advanced-canvas-" + kind + "-style 配置。");
+      return;
+    }
+
+    new CustomStylePresetModal(this.app, choices, choice => {
+      if (this.getCanvas() !== canvas) {
+        new Notice("当前画布已切换；未应用样式。请在目标画布重新运行命令。");
+        return;
+      }
+      if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+        new Notice("当前 Canvas 处于只读模式，无法更改样式。");
+        return;
+      }
+      const latestData = readCanvasData(canvas);
+      const result = applyCustomStyleChoice(latestData, targetIds, choice.definition, choice.option.value);
+      if (result.updated === 0) {
+        new Notice("所选节点或连线已不存在，未应用样式。");
+        return;
+      }
+      canvas.importData(result.data);
+      canvas.requestSave?.();
+      canvas.requestFrame?.();
+      decorateCanvas(canvas);
+      new Notice("已将“" + choice.definition.label + " / " + choice.option.label + "”应用到 " +
+        result.updated + " 个" + (kind === "node" ? "节点" : "连线") + "。");
+    }).open();
   }
 
   private bindCanvasKeyboard(): void {
