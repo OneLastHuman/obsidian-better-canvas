@@ -51,3 +51,43 @@ describe("static SVG Markdown layout", () => {
     expect(lines.flatMap(line => line.runs).map(run => run.text).join("")).toBe("<script>alert(1)</script>");
   });
 });
+
+
+describe("Markdown table layout for SVG", () => {
+  it("parses header separators, cell alignment, inline formatting and escaped pipes", () => {
+    const lines = layoutMarkdownForSvg(
+      "| **Name** | Description | Score |\n|:---|:---:|---:|\n| Alpha | [documentation](https://example.com/private) | 10 |\n| Beta | value \\| total | 4 |",
+      72,
+      40,
+      16
+    );
+    expect(lines).toHaveLength(3);
+    expect(lines.every(line => Boolean(line.tableRow))).toBe(true);
+    const header = lines[0].tableRow!;
+    expect(header.isHeader).toBe(true);
+    expect(header.cells.map(cell => cell.align)).toEqual(["left", "center", "right"]);
+    expect(header.cells[0].lines[0].map(run => run.text).join("")).toBe("Name");
+    expect(header.cells[0].lines[0].some(run => run.style.bold)).toBe(true);
+    expect(lines[1].tableRow!.cells[1].lines[0].some(run => run.style.link)).toBe(true);
+    expect(lines[2].tableRow!.cells[1].lines.flat().map(run => run.text).join("")).toBe("value | total");
+    expect(lines[0].tableRow!.lineCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("wraps cell content and keeps the total table within the node height budget", () => {
+    const lines = layoutMarkdownForSvg(
+      "| First | Second |\n|---|---|\n| value | several words that need wrapping |\n| another | more content |",
+      24,
+      2,
+      16
+    );
+    expect(lines.length).toBe(1);
+    expect(lines[0].tableRow!.isHeader).toBe(true);
+    expect(lines[0].tableRow!.cells[1].lines.flat().map(run => run.text).join("")).toContain("…");
+  });
+
+  it("does not interpret pipe-like content in fenced code as a table", () => {
+    const lines = layoutMarkdownForSvg("\x60\x60\x60md\n| A | B |\n|---|---|\n\x60\x60\x60", 80, 10, 16);
+    expect(lines.every(line => !line.tableRow)).toBe(true);
+    expect(lines.map(line => line.runs.map(run => run.text).join("")).join("\n")).toBe("| A | B |\n|---|---|");
+  });
+});
