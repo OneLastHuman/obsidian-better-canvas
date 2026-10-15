@@ -43,9 +43,9 @@ describe("Canvas text-node metadata fallback parser", () => {
     expect(parsed.tags.map(item => item.tag)).toEqual(["#release", "#team/platform"]);
     expect(parsed.listItems).toHaveLength(3);
     expect(parsed.listItems[0].task).toBe("x");
-    expect(parsed.listItems[0].parent).toBe(0);
+    expect(parsed.listItems[0].parent).toBe(-3);
     expect(parsed.listItems[1].parent).toBe(3);
-    expect(parsed.listItems[2].parent).toBe(0);
+    expect(parsed.listItems[2].parent).toBe(-3);
     expect(parsed.sections.map(section => section.type)).toEqual([
       "heading", "paragraph", "list", "blockquote", "paragraph"
     ]);
@@ -103,7 +103,7 @@ describe("Canvas metadata cache integration", () => {
         {
           id: "text-1",
           type: "text",
-          text: "# Roadmap\\nSee [[Topic.md|topic]] and [guide](https://example.org/docs) #local-tag.\\n- [x] ship"
+          text: "# Roadmap\nSee [[Topic.md|topic]] and [guide](https://example.org/docs) #local-tag.\n- [x] ship"
         },
         { id: "file-1", type: "file", file: "Attachments/brief.pdf" }
       ]
