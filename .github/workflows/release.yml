@@ -40,7 +40,7 @@ jobs:
           const tag = process.env.RELEASE_TAG;
           const tagVersion = tag.startsWith("v") ? tag.slice(1) : "";
 
-          if (!/^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/.test(tagVersion)) {
+          if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(tagVersion)) {
             throw new Error(`Invalid release tag "${tag}". Expected vMAJOR.MINOR.PATCH, optionally with a prerelease suffix.`);
           }
           if (packageJson.version !== manifest.version) {
