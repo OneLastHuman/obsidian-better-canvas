@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Notice, TFile } from "obsidian";
+import { Modal, Notice, TFile } from "obsidian";
 import { CanvasPortalManager, hasMovedOpenPortal } from "./canvas-portals";
 
 vi.mock("obsidian", () => ({
   ItemView: class ItemView {},
+  Modal: class Modal {
+    app: unknown;
+    constructor(app: unknown) { this.app = app; }
+    open() { return this; }
+    close() {}
+  },
   Notice: vi.fn(),
   TFile: class TFile {
     extension: string;
@@ -45,7 +51,7 @@ function makeHarness(portalOpen = false) {
     },
     requestSave: vi.fn(),
     requestFrame: vi.fn(),
-    selection: { size: 1, values: () => [{ id: "portal" }] }
+    selection: { size: 1, values: () => new Set([{ id: "portal" }]).values() }
   };
   for (const node of canvas.data.nodes) canvas.nodes.set(node.id, { id: node.id });
   const view = { getViewType: () => "canvas", canvas, file: { path: "host.canvas" } };
@@ -158,6 +164,69 @@ describe("Canvas Portal target validation", () => {
 
     expect(hasMovedOpenPortal(previous, nodes)).toBe(true);
     expect(hasMovedOpenPortal(previous, nodes.slice(0, 1))).toBe(false);
+  });
+
+  it("registers a command and context-menu action for open Portals", () => {
+    const { plugin, manager } = makeHarness(true);
+    const commands: any[] = [];
+    const handlers = new Map<string, (...args: any[]) => void>();
+    plugin.addCommand = (command: any) => commands.push(command);
+    plugin.registerEvent = vi.fn();
+    plugin.register = vi.fn();
+    plugin.app.workspace.on = vi.fn((event: string, handler: (...args: any[]) => void) => {
+      handlers.set(event, handler);
+      return {};
+    });
+    plugin.app.workspace.onLayoutReady = vi.fn();
+    plugin.app.workspace.getLeavesOfType = vi.fn(() => []);
+    plugin.app.vault.on = vi.fn();
+
+    manager.start();
+
+    const command = commands.find(item => item.id === "bc-create-text-node-in-portal");
+    expect(command).toBeDefined();
+    const openModal = vi.spyOn(Modal.prototype, "open");
+    command.callback();
+    expect(openModal).toHaveBeenCalledOnce();
+
+    openModal.mockClear();
+    const items: any[] = [];
+    const menu = {
+      addItem: vi.fn((configure: (item: any) => unknown) => {
+        const item: any = {
+          setTitle(value: string) { this.title = value; return this; },
+          setIcon() { return this; },
+          onClick(callback: () => void) { this.action = callback; return this; }
+        };
+        configure(item);
+        items.push(item);
+        return item;
+      })
+    };
+    const nodeMenuHandler = handlers.get("canvas:node-menu");
+    expect(nodeMenuHandler).toBeDefined();
+    nodeMenuHandler?.(menu, {
+      id: "portal",
+      getData: () => ({
+        id: "portal", type: "file", file: "target.canvas",
+        x: 0, y: 0, width: 200, height: 160, portal: true
+      })
+    });
+    expect(menu.addItem).toHaveBeenCalledOnce();
+    expect(items[0].title).toBe("Better Canvas: 在 Portal 源画布中创建文本节点");
+    items[0].action();
+    expect(openModal).toHaveBeenCalledOnce();
+
+    openModal.mockClear();
+    menu.addItem.mockClear();
+    nodeMenuHandler?.(menu, {
+      id: "closed",
+      getData: () => ({
+        id: "closed", type: "file", file: "target.canvas",
+        x: 0, y: 0, width: 200, height: 160, portal: false
+      })
+    });
+    expect(menu.addItem).not.toHaveBeenCalled();
   });
 
   it("opens and saves a Portal only when the target Canvas file exists", () => {
