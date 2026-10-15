@@ -229,13 +229,6 @@ describe("Canvas Portal target validation", () => {
     expect(menu.addItem).not.toHaveBeenCalled();
   });
 
- portal: true }
-    ];
-
-    expect(hasMovedOpenPortal(previous, nodes)).toBe(true);
-    expect(hasMovedOpenPortal(previous, nodes.slice(0, 1))).toBe(false);
-  });
-
   it("opens and saves a Portal only when the target Canvas file exists", () => {
     const { canvas, plugin, manager } = makeHarness();
     plugin.app.vault.getAbstractFileByPath.mockReturnValue(makeTFile("canvas"));
