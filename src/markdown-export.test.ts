@@ -21,11 +21,11 @@ describe("flattenMarkdownForSvg", () => {
 
   it("removes code-fence delimiters but retains the code body and normalizes blank lines", () => {
     expect(flattenMarkdownForSvg("Before\n\n\x60\x60\x60ts\nconst value = \x60hello\x60;\n\x60\x60\x60\n\n\nAfter"))
-      .toBe("Before\n\nconst value = \\x60hello\\x60;\n\nAfter");
+      .toBe("Before\n\nconst value = \x60hello\x60;\n\nAfter");
   });
 
   it("does not strip Markdown-like characters from fenced code", () => {
-    expect(flattenMarkdownForSvg("\\x60\\x60\\x60js\\nconst bold = **literal**;\\n\\x60\\x60\\x60"))
+    expect(flattenMarkdownForSvg("\x60\x60\x60js\nconst bold = **literal**;\n\x60\x60\x60"))
       .toBe("const bold = **literal**;");
   });
 
