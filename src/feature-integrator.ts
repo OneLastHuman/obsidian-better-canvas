@@ -30,6 +30,7 @@ import {
   toggleGroupCollapse
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
+import { readCanvasFrontmatter, replaceCanvasFrontmatter } from "./canvas-frontmatter";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
 import { callSseMcpTool, listSseMcpTools } from "./mcp-sse";
@@ -449,6 +450,7 @@ export default class BetterCanvasFeatures {
     add("bc-style-selected-edges", "设置当前选中连线样式", () => this.edgeStyle());
     add("bc-set-edge-pathfinding", "设置选中连线路径算法", () => this.edgePathfinding());
     add("bc-edit-canvas-frontmatter", "编辑当前 Canvas frontmatter 属性", () => this.editCanvasFrontmatter());
+    add("bc-edit-canvas-frontmatter-json", "批量编辑当前 Canvas frontmatter（JSON）", () => this.editCanvasFrontmatterJson());
     add("bc-front-node", "将节点置于最前", () => this.reorder(true));
     add("bc-align-selection-grid", "将所选节点对齐到网格", () => this.alignSelectionToGrid());
     add("bc-toggle-readonly", "切换 Canvas 只读模式", () => this.toggleReadonly());
@@ -1822,6 +1824,45 @@ export default class BetterCanvasFeatures {
         }
       })();
     });
+  }
+
+  private editCanvasFrontmatterJson(): void {
+    const view = this.activeCanvasView();
+    const file = view?.file;
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas") {
+      new Notice("请先打开一个已保存的 .canvas 文件。");
+      return;
+    }
+
+    void (async () => {
+      try {
+        const raw = await this.p.app.vault.cachedRead(file);
+        const snapshot = readCanvasFrontmatter(raw);
+        this.input(
+          "批量编辑 Canvas frontmatter（JSON）",
+          "编辑完整 JSON 对象；输入 {} 可清空属性，Ctrl/Cmd+Enter 保存。",
+          valueInput => {
+            void (async () => {
+              try {
+                // Read the latest file again after the modal was opened, so
+                // node/edge edits made while the editor was open are retained.
+                const latestRaw = await this.p.app.vault.cachedRead(file);
+                const result = replaceCanvasFrontmatter(latestRaw, valueInput);
+                await this.p.app.vault.modify(file, result.serialized);
+                if (view?.canvas) view.canvas.metadata = result.metadata;
+                this.metadataIndexer?.refreshAll();
+                new Notice("已保存 Canvas frontmatter（" + Object.keys(result.frontmatter).length + " 个属性）。");
+              } catch (error) {
+                new Notice("保存 Canvas frontmatter 失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+              }
+            })();
+          },
+          JSON.stringify(snapshot.frontmatter, null, 2)
+        );
+      } catch (error) {
+        new Notice("读取 Canvas frontmatter 失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+      }
+    })();
   }
 
   private async ingest(raw: string, youtube: boolean): Promise<void> {
