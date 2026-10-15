@@ -302,7 +302,7 @@ export class CanvasMetadataIndexer {
       const values = Array.isArray(rawValue) ? rawValue : [rawValue];
       for (const value of values) {
         if (typeof value !== "string") continue;
-        const match = value.match(/^\\[\\[([^\\]|]+)(?:\\|([^\\]]+))?\\]\\]$/);
+        const match = value.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
         if (match) {
           metadata.frontmatterLinks.push({
             key,
@@ -316,9 +316,9 @@ export class CanvasMetadataIndexer {
 
     const rawTags = frontmatter.tags ?? frontmatter.tag;
     const frontmatterTags = (Array.isArray(rawTags) ? rawTags : typeof rawTags === "string" ? [rawTags] : [])
-      .flatMap((raw: unknown) => typeof raw === "string" ? raw.split(/[\\s,]+/) : [])
+      .flatMap((raw: unknown) => typeof raw === "string" ? raw.split(/[\s,]+/) : [])
       .map((tag: string) => tag.trim().replace(/^#+/, ""))
-      .filter((tag: string) => /^[\\p{L}\\p{N}_][\\p{L}\\p{N}_/-]*$/u.test(tag));
+      .filter((tag: string) => /^[\p{L}\p{N}_][\p{L}\p{N}_/-]*$/u.test(tag));
     for (const tag of frontmatterTags) {
       metadata.tags.push({
         tag: "#" + tag,
