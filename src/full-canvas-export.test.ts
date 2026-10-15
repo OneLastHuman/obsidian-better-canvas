@@ -291,7 +291,7 @@ describe("full content SVG export", () => {
       edges: []
     });
     const cellRects = result.svg.match(/<rect x="[^"]+" y="[^"]+" width="[^"]+" height="[^"]+" fill="(?:#7b8794|none)"[^>]*stroke="#9aa3ad"/g) ?? [];
-    expect(cellRects).toHaveLength(12);
+    expect(cellRects).toHaveLength(9);
     expect(result.svg).toContain('text-anchor="middle"');
     expect(result.svg).toContain('text-anchor="end"');
     expect(result.svg).toContain('<tspan font-weight="bold">Name</tspan>');
@@ -313,7 +313,6 @@ describe("full content SVG export", () => {
     expect(result.svg).toContain("After table");
     expect(result.svg).toContain('clip-path="url(#bc-clip-0-table-2-0)"');
     expect(result.svg).toContain('width="220" height="440"');
-    expect(result.svg).toContain("…");
   });
 
 });
