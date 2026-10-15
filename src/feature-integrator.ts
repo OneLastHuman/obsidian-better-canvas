@@ -16,6 +16,7 @@ import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityR
 import { parseProviderParamsJson } from "./provider-params";
 import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { connectedEdgeIds, selectedCanvasNodeIds } from "./edge-highlight";
 import { mergeCanvasExportData, viewportExportAppearance } from "./canvas-export-data";
 import { prepareViewportSvgExportClone, shouldIncludeViewportSvgNode } from "./canvas-viewport-export";
 import {
@@ -520,6 +521,7 @@ export default class BetterCanvasFeatures {
     if (!node) return;
     canvas.selectOnly?.(node);
     canvas.zoomToSelection?.();
+    this.applySelectionEdgeHighlight(canvas);
   }
 
   private input(title: string, placeholder: string, cb: (value: string) => unknown, initial = "", allowEmptySubmission = false): void {
@@ -655,6 +657,7 @@ export default class BetterCanvasFeatures {
       this.decorate(view.canvas);
       this.applyZoomBreakpoints(view.canvas);
       this.applyFocus(view.canvas);
+      this.applySelectionEdgeHighlight(view.canvas);
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
     }
   }
@@ -1005,6 +1008,7 @@ export default class BetterCanvasFeatures {
         if (!canvas) return;
         this.decorate(canvas);
         this.applyZoomBreakpoints(canvas);
+        this.applySelectionEdgeHighlight(canvas);
       });
     };
     container.addEventListener("pointerup", schedule, true);
@@ -1275,6 +1279,25 @@ export default class BetterCanvasFeatures {
       const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
       const related = Boolean(root) && (edgeData.fromNode === root || edgeData.toNode === root);
       if (path instanceof SVGElement) path.classList.toggle("bc-focus-dimmed", Boolean(root) && !related);
+    }
+  }
+
+  /**
+   * Highlight every edge incident to the current node selection.
+   * This is visual-only: Canvas JSON and the current selection remain untouched.
+   */
+  private applySelectionEdgeHighlight(canvas: any): void {
+    if (!canvas) return;
+    const data = readCanvasData(canvas);
+    const nodeIds = new Set(data.nodes.map(node => node.id));
+    const selected = selectedCanvasNodeIds(canvas, nodeIds);
+    const highlighted = connectedEdgeIds(data.edges, selected);
+    for (const edgeData of data.edges) {
+      const edge = canvas.edges?.get?.(edgeData.id);
+      const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
+      if (path instanceof SVGElement) {
+        path.classList.toggle("bc-selection-related", highlighted.has(edgeData.id));
+      }
     }
   }
 
