@@ -100,8 +100,10 @@ export function emitAIUsageEvent(
   counts: AIUsageTokenCounts = {}
 ): void {
   if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+  const timestamp = Date.now();
+  const uniqueId = `${timestamp}-${Math.random().toString(36).slice(2, 10)}`;
   window.dispatchEvent(new CustomEvent(AI_USAGE_EVENT, {
-    detail: { protocol, model, ...counts, timestamp: Date.now() }
+    detail: { id: uniqueId, protocol, model, ...counts, timestamp }
   }));
 }
 
