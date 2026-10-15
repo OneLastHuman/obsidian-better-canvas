@@ -3,6 +3,7 @@ import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedProm
 import { modelCapabilityReportKey, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
+import { validateNumericRangeInput } from "./numeric-range-validation";
 
 type SettingSection = {
   id: string;
@@ -10,6 +11,8 @@ type SettingSection = {
   title: string;
   description: string;
 };
+
+let numericRangeDescriptionId = 0;
 
 export default class BetterCanvasSettingsTab extends PluginSettingTab {
   private plugin: any;
@@ -134,6 +137,47 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     await this.features.save();
   }
 
+  private addNumericRangeSetting(
+    page: HTMLElement,
+    name: string,
+    currentValue: number,
+    min: number,
+    max: number,
+    onValidChange: (value: number) => Promise<void>,
+    options: { description?: string; step?: string; integer?: boolean; allowEmpty?: boolean } = {}
+  ): void {
+    const setting = new Setting(page).setName(name);
+    if (options.description) setting.setDesc(options.description);
+
+    setting.addText(text => {
+      const input = text.inputEl;
+      input.type = "number";
+      input.min = String(min);
+      input.max = String(max);
+      if (options.step) input.step = options.step;
+
+      const feedback = setting.descEl.createEl("span", { cls: "bc-settings-number-error" });
+      feedback.hidden = true;
+      feedback.setAttribute("role", "status");
+      feedback.setAttribute("aria-live", "polite");
+
+      const descriptionId = setting.descEl.id || ("bc-settings-number-description-" + (++numericRangeDescriptionId));
+      setting.descEl.id = descriptionId;
+      const describedBy = new Set((input.getAttribute("aria-describedby") || "").split(" ").filter(Boolean));
+      describedBy.add(descriptionId);
+      input.setAttribute("aria-describedby", Array.from(describedBy).join(" "));
+
+      text.setValue(String(currentValue)).onChange(async rawValue => {
+        const number = validateNumericRangeInput(rawValue, min, max, input, feedback, {
+          integer: options.integer,
+          allowEmpty: options.allowEmpty
+        });
+        if (number === null) return;
+        await onValidChange(number);
+      });
+    });
+  }
+
   private renderCanvasSettings(page: HTMLElement): void {
     const settings = this.features.settings() as any;
 
@@ -149,75 +193,30 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           await this.features.save();
         }));
 
-    new Setting(page).setName("水平间距")
-      .addText(text => {
-        text.inputEl.type = "number";
-        text.inputEl.min = "0";
-        text.inputEl.max = "1000";
-        text.setValue(String(this.plugin.settings.gapX ?? 100)).onChange(async value => {
-          const number = Number(value);
-          if (Number.isFinite(number) && number >= 0 && number <= 1000) {
-            this.plugin.settings.gapX = number;
-            await this.features.save();
-          }
-        });
-      });
+    this.addNumericRangeSetting(page, "水平间距", this.plugin.settings.gapX ?? 100, 0, 1000, async number => {
+      this.plugin.settings.gapX = number;
+      await this.features.save();
+    });
 
-    new Setting(page).setName("垂直间距")
-      .addText(text => {
-        text.inputEl.type = "number";
-        text.inputEl.min = "0";
-        text.inputEl.max = "1000";
-        text.setValue(String(this.plugin.settings.gapY ?? 44)).onChange(async value => {
-          const number = Number(value);
-          if (Number.isFinite(number) && number >= 0 && number <= 1000) {
-            this.plugin.settings.gapY = number;
-            await this.features.save();
-          }
-        });
-      });
+    this.addNumericRangeSetting(page, "垂直间距", this.plugin.settings.gapY ?? 44, 0, 1000, async number => {
+      this.plugin.settings.gapY = number;
+      await this.features.save();
+    });
 
-    new Setting(page).setName("网格大小")
-      .addText(text => {
-        text.inputEl.type = "number";
-        text.inputEl.min = "1";
-        text.inputEl.max = "500";
-        text.setValue(String(settings.gridSize ?? 20)).onChange(async value => {
-          const number = Number(value);
-          if (Number.isFinite(number) && number >= 1 && number <= 500) {
-            settings.gridSize = number;
-            await this.features.save();
-          }
-        });
-      });
+    this.addNumericRangeSetting(page, "网格大小", settings.gridSize ?? 20, 1, 500, async number => {
+      settings.gridSize = number;
+      await this.features.save();
+    });
 
-    new Setting(page).setName("默认节点宽度")
-      .addText(text => {
-        text.inputEl.type = "number";
-        text.inputEl.min = "120";
-        text.inputEl.max = "1200";
-        text.setValue(String(settings.defaultNodeWidth ?? 280)).onChange(async value => {
-          const number = Number(value);
-          if (Number.isFinite(number) && number >= 120 && number <= 1200) {
-            settings.defaultNodeWidth = number;
-            await this.features.save();
-          }
-        });
-      });
+    this.addNumericRangeSetting(page, "默认节点宽度", settings.defaultNodeWidth ?? 280, 120, 1200, async number => {
+      settings.defaultNodeWidth = number;
+      await this.features.save();
+    });
 
-    new Setting(page).setName("默认节点高度")
-      .addText(text => {
-        text.inputEl.type = "number";
-        text.inputEl.min = "80";
-        text.inputEl.max = "1000";
-        text.setValue(String(settings.defaultNodeHeight ?? 140)).onChange(async value => {
-          const number = Number(value);
-          if (Number.isFinite(number) && number >= 80 && number <= 1000) {
-            settings.defaultNodeHeight = number;
-            await this.features.save();
-          }
-        });
-      });
+    this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, 80, 1000, async number => {
+      settings.defaultNodeHeight = number;
+      await this.features.save();
+    });
 
     new Setting(page).setName("Tab 创建子节点")
       .setDesc("关闭后，Tab 不会被 Better Canvas 拦截，可继续使用 Obsidian 或其他插件的快捷键。")
@@ -397,42 +396,42 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           await this.saveProvider(profile, settings);
         }));
 
-      new Setting(card).setName("Temperature")
-        .setDesc(profile.protocol === "anthropic" ? "Anthropic 范围 0 到 1；留空或无效输入不会覆盖上一次有效值。" : "范围 0 到 2；留空或无效输入不会覆盖上一次有效值。")
-        .addText(text => {
-          text.inputEl.type = "number";
-          text.inputEl.min = "0";
-          text.inputEl.max = profile.protocol === "anthropic" ? "1" : "2";
-          text.inputEl.step = "0.1";
-          text.setValue(String(typeof profile.temperature === "number" ? profile.temperature : 0.4))
-            .onChange(async value => {
-              if (!value.trim()) return;
-              const number = Number(value);
-              const maxTemperature = profile.protocol === "anthropic" ? 1 : 2;
-              if (Number.isFinite(number) && number >= 0 && number <= maxTemperature) {
-                profile.temperature = number;
-                await this.saveProvider(profile, settings);
-              }
-            });
-        });
+      this.addNumericRangeSetting(
+        card,
+        "Temperature",
+        typeof profile.temperature === "number" ? profile.temperature : 0.4,
+        0,
+        profile.protocol === "anthropic" ? 1 : 2,
+        async number => {
+          profile.temperature = number;
+          await this.saveProvider(profile, settings);
+        },
+        {
+          description: profile.protocol === "anthropic"
+            ? "Anthropic 范围 0 到 1；留空或无效输入不会覆盖上一次有效值。"
+            : "范围 0 到 2；留空或无效输入不会覆盖上一次有效值。",
+          step: "0.1",
+          allowEmpty: true
+        }
+      );
 
-      new Setting(card).setName("最大输出 token 数")
-        .setDesc("0 表示使用协议适配器默认值；只限制输出，不是模型上下文长度。")
-        .addText(text => {
-          text.inputEl.type = "number";
-          text.inputEl.min = "0";
-          text.inputEl.max = "200000";
-          text.inputEl.step = "1";
-          text.setValue(String(typeof profile.maxOutputTokens === "number" ? profile.maxOutputTokens : 0))
-            .onChange(async value => {
-              if (!value.trim()) return;
-              const number = Number(value);
-              if (Number.isInteger(number) && number >= 0 && number <= 200000) {
-                profile.maxOutputTokens = number;
-                await this.saveProvider(profile, settings);
-              }
-            });
-        });
+      this.addNumericRangeSetting(
+        card,
+        "最大输出 token 数",
+        typeof profile.maxOutputTokens === "number" ? profile.maxOutputTokens : 0,
+        0,
+        200000,
+        async number => {
+          profile.maxOutputTokens = number;
+          await this.saveProvider(profile, settings);
+        },
+        {
+          description: "0 表示使用协议适配器默认值；只限制输出，不是模型上下文长度。",
+          step: "1",
+          integer: true,
+          allowEmpty: true
+        }
+      );
 
       const paramsStatus = card.createEl("p", { cls: "bc-settings-params-status" });
       new Setting(card).setName("高级请求参数（JSON）")
