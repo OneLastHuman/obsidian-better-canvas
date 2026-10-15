@@ -19,7 +19,7 @@ describe("full content SVG export", () => {
     expect(result.height).toBe(300);
     expect(result.svg).toContain('viewBox="0 0 740 300"');
     expect(result.svg).toContain("Root &amp; &lt;notes&gt;");
-    expect(result.svg).toContain("marker-end=\"url(#bc-arrow)\"");
+    expect(result.svg).toMatch(/marker-end="url\(#bc-arrow-\d+-end\)"/);
     expect(result.svg).toContain("<polygon");
   });
 
