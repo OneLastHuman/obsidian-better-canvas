@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canvasDataToFullSvg } from "./full-canvas-export";
+import { canvasDataForSelection, canvasDataToFullSvg } from "./full-canvas-export";
 import type { CanvasData } from "./canvas";
 
 const sample: CanvasData = {
@@ -204,6 +204,32 @@ describe("full content SVG export", () => {
     const edge = result.match(/<path id="bc-edge-0"[^>]*>/)?.[0] ?? "";
     expect(edge).toContain("d=");
     expect(edge.split(" L ").length - 1).toBeGreaterThan(1);
+  });
+
+  it("exports only selected nodes and edges whose endpoints are both selected", () => {
+    const data = {
+      nodes: [
+        { id: "a", type: "text" as const, x: 0, y: 0, width: 100, height: 80, text: "A" },
+        { id: "b", type: "text" as const, x: 150, y: 0, width: 100, height: 80, text: "B" },
+        { id: "c", type: "text" as const, x: 300, y: 0, width: 100, height: 80, text: "C" }
+      ],
+      edges: [
+        { id: "ab", fromNode: "a", toNode: "b" },
+        { id: "bc", fromNode: "b", toNode: "c" },
+        { id: "ac", fromNode: "a", toNode: "c" }
+      ],
+      metadata: { keep: true }
+    };
+    const selection = canvasDataForSelection(data, ["a", "b"]);
+    expect(selection.nodes.map(node => node.id)).toEqual(["a", "b"]);
+    expect(selection.edges.map(edge => edge.id)).toEqual(["ab"]);
+    expect(selection.metadata).toEqual({ keep: true });
+  });
+
+  it("returns an empty selection without leaking unrelated edges", () => {
+    const result = canvasDataForSelection({ nodes: [], edges: [] }, []);
+    expect(result.nodes).toEqual([]);
+    expect(result.edges).toEqual([]);
   });
 
   it("supports an optional background and empty canvas", () => {
