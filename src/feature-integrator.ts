@@ -676,7 +676,7 @@ export default class BetterCanvasFeatures {
   private decorate(canvas: any): void {
     decorateCanvas(canvas);
     const data = readCanvasData(canvas);
-    syncHtmlPreviews(canvas, data);
+    syncHtmlPreviews(canvas, data, this.p.app.vault);
     for (const item of data.nodes) {
       const node = canvas.nodes?.get?.(item.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;

@@ -86,11 +86,57 @@ export function syncHtmlPreviewNode(canvas: any, node: CanvasNodeData): void {
   element.classList.add("bc-has-html-preview");
 }
 
-export function syncHtmlPreviews(canvas: any, data?: CanvasData): void {
+export function isHtmlPreviewCandidate(node: CanvasNodeData): boolean {
+  if (node.type === "text") return typeof node.text === "string";
+  return node.type === "file" && typeof node.file === "string" && /\.md$/i.test(node.file);
+}
+
+/**
+ * Sync text nodes immediately and load Markdown file-node contents from Vault.
+ * Re-check node identity after async reads so deleted/repointed nodes aren't decorated.
+ */
+export function syncHtmlPreviews(canvas: any, data?: CanvasData, vault?: any): void {
   const nodes = data?.nodes ?? (canvas?.getData?.()?.nodes ?? []);
+  const currentNodes = () => readCanvasNodes(canvas);
+  const fileReads = new Map<string, Promise<string>>();
+
   for (const node of nodes) {
     if (node.type === "text" && typeof node.text === "string") {
       syncHtmlPreviewNode(canvas, node);
+      continue;
     }
+    if (node.type !== "file" || !isHtmlPreviewCandidate(node)) continue;
+
+    const path = node.file;
+    const file = vault?.getAbstractFileByPath?.(path);
+    if (!file || String(file.extension ?? path.split(".").pop() ?? "").toLowerCase() !== "md" ||
+        typeof vault?.cachedRead !== "function") {
+      syncHtmlPreviewNode(canvas, { ...node, type: "text", text: "" } as CanvasNodeData);
+      continue;
+    }
+
+    let read = fileReads.get(path);
+    if (!read) {
+      read = Promise.resolve(vault.cachedRead(file)).then((text: unknown) => {
+        if (typeof text !== "string") throw new Error("Markdown file content was not text.");
+        return text;
+      });
+      fileReads.set(path, read);
+    }
+    void read.then(text => {
+      const current = currentNodes().find(candidate => candidate.id === node.id);
+      if (!current || current.type !== "file" || current.file !== path) return;
+      syncHtmlPreviewNode(canvas, { ...current, type: "text", text } as CanvasNodeData);
+    }).catch(() => {
+      const current = currentNodes().find(candidate => candidate.id === node.id);
+      if (current?.type === "file" && current.file === path) {
+        syncHtmlPreviewNode(canvas, { ...current, type: "text", text: "" } as CanvasNodeData);
+      }
+    });
   }
+}
+
+function readCanvasNodes(canvas: any): CanvasNodeData[] {
+  const nodes = canvas?.getData?.()?.nodes;
+  return Array.isArray(nodes) ? nodes : [];
 }
