@@ -17,7 +17,7 @@ describe("extractAutoEdgeTargets", () => {
 
   it("preserves target order while deduplicating repeated links", () => {
     expect(extractAutoEdgeTargets("first [[B]] then [[A]] then [[B]]"))
-      .toEqual(["first [[B]] then [[A]] then [[B]]", "B", "A"]);
+      .toEqual(["B", "A"]);
   });
 });
 
