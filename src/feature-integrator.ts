@@ -43,7 +43,7 @@ import { PdfAnnotationManager } from "./pdf-annotations";
 import { extractPdfPages } from "./pdf-context";
 import { CanvasPortalManager } from "./canvas-portals";
 import { canEmbedExportMedia, estimateDataUrlByteLength, scaleSvgIntrinsicDimensions } from "./export-utils";
-import { canvasDataToFullSvg } from "./full-canvas-export";
+import { canvasDataForSelection, canvasDataToFullSvg } from "./full-canvas-export";
 import { extractWikiLinks } from "./canvas-links";
 import { discoverModels } from "./model-discovery";
 import { syncHtmlPreviews } from "./html-preview";
