@@ -15,7 +15,9 @@ import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateI
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
 import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
-import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { mergeCanvasExportData, viewportExportAppearance } from "./canvas-export-data";
+import { prepareViewportSvgExportClone, shouldIncludeViewportSvgNode } from "./canvas-viewport-export";
 import {
   colorIncidentEdges,
   decorateCanvas,
@@ -1810,7 +1812,22 @@ export default class BetterCanvasFeatures {
     await this.ensureFolder(folder);
     if (format === "canvas") {
       const filePath = await this.uniquePath(folder + "/" + baseName + "-export", "canvas");
-      await this.p.app.vault.create(filePath, JSON.stringify(readCanvasData(canvas), null, 2));
+      const liveData = readCanvasData(canvas);
+      let exportData = liveData;
+      const sourceFile = view?.file;
+      if (sourceFile instanceof TFile && sourceFile.extension === "canvas") {
+        try {
+          const source = JSON.parse(await this.p.app.vault.read(sourceFile)) as CanvasData;
+          if (!Array.isArray(source?.nodes) || !Array.isArray(source?.edges)) {
+            throw new Error("原 Canvas 文件缺少 nodes 或 edges。");
+          }
+          exportData = mergeCanvasExportData(liveData, source);
+        } catch (error) {
+          new Notice("无法读取原 Canvas 的完整字段；导出将仅包含当前画布数据。", 8000);
+          console.warn("Better Canvas could not preserve all source JSON fields during export:", error);
+        }
+      }
+      await this.p.app.vault.create(filePath, JSON.stringify(exportData, null, 2));
       new Notice("已导出 " + filePath);
       return;
     }
@@ -1833,11 +1850,12 @@ export default class BetterCanvasFeatures {
       const exportOptions: any = {
         cacheBust: true,
         pixelRatio,
-        ...(backgroundColor ? { backgroundColor } : {})
+        ...viewportExportAppearance(backgroundColor)
       };
+      const svgContainer = format === "svg" ? prepareViewportSvgExportClone(container) : container;
       const dataUrl = format === "png"
         ? await toPng(container, exportOptions)
-        : await toSvg(container, exportOptions);
+        : await toSvg(svgContainer, { ...exportOptions, filter: shouldIncludeViewportSvgNode });
       const filePath = await this.uniquePath(folder + "/" + baseName + "-export", format);
       const comma = dataUrl.indexOf(",");
       if (comma < 0) throw new Error("导出图像的数据 URL 格式无效。");
