@@ -21,6 +21,7 @@ describe("MCP resources and prompts catalog", () => {
       nextCursor: "next"
     })).toEqual({
       items: [{ uri: "file:///safe.txt", name: "Safe", mimeType: "text/plain" }],
+      rawEntryCount: 3,
       nextCursor: "next"
     });
     expect(normalizeMcpPromptPage({
@@ -28,7 +29,10 @@ describe("MCP resources and prompts catalog", () => {
         { name: "review", arguments: [{ name: "topic", required: true }, { name: 7 }] },
         { name: "" }
       ]
-    })).toEqual({ items: [{ name: "review", arguments: [{ name: "topic", required: true }] }] });
+    })).toEqual({
+      items: [{ name: "review", arguments: [{ name: "topic", required: true }] }],
+      rawEntryCount: 2
+    });
   });
 
   it("follows cursor pages, deduplicates entries and rejects repeated cursors", async () => {
@@ -50,6 +54,41 @@ describe("MCP resources and prompts catalog", () => {
       nextCursor: "page-" + String(Number((cursor ?? "page-0").replace("page-", "")) + 1)
     });
     await expect(collectMcpCatalogPages(fetchPage, item => String(item), 2)).rejects.toThrow(/2-page safety limit/);
+  });
+
+  it("counts duplicate entries before deduplication across catalog pages", async () => {
+    const duplicatePage = Array.from({ length: 600 }, () => ({ id: "same" }));
+    const fetchPage = async (cursor?: string) => ({
+      items: duplicatePage,
+      rawEntryCount: duplicatePage.length,
+      ...(cursor ? {} : { nextCursor: "page-2" })
+    });
+
+    await expect(collectMcpCatalogPages(fetchPage, item => item.id))
+      .rejects.toThrow(/1000-entry safety limit/);
+  });
+
+  it("counts malformed raw rows even when normalization discards them", async () => {
+    const page = normalizeMcpResourcePage({
+      resources: Array.from({ length: 1001 }, () => ({ uri: " " }))
+    });
+    expect(page.items).toEqual([]);
+    expect(page.rawEntryCount).toBe(1001);
+
+    await expect(collectMcpCatalogPages(async () => page, item => item.uri))
+      .rejects.toThrow(/1000-entry safety limit/);
+  });
+
+  it("does not allow callers to raise the hard 50-page safety limit", async () => {
+    let calls = 0;
+    const fetchPage = async () => ({
+      items: [],
+      nextCursor: "page-" + String(calls++)
+    });
+
+    await expect(collectMcpCatalogPages(fetchPage, item => String(item), 1000))
+      .rejects.toThrow(/50-page safety limit/);
+    expect(calls).toBe(50);
   });
 
   it("validates prompt arguments as a JSON object of string values", () => {
