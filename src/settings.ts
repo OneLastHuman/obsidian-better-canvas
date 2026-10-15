@@ -215,6 +215,42 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         });
       });
 
+    new Setting(page).setName("Tab 创建子节点")
+      .setDesc("关闭后，Tab 不会被 Better Canvas 拦截，可继续使用 Obsidian 或其他插件的快捷键。")
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.mindMapShortcutChildTabEnabled !== false)
+        .onChange(async value => {
+          this.plugin.settings.mindMapShortcutChildTabEnabled = value;
+          await this.features.save();
+        }));
+
+    new Setting(page).setName("Enter 创建同级节点")
+      .setDesc("关闭后，Enter 不会被 Better Canvas 用于创建同级节点。")
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.mindMapShortcutSiblingEnterEnabled !== false)
+        .onChange(async value => {
+          this.plugin.settings.mindMapShortcutSiblingEnterEnabled = value;
+          await this.features.save();
+        }));
+
+    new Setting(page).setName("Alt + 方向键导航节点")
+      .setDesc("关闭后，Alt + 方向键不会触发 Better Canvas 的相邻节点导航。")
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.mindMapShortcutAltArrowNavigationEnabled !== false)
+        .onChange(async value => {
+          this.plugin.settings.mindMapShortcutAltArrowNavigationEnabled = value;
+          await this.features.save();
+        }));
+
+    new Setting(page).setName("Ctrl/Cmd + 方向键创建方向节点")
+      .setDesc("关闭后，Ctrl/Cmd + 方向键及其 Shift 变体不会被 Better Canvas 拦截。")
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.mindMapShortcutDirectionalCreationEnabled !== false)
+        .onChange(async value => {
+          this.plugin.settings.mindMapShortcutDirectionalCreationEnabled = value;
+          await this.features.save();
+        }));
+
     new Setting(page).setName("自动创建文件节点连线")
       .setDesc("读取 Markdown frontmatter 中的关联文件。")
       .addToggle(toggle => toggle.setValue(Boolean(settings.autoFileNodeEdgesEnabled)).onChange(async value => {
