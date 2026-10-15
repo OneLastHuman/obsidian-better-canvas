@@ -132,6 +132,7 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 - LR、RL、TB、BT 布局方向及非树结构；
 - 导入和更新之后保留未知扩展字段、节点样式和连线属性；
 - 选择 0/1/多个节点时的行为和通知。
+- Zoom breakpoint：将 Obsidian 的 log2 zoom 转为线性 scale；测试 0/1/负值、接近断点、等于断点、非有限值，并验证内容只在 scale 小于断点时隐藏。
 
 ### 插件命令与键盘操作
 - 每个命令都在正确的 view/selection 状态下执行；
