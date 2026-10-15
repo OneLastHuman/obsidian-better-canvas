@@ -9,6 +9,7 @@ import {
 import { chatCompletion, generateImage } from "./ai";
 import BetterCanvasFeatures from "./feature-integrator";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
+import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import {
   CanvasNodeData,
   LayoutDirection,
@@ -52,6 +53,8 @@ interface BetterCanvasSettings {
   mindMapShortcutSiblingEnterEnabled: boolean;
   mindMapShortcutAltArrowNavigationEnabled: boolean;
   mindMapShortcutDirectionalCreationEnabled: boolean;
+  systemPromptProfiles: NamedPromptProfile[];
+  activeSystemPromptProfile: string;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -70,7 +73,9 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   mindMapShortcutChildTabEnabled: true,
   mindMapShortcutSiblingEnterEnabled: true,
   mindMapShortcutAltArrowNavigationEnabled: true,
-  mindMapShortcutDirectionalCreationEnabled: true
+  mindMapShortcutDirectionalCreationEnabled: true,
+  systemPromptProfiles: [],
+  activeSystemPromptProfile: ""
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
@@ -233,6 +238,7 @@ export default class BetterCanvasPlugin extends Plugin {
   async onload(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
     this.settings.templates = Array.isArray(this.settings.templates) ? this.settings.templates : [];
+    this.settings.systemPromptProfiles = normalizeNamedPromptProfiles(this.settings.systemPromptProfiles);
 
     this.registerCommands();
     this.registerCanvasContextMenu();
