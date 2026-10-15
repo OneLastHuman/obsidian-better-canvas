@@ -19,6 +19,22 @@ export interface McpPrompt {
   arguments: McpPromptArgument[];
 }
 
+export function parseMcpPromptArguments(raw: string): Record<string, string> {
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { throw new Error("MCP prompt 参数不是有效 JSON。"); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("MCP prompt 参数必须是 JSON object。");
+  }
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!key.trim() || typeof value !== "string") {
+      throw new Error("MCP prompt 的每个参数都必须是有名称的字符串。");
+    }
+    output[key] = value;
+  }
+  return output;
+}
+
 export interface McpCatalogPage<T> {
   items: T[];
   nextCursor?: string;
