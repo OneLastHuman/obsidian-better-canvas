@@ -42,7 +42,7 @@ import {
   callRemoteTool, getRemotePrompt, listRemotePrompts, listRemoteResources, listRemoteTools, readRemoteResource, RemoteMcpResult
 } from "./mcp";
 import {
-  callLocalMcpTool, getLocalMcpPrompt, listLocalMcpPrompts, listLocalMcpResources, listLocalMcpTools, readLocalMcpResource
+  callLocalMcpTool, closeAllLocalMcpSessions, getLocalMcpPrompt, listLocalMcpPrompts, listLocalMcpResources, listLocalMcpTools, readLocalMcpResource
 } from "./mcp-stdio";
 import {
   callSseMcpTool, getSseMcpPrompt, listSseMcpPrompts, listSseMcpResources, listSseMcpTools, readSseMcpResource
@@ -261,7 +261,10 @@ export default class BetterCanvasFeatures {
     this.pdfAnnotations.start();
     this.portalManager = new CanvasPortalManager(this.p);
     this.portalManager.start();
-    this.p.register(() => this.cleanup());
+    this.p.register(() => {
+      this.cleanup();
+      closeAllLocalMcpSessions();
+    });
     this.registerCommands();
     this.registerCanvasMenus();
     this.registerMarkdownNodeEmbeds();
