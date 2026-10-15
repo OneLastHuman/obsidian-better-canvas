@@ -14,6 +14,7 @@ import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
+import { canvasZoomToScale, isZoomBreakpointHidden } from "./zoom-breakpoints";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
@@ -888,8 +889,10 @@ export default class BetterCanvasFeatures {
   }
 
   private applyZoomBreakpoints(canvas: any): void {
-    const zoom = Number(canvas?.zoom);
-    if (!Number.isFinite(zoom)) return;
+    // Obsidian Canvas exposes zoom as log2(scale), while our stored values and
+    // --variable-breakpoint are linear scale ratios (for example, 0.6 = 60%).
+    const scale = canvasZoomToScale(canvas?.zoom);
+    if (scale === undefined) return;
     for (const nodeData of readCanvasData(canvas).nodes) {
       const node = canvas?.nodes?.get?.(nodeData.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
@@ -898,11 +901,12 @@ export default class BetterCanvasFeatures {
       const cssValue = window.getComputedStyle(element).getPropertyValue("--variable-breakpoint").trim();
       const cssBreakpoint = cssValue ? Number.parseFloat(cssValue) : NaN;
       const breakpoint = typeof stored === "number" && Number.isFinite(stored) ? stored : cssBreakpoint;
-      if (!Number.isFinite(breakpoint)) {
+      const hidden = isZoomBreakpointHidden(scale, breakpoint);
+      if (hidden === undefined) {
         delete element.dataset.bcBreakpointHidden;
         continue;
       }
-      element.dataset.bcBreakpointHidden = String(zoom <= breakpoint);
+      element.dataset.bcBreakpointHidden = String(hidden);
     }
   }
   private setNodeCustomClass(): void {
