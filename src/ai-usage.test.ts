@@ -6,7 +6,7 @@ import {
   mergeUsageCounts,
   normalizeAIUsageRecord,
   parseAIModelPriceTable
-} from "./ai-usage";
+} from "./ai-usage-core";
 
 describe("AI usage normalization", () => {
   it("reads OpenAI-compatible usage", () => {
