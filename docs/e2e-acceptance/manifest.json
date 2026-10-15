@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15T06:52:32.739Z",
+  "generatedAt": "2026-10-15T07:11:18.969Z",
   "testedCommit": "8c693e7530b882564654433eae47cc20f2cf61ba",
   "testedSubject": "build: refresh installable plugin bundle",
   "mainJsSha256": "b229962acc2b2cac2d7bd3cfb541e7f73775d6d11aaf29303e4697ba6cb26240",
@@ -123,6 +123,18 @@
       {
         "file": "02-palette-e7949fe6.png",
         "caption": "同一现象的复现截图（面板文本提取结果：Better CanvasBetter Canvas: 根据所选节点生成图片 × 2）"
+      }
+    ],
+    "86": [
+      {
+        "file": "01-pinned-pdf-render.png",
+        "caption": "分页卡片为空白页：加载失败状态、错误标题与纯白画布"
+      }
+    ],
+    "88": [
+      {
+        "file": "01-generate-image-invalid-payload.png",
+        "caption": "非图片负载被当作 .png 保存并插入节点，界面只显示成功提示"
       }
     ]
   }
