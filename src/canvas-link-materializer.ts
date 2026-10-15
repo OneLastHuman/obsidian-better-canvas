@@ -4,6 +4,7 @@ export interface MaterializableCanvasLink {
   target: string;
   sourcePath: string;
   external?: boolean;
+  sourceNodeId?: string;
 }
 
 /** Canonical keys are used to avoid adding duplicate file/URL nodes. */
