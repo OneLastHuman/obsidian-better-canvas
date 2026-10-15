@@ -45,7 +45,7 @@ function makeHarness(portalOpen = false) {
     importData(next: any) { this.data = next; },
     requestSave: vi.fn(),
     requestFrame: vi.fn(),
-    selection: { size: 1, values: () => [{ id: "portal" }] }
+    selection: { size: 1, values: () => new Set([{ id: "portal" }]).values() }
   };
   const view = { getViewType: () => "canvas", canvas, file: { path: "host.canvas" } };
   const plugin: any = {
