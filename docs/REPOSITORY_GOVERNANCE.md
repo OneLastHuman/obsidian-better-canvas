@@ -1,6 +1,6 @@
 # 仓库治理与 Agent 协作规范
 
-本文定义 Better Canvas 的任务入口、Agent 协作、Issue/PR 生命周期、分支约定和合并门禁。它补充而不替代根目录的 AGENTS.md；测试命令与测试分层仍以 AGENTS.md 为准。
+本文定义 Better Canvas 的任务入口、Agent 协作、Issue/PR 生命周期、分支约定和合并门禁。根目录 [AGENTS.md](../AGENTS.md) 是 Agent 工作入口；所有测试方法、测试层级、回归清单与验证证据标准统一以 [测试与验证规范](TESTING.md) 为准。
 
 本项目当前只以 GitHub 仓库中的 Issue、Pull Request、代码、文档和 Actions 为工作依据。不建立或维护 Slack、社交媒体、论坛等外部社群监控流程。
 
