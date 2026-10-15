@@ -170,6 +170,42 @@ describe("full content SVG export", () => {
     expect(result.svg).toContain('fill="none"');
   });
 
+  it("preserves direct and square pathfinding when exporting full Canvas SVG", () => {
+    const nodes = [
+      { id: "a", type: "text", x: 0, y: 0, width: 100, height: 80, text: "A" },
+      { id: "b", type: "text", x: 220, y: 180, width: 100, height: 80, text: "B" }
+    ];
+    const render = (method: "direct" | "square") => canvasDataToFullSvg({
+      nodes,
+      edges: [{
+        id: "e", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left",
+        styleAttributes: { pathfindingMethod: method, arrow: "none" },
+        fromEnd: "none", toEnd: "none"
+      }]
+    }, { margin: 0 }).svg;
+
+    expect(render("direct")).toContain('d="M 100.00 40.00 L 220.00 220.00"');
+    expect(render("square")).toContain('d="M 100.00 40.00 L 160.00 40.00 L 160.00 220.00 L 220.00 220.00"');
+  });
+
+  it("uses A-star routing around obstacles in a static export", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [
+        { id: "a", type: "text", x: 0, y: 60, width: 100, height: 80, text: "A" },
+        { id: "obstacle", type: "text", x: 140, y: 30, width: 100, height: 170, text: "Obstacle" },
+        { id: "b", type: "text", x: 300, y: 60, width: 100, height: 80, text: "B" }
+      ],
+      edges: [{
+        id: "e", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left",
+        styleAttributes: { pathfindingMethod: "a-star", arrow: "none" },
+        fromEnd: "none", toEnd: "none"
+      }]
+    }, { margin: 0 }).svg;
+    const edge = result.svg.match(/<path id="bc-edge-0"[^>]*>/)?.[0] ?? "";
+    expect(edge).toContain(" L ");
+    expect(edge).not.toContain('d="M 100.00 100.00 L 300.00 100.00"');
+  });
+
   it("supports an optional background and empty canvas", () => {
     const colored = canvasDataToFullSvg(sample, { backgroundColor: "#fff" });
     expect(colored.svg).toContain('fill="#fff"');

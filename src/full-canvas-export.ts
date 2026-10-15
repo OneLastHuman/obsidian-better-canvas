@@ -1,4 +1,5 @@
 import type { CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { routePointsForMethod, type CanvasEdgeRouteMethod, type RouteBox } from "./enhancements";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -219,7 +220,29 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
     markers.push(arrowMarker(id, arrowStyle, color));
     markerAttrs.push(' marker-end="url(#' + id + ')"');
   }
-  const d = "M " + start.x + " " + start.y + " L " + end.x + " " + end.y;
+  const routeMethod = attrs.pathfindingMethod ?? (edge as any).bcPathfindingMethod;
+  const routePoints = ["direct", "square", "a-star"].includes(String(routeMethod))
+    ? routePointsForMethod(
+        String(routeMethod) as CanvasEdgeRouteMethod,
+        start,
+        end,
+        String(edge.fromSide || sides[0]),
+        String(edge.toSide || sides[1]),
+        routeMethod === "a-star"
+          ? [...nodes.values()]
+              .filter(node => node.id !== edge.fromNode && node.id !== edge.toNode && node.type !== "group")
+              .map(node => ({
+                minX: number(node.x),
+                minY: number(node.y),
+                maxX: number(node.x) + number(node.width, 280),
+                maxY: number(node.y) + number(node.height, 140)
+              } satisfies RouteBox))
+          : []
+      )
+    : [start, end];
+  const d = routePoints.map((point, pointIndex) =>
+    (pointIndex === 0 ? "M " : "L ") + point.x.toFixed(2) + " " + point.y.toFixed(2)
+  ).join(" ");
   return (markers.length ? "<defs>" + markers.join("") + "</defs>" : "") +
     '<path id="bc-edge-' + index + '" d="' + xml(d) + '" fill="none" stroke="' + xml(color) +
     '" stroke-width="' + lineWidth + '" stroke-linecap="round"' +

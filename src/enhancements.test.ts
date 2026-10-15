@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   bestFloatingSide,
+  routePointsForMethod,
   colorIncidentEdges,
   decorateCanvas,
   flipIncidentEdges,
@@ -33,6 +34,34 @@ function makeCanvas(data: CanvasData, selected: any[] = []): any {
     }
   };
 }
+
+describe("Canvas edge route calculation", () => {
+  const start = { x: 100, y: 40 };
+  const end = { x: 220, y: 220 };
+
+  it("returns a direct route without extra waypoints", () => {
+    expect(routePointsForMethod("direct", start, end, "right", "left")).toEqual([start, end]);
+  });
+
+  it("creates orthogonal waypoints for square routes", () => {
+    expect(routePointsForMethod("square", start, end, "right", "left")).toEqual([
+      start, { x: 160, y: 40 }, { x: 160, y: 220 }, end
+    ]);
+  });
+
+  it("routes around blocking node boxes for A-star paths", () => {
+    const points = routePointsForMethod(
+      "a-star",
+      { x: 100, y: 100 },
+      { x: 300, y: 100 },
+      "right",
+      "left",
+      [{ minX: 140, minY: 30, maxX: 240, maxY: 170 }]
+    );
+    expect(points.length).toBeGreaterThan(4);
+    expect(points.some(point => point.y < 18 || point.y > 182)).toBe(true);
+  });
+});
 
 describe("flowchart shape normalization", () => {
   it("maps common aliases to interoperable JSON Canvas shapes", () => {
