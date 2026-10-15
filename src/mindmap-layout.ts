@@ -101,7 +101,7 @@ export function computeMindMapLayout(
   const reorderLayer = (layerIndex: number, neighborLayer: number, useParents: boolean): void => {
     const neighbors = orderIndices();
     const current = layers[layerIndex];
-    const priorOrder = new Map(current.map((id, index) => [id, index]));
+    const priorOrder = new Map<string, number>(current.map((id, index) => [id, index] as const));
     const score = (id: string): number => {
       const connected = (useParents ? parents.get(id) : children.get(id)) ?? new Set<string>();
       const values: number[] = [];
