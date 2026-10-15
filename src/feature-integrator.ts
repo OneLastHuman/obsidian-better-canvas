@@ -402,7 +402,8 @@ export default class BetterCanvasFeatures {
     if (!s.providerProfiles.length) s.providerProfiles = JSON.parse(JSON.stringify(DEFAULT_PROFILES));
     for (const profile of s.providerProfiles as ProviderProfile[]) {
       if (typeof profile.requestParamsJson !== "string") profile.requestParamsJson = "{}";
-      if (typeof profile.temperature !== "number" || !Number.isFinite(profile.temperature) || profile.temperature < 0 || profile.temperature > 2) profile.temperature = 0.4;
+      const maxTemperature = profile.protocol === "anthropic" ? 1 : 2;
+      if (typeof profile.temperature !== "number" || !Number.isFinite(profile.temperature) || profile.temperature < 0 || profile.temperature > maxTemperature) profile.temperature = 0.4;
       if (typeof profile.maxOutputTokens !== "number" || !Number.isInteger(profile.maxOutputTokens) || profile.maxOutputTokens < 0 || profile.maxOutputTokens > 200_000) profile.maxOutputTokens = 0;
     }
     if (!s.providerProfiles.some((p: ProviderProfile) => p.id === s.activeProviderId)) {
