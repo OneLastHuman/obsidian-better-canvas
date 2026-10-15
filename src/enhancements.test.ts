@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   bestFloatingSide,
   colorIncidentEdges,
+  decorateCanvas,
   flipIncidentEdges,
   normalizeNodeShape,
   reorderNode,
@@ -66,6 +67,38 @@ const fixture: CanvasData = {
     }
   ]
 };
+
+describe("Canvas node decoration", () => {
+  it("preserves the native border for nodes with the default border style", () => {
+    class FakeHTMLElement {
+      dataset: Record<string, string> = {};
+      style: Record<string, string> = {};
+      querySelectorAll(): any[] {
+        return [];
+      }
+    }
+
+    vi.stubGlobal("HTMLElement", FakeHTMLElement);
+    try {
+      const element = new FakeHTMLElement();
+      const canvas = {
+        getData: () => ({
+          nodes: [{ id: "a", x: 0, y: 0, width: 100, height: 100, type: "text" }],
+          edges: []
+        }),
+        nodes: new Map([["a", { nodeEl: element }]]),
+        edges: new Map()
+      };
+
+      decorateCanvas(canvas);
+
+      expect(element.dataset.bcBorder).toBe("solid");
+      expect(element.style.borderStyle).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe("floating edge side selection", () => {
   const box = { minX: 0, minY: 0, maxX: 100, maxY: 80 };
