@@ -257,12 +257,14 @@ export default class BetterCanvasPlugin extends Plugin {
     if (typeof this.settings.spacedRepetitionDeck !== "string") this.settings.spacedRepetitionDeck = "better-canvas";
     if (typeof this.settings.aiModelPricesJson !== "string") this.settings.aiModelPricesJson = "{}";
     this.settings.aiUsageRecords = appendAIUsageRecord(this.settings.aiUsageRecords, null, AI_USAGE_HISTORY_LIMIT);
-    this.registerDomEvent(window, AI_USAGE_EVENT, (event: Event) => {
+    const handleAIUsage = (event: Event): void => {
       const record = normalizeAIUsageRecord((event as CustomEvent<unknown>).detail);
       if (!record) return;
       this.settings.aiUsageRecords = appendAIUsageRecord(this.settings.aiUsageRecords, record, AI_USAGE_HISTORY_LIMIT);
       void this.saveSettings().catch(error => new Notice(error instanceof Error ? error.message : "保存 AI 用量记录失败。"));
-    });
+    };
+    window.addEventListener(AI_USAGE_EVENT, handleAIUsage);
+    this.register(() => window.removeEventListener(AI_USAGE_EVENT, handleAIUsage));
 
     this.registerCommands();
     this.registerCanvasContextMenu();
