@@ -418,7 +418,7 @@ export class CanvasPortalManager {
       pointerDownPortalPositions = new Map(
         data.nodes
           .filter((node: any) => isCanvasFileNode(node) && node.portal === true)
-          .map((node: CanvasNodeData) => [node.id, { x: node.x, y: node.y }])
+          .map((node: CanvasNodeData): [string, { x: number; y: number }] => [node.id, { x: node.x, y: node.y }])
       );
     };
 
