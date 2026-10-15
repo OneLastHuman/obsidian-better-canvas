@@ -4,6 +4,7 @@ import {
   Modal,
   Notice,
   Plugin,
+  SuggestModal,
   TFile
 } from "obsidian";
 import BetterCanvasFeatures from "./feature-integrator";
