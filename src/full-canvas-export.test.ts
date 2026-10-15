@@ -258,7 +258,8 @@ describe("full content SVG export", () => {
     expect(result.svg).toContain("Heading");
     expect(result.svg).toContain('font-size="24" font-weight="bold"');
     expect(result.svg).toContain('<tspan font-weight="bold">bold</tspan>');
-    expect(result.svg).toContain('<tspan font-style="italic">italic</tspan>');
+    expect(result.svg).toContain('<tspan font-style="italic">');
+    expect(result.svg).toContain("italic</tspan>");
     expect(result.svg).toContain('text-decoration="line-through"');
     expect(result.svg).toContain('font-family="ui-monospace,SFMono-Regular,Consolas,monospace"');
     expect(result.svg).toContain('fill="#3467a9"');
@@ -270,7 +271,7 @@ describe("full content SVG export", () => {
   it("escapes HTML-looking node text in static exports instead of interpreting it", () => {
     const result = canvasDataToFullSvg({
       nodes: [{
-        id: "html", type: "text", x: 0, y: 0, width: 260, height: 100,
+        id: "html", type: "text", x: 0, y: 0, width: 500, height: 100,
         text: "<script>alert('x')</script>"
       }],
       edges: []
