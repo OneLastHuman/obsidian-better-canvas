@@ -97,7 +97,7 @@ npm run build
 ## 快速配置
 
 - **Canvas 与思维导图：** 安装并启用插件即可使用，不需要 API Key。
-- **AI 与 MCP：** 在插件设置中配置 AI provider profile、远程 MCP endpoint 或本地服务。
+- **AI 与 MCP：** 在插件设置中配置多个 AI 服务商、远程 MCP endpoint 或本地服务；删除服务商前会显示确认，删除当前服务时会说明切换目标。
 - **本地 OpenCode / Codex：** 需要在桌面端预先安装并登录对应 CLI。
 
 配置步骤、安全说明与本地 AI 后端说明见 [AI 与 MCP 配置指南](docs/AI_SETUP.md)。完整能力清单见 [功能指南](docs/FEATURE_GUIDE.md)，详细安装方式见 [安装与构建指南](docs/INSTALLATION.md)。
