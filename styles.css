@@ -619,3 +619,11 @@
   outline: 2px solid var(--interactive-accent);
   outline-offset: 1px;
 }
+
+/* Highlight edges incident to the current Canvas node selection. */
+.canvas-edges path.bc-selection-related {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 2px var(--interactive-accent));
+  stroke-width: 2.5px !important;
+  transition: filter 100ms ease, stroke-width 100ms ease, opacity 100ms ease;
+}

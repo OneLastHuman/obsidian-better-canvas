@@ -2,6 +2,7 @@ import { ItemView, Notice } from "obsidian";
 import { insertCanvasNode, makeTextNode, readCanvasData } from "./canvas";
 import { patchNode } from "./enhancements";
 import { strokeTouchesEraser } from "./pdf-annotation-geometry";
+import { buildPdfAnnotationMarkdown } from "./pdf-annotation-export";
 
 interface PdfPoint {
   x: number;
@@ -97,6 +98,11 @@ export class PdfAnnotationManager {
       name: "Better Canvas: 清除所选 PDF 页面的批注",
       callback: () => this.clearForSelection()
     });
+    this.plugin.addCommand({
+      id: "bc-export-pdf-annotation-bundle",
+      name: "Better Canvas: 导出当前 Canvas 的 PDF 批注为 Markdown",
+      callback: () => { void this.exportAnnotationsForActiveCanvas(); }
+    });
     this.plugin.registerEvent(this.plugin.app.workspace.on("layout-change", () => this.scheduleRefresh()));
     this.plugin.registerEvent(this.plugin.app.workspace.on("active-leaf-change", () => this.scheduleRefresh()));
     this.plugin.app.workspace.onLayoutReady(() => this.refresh());
@@ -115,6 +121,46 @@ export class PdfAnnotationManager {
   private activeCanvas(): any | null {
     const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
     return view?.getViewType?.() === "canvas" ? view.canvas ?? null : null;
+  }
+
+  private async exportAnnotationsForActiveCanvas(): Promise<void> {
+    const canvas = this.activeCanvas();
+    if (!canvas) {
+      new Notice("请先打开要导出批注的 Canvas。");
+      return;
+    }
+
+    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
+    const sourcePath = typeof view?.file?.path === "string" ? view.file.path : "";
+    const bundle = buildPdfAnnotationMarkdown(readCanvasData(canvas).nodes, sourcePath);
+    if (!bundle) {
+      new Notice("当前 Canvas 没有可导出的固定 PDF 页面批注。");
+      return;
+    }
+
+    const vault = this.plugin.app.vault;
+    try {
+      const folderPaths = ["Better Canvas", "Better Canvas/PDF Annotations"];
+      for (const folderPath of folderPaths) {
+        if (!vault.getAbstractFileByPath(folderPath)) await vault.createFolder(folderPath);
+      }
+
+      const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+      const basePath = "Better Canvas/PDF Annotations/pdf-annotations-" + timestamp;
+      let path = basePath + ".md";
+      let suffix = 2;
+      while (vault.getAbstractFileByPath(path)) {
+        path = basePath + "-" + suffix + ".md";
+        suffix++;
+      }
+      await vault.create(path, bundle.markdown);
+      new Notice("已导出 " + bundle.pageCount + " 个 PDF 页面、" +
+        bundle.highlightCount + " 处文字高亮和 " + bundle.strokeCount +
+        " 笔手绘批注：" + path + (bundle.truncated ? "（部分数据达到安全上限，详见导出文件）" : ""));
+    } catch (error) {
+      console.error("Better Canvas PDF annotation export failed:", error);
+      new Notice("PDF 批注导出失败：" + (error instanceof Error ? error.message : String(error)));
+    }
   }
 
   private selectedPdfNode(): { canvas: any; node: any } | null {

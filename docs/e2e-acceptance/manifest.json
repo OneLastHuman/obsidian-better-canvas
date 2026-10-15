@@ -1,0 +1,113 @@
+{
+  "generatedAt": "2026-10-15T05:45:26.108Z",
+  "testedCommit": "8c693e7530b882564654433eae47cc20f2cf61ba",
+  "testedSubject": "build: refresh installable plugin bundle",
+  "mainJsSha256": "b229962acc2b2cac2d7bd3cfb541e7f73775d6d11aaf29303e4697ba6cb26240",
+  "obsidian": "1.14.4",
+  "issues": {
+    "25": [
+      {
+        "file": "01-orphan-check.png",
+        "caption": "AI 生成失败后残留的空占位节点（画布与磁盘均有）"
+      },
+      {
+        "file": "02-ai-malformed-01.png",
+        "caption": "返回非 JSON 响应时的界面状态"
+      }
+    ],
+    "26": [
+      {
+        "file": "01-ns-13-breakpoint-06-at-100pct.png",
+        "caption": "断点 0.6，scale≈0.6：内容被隐藏（按线性比例不应隐藏）"
+      },
+      {
+        "file": "02-ns-14-breakpoint-06-zoomed-in.png",
+        "caption": "放大到 scale≈1.84：内容才重新出现"
+      },
+      {
+        "file": "03-r48.png",
+        "caption": "回归复验：scale=1.0 时 hidden 仍为 true"
+      }
+    ],
+    "27": [
+      {
+        "file": "01-readonly-on.png",
+        "caption": "已开启只读模式"
+      },
+      {
+        "file": "02-readonly-edge-arrow-bypass.png",
+        "caption": "只读模式下连线箭头样式仍被修改并保存"
+      }
+    ],
+    "30": [
+      {
+        "file": "01-full-svg-basic.png",
+        "caption": "导出产物示例（导出内容基于内存中的 getData()）"
+      }
+    ],
+    "32": [
+      {
+        "file": "01-portal-5-adoption.png",
+        "caption": "Portal 框由 canvas-node-content-blocker 覆盖，手势无法在其中创建节点"
+      }
+    ],
+    "33": [
+      {
+        "file": "01-ns-05-custom-class.png",
+        "caption": "设置自定义样式类后（清空提交无效，无法清除）"
+      }
+    ],
+    "34": [
+      {
+        "file": "01-a34-export.png",
+        "caption": "导出背景颜色留空时的视口 PNG，左上角为不透明的主题背景"
+      },
+      {
+        "file": "02-a34-full-content.png",
+        "caption": "同设置下全内容导出的对照"
+      }
+    ],
+    "46": [
+      {
+        "file": "01-svg-expanded.png",
+        "caption": "展开 HTML 预览后导出视口 SVG"
+      },
+      {
+        "file": "02-export-html-node.png",
+        "caption": "导出产物中保留了 HTML 预览 iframe"
+      }
+    ],
+    "47": [
+      {
+        "file": "01-viewport-png-2x.png",
+        "caption": "视口导出把画布控件与卡片工具栏一并烘焙进图片"
+      }
+    ],
+    "48": [
+      {
+        "file": "01-verify-styleattrs.png",
+        "caption": "仅带 styleAttributes 的节点仍渲染为普通方框"
+      }
+    ],
+    "52": [
+      {
+        "file": "01-portal-corruption.png",
+        "caption": "独立复现：Portal 框已选中 / 未选中两种拖拽路径"
+      },
+      {
+        "file": "02-portal-10-drag-corruption.png",
+        "caption": "三轮一致会话中的源文件损坏截图"
+      }
+    ],
+    "53": [
+      {
+        "file": "01-tog2-open.png",
+        "caption": "打开 Portal 后镜像节点出现（id 采用命名空间隔离）"
+      },
+      {
+        "file": "02-toggle-closed.png",
+        "caption": "执行关闭后镜像仍留在画布上"
+      }
+    ]
+  }
+}
