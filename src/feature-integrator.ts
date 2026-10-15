@@ -473,6 +473,8 @@ export default class BetterCanvasFeatures {
     add("bc-export-svg", "导出 Canvas SVG", () => void this.export("svg"));
     add("bc-export-full-png", "导出 Canvas 全内容 PNG（按所有节点边界）", () => void this.exportFullContent("png"));
     add("bc-export-full-svg", "导出 Canvas 全内容 SVG（按所有节点边界）", () => void this.exportFullContent("svg"));
+    add("bc-export-selection-png", "仅导出选区 PNG", () => void this.exportFullContent("png", true));
+    add("bc-export-selection-svg", "仅导出选区 SVG", () => void this.exportFullContent("svg", true));
     add("bc-ingest-web", "导入网页正文", () => this.input("导入网页正文", "完整 URL", value => void this.ingest(value, false)));
     add("bc-ingest-youtube", "导入 YouTube 字幕", () => this.input("导入 YouTube 字幕", "YouTube 视频 URL", value => void this.ingest(value, true)));
     add("bc-gemini-youtube-video", "用 Gemini 直接分析 YouTube 视频", () => this.askGeminiAboutYoutube());
@@ -1690,7 +1692,7 @@ export default class BetterCanvasFeatures {
     }
   }
 
-  private async exportFullContent(format: "png" | "svg"): Promise<void> {
+  private async exportFullContent(format: "png" | "svg", selectionOnly = false): Promise<void> {
     const canvas = this.canvas();
     if (!canvas) {
       new Notice("请先打开 Canvas。");
@@ -1699,7 +1701,7 @@ export default class BetterCanvasFeatures {
     const view = this.activeCanvasView();
     const baseName = String(view?.file?.basename ?? "canvas").replace(/[ :*?"<>|]/g, "-").replaceAll("/", "-").replaceAll(String.fromCharCode(92), "-");
     const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").split("/").filter(Boolean).join("/");
-    const notice = new Notice("正在按所有节点边界渲染整张 Canvas…", 0);
+    const notice = new Notice(selectionOnly ? "正在按选区节点边界渲染…" : "正在按所有节点边界渲染整张 Canvas…", 0);
     let objectUrl = "";
     try {
       await this.ensureFolder(folder);
@@ -1717,10 +1719,22 @@ export default class BetterCanvasFeatures {
       }
 
       const sourceData = readCanvasData(canvas);
+      const selectedIds = selectionOnly
+        ? Array.from(canvas.selection ?? []).map((item: any) => String(item?.id ?? "")).filter(Boolean)
+        : null;
+      if (selectionOnly && (!selectedIds || selectedIds.length === 0)) {
+        throw new Error("请先选择一个或多个节点，再执行选区导出。");
+      }
+      const exportSource = selectionOnly
+        ? canvasDataForSelection(sourceData, selectedIds as string[])
+        : sourceData;
+      if (selectionOnly && exportSource.nodes.length === 0) {
+        throw new Error("未找到可导出的选中节点。");
+      }
       const exportData = {
-        ...sourceData,
-        nodes: sourceData.nodes.map((node: CanvasNodeData) => ({ ...node })),
-        edges: sourceData.edges.map((edge: any) => ({ ...edge }))
+        ...exportSource,
+        nodes: exportSource.nodes.map((node: CanvasNodeData) => ({ ...node })),
+        edges: exportSource.edges.map((edge: any) => ({ ...edge }))
       };
       const mimeByExtension: Record<string, string> = {
         png: "image/png",
@@ -1809,7 +1823,7 @@ export default class BetterCanvasFeatures {
       }
 
       const full = canvasDataToFullSvg(exportData, { backgroundColor, margin: 48 });
-      const filePath = await this.uniquePath(folder + "/" + baseName + "-full-content", format);
+      const filePath = await this.uniquePath(folder + "/" + baseName + (selectionOnly ? "-selection" : "-full-content"), format);
       if (format === "svg") {
         await this.p.app.vault.create(filePath, full.svg);
       } else {
@@ -1856,10 +1870,10 @@ export default class BetterCanvasFeatures {
       const skippedSummary = skippedImageCount
         ? "；有 " + skippedImageCount + " 项图片或 PDF 页面预览因大小、格式或读取问题以标签代替"
         : "";
-      new Notice("已导出整张 Canvas：" + filePath + mediaSummary + skippedSummary);
+      new Notice((selectionOnly ? "已导出 Canvas 选区：" : "已导出整张 Canvas：") + filePath + mediaSummary + skippedSummary);
     } catch (error) {
       notice.hide();
-      new Notice("全内容导出失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+      new Notice((selectionOnly ? "选区导出失败：" : "全内容导出失败：") + (error instanceof Error ? error.message : String(error)), 8000);
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     }
