@@ -36,8 +36,8 @@ export function sanitizeSpacedRepetitionTitle(value: string): string {
   const firstLine = String(value ?? "").replace(/\r\n?/g, "\n").split("\n", 1)[0]
     .replace(/^\s*#+\s*/, "").trim();
   const clean = firstLine.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-")
-    .replace(/\s+/g, " ").replace(/[. ]+$/g, "").slice(0, 80).trim();
-  return clean || "Flashcards";
+    .replace(/^\.+/, "").replace(/\s+/g, " ").replace(/[. ]+$/g, "").slice(0, 80).trim();
+  return clean && !/^[-_]+$/.test(clean) ? clean : "Flashcards";
 }
 
 /** Return a non-overwriting Markdown path, suffixing the basename on collision. */
