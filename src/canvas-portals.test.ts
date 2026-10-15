@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Modal, Notice, TFile } from "obsidian";
-import { CanvasPortalManager } from "./canvas-portals";
+import { CanvasPortalManager, hasMovedOpenPortal } from "./canvas-portals";
 
 vi.mock("obsidian", () => ({
   ItemView: class ItemView {},
@@ -41,17 +41,24 @@ function makeHarness(portalOpen = false) {
       edges: []
     },
     wrapperEl: { classList: { contains: () => false } },
+    nodes: new Map<string, any>(),
     getData() { return this.data; },
     importData(next: any) { this.data = next; },
+    removeNode(liveNode: any) {
+      this.data.nodes = this.data.nodes.filter((node: any) => node.id !== liveNode.id);
+      this.data.edges = this.data.edges.filter((edge: any) => edge.fromNode !== liveNode.id && edge.toNode !== liveNode.id);
+      this.nodes.delete(liveNode.id);
+    },
     requestSave: vi.fn(),
     requestFrame: vi.fn(),
     selection: { size: 1, values: () => new Set([{ id: "portal" }]).values() }
   };
+  for (const node of canvas.data.nodes) canvas.nodes.set(node.id, { id: node.id });
   const view = { getViewType: () => "canvas", canvas, file: { path: "host.canvas" } };
   const plugin: any = {
     app: {
       workspace: { getActiveViewOfType: vi.fn(() => view) },
-      vault: { getAbstractFileByPath: vi.fn() }
+      vault: { getAbstractFileByPath: vi.fn(), cachedRead: vi.fn(), modify: vi.fn() }
     }
   };
   const manager = new CanvasPortalManager(plugin);
@@ -97,7 +104,62 @@ describe("Canvas Portal target validation", () => {
     expect(Notice as any).toHaveBeenCalledWith("Portal 已关闭。");
   });
 
-  it("registers a command and context-menu action for open Portals", () => {
+
+  it("removes mirror nodes and mirror/cross edges from the live Canvas when closing a Portal", () => {
+    const { canvas, plugin, manager } = makeHarness(true);
+    const mirrorOne = "bcportal||portal||source-one";
+    const mirrorTwo = "bcportal||portal||source-two";
+    canvas.data.nodes.push(
+      { id: mirrorOne, type: "text", text: "one", x: 48, y: 48, width: 100, height: 100 },
+      { id: mirrorTwo, type: "text", text: "two", x: 248, y: 48, width: 100, height: 100 }
+    );
+    canvas.nodes.set(mirrorOne, { id: mirrorOne });
+    canvas.nodes.set(mirrorTwo, { id: mirrorTwo });
+    canvas.data.edges.push(
+      { id: "bcportal||portal||source-edge", fromNode: mirrorOne, fromSide: "right", toNode: mirrorTwo, toSide: "left" },
+      { id: "cross-edge", fromNode: mirrorOne, fromSide: "left", toNode: "portal", toSide: "right" }
+    );
+    plugin.app.vault.getAbstractFileByPath.mockReturnValue(null);
+
+    manager.togglePortalForNode("portal");
+
+    expect(canvas.data.nodes.map((item: any) => item.id)).toEqual(["portal"]);
+    expect(canvas.data.edges).toEqual([]);
+    expect(canvas.data.nodes[0].portal).toBe(false);
+    expect(canvas.requestSave).toHaveBeenCalledOnce();
+    expect(Notice as any).toHaveBeenCalledWith("Portal 已关闭。");
+  });
+
+  it("does not write source positions when an open Portal moved before its mirrors refresh", async () => {
+    const { canvas, view, plugin, manager } = makeHarness(true);
+    const mirror = "bcportal||portal||source-one";
+    canvas.data.nodes[0].x = 200;
+    canvas.data.nodes.push({
+      id: mirror, type: "text", text: "source", x: 48, y: 48, width: 100, height: 100
+    });
+    const file = makeTFile("canvas");
+    plugin.app.vault.getAbstractFileByPath.mockReturnValue(file);
+    plugin.app.vault.cachedRead.mockResolvedValue(JSON.stringify({
+      nodes: [{ id: "source-one", type: "text", text: "source", x: 0, y: 0, width: 100, height: 100 }],
+      edges: []
+    }));
+    (manager as any).readyPortalIds.set(view, new Set(["portal"]));
+    (manager as any).lastPortalPositions.set(view, new Map([["portal", { x: 0, y: 0 }]]));
+
+    await (manager as any).syncPortalFiles(view);
+
+    expect(manager.refreshView).toHaveBeenCalledWith(view, true);
+    expect(plugin.app.vault.modify).not.toHaveBeenCalled();
+  });
+
+  it("detects movement of any open Portal independently of the current selection", () => {
+    const previous = new Map([
+      ["portal-a", { x: 0, y: 0 }],
+      ["portal-b", { x: 400, y: 300 }]
+    ]);
+    const nodes: any[] = [
+      { id: "portal-a", type: "file", file: "a.canvas", x: 0, y: 0, width: 200, height: 160, portal: true },
+      { id: "portal-b", type: "file", file: "b.canvas", x: 600, y: 320, width: 200, height: 160,  it("registers a command and context-menu action for open Portals", () => {
     const { plugin, manager } = makeHarness(true);
     const commands: any[] = [];
     const handlers = new Map<string, (...args: any[]) => void>();
@@ -158,6 +220,13 @@ describe("Canvas Portal target validation", () => {
       })
     });
     expect(menu.addItem).not.toHaveBeenCalled();
+  });
+
+ portal: true }
+    ];
+
+    expect(hasMovedOpenPortal(previous, nodes)).toBe(true);
+    expect(hasMovedOpenPortal(previous, nodes.slice(0, 1))).toBe(false);
   });
 
   it("opens and saves a Portal only when the target Canvas file exists", () => {
