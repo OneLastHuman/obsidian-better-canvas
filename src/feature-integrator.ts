@@ -37,6 +37,7 @@ import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirectio
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
+import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
 import { callSseMcpTool, listSseMcpTools } from "./mcp-sse";
@@ -83,6 +84,9 @@ interface FeatureSettings {
   codexBinaryPath: string;
   backend: "api" | "opencode-acp";
   opencodeBinaryPath: string;
+  flashcardOutputMode: "canvas" | "spaced-repetition";
+  spacedRepetitionFolder: string;
+  spacedRepetitionDeck: string;
 }
 
 const DEFAULT_PROFILES: ProviderProfile[] = [{
@@ -2771,10 +2775,33 @@ export default class BetterCanvasFeatures {
     });
   }
 
+  private async saveSpacedRepetitionDeck(
+    cards: Array<{ question?: string; answer?: string }>,
+    sourceNode: CanvasNodeData
+  ): Promise<string> {
+    const settings = this.settings();
+    const folder = normalizeSpacedRepetitionFolderPath(
+      String(settings.spacedRepetitionFolder || "Better Canvas/Flashcards")
+    );
+    const deckName = String(settings.spacedRepetitionDeck || "better-canvas");
+    const title = String(sourceNode.text ?? "Flashcards");
+    const markdown = formatSpacedRepetitionDeck(cards, deckName, title);
+    await this.ensureFolder(folder);
+    const path = uniqueSpacedRepetitionPath(
+      folder,
+      title,
+      this.p.app.vault.getFiles().map((file: TFile) => file.path)
+    );
+    // Never overwrite an existing user note; collisions use a numbered suffix.
+    await this.p.app.vault.create(path, markdown);
+    return path;
+  }
+
   private async generateFlashcardNodes(): Promise<void> {
     const selected = this.selected();
     if (!selected) return;
-    const notice = new Notice("正在生成独立闪卡…", 0);
+    const spacedRepetition = this.settings().flashcardOutputMode === "spaced-repetition";
+    const notice = new Notice(spacedRepetition ? "正在生成并导出复习卡组…" : "正在生成独立闪卡…", 0);
     try {
       const context = await this.getNodeContext(selected.canvas, selected.node.id);
       const raw = await this.completeStructured(
@@ -2787,6 +2814,14 @@ export default class BetterCanvasFeatures {
         typeof card.question === "string" && Boolean(card.question.trim()) &&
         typeof card.answer === "string" && Boolean(card.answer.trim())) : [];
       if (!cards.length) throw new Error("AI 未返回有效的复习闪卡。");
+
+      if (spacedRepetition) {
+        const filePath = await this.saveSpacedRepetitionDeck(cards, selected.node);
+        notice.hide();
+        new Notice("已导出 " + cards.length + " 张闪卡到 " + filePath + "。现有笔记不会被覆盖。");
+        return;
+      }
+
       for (let i = 0; i < cards.length; i++) {
         const card = cards[i];
         const text = "问题：" + card.question!.trim() + "\n\n答案：" + card.answer!.trim();
