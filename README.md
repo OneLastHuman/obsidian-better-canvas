@@ -77,7 +77,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - 在设置中管理命名系统提示词：保存多套提示词、选择以应用、同名覆盖更新或删除，不必反复手动粘贴系统提示词。
 - 通过配置的服务生成图片，并将图片保存到 Vault 的附件目录后插入画布。
 - 导入网页正文和可访问的 YouTube 字幕，作为后续整理与分析的素材。
-- 支持远程 **MCP Streamable HTTP**、旧式远程 **SSE** 和本地 MCP **stdio** 工具调用；也可让 AI 根据可用工具描述提出工具和参数建议，用户检查并确认后才执行。stdio 通过单独配置的 command/args/env/cwd 启动本地进程，请只配置可信服务。
+- 支持远程 **MCP Streamable HTTP**、旧式远程 **SSE** 和本地 MCP **stdio**。除工具调用外，还可浏览分页资源（resources/list）、读取资源（resources/read）、发现提示模板（prompts/list）并带参数解析模板（prompts/get）；结果写入 Canvas 节点，支持的图片内容另存为 Vault 附件。AI 工具建议仍需用户检查并确认；stdio 通过单独配置的 command/args/env/cwd 启动本地进程，请只配置可信服务。
 - 可从 OpenAI-compatible、Anthropic 和 Gemini 的模型端点发现可用模型，并为单个节点选择模型；接口不支持列出模型时仍可手动输入。
 - 桌面端可调用已安装并登录的 Codex CLI，在只读沙盒中分析选中节点和相邻上下文；任务可由“停止当前 AI 生成”中断，结果保存为关联节点。
 - 文本 AI 可选本机 OpenCode ACP：通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode 使用的模型与登录配置，不需要单独填写文本 API Key。
