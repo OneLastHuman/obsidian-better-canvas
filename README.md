@@ -130,7 +130,7 @@ npm run build
 | `npm test` | 单元测试 |
 | `npm run build` | 生产构建 |
 
-CI 会检查类型、单元测试和构建产物，但不会启动 Obsidian 图形界面。涉及原生 Canvas 交互、Portal、PDF、主题/DOM 或真实 AI 请求时，仍需在目标环境中手动验证。
+CI 会检查类型、单元测试和构建产物，但不会启动 Obsidian 图形界面。涉及原生 Canvas 交互、Portal、PDF、主题/DOM 或真实 AI 请求时，仍需在目标环境中手动验证。 版本号同步、打 tag 和 GitHub Release 发布步骤见 [发版流程](docs/RELEASING.md)。
 
 ## 兼容性与隐私
 
