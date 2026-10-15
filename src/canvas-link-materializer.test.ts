@@ -36,7 +36,7 @@ describe("Canvas link materialization", () => {
       entry("Notes/Plan.md"),
       entry("https://example.com", true),
       entry("Notes/Next.md")
-    ], ["file:Notes/Plan.md", "url:https://example.com"]);
+    ], ["file:Notes/Plan.md", "url:https://example.com/"]);
     expect(links.map(link => link.target)).toEqual(["Notes/Next.md"]);
   });
 
