@@ -28,7 +28,7 @@ describe("MCP Streamable HTTP resources and prompts", () => {
 
   it("lists paginated resources and prompts, reads resources, and resolves prompts", async () => {
     const methods: Array<{ method: string; params: Record<string, unknown>; id?: unknown }> = [];
-    mockedRequestUrl.mockImplementation(async (request: any) => {
+    (mockedRequestUrl as any).mockImplementation(async (request: any) => {
       const body = JSON.parse(String(request.body));
       methods.push({ method: body.method, params: body.params ?? {}, id: body.id });
       if (body.method === "initialize") {
@@ -70,7 +70,7 @@ describe("MCP Streamable HTTP resources and prompts", () => {
   });
 
   it("surfaces HTTP failures from resource operations", async () => {
-    mockedRequestUrl.mockImplementation(async (request: any) => {
+    (mockedRequestUrl as any).mockImplementation(async (request: any) => {
       const body = JSON.parse(String(request.body));
       if (body.method === "initialize") return response({ protocolVersion: "2025-03-26" });
       if (body.method === "notifications/initialized") return response(undefined, 202);
