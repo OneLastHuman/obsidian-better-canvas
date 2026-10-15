@@ -205,6 +205,10 @@ function toOpenAIRequest(settings: AISettings, messages: ChatMessage[], streamin
 }
 
 function parseCompletion(protocol: AIProtocol, body: any): string {
+  // Keep parser implementation details out of user-facing errors for successful responses.
+  if (typeof body === "string") {
+    throw new Error("AI 服务返回了成功状态，但没有找到可用的文本内容。");
+  }
   if (protocol === "anthropic") {
     const text = Array.isArray(body?.content)
       ? body.content.filter((part: any) => part?.type === "text" && typeof part.text === "string").map((part: any) => part.text).join("")
