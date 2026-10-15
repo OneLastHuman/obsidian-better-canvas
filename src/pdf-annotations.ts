@@ -1,6 +1,7 @@
 import { ItemView, Notice } from "obsidian";
 import { insertCanvasNode, makeTextNode, readCanvasData } from "./canvas";
 import { patchNode } from "./enhancements";
+import { strokeTouchesEraser } from "./pdf-annotation-geometry";
 
 interface PdfPoint {
   x: number;
@@ -596,9 +597,13 @@ export class PdfAnnotationManager {
       if (tool === "eraser") {
         const rect = svg.getBoundingClientRect();
         const tolerance = 22;
-        const retained = existing.filter(stroke => !stroke.points?.some(point =>
-          active!.some(sample => Math.hypot((point.x - sample.x) * rect.width, (point.y - sample.y) * rect.height) <= tolerance
-        )));
+        const retained = existing.filter(stroke => !strokeTouchesEraser(
+          stroke.points ?? [],
+          active!,
+          rect.width,
+          rect.height,
+          tolerance + Math.max(0, Number(stroke.width) || 0) / 2
+        ));
         patchNode(canvas, nodeId, { bcPdfStrokes: retained });
       } else {
         const width = Math.max(1, Math.min(64, Number(svg.dataset.width) || 5));
