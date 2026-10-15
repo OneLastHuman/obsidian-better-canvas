@@ -1,6 +1,6 @@
 import type { CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { routePointsForMethod, type CanvasEdgeRouteMethod, type RouteBox } from "./enhancements";
-import { layoutMarkdownForSvg } from "./svg-markdown";
+import { layoutMarkdownForSvg, type SvgMarkdownRun } from "./svg-markdown";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -231,12 +231,9 @@ function wrapNodeText(node: CanvasNodeData, clipId: string): string {
   const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * 0.58)));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
   const lines = layoutMarkdownForSvg(raw, maxChars, maxLines, fontSize);
-  const startY = node.y + 18 + fontSize;
-  const markup = lines.map((line, index) => {
-    const lineFontSize = Math.max(8, fontSize * line.fontScale);
-    const dy = index === 0 ? 0 : Math.max(fontSize * 1.35, lineFontSize * 1.2);
-    const lineWeight = line.bold ? "bold" : fontWeight;
-    const runs = line.runs.map(run => {
+
+  const renderRuns = (runs: SvgMarkdownRun[]): string =>
+    runs.map(run => {
       const style = run.style;
       const runAttrs: string[] = [];
       if (style.bold) runAttrs.push('font-weight="bold"');
@@ -250,8 +247,76 @@ function wrapNodeText(node: CanvasNodeData, clipId: string): string {
       if (decorations.length) runAttrs.push('text-decoration="' + decorations.join(" ") + '"');
       return '<tspan' + (runAttrs.length ? " " + runAttrs.join(" ") : "") + '>' + xml(run.text) + "</tspan>";
     }).join("");
+
+  // Table rows require geometry, rather than a pipe-delimited text label.
+  // Keep every cell clipped to the Canvas node bounds and use static SVG only.
+  if (lines.some(line => Boolean(line.tableRow))) {
+    let cursorY = node.y + 8;
+    const tableMarkup: string[] = [];
+    const nodeFont = fontFamily;
+    const lineHeight = fontSize * 1.25;
+    const cellPaddingX = 6;
+    const cellPaddingY = 4;
+
+    lines.forEach((line, lineIndex) => {
+      if (line.tableRow) {
+        const row = line.tableRow;
+        const columnCount = Math.max(1, row.cells.length);
+        const columnWidth = node.width / columnCount;
+        const rowHeight = Math.max(1, row.lineCount) * lineHeight + cellPaddingY * 2;
+        row.cells.forEach((cell, columnIndex) => {
+          const cellX = node.x + columnIndex * columnWidth;
+          const anchorForCell = cell.align === "center" ? "middle" : cell.align === "right" ? "end" : "start";
+          const textX = cell.align === "center"
+            ? cellX + columnWidth / 2
+            : cell.align === "right"
+              ? cellX + columnWidth - cellPaddingX
+              : cellX + cellPaddingX;
+          const clipIdForCell = clipId + "-table-" + lineIndex + "-" + columnIndex;
+          tableMarkup.push(
+            '<rect x="' + cellX + '" y="' + cursorY + '" width="' + columnWidth + '" height="' + rowHeight +
+            '" fill="' + (row.isHeader ? "#7b8794" : "none") + '" fill-opacity="' + (row.isHeader ? "0.14" : "1") +
+            '" stroke="#9aa3ad" stroke-width="0.7"/>'
+          );
+          tableMarkup.push(
+            '<defs><clipPath id="' + clipIdForCell + '"><rect x="' + (cellX + 1) + '" y="' + (cursorY + 1) +
+            '" width="' + Math.max(1, columnWidth - 2) + '" height="' + Math.max(1, rowHeight - 2) + '"/></clipPath></defs>'
+          );
+          const cellLines = cell.lines.length ? cell.lines : [[]];
+          const content = cellLines.map((runs, runIndex) =>
+            '<tspan x="' + textX + '" dy="' + (runIndex === 0 ? 0 : lineHeight) + '">' + renderRuns(runs) + "</tspan>"
+          ).join("");
+          tableMarkup.push(
+            '<text clip-path="url(#' + clipIdForCell + ')" x="' + textX + '" y="' + (cursorY + cellPaddingY + fontSize) +
+            '" font-family="' + nodeFont + '" font-size="' + fontSize + '" font-weight="' + (row.isHeader ? "bold" : fontWeight) +
+            '" font-style="' + fontStyle + '" fill="' + textColor + '" text-anchor="' + anchorForCell + '">' + content + "</text>"
+          );
+        });
+        cursorY += rowHeight;
+        return;
+      }
+
+      const lineFontSize = Math.max(8, fontSize * line.fontScale);
+      const lineWeight = line.bold ? "bold" : fontWeight;
+      const lineY = cursorY + lineFontSize;
+      tableMarkup.push(
+        '<text clip-path="url(#' + clipId + ')" x="' + startX + '" y="' + lineY +
+        '" font-family="' + fontFamily + '" font-size="' + lineFontSize + '" font-weight="' + lineWeight +
+        '" font-style="' + fontStyle + '" text-decoration="' + textDecoration +
+        '" fill="' + textColor + '" text-anchor="' + anchor + '">' + renderRuns(line.runs) + "</text>"
+      );
+      cursorY += Math.max(lineHeight, lineFontSize * 1.2);
+    });
+    return '<g clip-path="url(#' + clipId + ')">' + tableMarkup.join("") + "</g>";
+  }
+
+  const startY = node.y + 18 + fontSize;
+  const markup = lines.map((line, index) => {
+    const lineFontSize = Math.max(8, fontSize * line.fontScale);
+    const dy = index === 0 ? 0 : Math.max(fontSize * 1.35, lineFontSize * 1.2);
+    const lineWeight = line.bold ? "bold" : fontWeight;
     return '<tspan x="' + startX + '" dy="' + dy + '" font-size="' + lineFontSize +
-      '" font-weight="' + lineWeight + '">' + runs + "</tspan>";
+      '" font-weight="' + lineWeight + '">' + renderRuns(line.runs) + "</tspan>";
   }).join("");
   return '<text clip-path="url(#' + clipId + ')" x="' + startX + '" y="' + startY +
     '" font-family="' + fontFamily + '" font-size="' + fontSize + '" font-weight="' + fontWeight +
