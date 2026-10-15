@@ -113,7 +113,7 @@ The items below are gaps identified by comparing the current Better Canvas sourc
 
 | Feature | Status | Notes |
 |---|---|---|
-| Named system-prompt library and prompt picker | Not implemented | There is a single global system-prompt setting and task-specific prompts in commands. A library of built-in and user-managed named prompts, with a reusable prompt/context picker, is not implemented |
+| Named system-prompt library and prompt picker | Implemented, basic | Users can save named prompt profiles, select one to load it into the active system prompt, update an existing profile by reusing its name, and delete saved profiles. Built-in provider-specific templates, prompt variables and per-task/context pickers remain incomplete |
 | Spaced Repetition file/deck integration | Not implemented | Flashcards are represented as Canvas nodes; compatible Markdown notes/decks for the Obsidian Spaced Repetition plugin are not created as a dedicated output mode |
 | Per-model capability probing | Partial | Model-list discovery is implemented for OpenAI-compatible, Anthropic and Gemini endpoints. The plugin does not maintain per-provider/model/route capability reports for vision, image generation, PDF, video, YouTube, URL context or search |
 | Provider-specific request parameters and model limits | Partial | Core protocol adapters exist, but settings do not expose upstream-equivalent per-model `providerParams`, token/context limits, retry policy and provider-specific tuning. Several request parameters are fixed in code; behavior varies by endpoint |
