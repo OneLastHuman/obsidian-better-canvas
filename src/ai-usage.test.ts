@@ -40,6 +40,25 @@ describe("AI usage normalization", () => {
     })).toBeNull();
   });
 
+  it("bounds inferred totals and refuses non-finite cost estimates", () => {
+    expect(normalizeAIUsageRecord({
+      protocol: "openai",
+      model: "large",
+      inputTokens: Number.MAX_SAFE_INTEGER,
+      outputTokens: Number.MAX_SAFE_INTEGER
+    })?.totalTokens).toBe(Number.MAX_SAFE_INTEGER);
+
+    const prices = parseAIModelPriceTable(
+      '{"openai:huge":{"inputPerMillion":1e308,"outputPerMillion":1e308}}'
+    );
+    expect(estimateAIUsageCost({
+      protocol: "openai",
+      model: "huge",
+      inputTokens: Number.MAX_SAFE_INTEGER,
+      outputTokens: Number.MAX_SAFE_INTEGER
+    }, prices)).toBeNull();
+  });
+
   it("normalizes event details and computes total tokens when both sides are known", () => {
     expect(normalizeAIUsageRecord({
       protocol: "openai",
