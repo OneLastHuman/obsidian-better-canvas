@@ -84,6 +84,28 @@ describe("full content SVG export", () => {
     expect(result.svg).toContain("demo.png");
   });
 
+  it("renders the complete built-in flowchart shape set in full-canvas exports", () => {
+    const render = (shape: string) => canvasDataToFullSvg({
+      nodes: [{
+        id: "n", type: "text", x: 0, y: 0, width: 120, height: 80, text: shape,
+        styleAttributes: { shape }
+      }],
+      edges: []
+    }).svg;
+
+    expect(render("triangle")).toContain('points="108,48 168,128 48,128"');
+    expect(render("pentagon")).toContain("<polygon");
+    expect(render("octagon")).toContain("<polygon");
+    expect(render("trapezoid")).toContain("<polygon");
+    expect(render("chevron")).toContain("<polygon");
+    expect(render("cloud")).toContain("<polygon");
+    expect(render("parallelogram")).toContain("<polygon");
+    expect(render("predefined-process")).toContain("V 128 M");
+    expect(render("document")).toContain('C 148.8 126.4');
+    expect(render("database")).toContain('fill="none" stroke=');
+    expect(render("pill")).toContain('rx="40"');
+  });
+
   it("supports an optional background and empty canvas", () => {
     const colored = canvasDataToFullSvg(sample, { backgroundColor: "#fff" });
     expect(colored.svg).toContain('fill="#fff"');
