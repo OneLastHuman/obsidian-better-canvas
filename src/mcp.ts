@@ -46,16 +46,18 @@ async function rpc(
   if (apiKey.trim()) headers.Authorization = "Bearer " + apiKey.trim();
   if (sessionId) headers["Mcp-Session-Id"] = sessionId;
 
+  const notification = method.startsWith("notifications/");
+  const message: Record<string, unknown> = {
+    jsonrpc: "2.0",
+    method,
+    params,
+    ...(notification ? {} : { id: "better-canvas-" + Math.random().toString(16).slice(2) })
+  };
   const response = await requestUrl({
     url: endpoint.trim(),
     method: "POST",
     headers,
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: "better-canvas-" + Math.random().toString(16).slice(2),
-      method,
-      params
-    }),
+    body: JSON.stringify(message),
     throw: false
   });
   const body = parseResponse(response);
