@@ -17,6 +17,7 @@ import { parseProviderParamsJson } from "./provider-params";
 import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { connectedEdgeIds, selectedCanvasNodeIds } from "./edge-highlight";
+import { CanvasReadonlyController, type CanvasReadonlyOptions } from "./canvas-readonly";
 import { mergeCanvasExportData, viewportExportAppearance } from "./canvas-export-data";
 import { prepareViewportSvgExportClone, shouldIncludeViewportSvgNode } from "./canvas-viewport-export";
 import {
@@ -261,10 +262,12 @@ export default class BetterCanvasFeatures {
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
   private pdfAnnotations: PdfAnnotationManager | null = null;
   private portalManager: CanvasPortalManager | null = null;
+  private readonlyController = new CanvasReadonlyController();
   private p: any;
 
   constructor(plugin: any) {
     this.p = plugin;
+    this.p.register(() => this.readonlyController.stop());
   }
 
   init(): void {
@@ -658,6 +661,7 @@ export default class BetterCanvasFeatures {
       this.applyZoomBreakpoints(view.canvas);
       this.applyFocus(view.canvas);
       this.applySelectionEdgeHighlight(view.canvas);
+      this.readonlyController.bind(view, view.canvas, this.readonlyOptions());
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
     }
   }
@@ -1156,6 +1160,22 @@ export default class BetterCanvasFeatures {
     new Notice(count ? "已选择 " + count + " 条连线。" : "没有匹配连线。");
   }
 
+  private readonlyOptions(): CanvasReadonlyOptions {
+    const settings = this.settings();
+    return {
+      disableContextMenus: settings.readOnlyDisableNodeMenusEnabled !== false,
+      lockPanZoom: settings.readOnlyLockPanZoomEnabled === true
+    };
+  }
+
+  /** Refresh read-only event guards after commands or setting changes. */
+  refreshReadonly(): void {
+    for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
+      const view = leaf.view as any;
+      if (view?.canvas) this.readonlyController.bind(view, view.canvas, this.readonlyOptions());
+    }
+  }
+
   private toggleReadonly(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
@@ -1163,6 +1183,7 @@ export default class BetterCanvasFeatures {
     if (!(wrapper instanceof HTMLElement)) { new Notice("无法获取 Canvas 容器。"); return; }
     const enabled = !wrapper.classList.contains("bc-readonly");
     wrapper.classList.toggle("bc-readonly", enabled);
+    this.refreshReadonly();
     new Notice(enabled ? "已启用只读模式；节点不能被鼠标拖动或编辑。再次运行命令可解除。" : "已退出只读模式。");
   }
   private alignSelectionToGrid(): void {
