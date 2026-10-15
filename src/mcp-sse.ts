@@ -65,7 +65,7 @@ interface JsonRpcResponse {
   error?: { code?: number; message?: string; data?: unknown };
 }
 
-class SseMcpConnection {
+export class SseMcpConnection {
   private controller = new AbortController();
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   private streamUrl: string;
@@ -202,6 +202,7 @@ class SseMcpConnection {
   }
 
   private post(method: string, params: Record<string, unknown>, id?: string): Promise<any> {
+    if (this.closed) return Promise.reject(new Error("MCP SSE connection is closed."));
     if (!this.postUrl) return Promise.reject(new Error("MCP SSE message endpoint 尚未就绪。"));
     const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
     if (id !== undefined) message.id = id;
@@ -236,6 +237,7 @@ class SseMcpConnection {
   }
 
   async request<T>(method: string, params: Record<string, unknown>): Promise<T> {
+    if (this.closed) throw new Error("MCP SSE connection is closed.");
     const id = "bc-sse-" + (++this.sequence);
     const resultPromise = new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -256,6 +258,9 @@ class SseMcpConnection {
 
   private fail(error: Error): void {
     if (this.closed) return;
+    this.closed = true;
+    this.controller.abort();
+    void this.reader?.cancel().catch(() => undefined);
     this.rejectEndpoint(error);
     for (const handler of this.pending.values()) {
       clearTimeout(handler.timer);
