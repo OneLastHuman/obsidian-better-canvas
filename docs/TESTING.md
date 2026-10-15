@@ -148,6 +148,7 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 - 使用 mock HTTP/固定响应测试请求格式、非 2xx、超时、断网、坏 JSON、流式结束、流式中止和重复生成；
 - API Key 不得进入日志、截图、测试 fixture 或提交记录；
 - 对 MCP 文本/图片块、不支持的 MIME、无效 payload、工具失败及用户确认流程分别测试；
+- MCP Resources/Prompts：测试 resources/list 与 prompts/list 的分页/重复游标、resources/read 文本及二进制/图片处理、prompts/get 参数验证和三种传输层的错误路径；真实服务器兼容性仍需用用户配置的测试服务复验。
 - 将确定性的模拟测试和真实 provider smoke test 分开；真实 smoke test 需要明确配置和密钥，默认不应在普通 CI 中调用付费 API。
 
 ### PDF 与导出
