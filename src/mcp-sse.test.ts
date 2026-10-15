@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { callSseMcpTool, listSseMcpTools, resolveSsePostUrl, splitSseFrames } from "./mcp-sse";
+import {
+  callSseMcpTool,
+  getSseMcpPrompt,
+  listSseMcpPrompts,
+  listSseMcpResources,
+  listSseMcpTools,
+  readSseMcpResource,
+  resolveSsePostUrl,
+  splitSseFrames
+} from "./mcp-sse";
 
 describe("legacy MCP SSE parsing", () => {
   it("parses endpoint and message events across a partial buffer", () => {
@@ -53,11 +62,21 @@ describe("legacy MCP SSE JSON-RPC round trip", () => {
       if (message.id !== undefined) {
         let result: unknown;
         if (message.method === "initialize") {
-          result = { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "sse-fixture", version: "1" } };
+          result = { protocolVersion: "2025-03-26", capabilities: { tools: {}, resources: {}, prompts: {} }, serverInfo: { name: "sse-fixture", version: "1" } };
         } else if (message.method === "tools/list") {
           result = { tools: [{ name: "echo", description: "Echo arguments", inputSchema: { type: "object" } }] };
         } else if (message.method === "tools/call") {
           result = { content: [{ type: "text", text: JSON.stringify(message.params.arguments) }] };
+        } else if (message.method === "resources/list") {
+          result = message.params.cursor
+            ? { resources: [{ uri: "note://second", name: "Second" }] }
+            : { resources: [{ uri: "note://first", name: "First" }], nextCursor: "page-2" };
+        } else if (message.method === "resources/read") {
+          result = { contents: [{ uri: message.params.uri, text: "SSE resource body" }] };
+        } else if (message.method === "prompts/list") {
+          result = { prompts: [{ name: "outline", description: "Outline a topic", arguments: [{ name: "topic", required: true }] }] };
+        } else if (message.method === "prompts/get") {
+          result = { messages: [{ role: "user", content: { type: "text", text: "Outline: " + message.params.arguments.topic } }] };
         }
         eventController?.enqueue(encoder.encode("event: message\ndata: " + JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\n\n"));
       }
@@ -71,5 +90,15 @@ describe("legacy MCP SSE JSON-RPC round trip", () => {
     const result = await callSseMcpTool("https://mcp.example/sse", "secret", "echo", { text: "hello" });
     expect(result.text).toBe(JSON.stringify({ text: "hello" }));
     expect(result.images).toEqual([]);
-  }, 15000);
+
+    const resources = await listSseMcpResources("https://mcp.example/sse", "secret");
+    expect(resources.map(resource => resource.uri)).toEqual(["note://first", "note://second"]);
+    const resource = await readSseMcpResource("https://mcp.example/sse", "secret", "note://first");
+    expect(resource.text).toContain("SSE resource body");
+
+    const prompts = await listSseMcpPrompts("https://mcp.example/sse", "secret");
+    expect(prompts[0].name).toBe("outline");
+    const prompt = await getSseMcpPrompt("https://mcp.example/sse", "secret", "outline", { topic: "graphs" });
+    expect(prompt.text).toContain("Outline: graphs");
+  }, 30000);
 });

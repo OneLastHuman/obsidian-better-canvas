@@ -1,5 +1,14 @@
 import { normalizeMcpToolResult, type RemoteMcpResult } from "./mcp-result";
 import type { RemoteMcpTool } from "./mcp";
+import {
+  collectMcpCatalogPages,
+  formatMcpPromptResult,
+  formatMcpResourceRead,
+  normalizeMcpPromptPage,
+  normalizeMcpResourcePage,
+  type McpPrompt,
+  type McpResource
+} from "./mcp-catalog";
 
 export interface SseFrame {
   event: string;
@@ -315,5 +324,41 @@ export async function callSseMcpTool(
     });
     if (result?.isError) throw new Error("MCP SSE 工具执行失败：" + JSON.stringify(result.content ?? result));
     return normalizeMcpToolResult(result);
+  });
+}
+
+
+export async function listSseMcpResources(endpoint: string, apiKey: string): Promise<McpResource[]> {
+  return await withSse(endpoint, apiKey, async connection => await collectMcpCatalogPages(
+    async cursor => normalizeMcpResourcePage(await connection.request<any>("resources/list", cursor ? { cursor } : {})),
+    resource => resource.uri
+  ));
+}
+
+export async function readSseMcpResource(endpoint: string, apiKey: string, uri: string): Promise<RemoteMcpResult> {
+  if (!uri.trim()) throw new Error("MCP resource URI 不能为空。");
+  return await withSse(endpoint, apiKey, async connection => {
+    const result = await connection.request<any>("resources/read", { uri: uri.trim() });
+    return formatMcpResourceRead(uri.trim(), result);
+  });
+}
+
+export async function listSseMcpPrompts(endpoint: string, apiKey: string): Promise<McpPrompt[]> {
+  return await withSse(endpoint, apiKey, async connection => await collectMcpCatalogPages(
+    async cursor => normalizeMcpPromptPage(await connection.request<any>("prompts/list", cursor ? { cursor } : {})),
+    prompt => prompt.name
+  ));
+}
+
+export async function getSseMcpPrompt(
+  endpoint: string,
+  apiKey: string,
+  name: string,
+  args: Record<string, string>
+): Promise<RemoteMcpResult> {
+  if (!name.trim()) throw new Error("MCP prompt 名称不能为空。");
+  return await withSse(endpoint, apiKey, async connection => {
+    const result = await connection.request<any>("prompts/get", { name: name.trim(), arguments: args });
+    return formatMcpPromptResult(name.trim(), result);
   });
 }
