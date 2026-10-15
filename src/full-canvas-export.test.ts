@@ -106,6 +106,20 @@ describe("full content SVG export", () => {
     expect(render("pill")).toContain('rx="40"');
   });
 
+  it("exports double node borders and text alignment metadata", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "double", type: "text", x: 0, y: 0, width: 160, height: 100, text: "Centered",
+        bcBorderStyle: "double", bcTextAlign: "center"
+      }],
+      edges: []
+    });
+    expect(result.svg).toContain('text-anchor="middle"');
+    expect(result.svg).toContain('stroke-width="1.5"');
+    expect(result.svg).toContain('stroke-width="1"');
+    expect(result.svg).toContain('<g transform="translate(');
+  });
+
   it("supports an optional background and empty canvas", () => {
     const colored = canvasDataToFullSvg(sample, { backgroundColor: "#fff" });
     expect(colored.svg).toContain('fill="#fff"');
