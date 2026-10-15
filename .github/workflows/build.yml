@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,6 +21,13 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Upload production entrypoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-main-js
+          path: main.js
+          if-no-files-found: error
+          retention-days: 3
       - name: Package installable plugin
         run: |
           mkdir -p dist/obsidian-better-canvas
@@ -30,3 +40,31 @@ jobs:
           path: dist/obsidian-better-canvas.zip
           if-no-files-found: error
           retention-days: 14
+
+  publish-installable-bundle:
+    name: Sync installable bundle to repository
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: built-main-js
+          path: .
+      - name: Commit production bundle
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add main.js
+          if git diff --cached --quiet; then
+            echo "main.js is already up to date."
+            exit 0
+          fi
+          git commit -m "build: refresh installable plugin bundle"
+          git push origin HEAD:main
