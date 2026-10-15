@@ -205,7 +205,9 @@ function toOpenAIRequest(settings: AISettings, messages: ChatMessage[], streamin
 }
 
 function parseCompletion(protocol: AIProtocol, body: any): string {
-  // Keep parser implementation details out of user-facing errors for successful responses.
+  // bodyOf() preserves an unparsable success response as raw text so HTTP
+  // error responses can include their original message. A 2xx response must
+  // not leak JSON.parse's implementation-specific exception into the Notice.
   if (typeof body === "string") {
     throw new Error("AI 服务返回了成功状态，但没有找到可用的文本内容。");
   }
