@@ -11,7 +11,8 @@ import {
   TFolder
 } from "obsidian";
 import { toPng, toSvg } from "html-to-image";
-import { AIProtocol, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
+import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
+import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
@@ -87,6 +88,7 @@ interface FeatureSettings {
   flashcardOutputMode: "canvas" | "spaced-repetition";
   spacedRepetitionFolder: string;
   spacedRepetitionDeck: string;
+  modelCapabilityReports: Record<string, ModelCapabilityReport>;
 }
 
 const DEFAULT_PROFILES: ProviderProfile[] = [{
@@ -298,6 +300,48 @@ export default class BetterCanvasFeatures {
     return this.p.settings as any;
   }
 
+  async probeProviderCapabilities(profileId: string): Promise<ModelCapabilityReport> {
+    const s = this.settings() as FeatureSettings & any;
+    const selected = (Array.isArray(s.providerProfiles) ? s.providerProfiles : [])
+      .find((profile: ProviderProfile) => profile.id === profileId) as ProviderProfile | undefined;
+    if (!selected) throw new Error("找不到要探测的 AI 服务商配置。");
+
+    const profile = selected.id === "default"
+      ? {
+          ...selected,
+          baseUrl: s.baseUrl || selected.baseUrl,
+          apiKey: s.apiKey || selected.apiKey,
+          model: s.model || selected.model,
+          imageModel: s.imageModel || selected.imageModel
+        }
+      : selected;
+    const aiSettings: AISettings = {
+      baseUrl: String(profile.baseUrl || ""),
+      apiKey: String(profile.apiKey || ""),
+      model: String(profile.model || ""),
+      imageModel: String(profile.imageModel || ""),
+      systemPrompt: "You are running a user-requested capability smoke test.",
+      protocol: profile.protocol === "anthropic" || profile.protocol === "gemini" ? profile.protocol : "openai",
+      backend: "api"
+    };
+    const report = await probeModelCapabilities(
+      { id: profile.id, name: String(profile.name || profile.id) },
+      aiSettings,
+      chatCompletion
+    );
+    const reports = s.modelCapabilityReports && typeof s.modelCapabilityReports === "object" && !Array.isArray(s.modelCapabilityReports)
+      ? s.modelCapabilityReports as Record<string, ModelCapabilityReport>
+      : {};
+    reports[modelCapabilityReportKey(report.profileId, report.protocol, report.model)] = report;
+    const keys = Object.keys(reports);
+    while (keys.length > 50) {
+      delete reports[keys.shift()!];
+    }
+    s.modelCapabilityReports = reports;
+    await this.save();
+    return report;
+  }
+
   async save(): Promise<void> {
     await this.p.saveSettings();
   }
@@ -351,6 +395,7 @@ export default class BetterCanvasFeatures {
     if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
     if (s.backend !== "opencode-acp" && s.backend !== "api") s.backend = "api";
     if (typeof s.opencodeBinaryPath !== "string") s.opencodeBinaryPath = "opencode";
+    if (!s.modelCapabilityReports || typeof s.modelCapabilityReports !== "object" || Array.isArray(s.modelCapabilityReports)) s.modelCapabilityReports = {};
     void this.save();
   }
 
