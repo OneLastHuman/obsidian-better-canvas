@@ -74,6 +74,7 @@ import { syncHtmlPreviews } from "./html-preview";
 import { runLocalCodex } from "./codex-cli";
 import BetterCanvasSettingsTab from "./settings";
 import { normalizeCommandDisplayName } from "./command-names";
+import { joinVaultPath } from "./vault-path";
 
 interface ProviderProfile {
   id: string;
@@ -1408,8 +1409,8 @@ export default class BetterCanvasFeatures {
       if (!base) return;
       try {
         const view = this.activeCanvasView();
-        const folder = view?.file?.parent?.path ?? "";
-        const pathBase = (folder ? folder + "/" : "") + base;
+        const folder = String(view?.file?.parent?.path ?? "").replace(/^\/+|\/+$/g, "");
+        const pathBase = joinVaultPath(folder, base);
         const filePath = await this.uniquePath(pathBase, "canvas");
 
         // Rebase the moved subgraph so that it opens around the Canvas origin.
@@ -1866,7 +1867,7 @@ export default class BetterCanvasFeatures {
     const folder = String(this.settings().attachmentFolder || "Better Canvas Exports").replace(/^\/+|\/+$/g, "");
     await this.ensureFolder(folder);
     if (format === "canvas") {
-      const filePath = await this.uniquePath(folder + "/" + baseName + "-export", "canvas");
+      const filePath = await this.uniquePath(joinVaultPath(folder, baseName + "-export"), "canvas");
       const liveData = readCanvasData(canvas);
       let exportData = liveData;
       const sourceFile = view?.file;
@@ -1911,7 +1912,7 @@ export default class BetterCanvasFeatures {
       const dataUrl = format === "png"
         ? await toPng(container, exportOptions)
         : await toSvg(svgContainer, { ...exportOptions, filter: shouldIncludeViewportSvgNode });
-      const filePath = await this.uniquePath(folder + "/" + baseName + "-export", format);
+      const filePath = await this.uniquePath(joinVaultPath(folder, baseName + "-export"), format);
       const comma = dataUrl.indexOf(",");
       if (comma < 0) throw new Error("导出图像的数据 URL 格式无效。");
       const metadata = dataUrl.slice(0, comma);
@@ -2071,7 +2072,7 @@ export default class BetterCanvasFeatures {
       }
 
       const full = canvasDataToFullSvg(exportData, { backgroundColor, margin: 48 });
-      const filePath = await this.uniquePath(folder + "/" + baseName + (selectionOnly ? "-selection" : "-full-content"), format);
+      const filePath = await this.uniquePath(joinVaultPath(folder, baseName + (selectionOnly ? "-selection" : "-full-content")), format);
       if (format === "svg") {
         await this.p.app.vault.create(filePath, full.svg);
       } else {
