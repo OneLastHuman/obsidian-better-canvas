@@ -582,6 +582,35 @@ function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes
   setSvgPath(edge.path?.display, svgPath);
 }
 
+function syncCustomStyleDataAttributes(element: Element | null | undefined, styleAttributes: Record<string, unknown>): void {
+  if (!element || typeof element.setAttribute !== "function") return;
+
+  const tracked = element as Element & { __bcCustomStyleAttributeNames?: string[] };
+  const next = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(styleAttributes)) {
+    if (!/^[a-z][a-zA-Z0-9-]*$/.test(key)) continue;
+    const kebabKey = key.replace(/[A-Z]/g, letter => "-" + letter.toLowerCase());
+    next.set("data-" + kebabKey, value);
+  }
+
+  const previous = Array.isArray(tracked.__bcCustomStyleAttributeNames)
+    ? tracked.__bcCustomStyleAttributeNames
+    : [];
+  for (const attributeName of previous) {
+    if (!next.has(attributeName)) element.removeAttribute(attributeName);
+  }
+
+  for (const [attributeName, value] of next) {
+    if (value === null || value === undefined ||
+        (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")) {
+      element.removeAttribute(attributeName);
+    } else {
+      element.setAttribute(attributeName, String(value));
+    }
+  }
+  tracked.__bcCustomStyleAttributeNames = [...next.keys()];
+}
+
 export function decorateCanvas(canvas: any): void {
   let data = readCanvasData(canvas);
 
@@ -616,6 +645,7 @@ export function decorateCanvas(canvas: any): void {
     const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
     if (!(element instanceof HTMLElement)) continue;
     const styleAttributes = (nodeData as any).styleAttributes ?? {};
+    syncCustomStyleDataAttributes(element, styleAttributes);
     const storedShape = typeof nodeData.bcShape === "string" ? nodeData.bcShape
       : typeof styleAttributes.shape === "string" ? styleAttributes.shape : "default";
     const shape = storedShape === "rectangle" ? "default" : storedShape === "circle" ? "circle" : storedShape;
@@ -637,6 +667,8 @@ export function decorateCanvas(canvas: any): void {
     applyConfiguredEdgePath(canvas, edge, edgeData, data.nodes);
     const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
     const styleAttributes = (edgeData as any).styleAttributes ?? {};
+    syncCustomStyleDataAttributes(path, styleAttributes);
+    syncCustomStyleDataAttributes(edge?.path?.interaction, styleAttributes);
     const storedPath = edgeData.bcPathStyle
       ?? (styleAttributes.path === "short-dashed" || styleAttributes.path === "long-dashed" ? "dashed"
         : styleAttributes.path === "dotted" ? "dotted" : "solid");
