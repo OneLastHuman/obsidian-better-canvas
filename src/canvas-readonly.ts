@@ -128,6 +128,13 @@ export class CanvasReadonlyController {
     this.bindings.delete(container);
   }
 
+  retainOnly(activeContainers: Iterable<any>): void {
+    const active = new Set(activeContainers);
+    for (const container of [...this.bindings.keys()]) {
+      if (!active.has(container)) this.unbind(container);
+    }
+  }
+
   stop(): void {
     for (const container of [...this.bindings.keys()]) this.unbind(container);
   }
