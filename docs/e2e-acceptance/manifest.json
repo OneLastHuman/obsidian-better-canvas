@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15T07:11:18.969Z",
+  "generatedAt": "2026-10-15T07:16:20.176Z",
   "testedCommit": "8c693e7530b882564654433eae47cc20f2cf61ba",
   "testedSubject": "build: refresh installable plugin bundle",
   "mainJsSha256": "b229962acc2b2cac2d7bd3cfb541e7f73775d6d11aaf29303e4697ba6cb26240",
@@ -135,6 +135,12 @@
       {
         "file": "01-generate-image-invalid-payload.png",
         "caption": "非图片负载被当作 .png 保存并插入节点，界面只显示成功提示"
+      }
+    ],
+    "89": [
+      {
+        "file": "01-encapsulate-root-path.png",
+        "caption": "Vault 根目录执行封装选区：文件已创建，但节点 file 字段为 //enc-single.canvas，节点打不开"
       }
     ]
   }
