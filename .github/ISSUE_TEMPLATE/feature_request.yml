@@ -1,0 +1,53 @@
+name: Feature request
+description: 提出 Better Canvas 的功能或改进建议
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请聚焦一个主要需求。优先描述实际问题和验收结果，不需要先给出实现方案。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相关功能范围
+      options:
+        - Canvas 节点 / 连线 / 快捷键
+        - 布局 / 分组 / 导入导出
+        - Canvas Portal
+        - PDF / 批注 / OCR
+        - AI / Provider
+        - MCP
+        - 设置 / 其他
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 当前问题或使用场景
+      description: 说明你希望完成什么、现在遇到了什么障碍，以及谁会受影响。
+      placeholder: 当前流程中的限制是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 希望的行为
+      description: 描述你希望产品如何表现；无需规定代码实现方式。
+      placeholder: 当用户执行某项操作时，期望得到……
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 可验证的验收条件
+      description: 列出能确认需求完成的结果或场景。
+      placeholder: |
+        - [ ] 在……情况下可以……
+        - [ ] 原有……行为保持不变
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案或补充背景（可选）
+      placeholder: 已尝试的方法、相关 Issue 或其他限制。

@@ -1,0 +1,76 @@
+name: Bug report
+description: 报告 Better Canvas 的可复现缺陷
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请检查是否已有相关 Issue。请勿附带真实 API Key、私密 Vault 内容或含个人信息的日志；如需样例，请使用脱敏后的最小 Canvas 文件。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 受影响的功能
+      options:
+        - Canvas 节点 / 连线 / 快捷键
+        - 布局 / 分组 / 导入导出
+        - Canvas Portal
+        - PDF / 批注 / OCR
+        - AI / Provider
+        - MCP
+        - 设置 / 其他
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题摘要
+      description: 描述发生了什么，以及影响了哪项操作。
+      placeholder: 清晰、具体地描述问题。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 尽量提供最小、可重复的步骤；如果只在特定文件或设置下出现，请说明条件。
+      placeholder: |
+        1. 打开……
+        2. 选择……
+        3. 执行……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      placeholder: 说明你认为应发生什么。
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      placeholder: 说明实际发生了什么，并附上可观察到的错误信息。
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Better Canvas 版本或 commit
+      placeholder: 例如 版本号或短 SHA；无法确认可留空
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian 版本
+      placeholder: 例如 1.x
+  - type: input
+    id: platform
+    attributes:
+      label: 操作系统 / 设备
+      placeholder: 例如 Windows 11、macOS、Linux
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 日志、截图或最小样例（可选）
+      description: 请先脱敏。不要上传密钥、私人笔记、整个 Vault 或其他敏感资料。
+      render: text
