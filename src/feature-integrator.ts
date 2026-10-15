@@ -661,9 +661,9 @@ export default class BetterCanvasFeatures {
       this.applyZoomBreakpoints(view.canvas);
       this.applyFocus(view.canvas);
       this.applySelectionEdgeHighlight(view.canvas);
-      this.readonlyController.bind(view, view.canvas, this.readonlyOptions());
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
     }
+    this.refreshReadonly();
   }
 
   private decorate(canvas: any): void {
@@ -1170,10 +1170,14 @@ export default class BetterCanvasFeatures {
 
   /** Refresh read-only event guards after commands or setting changes. */
   refreshReadonly(): void {
+    const containers: any[] = [];
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as any;
-      if (view?.canvas) this.readonlyController.bind(view, view.canvas, this.readonlyOptions());
+      if (!view?.canvas) continue;
+      this.readonlyController.bind(view, view.canvas, this.readonlyOptions());
+      containers.push(view.containerEl ?? view.contentEl ?? view.canvas.wrapperEl);
     }
+    this.readonlyController.retainOnly(containers);
   }
 
   private toggleReadonly(): void {
