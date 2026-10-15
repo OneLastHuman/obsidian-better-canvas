@@ -7,6 +7,7 @@ import {
   type McpPrompt,
   type McpResource
 } from "./mcp-catalog";
+import { loadNodeRuntimeModules } from "./node-runtime";
 
 export interface LocalMcpServerConfig {
   command: string;
@@ -128,11 +129,10 @@ class LocalMcpSession {
   }
 
   private async startProcess(): Promise<void> {
-    const [{ spawn }, { tmpdir }, processModule] = await Promise.all([
-      import("node:child_process"),
-      import("node:os"),
-      import("node:process")
-    ]);
+    const runtime = await loadNodeRuntimeModules();
+    const { spawn } = runtime.childProcess;
+    const { tmpdir } = runtime.os;
+    const processModule = runtime.process;
     if (this.closed) throw new Error("Local MCP stdio session is closed.");
 
     try {
