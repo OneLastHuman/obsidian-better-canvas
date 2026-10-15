@@ -54,7 +54,7 @@ describe("parseCssStyleDefinitions", () => {
   it("ignores malformed definitions, unsafe keys and definitions without exactly one null reset", () => {
     const css = [
       "/* @advanced-canvas-node-style",
-      "key: on-click",
+      "key: onclick!",
       "label: Unsafe",
       "options:",
       "  - label: Reset",
