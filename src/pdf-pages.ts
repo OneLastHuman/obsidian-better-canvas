@@ -42,6 +42,8 @@ class PinnedPdfPageEmbed extends Component {
   private pageViewport: any = null;
   private textResizeObserver: ResizeObserver | null = null;
   private cancelled = false;
+  private rendered = false;
+  private loadPromise: Promise<void> | null = null;
 
   constructor(plugin: any, context: any, file: TFile, subpath?: string) {
     super();
@@ -208,6 +210,17 @@ class PinnedPdfPageEmbed extends Component {
   }
 
   async loadFile(): Promise<void> {
+    if (this.cancelled || this.rendered) return;
+    if (this.loadPromise) return this.loadPromise;
+    this.loadPromise = this.renderFile();
+    try {
+      await this.loadPromise;
+    } finally {
+      this.loadPromise = null;
+    }
+  }
+
+  private async renderFile(): Promise<void> {
     const target = this.canvas;
     const pageNumber = getPageNumber(this.subpath);
     if (!target || !pageNumber) return;
@@ -236,6 +249,7 @@ class PinnedPdfPageEmbed extends Component {
       const context = target.getContext("2d", { alpha: false });
       if (!context) throw new Error("Could not create a 2D canvas context.");
       await page.render({ canvasContext: context, viewport }).promise;
+      this.rendered = true;
 
       // Expose selectable text without modifying the original PDF or relying on
       // undocumented native PDF selection internals. The details panel is
@@ -313,6 +327,9 @@ export class PinnedPdfPageRenderer {
   }
 
   start(): void {
+    const currentEntries = (this.plugin.app as any).embedRegistry?.embedByExtension;
+    if (this.wrappedEmbed && currentEntries?.pdf === this.wrappedEmbed) return;
+    this.stop();
     this.registry = (this.plugin.app as any).embedRegistry;
     const entries = this.registry?.embedByExtension;
     const original = entries?.pdf;
