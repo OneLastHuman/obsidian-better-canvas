@@ -38,7 +38,7 @@
 - 按指定方向克隆并连接节点，同时保留原内容、样式和扩展属性。
 - 生成思维导图结构和复习闪卡。闪卡默认保存为关联 Canvas 节点；也可导出为 Obsidian Spaced Repetition 兼容的 Markdown 卡组。卡组支持主题标签、目录设置和防覆盖的重名文件处理。
 
-快捷键列表见 [README](../README.md#常用快捷键)。
+快捷键列表见 [README](../README.md#常用快捷键)。可在 **设置 → Better Canvas → 画布** 中分别关闭 Tab、Enter、Alt + 方向键和 Ctrl/Cmd + 方向键快捷键，以免与其他插件或个人热键冲突。
 
 ## 3. AI 工作流
 
