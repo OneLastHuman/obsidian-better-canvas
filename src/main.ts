@@ -11,6 +11,7 @@ import BetterCanvasFeatures from "./feature-integrator";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
 import { decorateCanvas } from "./enhancements";
+import { getNodeAIContextMenuActions } from "./node-ai-context-menu";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import type { ModelCapabilityReport } from "./model-capabilities";
 import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
@@ -393,19 +394,43 @@ export default class BetterCanvasPlugin extends Plugin {
     const workspace = this.app.workspace as any;
     const ref = workspace.on("canvas:node-menu", (menu: any, node: any) => {
       if (!menu?.addItem || !node?.id) return;
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 向 AI 提问").setIcon("sparkles").onClick(() => this.features.askSelectedNode(String(node.id))));
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 生成复习闪卡").setIcon("graduation-cap").onClick(() => {
-        this.selectNode(this.getCanvas(), String(node.id));
-        this.features.generateFlashcardsFromSelection(String(node.id));
-      }));
+      const nodeId = String(node.id);
+      const canvas = this.getCanvas();
+      const record = canvas ? readCanvasData(canvas).nodes.find(item => item.id === nodeId) : undefined;
+      const isGeneratedAI = Boolean((record as any)?.bcGenerated);
+
+      for (const action of getNodeAIContextMenuActions(isGeneratedAI)) {
+        menu.addItem((item: any) => {
+          item.setTitle(action.title).setIcon(action.icon).onClick(() => {
+            switch (action.id) {
+              case "ask":
+                this.features.askSelectedNode(nodeId);
+                break;
+              case "image":
+                this.features.generateImageFromSelection(nodeId);
+                break;
+              case "flashcards":
+                this.features.generateFlashcardsFromSelection(nodeId);
+                break;
+              case "model":
+                this.features.chooseModelForNode(nodeId);
+                break;
+              case "regenerate":
+                this.features.regenerateNode(nodeId);
+                break;
+            }
+          });
+        });
+      }
+
       menu.addItem((item: any) => item.setTitle("Better Canvas: 自动整理思维导图").setIcon("git-branch").onClick(() => {
-        this.selectNode(this.getCanvas(), String(node.id));
+        this.selectNode(this.getCanvas(), nodeId);
         this.autoLayout();
       }));
       menu.addItem((item: any) => item.setTitle("Better Canvas: 应用 CSS 自定义样式预设").setIcon("palette").onClick(() => {
-        const canvas = this.getCanvas();
-        const internalNode = canvas?.nodes?.get?.(String(node.id));
-        if (internalNode) canvas.selectOnly?.(internalNode);
+        const currentCanvas = this.getCanvas();
+        const internalNode = currentCanvas?.nodes?.get?.(nodeId);
+        if (internalNode) currentCanvas.selectOnly?.(internalNode);
         void this.applyCustomStylePreset();
       }));
     });
