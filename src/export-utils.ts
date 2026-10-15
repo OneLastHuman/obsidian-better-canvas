@@ -37,3 +37,54 @@ export function scaleSvgIntrinsicDimensions(svg: string, scale: number): string 
   const newRoot = "<svg" + attributes + ">";
   return svg.replace(root[0], newRoot);
 }
+
+
+export interface ExportMediaBudget {
+  perItemLimit?: number;
+  totalLimit?: number;
+  maxItems?: number;
+}
+
+/** Estimate decoded bytes in a data URL without allocating a binary buffer. */
+export function estimateDataUrlByteLength(dataUrl: string): number {
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) return 0;
+  const metadata = dataUrl.slice(0, comma).toLowerCase();
+  const payload = dataUrl.slice(comma + 1).replace(/\\s/g, "");
+  if (!payload) return 0;
+
+  if (metadata.includes(";base64")) {
+    if (!/^[a-z0-9+/]*={0,2}$/i.test(payload) || payload.length % 4 !== 0) return 0;
+    const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+    return Math.max(0, Math.floor(payload.length * 3 / 4) - padding);
+  }
+
+  try {
+    return new TextEncoder().encode(decodeURIComponent(payload)).byteLength;
+  } catch {
+    return 0;
+  }
+}
+
+const DEFAULT_EXPORT_MEDIA_BUDGET: Required<ExportMediaBudget> = {
+  perItemLimit: 3 * 1024 * 1024,
+  totalLimit: 8 * 1024 * 1024,
+  maxItems: 20
+};
+
+/** Check the same per-item, cumulative and count limits used by full Canvas exports. */
+export function canEmbedExportMedia(
+  byteLength: number,
+  currentTotalBytes: number,
+  currentCount: number,
+  limits: ExportMediaBudget = {}
+): boolean {
+  const budget = { ...DEFAULT_EXPORT_MEDIA_BUDGET, ...limits };
+  if (![byteLength, currentTotalBytes, currentCount, budget.perItemLimit, budget.totalLimit, budget.maxItems]
+    .every(Number.isFinite)) return false;
+  if (byteLength <= 0 || currentTotalBytes < 0 || currentCount < 0) return false;
+  if (budget.perItemLimit <= 0 || budget.totalLimit <= 0 || budget.maxItems < 1) return false;
+  return byteLength <= budget.perItemLimit &&
+    currentTotalBytes + byteLength <= budget.totalLimit &&
+    currentCount < budget.maxItems;
+}

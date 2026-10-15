@@ -39,7 +39,7 @@ import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 import { PdfAnnotationManager } from "./pdf-annotations";
 import { extractPdfPages } from "./pdf-context";
 import { CanvasPortalManager } from "./canvas-portals";
-import { scaleSvgIntrinsicDimensions } from "./export-utils";
+import { canEmbedExportMedia, estimateDataUrlByteLength, scaleSvgIntrinsicDimensions } from "./export-utils";
 import { canvasDataToFullSvg } from "./full-canvas-export";
 import { extractWikiLinks } from "./canvas-links";
 import { discoverModels } from "./model-discovery";
@@ -1520,28 +1520,67 @@ export default class BetterCanvasFeatures {
       };
       const perImageLimit = 3 * 1024 * 1024;
       const totalImageLimit = 8 * 1024 * 1024;
+      const mediaBudget = { perItemLimit: perImageLimit, totalLimit: totalImageLimit, maxItems: 20 };
       let embeddedImageBytes = 0;
       let embeddedImageCount = 0;
+      let embeddedPdfPreviewCount = 0;
       let skippedImageCount = 0;
 
       for (const node of exportData.nodes) {
         if (node.type !== "file" || typeof node.file !== "string") continue;
         const extension = node.file.split(".").pop()?.toLowerCase() ?? "";
+        const isPdf = extension === "pdf";
         const mime = mimeByExtension[extension];
-        if (!mime) continue;
+        if (!mime && !isPdf) continue;
+
         const file = this.p.app.vault.getAbstractFileByPath(node.file);
         if (!(file instanceof TFile)) {
           skippedImageCount++;
           continue;
         }
-        if (file.stat.size > perImageLimit || embeddedImageBytes + file.stat.size > totalImageLimit ||
-            embeddedImageCount >= 20) {
+
+        if (isPdf) {
+          if (embeddedImageCount >= mediaBudget.maxItems || embeddedImageBytes >= totalImageLimit) {
+            skippedImageCount++;
+            continue;
+          }
+          try {
+            // Pinned PDF nodes use their saved page subpath; an ordinary PDF
+            // file node gets a first-page preview. The source PDF is never modified.
+            const pages = await extractPdfPages(
+              this.p.app,
+              file,
+              typeof (node as any).subpath === "string" ? String((node as any).subpath) : undefined,
+              1,
+              true
+            );
+            const preview = pages.find(page => typeof page.imageDataUrl === "string")?.imageDataUrl;
+            if (!preview) {
+              skippedImageCount++;
+              continue;
+            }
+            const previewBytes = estimateDataUrlByteLength(preview);
+            if (!canEmbedExportMedia(previewBytes, embeddedImageBytes, embeddedImageCount, mediaBudget)) {
+              skippedImageCount++;
+              continue;
+            }
+            (node as any).bcExportImageDataUrl = preview;
+            embeddedImageBytes += previewBytes;
+            embeddedImageCount++;
+            embeddedPdfPreviewCount++;
+          } catch {
+            skippedImageCount++;
+          }
+          continue;
+        }
+
+        if (!canEmbedExportMedia(file.stat.size, embeddedImageBytes, embeddedImageCount, mediaBudget)) {
           skippedImageCount++;
           continue;
         }
         try {
           const buffer = await this.p.app.vault.readBinary(file);
-          if (buffer.byteLength > perImageLimit || embeddedImageBytes + buffer.byteLength > totalImageLimit) {
+          if (!canEmbedExportMedia(buffer.byteLength, embeddedImageBytes, embeddedImageCount, mediaBudget)) {
             skippedImageCount++;
             continue;
           }
@@ -1600,10 +1639,11 @@ export default class BetterCanvasFeatures {
       }
       notice.hide();
       const mediaSummary = embeddedImageCount
-        ? "；已嵌入 " + embeddedImageCount + " 张图片"
+        ? "；已嵌入 " + embeddedImageCount + " 项媒体预览" +
+          (embeddedPdfPreviewCount ? "（其中 PDF 页面 " + embeddedPdfPreviewCount + " 个）" : "")
         : "";
       const skippedSummary = skippedImageCount
-        ? "；有 " + skippedImageCount + " 张图片因大小、格式或读取问题以标签代替"
+        ? "；有 " + skippedImageCount + " 项图片或 PDF 页面预览因大小、格式或读取问题以标签代替"
         : "";
       new Notice("已导出整张 Canvas：" + filePath + mediaSummary + skippedSummary);
     } catch (error) {
