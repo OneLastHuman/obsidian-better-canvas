@@ -233,7 +233,7 @@ export class AIUsageModal extends Modal {
     const input = this.history.reduce((sum, record) => sum + (record.inputTokens ?? 0), 0);
     const output = this.history.reduce((sum, record) => sum + (record.outputTokens ?? 0), 0);
     root.createEl("p", {
-      text: `请求 ${this.history.length} 次 · 输入 ${formatNumber(input)} tokens · 输出 ${formatNumber(output)} tokens · 可计价 ${pricedCount} 次 · 已知费率估算合计 ${formatCost(cost)}`
+      text: `请求 ${this.history.length} 次 · 输入 ${formatNumber(input)} tokens · 输出 ${formatNumber(output)} tokens · 可计价 ${pricedCount} 次 · 已知费率估算合计 ${pricedCount > 0 ? formatCost(cost) : "暂无可估算费用"}`
     });
     root.createEl("p", { text: "未返回 token 用量或未配置费率的请求仍计入请求数，但不计入估算总价。" });
 
