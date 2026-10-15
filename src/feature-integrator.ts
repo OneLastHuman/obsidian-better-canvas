@@ -31,6 +31,7 @@ import {
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { readCanvasFrontmatter, replaceCanvasFrontmatter } from "./canvas-frontmatter";
+import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
 import { callSseMcpTool, listSseMcpTools } from "./mcp-sse";
@@ -2935,38 +2936,18 @@ export default class BetterCanvasFeatures {
     const data = readCanvasData(canvas);
     const prefix = "bc-auto-";
     const keep = data.edges.filter((edge: any) => !String(edge.id).startsWith(prefix));
-    const generated: any[] = [];
-    const fileNodes = data.nodes.filter((node: CanvasNodeData) => node.type === "file" && typeof node.file === "string");
-    for (const node of fileNodes) {
-      const file = this.p.app.vault.getAbstractFileByPath(node.file as string);
-      if (!(file instanceof TFile)) continue;
-      const frontmatter = this.p.app.metadataCache.getFileCache(file)?.frontmatter;
-      const raw = frontmatter?.[s.autoEdgesFrontmatterKey || "canvas-edges"];
-      const values = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
-      for (const value of values) {
-        if (typeof value !== "string") continue;
-        const links = value.match(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g);
-        const targets = links?.length
-          ? links.map((link: string) => link.slice(2, -2).split("|")[0])
-          : [value.trim()];
-        for (const targetPath of targets) {
-          const destination = this.p.app.metadataCache.getFirstLinkpathDest(targetPath, canvasFile.path);
-          if (!destination) continue;
-          for (const target of fileNodes) {
-            if (target.id === node.id || target.file !== destination.path) continue;
-            generated.push({
-              id: prefix + node.id + "-" + target.id,
-              fromNode: node.id,
-              fromSide: "right",
-              fromFloating: true,
-              toNode: target.id,
-              toSide: "left",
-              toFloating: true
-            });
-          }
-        }
-      }
-    }
+    const fileNodes = data.nodes.filter((node: CanvasNodeData) =>
+      node.type === "file" && typeof node.file === "string"
+    ) as Array<CanvasNodeData & { file: string }>;
+    const generated = buildAutoFileNodeEdges(
+      fileNodes.map(node => ({ id: node.id, file: node.file })),
+      filePath => {
+        const file = this.p.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) return undefined;
+        return this.p.app.metadataCache.getFileCache(file)?.frontmatter?.[s.autoEdgesFrontmatterKey || "canvas-edges"];
+      },
+      targetPath => this.p.app.metadataCache.getFirstLinkpathDest(targetPath, canvasFile.path)?.path
+    );
     const edges = [...keep, ...generated];
     if (JSON.stringify(edges) === JSON.stringify(data.edges)) return;
     canvas.importData({ ...data, nodes: data.nodes, edges });
