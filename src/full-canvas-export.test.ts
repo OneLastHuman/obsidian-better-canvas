@@ -203,7 +203,7 @@ describe("full content SVG export", () => {
     }, { margin: 0 }).svg;
     const edge = result.match(/<path id="bc-edge-0"[^>]*>/)?.[0] ?? "";
     expect(edge).toContain("d=");
-    expect((edge.match(/\\bL\\b/g) ?? []).length).toBeGreaterThan(1);
+    expect(edge.split(" L ").length - 1).toBeGreaterThan(1);
   });
 
   it("supports an optional background and empty canvas", () => {
