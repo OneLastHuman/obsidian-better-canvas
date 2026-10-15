@@ -1,4 +1,5 @@
 import { requestUrl } from "obsidian";
+import { validatePublicHttpUrl } from "./public-url";
 
 export interface RetrievedPage {
   url: string;
@@ -7,27 +8,7 @@ export interface RetrievedPage {
   kind: "webpage" | "youtube";
 }
 
-function validatePublicHttpUrl(raw: string): URL {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error("请输入完整的网页 URL。");
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("只支持 http 和 https URL。");
-  }
-  const host = url.hostname.toLowerCase();
-  if (
-    host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
-    host === "0.0.0.0" || host === "::1" || host === "[::1]" ||
-    /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) ||
-    /^169\.254\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
-  ) {
-    throw new Error("为避免意外访问本机或内网地址，不处理 localhost、私有 IP 或 .local 域名。");
-  }
-  return url;
-}
+
 
 function htmlToText(html: string): { title: string; text: string } {
   if (typeof DOMParser === "undefined") {
