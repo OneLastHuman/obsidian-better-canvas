@@ -53,7 +53,7 @@ export class PdfAnnotationManager {
   private observers = new Map<HTMLElement, MutationObserver>();
   private resizeObservers = new Map<HTMLElement, ResizeObserver>();
   private excerptContainers = new WeakSet<HTMLElement>();
-  private toolbarContainers = new WeakMap<HTMLElement, HTMLDivElement>();
+  private toolbarContainers = new Map<HTMLElement, HTMLDivElement>();
   private refreshQueued = false;
 
   constructor(plugin: any) {
@@ -107,6 +107,8 @@ export class PdfAnnotationManager {
     this.observers.clear();
     for (const observer of this.resizeObservers.values()) observer.disconnect();
     this.resizeObservers.clear();
+    for (const toolbar of this.toolbarContainers.values()) toolbar.remove();
+    this.toolbarContainers.clear();
   }
 
   private activeCanvas(): any | null {
