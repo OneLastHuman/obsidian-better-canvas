@@ -374,17 +374,18 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         }));
 
       new Setting(card).setName("Temperature")
-        .setDesc("范围 0 到 2；留空或无效输入不会覆盖上一次有效值。")
+        .setDesc(profile.protocol === "anthropic" ? "Anthropic 范围 0 到 1；留空或无效输入不会覆盖上一次有效值。" : "范围 0 到 2；留空或无效输入不会覆盖上一次有效值。")
         .addText(text => {
           text.inputEl.type = "number";
           text.inputEl.min = "0";
-          text.inputEl.max = "2";
+          text.inputEl.max = profile.protocol === "anthropic" ? "1" : "2";
           text.inputEl.step = "0.1";
           text.setValue(String(typeof profile.temperature === "number" ? profile.temperature : 0.4))
             .onChange(async value => {
               if (!value.trim()) return;
               const number = Number(value);
-              if (Number.isFinite(number) && number >= 0 && number <= 2) {
+              const maxTemperature = profile.protocol === "anthropic" ? 1 : 2;
+              if (Number.isFinite(number) && number >= 0 && number <= maxTemperature) {
                 profile.temperature = number;
                 await this.saveProvider(profile, settings);
               }
