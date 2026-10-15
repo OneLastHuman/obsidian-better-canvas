@@ -2,7 +2,7 @@
 
 This matrix records Better Canvas implementation and parity gaps against the current default branches of Advanced Canvas, Canvas MindMap, and Obsidian AI Canvas. “Implemented” means code exists; it does not imply that every supported Obsidian version, provider endpoint, or internal DOM patch has been manually validated.
 
-**Last reviewed:** 2026-10-15. The code review baseline immediately before this documentation update was `ea95660f61c7af65e35410a38e1774eb82f47080`; its GitHub Actions run passed typecheck, unit tests, production build, and install-package creation. The entries below separate missing feature parity from work that exists but still needs host-runtime verification.
+**Last reviewed:** 2026-10-15. The source baseline for the PDF annotation export addition is `c5c70671ecccb91bfe51d687ec444260503941ae`; exact-head typecheck, unit tests, production build, and package creation for the new branch are pending and are not claimed here. The entries below separate missing feature parity from work that exists but still needs host-runtime verification.
 
 ## Canvas MindMap
 
