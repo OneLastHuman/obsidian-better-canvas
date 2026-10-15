@@ -139,6 +139,21 @@ function asText(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+function displayPromptContent(value: unknown): string {
+  if (!value || typeof value !== "object") return asText(value);
+  const item = value as Record<string, unknown>;
+  if (item.type === "image") {
+    return "[Image attachment" + (typeof item.mimeType === "string" ? ": " + item.mimeType : "") + "]";
+  }
+  if (item.type === "resource" && item.resource && typeof item.resource === "object") {
+    const resource = item.resource as Record<string, unknown>;
+    if (typeof resource.blob === "string") {
+      return "[Embedded binary resource" + (typeof resource.mimeType === "string" ? ": " + resource.mimeType : "") + "]";
+    }
+  }
+  return asText(value);
+}
+
 function extractImages(value: unknown, images: RemoteMcpResult["images"]): void {
   if (!value || typeof value !== "object") return;
   const item = value as Record<string, unknown>;
@@ -194,11 +209,11 @@ export function formatMcpPromptResult(name: string, value: unknown): RemoteMcpRe
     if (Array.isArray(content)) {
       for (const item of content) {
         extractImages(item, images);
-        blocks.push("[" + role + "] " + asText(item));
+        blocks.push("[" + role + "] " + displayPromptContent(item));
       }
     } else {
       extractImages(content, images);
-      blocks.push("[" + role + "] " + asText(content));
+      blocks.push("[" + role + "] " + displayPromptContent(content));
     }
   }
   return {
