@@ -18,6 +18,7 @@ import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { connectedEdgeIds, selectedCanvasNodeIds } from "./edge-highlight";
 import { CanvasReadonlyController, type CanvasReadonlyOptions } from "./canvas-readonly";
+import { AdvancedCanvasEventBridge } from "./advanced-canvas-events";
 import { mergeCanvasExportData, viewportExportAppearance } from "./canvas-export-data";
 import { prepareViewportSvgExportClone, shouldIncludeViewportSvgNode } from "./canvas-viewport-export";
 import {
@@ -262,6 +263,7 @@ export default class BetterCanvasFeatures {
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
   private pdfAnnotations: PdfAnnotationManager | null = null;
   private portalManager: CanvasPortalManager | null = null;
+  private advancedCanvasEventBridge: AdvancedCanvasEventBridge | null = null;
   private readonlyController = new CanvasReadonlyController();
   private p: any;
 
@@ -284,6 +286,8 @@ export default class BetterCanvasFeatures {
       this.cleanup();
       closeAllLocalMcpSessions();
     });
+    this.advancedCanvasEventBridge = new AdvancedCanvasEventBridge(this.p.app, this.p);
+    this.advancedCanvasEventBridge.start();
     this.registerCommands();
     this.registerCanvasMenus();
     this.registerMarkdownNodeEmbeds();
@@ -384,6 +388,8 @@ export default class BetterCanvasFeatures {
   }
 
   private cleanup(): void {
+    this.advancedCanvasEventBridge?.stop();
+    this.advancedCanvasEventBridge = null;
     for (const active of this.activeGenerations.values()) active.controller.abort();
     this.activeGenerations.clear();
     this.paletteStyle?.remove();
