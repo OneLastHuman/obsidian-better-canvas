@@ -1,4 +1,5 @@
 import { TFile } from "obsidian";
+import { parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
 
 /**
  * Makes .canvas files visible to Obsidian's metadata cache.
@@ -250,6 +251,9 @@ export class CanvasMetadataIndexer {
       for (const reference of references) {
         const link = typeof reference?.link === "string" ? reference.link : "";
         if (!link) continue;
+        // URI destinations belong to external-link consumers, not Obsidian's
+        // unresolved Vault-link map. Keep them in metadata.links for inspection.
+        if (/^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith("//")) continue;
         const destination = this.cache.getFirstLinkpathDest?.(link, path);
         if (destination?.path) {
           resolved[destination.path] = (resolved[destination.path] ?? 0) + 1;
@@ -286,6 +290,10 @@ export class CanvasMetadataIndexer {
       tags: [],
       headings: [],
       sections: [],
+      listItems: [],
+      footnotes: [],
+      footnoteRefs: [],
+      referenceLinks: [],
       blocks: {},
       nodes: {}
     };
@@ -294,7 +302,7 @@ export class CanvasMetadataIndexer {
       const values = Array.isArray(rawValue) ? rawValue : [rawValue];
       for (const value of values) {
         if (typeof value !== "string") continue;
-        const match = value.match(/^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
+        const match = value.match(/^\\[\\[([^\\]|]+)(?:\\|([^\\]]+))?\\]\\]$/);
         if (match) {
           metadata.frontmatterLinks.push({
             key,
@@ -306,9 +314,43 @@ export class CanvasMetadataIndexer {
       }
     }
 
+    const rawTags = frontmatter.tags ?? frontmatter.tag;
+    const frontmatterTags = (Array.isArray(rawTags) ? rawTags : typeof rawTags === "string" ? [rawTags] : [])
+      .flatMap((raw: unknown) => typeof raw === "string" ? raw.split(/[\\s,]+/) : [])
+      .map((tag: string) => tag.trim().replace(/^#+/, ""))
+      .filter((tag: string) => /^[\\p{L}\\p{N}_][\\p{L}\\p{N}_/-]*$/u.test(tag));
+    for (const tag of frontmatterTags) {
+      metadata.tags.push({
+        tag: "#" + tag,
+        source: "frontmatter",
+        position: {
+          start: { line: 0, col: 0, offset: 0 },
+          end: { line: 0, col: 0, offset: 0 }
+        }
+      });
+    }
+
+    const nodePosition = (entry: any, nodeId: string): any => {
+      const position = entry?.position;
+      const fallback = { line: 0, col: 0, offset: 0 };
+      return {
+        ...entry,
+        position: {
+          nodeId,
+          start: position?.start ?? fallback,
+          end: position?.end ?? position?.start ?? fallback
+        }
+      };
+    };
+    const aggregate = (target: string, entries: unknown, nodeId: string): void => {
+      if (!Array.isArray(entries)) return;
+      for (const entry of entries) {
+        if (entry && typeof entry === "object") metadata[target].push(nodePosition(entry, nodeId));
+      }
+    };
+
     const nodes = Array.isArray(canvas?.nodes) ? canvas.nodes : [];
-    for (let index = 0; index < nodes.length; index++) {
-      const node = nodes[index];
+    for (const node of nodes) {
       if (node?.type === "text" && typeof node.text === "string") {
         let nodeMetadata: any = null;
         if (typeof this.cache.computeMetadataAsync === "function") {
@@ -320,25 +362,20 @@ export class CanvasMetadataIndexer {
         }
         nodeMetadata ??= this.fallbackMarkdownMetadata(node.text);
         metadata.nodes[node.id] = nodeMetadata;
-        for (const link of nodeMetadata?.links ?? []) {
-          metadata.links.push({
-            ...link,
-            position: {
-              nodeId: node.id,
-              start: { line: 0, col: 1, offset: 0 },
-              end: { line: 0, col: 1, offset: index }
-            }
-          });
-        }
-        for (const embed of nodeMetadata?.embeds ?? []) {
-          metadata.embeds.push({
-            ...embed,
-            position: {
-              nodeId: node.id,
-              start: { line: 0, col: 1, offset: 0 },
-              end: { line: 0, col: 1, offset: index }
-            }
-          });
+
+        aggregate("links", nodeMetadata?.links, String(node.id));
+        aggregate("embeds", nodeMetadata?.embeds, String(node.id));
+        aggregate("tags", nodeMetadata?.tags, String(node.id));
+        aggregate("headings", nodeMetadata?.headings, String(node.id));
+        aggregate("sections", nodeMetadata?.sections, String(node.id));
+        aggregate("listItems", nodeMetadata?.listItems, String(node.id));
+        aggregate("footnotes", nodeMetadata?.footnotes, String(node.id));
+        aggregate("footnoteRefs", nodeMetadata?.footnoteRefs, String(node.id));
+        aggregate("referenceLinks", nodeMetadata?.referenceLinks, String(node.id));
+        if (nodeMetadata?.blocks && typeof nodeMetadata.blocks === "object") {
+          for (const [blockId, block] of Object.entries(nodeMetadata.blocks)) {
+            metadata.blocks[String(blockId)] ??= { ...((block && typeof block === "object") ? block : {}), nodeId: String(node.id) };
+          }
         }
       } else if (node?.type === "file" && typeof node.file === "string") {
         metadata.embeds.push({
@@ -346,9 +383,9 @@ export class CanvasMetadataIndexer {
           original: node.file,
           displayText: node.file,
           position: {
-            nodeId: node.id,
-            start: { line: 0, col: 1, offset: 0 },
-            end: { line: 0, col: 1, offset: index }
+            nodeId: String(node.id),
+            start: { line: 0, col: 0, offset: 0 },
+            end: { line: 0, col: 0, offset: 0 }
           }
         });
       } else if (node?.type === "link" && typeof node.url === "string") {
@@ -357,9 +394,9 @@ export class CanvasMetadataIndexer {
           original: node.url,
           displayText: node.url,
           position: {
-            nodeId: node.id,
-            start: { line: 0, col: 1, offset: 0 },
-            end: { line: 0, col: 1, offset: index }
+            nodeId: String(node.id),
+            start: { line: 0, col: 0, offset: 0 },
+            end: { line: 0, col: 0, offset: 0 }
           }
         });
       }
@@ -368,23 +405,7 @@ export class CanvasMetadataIndexer {
   }
 
   private fallbackMarkdownMetadata(text: string): any {
-    const links: any[] = [];
-    const embeds: any[] = [];
-    const expression = /!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-    for (const match of text.matchAll(expression)) {
-      const link = match[1].trim();
-      const value = {
-        link,
-        original: match[0],
-        displayText: (match[2] ?? link).trim(),
-        position: {
-          start: { line: 0, col: match.index ?? 0, offset: match.index ?? 0 },
-          end: { line: 0, col: (match.index ?? 0) + match[0].length, offset: (match.index ?? 0) + match[0].length }
-        }
-      };
-      if (match[0].startsWith("!")) embeds.push(value);
-      else links.push(value);
-    }
-    return { links, embeds, tags: [], headings: [], sections: [], blocks: {} };
+    return parseCanvasMarkdownMetadata(text);
   }
+
 }
