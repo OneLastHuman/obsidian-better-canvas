@@ -1,4 +1,12 @@
 /**
+ * Obsidian Canvas exposes zoom as a base-2 logarithm of the visual scale.
+ * Convert it back to the user-facing linear ratio used by node breakpoints.
+ */
+export function canvasZoomToScale(logarithmicZoom: number): number {
+  return Number.isFinite(logarithmicZoom) ? Math.pow(2, logarithmicZoom) : NaN;
+}
+
+/**
  * Reuse Obsidian Canvas' native zoom-to-selection behavior to fit all nodes
  * without leaving the whole Canvas selected after the camera has moved.
  */
