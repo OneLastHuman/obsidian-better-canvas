@@ -18,6 +18,12 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
+function isCredentialField(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return ["api_key", "apikey", "x-api-key", "x_goog_api_key", "access_token", "authorization", "secret", "password"]
+    .includes(normalized) || /(^|[_-])(api[_-]?key|access[_-]?token|authorization|secret|password)([_-]|$)/i.test(key);
+}
+
 function validateValue(value: unknown, path: string, depth: number, count: { value: number }): void {
   if (depth > MAX_DEPTH) throw new Error("请求参数 JSON 嵌套层级超过 8 层。");
   if (++count.value > MAX_TOTAL_VALUES) throw new Error("请求参数 JSON 内容过多（最多 500 个值）。");
@@ -33,6 +39,7 @@ function validateValue(value: unknown, path: string, depth: number, count: { val
   }
   if (!isPlainRecord(value)) throw new Error("请求参数只允许 JSON object、array 和基本类型：" + path);
   for (const [key, child] of Object.entries(value)) {
+    if (isCredentialField(key)) throw new Error("请求参数中不能包含凭据字段：" + path + "." + key);
     const normalizedKey = key.toLowerCase();
     if (["__proto__", "prototype", "constructor"].includes(normalizedKey)) {
       throw new Error("请求参数包含禁止的对象属性：" + key);
@@ -63,7 +70,11 @@ export function validateProviderParams(value: unknown): Record<string, unknown> 
 }
 
 export function parseProviderParamsJson(raw: string): Record<string, unknown> {
-  const source = String(raw ?? "").trim();
+  const rawSource = String(raw ?? "");
+  if (rawSource.length > MAX_JSON_LENGTH) {
+    throw new Error("高级请求参数 JSON 超过 16 KB 上限。");
+  }
+  const source = rawSource.trim();
   if (!source) return {};
   if (source.length > MAX_JSON_LENGTH) {
     throw new Error("高级请求参数 JSON 超过 16 KB 上限。");
@@ -77,11 +88,16 @@ export function parseProviderParamsJson(raw: string): Record<string, unknown> {
   return validateProviderParams(parsed);
 }
 
-export function resolveTemperature(value: unknown, fallback = 0.4): number {
+export function resolveTemperature(
+  value: unknown,
+  fallback = 0.4,
+  protocol: ProviderRequestProtocol = "openai"
+): number {
   if (value === undefined || value === null || value === "") return fallback;
   const number = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(number) || number < 0 || number > 2) {
-    throw new Error("Temperature 必须是 0 到 2 之间的数字。");
+  const maximum = protocol === "anthropic" ? 1 : 2;
+  if (!Number.isFinite(number) || number < 0 || number > maximum) {
+    throw new Error("Temperature 必须是 0 到 " + maximum + " 之间的数字。");
   }
   return number;
 }
