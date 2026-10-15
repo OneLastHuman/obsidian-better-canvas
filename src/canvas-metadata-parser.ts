@@ -294,3 +294,63 @@ export function parseCanvasMarkdownMetadata(text: string): CanvasMarkdownMetadat
 
   return metadata;
 }
+
+const AGGREGATED_NODE_METADATA_FIELDS = [
+  "links",
+  "embeds",
+  "tags",
+  "headings",
+  "sections",
+  "listItems",
+  "footnotes",
+  "footnoteRefs",
+  "referenceLinks"
+] as const;
+
+/** Convert a node-local metadata position into a Canvas-level position. */
+export function promoteCanvasNodeMetadataEntry(entry: any, nodeId: string): any {
+  const position = entry?.position;
+  const fallback = { line: 0, col: 0, offset: 0 };
+  return {
+    ...entry,
+    position: {
+      nodeId,
+      start: position?.start ?? fallback,
+      end: position?.end ?? position?.start ?? fallback
+    }
+  };
+}
+
+/** Store per-node cache data and also expose its searchable metadata at Canvas level. */
+export function appendCanvasNodeMetadata(metadata: any, nodeId: string, nodeMetadata: any): void {
+  metadata.nodes ??= {};
+  metadata.nodes[nodeId] = nodeMetadata;
+
+  for (const field of AGGREGATED_NODE_METADATA_FIELDS) {
+    metadata[field] ??= [];
+    const entries = nodeMetadata?.[field];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (entry && typeof entry === "object") {
+        metadata[field].push(promoteCanvasNodeMetadataEntry(entry, nodeId));
+      }
+    }
+  }
+
+  metadata.blocks ??= {};
+  if (nodeMetadata?.blocks && typeof nodeMetadata.blocks === "object") {
+    for (const [blockId, block] of Object.entries(nodeMetadata.blocks)) {
+      metadata.blocks[String(blockId)] ??= {
+        ...((block && typeof block === "object") ? block : {}),
+        nodeId
+      };
+    }
+  }
+}
+
+/** External URI schemes are not unresolved Vault file references. */
+export function isVaultLinkDestination(link: unknown): link is string {
+  if (typeof link !== "string" || !link.trim()) return false;
+  const value = link.trim();
+  return !/^[a-z][a-z0-9+.-]*:/i.test(value) && !value.startsWith("//");
+}
