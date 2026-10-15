@@ -1,7 +1,7 @@
 import { requestUrl } from "obsidian";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
 import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from "./provider-params";
-import { emitAIUsageEvent, extractProviderUsage, mergeUsageCounts, type AIUsageTokenCounts } from "./ai-usage";
+import { emitAIUsageEvent, extractProviderUsage, mergeUsageCounts, type AIUsageTokenCounts } from "./ai-usage-core";
 
 export type AIProtocol = "openai" | "anthropic" | "gemini";
 
