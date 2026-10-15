@@ -1,5 +1,5 @@
 import { TFile } from "obsidian";
-import { parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
+import { appendCanvasNodeMetadata, isVaultLinkDestination, parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
 
 /**
  * Makes .canvas files visible to Obsidian's metadata cache.
@@ -253,7 +253,7 @@ export class CanvasMetadataIndexer {
         if (!link) continue;
         // URI destinations belong to external-link consumers, not Obsidian's
         // unresolved Vault-link map. Keep them in metadata.links for inspection.
-        if (/^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith("//")) continue;
+        if (!isVaultLinkDestination(link)) continue;
         const destination = this.cache.getFirstLinkpathDest?.(link, path);
         if (destination?.path) {
           resolved[destination.path] = (resolved[destination.path] ?? 0) + 1;
@@ -330,25 +330,6 @@ export class CanvasMetadataIndexer {
       });
     }
 
-    const nodePosition = (entry: any, nodeId: string): any => {
-      const position = entry?.position;
-      const fallback = { line: 0, col: 0, offset: 0 };
-      return {
-        ...entry,
-        position: {
-          nodeId,
-          start: position?.start ?? fallback,
-          end: position?.end ?? position?.start ?? fallback
-        }
-      };
-    };
-    const aggregate = (target: string, entries: unknown, nodeId: string): void => {
-      if (!Array.isArray(entries)) return;
-      for (const entry of entries) {
-        if (entry && typeof entry === "object") metadata[target].push(nodePosition(entry, nodeId));
-      }
-    };
-
     const nodes = Array.isArray(canvas?.nodes) ? canvas.nodes : [];
     for (const node of nodes) {
       if (node?.type === "text" && typeof node.text === "string") {
@@ -361,22 +342,7 @@ export class CanvasMetadataIndexer {
           }
         }
         nodeMetadata ??= this.fallbackMarkdownMetadata(node.text);
-        metadata.nodes[node.id] = nodeMetadata;
-
-        aggregate("links", nodeMetadata?.links, String(node.id));
-        aggregate("embeds", nodeMetadata?.embeds, String(node.id));
-        aggregate("tags", nodeMetadata?.tags, String(node.id));
-        aggregate("headings", nodeMetadata?.headings, String(node.id));
-        aggregate("sections", nodeMetadata?.sections, String(node.id));
-        aggregate("listItems", nodeMetadata?.listItems, String(node.id));
-        aggregate("footnotes", nodeMetadata?.footnotes, String(node.id));
-        aggregate("footnoteRefs", nodeMetadata?.footnoteRefs, String(node.id));
-        aggregate("referenceLinks", nodeMetadata?.referenceLinks, String(node.id));
-        if (nodeMetadata?.blocks && typeof nodeMetadata.blocks === "object") {
-          for (const [blockId, block] of Object.entries(nodeMetadata.blocks)) {
-            metadata.blocks[String(blockId)] ??= { ...((block && typeof block === "object") ? block : {}), nodeId: String(node.id) };
-          }
-        }
+        appendCanvasNodeMetadata(metadata, String(node.id), nodeMetadata);
       } else if (node?.type === "file" && typeof node.file === "string") {
         metadata.embeds.push({
           link: node.file,
