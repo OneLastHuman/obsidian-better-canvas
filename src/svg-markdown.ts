@@ -180,7 +180,6 @@ export function layoutMarkdownForSvg(
   if (!value) return [];
   const width = Math.max(8, Math.floor(maxChars));
   const lineLimit = Math.max(1, Math.floor(maxLines));
-  const scale = Math.max(10, Math.min(28, Number.isFinite(baseFontSize) ? baseFontSize : 16));
   const normalized = value.replace(/\r\n?/g, "\n");
   const blocks: BlockLine[] = [];
   let inFence = false;
