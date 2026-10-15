@@ -251,7 +251,7 @@ npm run build
 - `npm test`：运行单元测试。
 - `npm run build`：生成生产构建。
 
-CI 会检查类型、测试和构建产物，但不会启动 Obsidian 图形界面。发布前请在目标 Obsidian 版本中手动验证 Canvas 保存、键盘操作、菜单、节点布局、导入导出、PDF 标注和实际 AI 请求。
+CI 会检查类型、测试和构建产物，但不会启动 Obsidian 图形界面。发布前请在目标 Obsidian 版本中手动验证 Canvas 保存、键盘操作、菜单、节点布局、导入导出、PDF 标注和实际 AI 请求。正式版本的版本号同步、打 tag 和 GitHub Release 发布步骤见 [发版流程](docs/RELEASING.md)。
 
 ## 已知限制
 
