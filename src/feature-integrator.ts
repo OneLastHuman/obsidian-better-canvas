@@ -38,9 +38,19 @@ import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arran
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
-import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
-import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
-import { callSseMcpTool, listSseMcpTools } from "./mcp-sse";
+import {
+  callRemoteTool, getRemotePrompt, listRemotePrompts, listRemoteResources, listRemoteTools, readRemoteResource, RemoteMcpResult
+} from "./mcp";
+import {
+  callLocalMcpTool, getLocalMcpPrompt, listLocalMcpPrompts, listLocalMcpResources, listLocalMcpTools, readLocalMcpResource
+} from "./mcp-stdio";
+import {
+  callSseMcpTool, getSseMcpPrompt, listSseMcpPrompts, listSseMcpResources, listSseMcpTools, readSseMcpResource
+} from "./mcp-sse";
+import {
+  formatMcpPromptCatalog, formatMcpResourceCatalog, parseMcpPromptArguments,
+  type McpPrompt, type McpResource
+} from "./mcp-catalog";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
 import { PinnedPdfPageRenderer, pinnedPdfSubpath } from "./pdf-pages";
 import { PdfAnnotationManager } from "./pdf-annotations";
@@ -504,6 +514,10 @@ export default class BetterCanvasFeatures {
     add("bc-regenerate", "重新生成所选 AI 节点", () => void this.regenerate());
     add("bc-stop-ai", "停止当前 AI 生成", () => this.stopAI());
     add("bc-mcp-tool", "调用远程 MCP 工具", () => void this.runMcpTool());
+    add("bc-mcp-list-resources", "列出 MCP 资源并添加到画布", () => void this.listMcpResources());
+    add("bc-mcp-read-resource", "读取 MCP 资源并添加到画布", () => void this.readMcpResource());
+    add("bc-mcp-list-prompts", "列出 MCP 提示模板并添加到画布", () => void this.listMcpPrompts());
+    add("bc-mcp-get-prompt", "运行 MCP 提示模板并添加到画布", () => void this.getMcpPrompt());
     add("bc-ai-mcp-tool", "让 AI 建议 MCP 工具调用（执行前确认）", () => void this.runAIMcpTool());
     add("bc-pdf-pages", "将 PDF 节点拆分为分页卡片", () => this.splitPdfPages());
     add("bc-pdf-ocr", "对所选 PDF 页面执行 AI OCR", () => this.ocrSelectedPdfPage());
@@ -3065,6 +3079,195 @@ export default class BetterCanvasFeatures {
     } catch (error) {
       new Notice(error instanceof Error ? error.message : String(error), 8000);
     }
+  }
+
+  private mcpOutputContext(): { canvas: any; source?: CanvasNodeData } | null {
+    const canvas = this.canvas();
+    if (!canvas) {
+      new Notice("请先打开一个 Canvas，再将 MCP 结果添加为节点。");
+      return null;
+    }
+    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再写入 MCP 结果。");
+      return null;
+    }
+    let source: CanvasNodeData | undefined;
+    try {
+      if (canvas.selection?.size === 1) {
+        const internal = canvas.selection.values().next().value;
+        source = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === internal?.id);
+      }
+    } catch {
+      // An empty or stale selection is fine; the result will be standalone.
+    }
+    return { canvas, source };
+  }
+
+  private async listConfiguredMcpResources(): Promise<McpResource[]> {
+    const s = this.settings();
+    if (s.mcpTransport === "stdio") return await listLocalMcpResources(String(s.mcpStdioConfig ?? ""));
+    if (!String(s.mcpEndpoint ?? "").trim()) throw new Error("请先在设置中填写远程 MCP endpoint URL。");
+    if (s.mcpTransport === "sse") return await listSseMcpResources(s.mcpEndpoint, s.mcpApiKey);
+    return await listRemoteResources(s.mcpEndpoint, s.mcpApiKey);
+  }
+
+  private async readConfiguredMcpResource(uri: string): Promise<RemoteMcpResult> {
+    const s = this.settings();
+    if (s.mcpTransport === "stdio") return await readLocalMcpResource(String(s.mcpStdioConfig ?? ""), uri);
+    if (!String(s.mcpEndpoint ?? "").trim()) throw new Error("请先在设置中填写远程 MCP endpoint URL。");
+    if (s.mcpTransport === "sse") return await readSseMcpResource(s.mcpEndpoint, s.mcpApiKey, uri);
+    return await readRemoteResource(s.mcpEndpoint, s.mcpApiKey, uri);
+  }
+
+  private async listConfiguredMcpPrompts(): Promise<McpPrompt[]> {
+    const s = this.settings();
+    if (s.mcpTransport === "stdio") return await listLocalMcpPrompts(String(s.mcpStdioConfig ?? ""));
+    if (!String(s.mcpEndpoint ?? "").trim()) throw new Error("请先在设置中填写远程 MCP endpoint URL。");
+    if (s.mcpTransport === "sse") return await listSseMcpPrompts(s.mcpEndpoint, s.mcpApiKey);
+    return await listRemotePrompts(s.mcpEndpoint, s.mcpApiKey);
+  }
+
+  private async getConfiguredMcpPrompt(name: string, args: Record<string, string>): Promise<RemoteMcpResult> {
+    const s = this.settings();
+    if (s.mcpTransport === "stdio") return await getLocalMcpPrompt(String(s.mcpStdioConfig ?? ""), name, args);
+    if (!String(s.mcpEndpoint ?? "").trim()) throw new Error("请先在设置中填写远程 MCP endpoint URL。");
+    if (s.mcpTransport === "sse") return await getSseMcpPrompt(s.mcpEndpoint, s.mcpApiKey, name, args);
+    return await getRemotePrompt(s.mcpEndpoint, s.mcpApiKey, name, args);
+  }
+
+  private async listMcpResources(): Promise<void> {
+    const context = this.mcpOutputContext();
+    if (!context) return;
+    const loading = new Notice("正在列出 MCP resources…", 0);
+    try {
+      const resources = await this.listConfiguredMcpResources();
+      await this.saveMcpResult("MCP Resources", {
+        text: formatMcpResourceCatalog(resources),
+        images: []
+      }, context.canvas, context.source);
+      loading.hide();
+      new Notice("已将 " + resources.length + " 个 MCP 资源写入 Canvas。");
+    } catch (error) {
+      loading.hide();
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+    }
+  }
+
+  private async readMcpResource(): Promise<void> {
+    const context = this.mcpOutputContext();
+    if (!context) return;
+    const loading = new Notice("正在读取 MCP resource 列表…", 0);
+    let resources: McpResource[];
+    try {
+      resources = await this.listConfiguredMcpResources();
+      loading.hide();
+    } catch (error) {
+      loading.hide();
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+      return;
+    }
+    if (!resources.length) {
+      new Notice("MCP 服务没有公开可读取的 resources。");
+      return;
+    }
+    const options = resources.map(item =>
+      item.uri + " — " + item.name + (item.description ? "\n  " + item.description : "")
+    ).join("\n\n");
+    this.input("选择 MCP resource URI", options + "\n\n输入完整 URI；只允许从上方列表选择。", uri => {
+      const resource = resources.find(item => item.uri === uri.trim());
+      if (!resource) {
+        new Notice("资源 URI 不在当前 MCP 服务的列表中。");
+        return;
+      }
+      void (async () => {
+        const notice = new Notice("正在读取 MCP resource…", 0);
+        try {
+          const result = await this.readConfiguredMcpResource(resource.uri);
+          await this.saveMcpResult("Resource: " + resource.name, result, context.canvas, context.source);
+          notice.hide();
+          new Notice("已将 MCP resource 添加到 Canvas。");
+        } catch (error) {
+          notice.hide();
+          new Notice(error instanceof Error ? error.message : String(error), 8000);
+        }
+      })();
+    }, resources[0].uri);
+  }
+
+  private async listMcpPrompts(): Promise<void> {
+    const context = this.mcpOutputContext();
+    if (!context) return;
+    const loading = new Notice("正在列出 MCP prompts…", 0);
+    try {
+      const prompts = await this.listConfiguredMcpPrompts();
+      await this.saveMcpResult("MCP Prompts", {
+        text: formatMcpPromptCatalog(prompts),
+        images: []
+      }, context.canvas, context.source);
+      loading.hide();
+      new Notice("已将 " + prompts.length + " 个 MCP 提示模板写入 Canvas。");
+    } catch (error) {
+      loading.hide();
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+    }
+  }
+
+  private async getMcpPrompt(): Promise<void> {
+    const context = this.mcpOutputContext();
+    if (!context) return;
+    const loading = new Notice("正在读取 MCP prompt 列表…", 0);
+    let prompts: McpPrompt[];
+    try {
+      prompts = await this.listConfiguredMcpPrompts();
+      loading.hide();
+    } catch (error) {
+      loading.hide();
+      new Notice(error instanceof Error ? error.message : String(error), 8000);
+      return;
+    }
+    if (!prompts.length) {
+      new Notice("MCP 服务没有公开可执行的 prompts。");
+      return;
+    }
+    const summary = prompts.map(prompt =>
+      prompt.name + (prompt.description ? " — " + prompt.description : "") +
+      (prompt.arguments.length ? "\n  参数：" + prompt.arguments.map(arg =>
+        arg.name + (arg.required ? "（必填）" : "") + (arg.description ? " — " + arg.description : "")
+      ).join(", ") : "")
+    ).join("\n\n");
+    this.input("选择 MCP Prompt", summary + "\n\n输入完整名称；只允许从上方列表选择。", name => {
+      const prompt = prompts.find(item => item.name === name.trim());
+      if (!prompt) {
+        new Notice("Prompt 名称不在当前 MCP 服务的列表中。");
+        return;
+      }
+      this.input("MCP Prompt 参数", "输入 JSON object；参数值必须是字符串。\n\n" + summary, raw => {
+        let args: Record<string, string>;
+        try {
+          args = parseMcpPromptArguments(raw);
+        } catch (error) {
+          new Notice(error instanceof Error ? error.message : String(error), 8000);
+          return;
+        }
+        const missing = prompt.arguments.filter(arg => arg.required && !String(args[arg.name] ?? "").trim());
+        if (missing.length) {
+          new Notice("缺少必填 Prompt 参数：" + missing.map(arg => arg.name).join(", "));
+          return;
+        }
+        void (async () => {
+          const notice = new Notice("正在解析 MCP Prompt…", 0);
+          try {
+            const result = await this.getConfiguredMcpPrompt(prompt.name, args);
+            await this.saveMcpResult("Prompt: " + prompt.name, result, context.canvas, context.source);
+            notice.hide();
+            new Notice("已将 MCP Prompt 结果添加到 Canvas。");
+          } catch (error) {
+            notice.hide();
+            new Notice(error instanceof Error ? error.message : String(error), 8000);
+          }
+        })();
+      }, "{}");
+    }, prompts[0].name);
   }
 
   private async runAIMcpTool(): Promise<void> {
