@@ -34,17 +34,33 @@ const canvasPalette: Record<string, string> = {
   "6": "#8f70ce"
 };
 
+function safeSvgColor(value: unknown, fallback: string): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  if (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw)) return raw;
+  if (/^(?:rgb|rgba|hsl|hsla)\([\d.\s,%+/-]+\)$/i.test(raw)) return raw;
+  if (/^[a-z]{1,32}$/i.test(raw)) return raw;
+  return fallback;
+}
+
 function nodeColor(node: CanvasNodeData): string {
-  const raw = String(node.color ?? "");
+  const attrs = (node as any).styleAttributes ?? {};
+  const stored = node.color !== undefined && node.color !== null && node.color !== ""
+    ? node.color
+    : attrs.fillColor ?? attrs.backgroundColor;
+  const raw = String(stored ?? "");
   if (canvasPalette[raw]) return canvasPalette[raw];
-  if (/^#[0-9a-f]{3,8}$/i.test(raw)) return raw;
-  return "none";
+  return safeSvgColor(raw, "none");
 }
 
 function edgeColor(edge: CanvasEdgeData): string {
-  const raw = String(edge.color ?? "");
+  const attrs = (edge as any).styleAttributes ?? {};
+  const stored = edge.color !== undefined && edge.color !== null && edge.color !== ""
+    ? edge.color
+    : attrs.strokeColor ?? attrs.color;
+  const raw = String(stored ?? "");
   if (canvasPalette[raw]) return canvasPalette[raw];
-  return /^#[0-9a-f]{3,8}$/i.test(raw) ? raw : "#7b8794";
+  return safeSvgColor(raw, "#7b8794");
 }
 
 function nodeText(node: CanvasNodeData): string {
@@ -176,7 +192,7 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
   const start = sidePoint(from, String(edge.fromSide || sides[0]), true);
   const end = sidePoint(to, String(edge.toSide || sides[1]), false);
   const attrs = (edge as any).styleAttributes ?? {};
-  const style = String(attrs.lineStyle ?? (edge as any).style ?? "");
+  const style = String(attrs.lineStyle ?? attrs.path ?? (edge as any).bcPathStyle ?? (edge as any).style ?? "");
   const dash = style.includes("dot") ? "2 5" : style.includes("dash") ? "8 5" : "";
   const rawArrowStyle = (edge as any).bcArrowStyle ?? attrs.arrow;
   const arrowStyle = arrowStyleFor(edge);
@@ -190,6 +206,7 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
     ? toEnd !== "none" && toEnd !== "null"
     : true);
   const color = edgeColor(edge);
+  const lineWidth = Math.max(0.5, Math.min(10, number(attrs.strokeWidth ?? attrs.lineWidth ?? (edge as any).bcWidth, 2)));
   const markers: string[] = [];
   const markerAttrs: string[] = [];
   if (startVisible && arrowStyle !== "none") {
@@ -205,7 +222,7 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
   const d = "M " + start.x + " " + start.y + " L " + end.x + " " + end.y;
   return (markers.length ? "<defs>" + markers.join("") + "</defs>" : "") +
     '<path id="bc-edge-' + index + '" d="' + xml(d) + '" fill="none" stroke="' + xml(color) +
-    '" stroke-width="2" stroke-linecap="round"' +
+    '" stroke-width="' + lineWidth + '" stroke-linecap="round"' +
     (dash ? ' stroke-dasharray="' + dash + '"' : "") + markerAttrs.join("") + "/>";
 }
 
@@ -228,12 +245,21 @@ function wrapNodeText(node: CanvasNodeData, clipId: string): string {
   const alignRaw = String(attrs.textAlign ?? attrs.textAlignment ?? (node as any).bcTextAlign ?? "left");
   const anchor = alignRaw === "center" ? "middle" : alignRaw === "right" ? "end" : "start";
   const startX = anchor === "middle" ? node.x + node.width / 2 : anchor === "end" ? node.x + node.width - 12 : node.x + 12;
+  const fontFamily = xml(String(attrs.fontFamily ?? attrs.font ?? "Inter,Arial,sans-serif"));
+  const rawWeight = String(attrs.fontWeight ?? "normal");
+  const fontWeight = /^(?:normal|bold|bolder|lighter|[1-9]00)$/i.test(rawWeight) ? rawWeight : "normal";
+  const rawFontStyle = String(attrs.fontStyle ?? "normal");
+  const fontStyle = /^(?:normal|italic|oblique)$/i.test(rawFontStyle) ? rawFontStyle : "normal";
+  const rawDecoration = String(attrs.textDecoration ?? "none");
+  const textDecoration = /^(?:none|underline|overline|line-through)$/i.test(rawDecoration) ? rawDecoration : "none";
+  const textColor = xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, "#202124"));
   const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * 0.58)));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
   const lines = wrapLines(raw, maxChars, maxLines);
   const startY = node.y + 18 + fontSize;
   return '<text clip-path="url(#' + clipId + ')" x="' + startX + '" y="' + startY +
-    '" font-family="Inter,Arial,sans-serif" font-size="' + fontSize + '" fill="' + xml(attrs.textColor ?? "#202124") +
+    '" font-family="' + fontFamily + '" font-size="' + fontSize + '" font-weight="' + fontWeight +
+    '" font-style="' + fontStyle + '" text-decoration="' + textDecoration + '" fill="' + textColor +
     '" text-anchor="' + anchor + '">' +
     lines.map((line, index) => '<tspan x="' + startX + '" dy="' + (index === 0 ? 0 : fontSize * 1.35) + '">' + xml(line) + "</tspan>").join("") +
     "</text>";
@@ -263,7 +289,7 @@ function renderNode(node: CanvasNodeData, index: number): string {
   const clip = "";
 
   let geometry: string;
-  const strokeWidth = 1.5;
+  const strokeWidth = Math.max(0.5, Math.min(10, number(attrs.borderWidth, 1.5)));
   const polygon = (points: Array<[number, number]>): string =>
     '<polygon points="' + boxPolygonPoints(x, y, width, height, points) + '" fill="' + fill +
     '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
