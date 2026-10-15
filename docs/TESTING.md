@@ -179,11 +179,10 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 
 1. **完整本地 checkout + 依赖可用：** 跑 typecheck、所有 Vitest 测试和 production build。
 2. **完整源码可用但依赖安装受阻：** 检查是否存在可用的现有 node_modules/缓存；不要假定缓存完整；报告哪些命令真实执行。
-3. **环境无法联网但允许从外部带入文件：** 用联网侧构建的离线包恢复完整 checkout 与 node_modules（`scripts/sandbox/build-bundle.sh`，见 [离线沙盒运行指南](SANDBOX_OFFLINE.md)）；环境具备 Xvfb 时可在同一离线包内运行真实 Obsidian 最小回归（`scripts/sandbox/run-bundle.sh`）。这类执行属于第 4 节的 Tier 4 最小回归，证据按第 6 节的要求记录；e2e 层无法执行时标记 BLOCKED，而不是省略。
-4. **只有远程 GitHub 读取能力：** 审查源码、workflow、对应 SHA 的 Actions 日志；不声称本地测试已执行。
-5. **只有独立模块或源码快照可运行：** 将它们称为定向验证，明确不是完整仓库测试，并写明 snapshot 与目标 commit 的对应关系及未覆盖模块。
-6. **浏览器/Obsidian 无法启动：** 保存环境诊断结果；将浏览器或宿主集成层标记为 BLOCKED，转到可运行该环境的 CI runner/VM。
-7. **当前环境缺少关键依赖或网络：** 不伪造测试结果、不绕过安全策略；提出最小的外部 runner 要求，并让可运行的检查继续提供价值。
+3. **只有远程 GitHub 读取能力：** 审查源码、workflow、对应 SHA 的 Actions 日志；不声称本地测试已执行。
+4. **只有独立模块或源码快照可运行：** 将它们称为定向验证，明确不是完整仓库测试，并写明 snapshot 与目标 commit 的对应关系及未覆盖模块。
+5. **浏览器/Obsidian 无法启动：** 保存环境诊断结果；将浏览器或宿主集成层标记为 BLOCKED，转到可运行该环境的 CI runner/VM。
+6. **当前环境缺少关键依赖或网络：** 不伪造测试结果、不绕过安全策略；提出最小的外部 runner 要求，并让可运行的检查继续提供价值。
 
 ## 8. 提交前检查与结果汇报
 

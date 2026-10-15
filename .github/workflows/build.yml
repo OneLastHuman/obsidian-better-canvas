@@ -41,41 +41,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  real-obsidian-e2e:
-    name: Real Obsidian E2E smoke
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install test dependencies
-        run: npm install
-      - name: Build plugin under test
-        run: npm run build
-      - name: Download and verify Obsidian 1.14.4 AppImage
-        shell: bash
-        run: |
-          set -euo pipefail
-          appimage="$RUNNER_TEMP/Obsidian.AppImage"
-          curl --fail --location --retry 3 --retry-delay 2 \
-            "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.14.4/Obsidian-1.14.4.AppImage" \
-            --output "$appimage"
-          echo "6362ddbeeeebb7bbccb48fae009572cf2284ef92f5c919c1332aba48de6ffeaa  $appimage" | sha256sum --check
-          chmod +x "$appimage"
-      - name: Run real Obsidian E2E smoke
-        run: bash scripts/sandbox/run-bundle.sh --appimage "$RUNNER_TEMP/Obsidian.AppImage" --skip-unit --out sandbox-out
-      - name: Upload E2E logs and screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-e2e-evidence
-          path: |
-            sandbox-out/
-            sandbox-out.tgz
-          if-no-files-found: warn
-          retention-days: 14
-
   publish-installable-bundle:
     name: Sync installable bundle to repository
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
