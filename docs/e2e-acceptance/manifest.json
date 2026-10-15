@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15T05:45:26.108Z",
+  "generatedAt": "2026-10-15T06:52:32.739Z",
   "testedCommit": "8c693e7530b882564654433eae47cc20f2cf61ba",
   "testedSubject": "build: refresh installable plugin bundle",
   "mainJsSha256": "b229962acc2b2cac2d7bd3cfb541e7f73775d6d11aaf29303e4697ba6cb26240",
@@ -107,6 +107,22 @@
       {
         "file": "02-toggle-closed.png",
         "caption": "执行关闭后镜像仍留在画布上"
+      }
+    ],
+    "79": [
+      {
+        "file": "01-ssrf-guard.png",
+        "caption": "导入网页正文成功绕过内网防护：本地 HTTP 服务被真实请求到，内容写入画布"
+      }
+    ],
+    "84": [
+      {
+        "file": "01-palette-generate-image.png",
+        "caption": "命令面板实际渲染：双层「Better Canvas: 」前缀，且两条完全无法区分的重复条目"
+      },
+      {
+        "file": "02-palette-e7949fe6.png",
+        "caption": "同一现象的复现截图（面板文本提取结果：Better CanvasBetter Canvas: 根据所选节点生成图片 × 2）"
       }
     ]
   }

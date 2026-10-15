@@ -37,6 +37,8 @@
 | `48` | styleAttributes 的 shape/border 不生效 |
 | `52` | 拖动未选中的 Portal 框损坏源文件 |
 | `53` | 关闭 Portal 后镜像仍留在界面 |
+| `79` | 网页导入的内网防护可被 IPv4-mapped IPv6 绕过 |
+| `84` | 命令面板双层前缀 + 重复条目 |
 
 ## 隐私
 
