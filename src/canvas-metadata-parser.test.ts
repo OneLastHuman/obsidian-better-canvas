@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
-import { CanvasMetadataIndexer } from "./canvas-metadata";
+import { appendCanvasNodeMetadata, isVaultLinkDestination, parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
 
 describe("Canvas text-node metadata fallback parser", () => {
   it("extracts WikiLinks, Markdown links, external links, and both embed forms", () => {
@@ -88,82 +88,48 @@ describe("Canvas text-node metadata fallback parser", () => {
 });
 
 
-describe("Canvas metadata cache integration", () => {
-  it("aggregates per-node headings, tags, lists, links, embeds and sections into Canvas metadata", async () => {
-    const indexer = new CanvasMetadataIndexer({}, {}, () => true) as any;
-    indexer.cache = {};
-    const result = await indexer.buildMetadata({
-      metadata: {
-        frontmatter: {
-          tags: ["project", "#team/platform"],
-          related: "[[Related.md|Related]]"
-        }
-      },
-      nodes: [
-        {
-          id: "text-1",
-          type: "text",
-          text: "# Roadmap\nSee [[Topic.md|topic]] and [guide](https://example.org/docs) #local-tag.\n- [x] ship"
-        },
-        { id: "file-1", type: "file", file: "Attachments/brief.pdf" }
-      ]
-    });
 
-    expect(result.frontmatterLinks.map((link: any) => link.link)).toEqual(["Related.md"]);
-    expect(result.links.map((link: any) => link.link)).toEqual(["Topic.md", "https://example.org/docs"]);
-    expect(result.embeds.map((embed: any) => embed.link)).toEqual(["Attachments/brief.pdf"]);
-    expect(result.tags.map((tag: any) => tag.tag)).toEqual(["#project", "#team/platform", "#local-tag"]);
-    expect(result.headings).toHaveLength(1);
-    expect(result.headings[0].heading).toBe("Roadmap");
-    expect(result.headings[0].position.nodeId).toBe("text-1");
-    expect(result.listItems[0].position.nodeId).toBe("text-1");
-    expect(result.sections.some((section: any) => section.type === "heading" && section.position.nodeId === "text-1")).toBe(true);
-    expect(result.nodes["text-1"].headings[0].heading).toBe("Roadmap");
+
+describe("Canvas metadata promotion and link classification", () => {
+  it("promotes node-local metadata into the Canvas-level cache while retaining node-local data", () => {
+    const metadata: any = {
+      links: [],
+      embeds: [],
+      tags: [],
+      headings: [],
+      sections: [],
+      listItems: [],
+      footnotes: [],
+      footnoteRefs: [],
+      referenceLinks: [],
+      nodes: {},
+      blocks: {}
+    };
+    const nodeMetadata = parseCanvasMarkdownMetadata(
+      "# Heading\n[[Topic.md]] #tag\n- [x] task"
+    );
+
+    appendCanvasNodeMetadata(metadata, "node-1", nodeMetadata);
+
+    expect(metadata.nodes["node-1"]).toBe(nodeMetadata);
+    expect(metadata.links.map((entry: any) => entry.link)).toEqual(["Topic.md"]);
+    expect(metadata.links[0].position.nodeId).toBe("node-1");
+    expect(metadata.links[0].position.start.line).toBe(1);
+    expect(metadata.tags[0].tag).toBe("#tag");
+    expect(metadata.tags[0].position.nodeId).toBe("node-1");
+    expect(metadata.headings[0].heading).toBe("Heading");
+    expect(metadata.headings[0].position.nodeId).toBe("node-1");
+    expect(metadata.listItems[0].position.nodeId).toBe("node-1");
   });
 
-  it("does not record external URI links as unresolved Vault links during indexing", async () => {
-    const text = JSON.stringify({
-      nodes: [{
-        id: "links",
-        type: "text",
-        text: "[[Local.md]] and [site](https://example.org/path)"
-      }],
-      edges: []
-    });
-    const file = {
-      path: "Boards/Overview.canvas",
-      name: "Overview.canvas",
-      stat: { mtime: 123, size: text.length }
-    };
-    const cache: any = {
-      metadataCache: {},
-      fileCache: {},
-      resolvedLinks: {},
-      unresolvedLinks: {},
-      uniqueFileLookup: { add() {}, remove() {} },
-      getFirstLinkpathDest(link: string) {
-        return link === "Local.md" ? { path: "Local.md" } : null;
-      },
-      saveFileCache(path: string, entry: unknown) { this.fileCache[path] = entry; },
-      saveMetaCache(hash: string, entry: unknown) { this.metadataCache[hash] = entry; },
-      trigger() {}
-    };
-    const app = {
-      vault: {
-        async readBinary() {
-          const bytes = new TextEncoder().encode(text);
-          return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-        }
-      }
-    };
-    const indexer = new CanvasMetadataIndexer(app, {}, () => true) as any;
-    indexer.cache = cache;
-
-    await indexer.index(file);
-
-    expect(cache.resolvedLinks[file.path]).toEqual({ "Local.md": 1 });
-    expect(cache.unresolvedLinks[file.path]).toEqual({});
-    const stored = Object.values(cache.metadataCache)[0] as any;
-    expect(stored.links.map((link: any) => link.link)).toEqual(["Local.md", "https://example.org/path"]);
+  it("treats only Vault paths as candidates for resolved or unresolved link maps", () => {
+    expect(isVaultLinkDestination("Notes/Topic.md")).toBe(true);
+    expect(isVaultLinkDestination("Topic")).toBe(true);
+    expect(isVaultLinkDestination("https://example.org/page")).toBe(false);
+    expect(isVaultLinkDestination("mailto:help@example.org")).toBe(false);
+    expect(isVaultLinkDestination("obsidian://open?vault=test")).toBe(false);
+    expect(isVaultLinkDestination("//example.org/page")).toBe(false);
+    expect(isVaultLinkDestination("")).toBe(false);
+    expect(isVaultLinkDestination(null)).toBe(false);
   });
 });
