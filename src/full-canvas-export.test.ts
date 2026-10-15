@@ -207,16 +207,16 @@ describe("full content SVG export", () => {
   });
 
   it("exports only selected nodes and edges whose endpoints are both selected", () => {
-    const data = {
+    const data: CanvasData = {
       nodes: [
         { id: "a", type: "text" as const, x: 0, y: 0, width: 100, height: 80, text: "A" },
         { id: "b", type: "text" as const, x: 150, y: 0, width: 100, height: 80, text: "B" },
         { id: "c", type: "text" as const, x: 300, y: 0, width: 100, height: 80, text: "C" }
       ],
       edges: [
-        { id: "ab", fromNode: "a", toNode: "b" },
-        { id: "bc", fromNode: "b", toNode: "c" },
-        { id: "ac", fromNode: "a", toNode: "c" }
+        { id: "ab", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" },
+        { id: "bc", fromNode: "b", fromSide: "right", toNode: "c", toSide: "left" },
+        { id: "ac", fromNode: "a", fromSide: "right", toNode: "c", toSide: "left" }
       ],
       metadata: { keep: true }
     };
