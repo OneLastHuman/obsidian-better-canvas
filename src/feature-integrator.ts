@@ -33,6 +33,7 @@ import { parsePdfPageSelection } from "./pdf-range";
 import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirection } from "./canvas-clone";
+import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
@@ -458,6 +459,9 @@ export default class BetterCanvasFeatures {
     add("bc-edit-canvas-frontmatter-json", "批量编辑当前 Canvas frontmatter（JSON）", () => this.editCanvasFrontmatterJson());
     add("bc-front-node", "将节点置于最前", () => this.reorder(true));
     add("bc-align-selection-grid", "将所选节点对齐到网格", () => this.alignSelectionToGrid());
+    add("bc-flip-selection-horizontal", "水平翻转所选节点布局", () => this.flipSelectionPositions("horizontal"));
+    add("bc-flip-selection-vertical", "垂直翻转所选节点布局", () => this.flipSelectionPositions("vertical"));
+    add("bc-swap-selected-node-positions", "交换两个所选节点的位置", () => this.swapSelectedNodePositions());
     add("bc-toggle-readonly", "切换 Canvas 只读模式", () => this.toggleReadonly());
     add("bc-back-node", "将节点置于最后", () => this.reorder(false));
     add("bc-focus", "切换专注模式", () => this.focus());
@@ -1054,6 +1058,55 @@ export default class BetterCanvasFeatures {
     canvas.requestFrame?.();
     new Notice("已将 " + ids.size + " 个节点对齐到 " + step + " px 网格。");
   }
+  private selectedCanvasNodeIds(canvas: any): Set<string> {
+    const ids = new Set<string>();
+    for (const item of canvas?.selection?.values?.() ?? []) {
+      const id = item?.id ?? item?.getData?.()?.id;
+      if (typeof id === "string" && canvas.nodes?.has?.(id)) ids.add(id);
+    }
+    return ids;
+  }
+
+  private flipSelectionPositions(axis: "horizontal" | "vertical"): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，不能翻转节点位置。");
+      return;
+    }
+    const ids = this.selectedCanvasNodeIds(canvas);
+    if (ids.size < 2) {
+      new Notice("请至少选择两个节点后再翻转布局。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    const nodes = flipCanvasNodePositions(data.nodes, ids, axis);
+    canvas.importData({ ...data, nodes, edges: data.edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    new Notice(axis === "horizontal" ? "已水平翻转所选节点布局。" : "已垂直翻转所选节点布局。");
+  }
+
+  private swapSelectedNodePositions(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，不能交换节点位置。");
+      return;
+    }
+    const ids = this.selectedCanvasNodeIds(canvas);
+    if (ids.size !== 2) {
+      new Notice("请恰好选择两个节点后再交换位置。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    const nodes = swapCanvasNodePositions(data.nodes, ids);
+    canvas.importData({ ...data, nodes, edges: data.edges });
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    new Notice("已交换两个节点的中心位置。");
+  }
+
   private reorder(front: boolean): void {
     const selection = this.selected();
     if (!selection) return;
