@@ -2,7 +2,7 @@
 
 **登记表 Issue：** [#16 — shared Agent coordination registry](https://github.com/OneLastHuman/obsidian-better-canvas/issues/16)  
 **本次核对日期：** 2026-10-15  
-**最新 main 基线：** `5d0087cb53641745e6bd748bbed42bdbb7fa09b9`；本表为 2026-10-15 的状态快照，不是实时心跳。
+**最新 main 基线：** `1bfda4a993753f56d83554d804c92ce45609f73e`；本表为 2026-10-15 的状态快照，不是实时心跳。
 
 本文规定协作方式，并保留一次可核验的 GitHub 状态快照。Agent 的实际运行身份不会总是出现在 GitHub API 中，因此“PR 作者”不等同于已确认的执行 Agent；无法确认的负责人或状态明确写为“未确认”，不得猜测。
 
@@ -28,7 +28,7 @@
 | 未确认执行 Agent；PR 作者为 `OneLastHuman` | MCP Resources / Prompts 与持久化 stdio 会话 | `done` | 支持 Streamable HTTP、旧式 SSE、本地 stdio 的 Resources/Prompts；std io 会话有空闲超时、LRU 数量限制和插件卸载清理 | `feat/mcp-resources-prompts` / [PR #14](https://github.com/OneLastHuman/obsidian-better-canvas/pull/14) | 已于 2026-10-15 合并为 `7dbbb927615a2d00eec613ecc74fca093af6a553`；Build run [38679842405](https://github.com/OneLastHuman/obsidian-better-canvas/actions/runs/38679842405) 对准确 head 通过。Obsidian/真实 MCP 服务实测仍未执行 |
 | 未确认 | 仓库治理与测试规范 | `unconfirmed` | 可见分支变更涉及 `.github/ISSUE_TEMPLATE/*`、`.github/pull_request_template.md`、`AGENTS.md`、`docs/REPOSITORY_GOVERNANCE.md`、`docs/TESTING.md`；开始前须与负责人对齐 | `chore/agent-repository-governance` | 请分支负责人认领/更新状态；本任务不修改这些共用文件 |
 | 当前会话；GitHub 未暴露更具体的 Agent 身份 | 协作登记和状态转换规则 | `review` | 仅修改本文件 `docs/AGENT_COORDINATION.md`；没有更改治理分支预留的 `AGENTS.md` | `docs/agent-coordination-register` / [PR #17](https://github.com/OneLastHuman/obsidian-better-canvas/pull/17) | 已将 PR #14、#19、#21 的最终状态同步到本文；等待本次 head CI 及合并 |
-
+| 当前会话；GitHub 未暴露更具体的 Agent 身份 | 本地 MCP stdio 分页目录安全上限 | `working` | 仅 `src/mcp-stdio.ts`、`src/mcp-stdio.test.ts`；为本地 MCP 目录增加 1000 项上限与跨页去重 | `fix/mcp-stdio-catalog-safety` / [Issue #23](https://github.com/OneLastHuman/obsidian-better-canvas/issues/23)，[PR #24](https://github.com/OneLastHuman/obsidian-better-canvas/pull/24) | 新增首屏/后续页超限测试和跨页重复 URI 测试；等待准确 PR head CI |
 | 未确认执行 Agent；PR 作者为 `OneLastHuman` | Canvas Portal 几何边界校验 | `done` | 只改 `src/portal-adoption.ts` 与 `src/portal-adoption.test.ts`，拒绝 NaN/Infinity、非正尺寸、溢出矩形和无效 inset | `agent/portal-adoption-geometry-guards` / [PR #19](https://github.com/OneLastHuman/obsidian-better-canvas/pull/19) | 已于 2026-10-15 合并为 `915ce78fcff546eb42afc3de17d5ae08bcd53a4a`；Build run [38679845708](https://github.com/OneLastHuman/obsidian-better-canvas/actions/runs/38679845708) 对准确 head 通过 |
 | 未确认执行 Agent；PR 作者为 `OneLastHuman` | 每个 AI 模型的可选能力探测 | `done` | 用户确认后最多发一条文本请求和一条微型图片输入请求；保存脱敏且最多 50 条的 provider/protocol/model 报告，未测试能力仍显式未知 | `feat/model-capability-probes-rebased` / [PR #21](https://github.com/OneLastHuman/obsidian-better-canvas/pull/21) | 已于 2026-10-15 合并为 `5d0087cb53641745e6bd748bbed42bdbb7fa09b9`；Build run [38680082263](https://github.com/OneLastHuman/obsidian-better-canvas/actions/runs/38680082263) 对准确 head 通过；没有执行真实供应商探测 |
 
@@ -64,6 +64,7 @@ PR #12 已关闭且未合并，维护者确认闪卡功能已由独立提交整�
 | 4 | Canvas Portal 深层/复杂场景 | 补充嵌套 Portal、跨 Portal 连线和源文件并发修改用例；测试验证失败恢复与保存结果 | 未认领 |
 | 5 | Canvas 样式/静态导出兼容性 | 明确未支持的 `styleAttributes` 与 Markdown embed 场景，补齐纯逻辑测试和导出回归 | 未认领 |
 | 6 | PDF 注释完整度与 Obsidian 宿主端回归 | 评估原生 PDF 高亮编辑、多页批注；在测试 Vault 覆盖 Canvas、Portal、PDF、MCP、AI 与导出并记录版本/commit | 未认领 |
+| 7 | 协作登记入口链接 | 治理分支负责人确认后，将本文件链接加入 `AGENTS.md`；避免重复编辑入口文件 | `unconfirmed` |
 
 ## 每个 Agent 必须遵守的流程
 
