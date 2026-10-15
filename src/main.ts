@@ -55,6 +55,9 @@ interface BetterCanvasSettings {
   mindMapShortcutDirectionalCreationEnabled: boolean;
   systemPromptProfiles: NamedPromptProfile[];
   activeSystemPromptProfile: string;
+  flashcardOutputMode: "canvas" | "spaced-repetition";
+  spacedRepetitionFolder: string;
+  spacedRepetitionDeck: string;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -75,7 +78,10 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   mindMapShortcutAltArrowNavigationEnabled: true,
   mindMapShortcutDirectionalCreationEnabled: true,
   systemPromptProfiles: [],
-  activeSystemPromptProfile: ""
+  activeSystemPromptProfile: "",
+  flashcardOutputMode: "canvas",
+  spacedRepetitionFolder: "Better Canvas/Flashcards",
+  spacedRepetitionDeck: "better-canvas"
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
@@ -239,6 +245,9 @@ export default class BetterCanvasPlugin extends Plugin {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
     this.settings.templates = Array.isArray(this.settings.templates) ? this.settings.templates : [];
     this.settings.systemPromptProfiles = normalizeNamedPromptProfiles(this.settings.systemPromptProfiles);
+    if (this.settings.flashcardOutputMode !== "spaced-repetition") this.settings.flashcardOutputMode = "canvas";
+    if (typeof this.settings.spacedRepetitionFolder !== "string") this.settings.spacedRepetitionFolder = "Better Canvas/Flashcards";
+    if (typeof this.settings.spacedRepetitionDeck !== "string") this.settings.spacedRepetitionDeck = "better-canvas";
 
     this.registerCommands();
     this.registerCanvasContextMenu();
