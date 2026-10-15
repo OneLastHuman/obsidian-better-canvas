@@ -154,6 +154,8 @@ export function parseCanvasMarkdownMetadata(text: string): CanvasMarkdownMetadat
     const source = line.text;
     if (line.fenced) {
       previousLineWasList = false;
+      parentStack.length = 0;
+      currentListRoot = -1;
       continue;
     }
 
