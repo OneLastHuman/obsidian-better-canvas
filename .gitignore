@@ -1,3 +1,7 @@
 node_modules/
 *.map
 .DS_Store
+dist/
+sandbox-out/
+sandbox-out.tgz
+
