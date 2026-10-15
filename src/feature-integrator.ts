@@ -31,6 +31,7 @@ import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
 import { readCanvasFrontmatter, replaceCanvasFrontmatter } from "./canvas-frontmatter";
 import { parsePdfPageSelection } from "./pdf-range";
 import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
+import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
 import { callSseMcpTool, listSseMcpTools } from "./mcp-sse";
@@ -462,6 +463,7 @@ export default class BetterCanvasFeatures {
     add("bc-encapsulate", "将选区移动到新 Canvas", () => void this.encapsulate());
     add("bc-copy-node-link", "复制节点 Wikilink", () => void this.copyNodeLink());
     add("bc-open-link-explorer", "查看当前 Canvas 链接与反向链接", () => void this.openCanvasLinkExplorer());
+    add("bc-materialize-canvas-links", "将当前 Canvas 链接与反向链接添加为节点", () => void this.openCanvasLinkExplorer(true));
     add("bc-export-json", "导出 Canvas JSON", () => void this.export("canvas"));
     add("bc-export-png", "导出 Canvas PNG", () => void this.export("png"));
     add("bc-export-svg", "导出 Canvas SVG", () => void this.export("svg"));
@@ -1246,12 +1248,17 @@ export default class BetterCanvasFeatures {
     });
   }
 
-  private async openCanvasLinkExplorer(): Promise<void> {
+  private async openCanvasLinkExplorer(materializeLinks = false): Promise<void> {
     const view = this.activeCanvasView();
     const canvas = view?.canvas;
     const file = view?.file;
     if (!canvas || !(file instanceof TFile)) {
       new Notice("请先打开一个已保存的 Canvas 文件。");
+      return;
+    }
+
+    if (materializeLinks && canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，不能添加链接节点。");
       return;
     }
 
