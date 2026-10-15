@@ -61,7 +61,7 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 - 从选中节点及其关联内容提问，将结果保存为相连的新节点；可重新生成，或按节点指定模型。
 - 保存命名系统提示词，生成闪卡，或将卡片导出为 Obsidian Spaced Repetition 兼容的 Markdown。
 - 按配置的服务生成图片、导入可访问的网页正文和 YouTube 字幕。
-- 将 Vault 文件夹中的 Markdown 文件批量交给同一条 Prompt 处理；单次最多 20 篇，发送前需要选择文件夹并确认。
+- 将 Vault 文件夹中的 Markdown 文件批量交给同一条 Prompt 处理；单次最多 20 篇，发送前需要选择文件夹并确认；每篇输入文件都会生成源文件节点，并与对应结果节点关联。
 - 对固定 PDF 页面提取文本并提供图像上下文；AI OCR 每批最多处理 20 页。
 - 通过 MCP 调用外部工具、读取资源或解析提示模板。使用 AI 建议的工具调用前仍需人工检查并确认。
 
@@ -92,7 +92,7 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 }
 ```
 
-`command` 是可执行文件路径；`args` 必须是字符串数组；`cwd` 和 `env` 可选。使用绝对路径通常更容易排查 Obsidian 无法找到命令的问题。stdio 服务应能在每次新进程启动时完成初始化。
+`command` 是可执行文件路径；`args` 必须是字符串数组；`cwd` 和 `env` 可选。使用绝对路径通常更容易排查 Obsidian 无法找到命令的问题。本地 stdio 会按配置复用会话，最多缓存 4 个会话；会话空闲 5 分钟后关闭，插件卸载时会清理子进程。遇到超时、进程退出或协议错误时，会话会被丢弃，后续操作再重新启动进程。服务应能在进程首次启动时完成初始化。
 
 插件可以列出和调用 MCP 工具，也支持浏览资源（resources/list）、读取资源（resources/read）、发现提示模板（prompts/list）及解析模板（prompts/get）。文本结果会写入关联 Canvas 节点；支持的 PNG、JPEG、WebP 和 GIF 内容会保存为 Vault 附件。
 
@@ -106,7 +106,7 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 2. 默认命令为 `opencode acp`。如果 Obsidian 无法找到它，在设置中填写 **OpenCode CLI executable** 的绝对路径。
 3. 该模式使用 OpenCode 自己的模型、登录和额度配置，无需另外填写文本 API Key。
 
-ACP 在临时目录中创建会话，不会把 Vault 作为 OpenCode 工作区。当前后端用于文本问答和闪卡，不支持图片或文件输入；遇到多模态上下文时，请切回 API 后端。该模式不保证离线处理，提示词仍会发送给 OpenCode 配置的模型服务。
+ACP 通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode，在临时目录中创建会话，不会把 Vault 作为 OpenCode 工作区。ACP 请求中的工具或文件权限默认拒绝。当前后端用于文本问答和闪卡，不支持图片或文件输入；遇到多模态上下文时，请切回 API 后端。该模式不保证离线处理，提示词仍会发送给 OpenCode 配置的模型服务。
 
 图片生成不走 ACP；请在 AI API profile 中配置兼容的服务及图片模型。
 
