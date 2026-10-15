@@ -824,6 +824,17 @@ export class CanvasPortalManager {
     }
 
     const nextOpen = node.portal !== true;
+    // Validate the source before persisting the open flag. Otherwise a missing
+    // target leaves a broken Portal node behind with no way to tell why it failed.
+    // Closing an existing Portal must remain possible even if its source was deleted.
+    if (nextOpen) {
+      const target = this.plugin.app.vault.getAbstractFileByPath(node.file);
+      if (!(target instanceof TFile) || target.extension.toLowerCase() !== "canvas") {
+        new Notice("找不到 Portal 对应的 Canvas 文件。");
+        return;
+      }
+    }
+
     const data = readCanvasData(canvas);
     const nodes = data.nodes.map((item: CanvasNodeData) => item.id === node.id
       ? { ...item, portal: nextOpen }
