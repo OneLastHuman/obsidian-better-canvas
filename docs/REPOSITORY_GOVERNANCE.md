@@ -21,7 +21,7 @@
 ## 2. 项目事实的唯一来源
 
 - README.md：用户可见的功能、安装、配置、已知限制和开发入口。
-- AGENTS.md：环境预检、测试层级、项目专项回归清单和证据要求。
+- docs/TESTING.md：环境预检、测试层级、项目专项回归清单和证据要求。
 - docs/INTEGRATION_MATRIX.md：功能实现程度、兼容性、尚未覆盖的行为。
 - INTEGRATION_STATUS.md：当前集成/验证状态；只有状态确有变化时才更新。
 - GitHub Issue：需求、缺陷、讨论结论和验收条件的工作入口。
