@@ -1,4 +1,12 @@
 import { normalizeMcpToolResult, type RemoteMcpResult } from "./mcp-result";
+import {
+  formatMcpPromptResult,
+  formatMcpResourceRead,
+  normalizeMcpPromptPage,
+  normalizeMcpResourcePage,
+  type McpPrompt,
+  type McpResource
+} from "./mcp-catalog";
 
 export interface LocalMcpServerConfig {
   command: string;
@@ -62,7 +70,8 @@ async function oneStdioRequest<T>(
   config: LocalMcpServerConfig,
   method: string,
   params: Record<string, unknown>,
-  timeoutMs = 60_000
+  timeoutMs = 60_000,
+  catalogKey?: "tools" | "resources" | "prompts"
 ): Promise<T> {
   // Load Node-only modules only when the user explicitly calls stdio MCP.
   const [{ spawn }, { tmpdir }, processModule] = await Promise.all([
@@ -212,7 +221,28 @@ async function oneStdioRequest<T>(
           clientInfo: { name: "obsidian-better-canvas", version: "0.1.0" }
         });
         write({ jsonrpc: "2.0", method: "notifications/initialized", params: {} });
-        const result = await request<T>(method, params);
+        let result: any = await request<any>(method, params);
+        if (catalogKey) {
+          if (!result || typeof result !== "object" || !Array.isArray(result[catalogKey])) {
+            throw new Error("MCP stdio 没有返回有效的 " + catalogKey + " 数组。");
+          }
+          result = { ...result, [catalogKey]: [...result[catalogKey]] };
+          const cursorSet = new Set<string>();
+          let cursor = typeof result.nextCursor === "string" ? result.nextCursor : "";
+          let pageCount = 1;
+          while (cursor) {
+            if (cursorSet.has(cursor)) throw new Error("MCP stdio catalog 返回重复 pagination cursor。");
+            cursorSet.add(cursor);
+            if (++pageCount > 50) throw new Error("MCP stdio catalog 超过 50 页安全限制。");
+            const page: any = await request<any>(method, { ...params, cursor });
+            if (!Array.isArray(page?.[catalogKey])) {
+              throw new Error("MCP stdio 后续页面没有返回有效的 " + catalogKey + " 数组。");
+            }
+            result[catalogKey].push(...page[catalogKey]);
+            cursor = typeof page.nextCursor === "string" ? page.nextCursor : "";
+          }
+          delete result.nextCursor;
+        }
         finish(undefined, result);
       } catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)));
@@ -223,7 +253,7 @@ async function oneStdioRequest<T>(
 
 export async function listLocalMcpTools(configJson: string): Promise<LocalMcpTool[]> {
   const config = parseLocalMcpConfig(configJson);
-  const result = await oneStdioRequest<any>(config, "tools/list", {});
+  const result = await oneStdioRequest<any>(config, "tools/list", {}, 60_000, "tools");
   const tools = result?.tools;
   if (!Array.isArray(tools)) throw new Error("本地 MCP stdio 服务没有返回 tools 数组。");
   return tools.filter((tool: any) => typeof tool?.name === "string").map((tool: any) => ({
@@ -246,4 +276,38 @@ export async function callLocalMcpTool(
   });
   if (result?.isError) throw new Error("本地 MCP 工具执行失败：" + JSON.stringify(result.content ?? result));
   return normalizeMcpToolResult(result);
+}
+
+
+export async function listLocalMcpResources(configJson: string): Promise<McpResource[]> {
+  const config = parseLocalMcpConfig(configJson);
+  const result = await oneStdioRequest<any>(config, "resources/list", {}, 60_000, "resources");
+  return normalizeMcpResourcePage(result).items;
+}
+
+export async function readLocalMcpResource(configJson: string, uri: string): Promise<RemoteMcpResult> {
+  const config = parseLocalMcpConfig(configJson);
+  if (!uri.trim()) throw new Error("MCP resource URI 不能为空。");
+  const result = await oneStdioRequest<any>(config, "resources/read", { uri: uri.trim() });
+  return formatMcpResourceRead(uri.trim(), result);
+}
+
+export async function listLocalMcpPrompts(configJson: string): Promise<McpPrompt[]> {
+  const config = parseLocalMcpConfig(configJson);
+  const result = await oneStdioRequest<any>(config, "prompts/list", {}, 60_000, "prompts");
+  return normalizeMcpPromptPage(result).items;
+}
+
+export async function getLocalMcpPrompt(
+  configJson: string,
+  name: string,
+  args: Record<string, string>
+): Promise<RemoteMcpResult> {
+  const config = parseLocalMcpConfig(configJson);
+  if (!name.trim()) throw new Error("MCP prompt 名称不能为空。");
+  const result = await oneStdioRequest<any>(config, "prompts/get", {
+    name: name.trim(),
+    arguments: args
+  });
+  return formatMcpPromptResult(name.trim(), result);
 }
