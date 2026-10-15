@@ -420,6 +420,23 @@ function renderNode(node: CanvasNodeData, index: number): string {
  * a static export and intentionally does not depend on the current viewport.
  * Media files are represented by labels unless the caller attaches a bounded raster preview data URL; live HTML is never evaluated.
  */
+/**
+ * Extract a selected node subgraph for static image export. Edges are kept
+ * only when both endpoints are selected; non-Canvas root metadata is retained.
+ */
+export function canvasDataForSelection(
+  data: CanvasData,
+  selectedNodeIds: Iterable<string>
+): CanvasData {
+  const selected = new Set(selectedNodeIds);
+  const nodes = data.nodes.filter(node => selected.has(node.id));
+  const includedIds = new Set(nodes.map(node => node.id));
+  const edges = data.edges.filter(edge =>
+    includedIds.has(edge.fromNode) && includedIds.has(edge.toNode)
+  );
+  return { ...data, nodes, edges };
+}
+
 export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOptions = {}): FullCanvasSvg {
   const nodes = Array.isArray(data.nodes) ? data.nodes : [];
   const edges = Array.isArray(data.edges) ? data.edges : [];
