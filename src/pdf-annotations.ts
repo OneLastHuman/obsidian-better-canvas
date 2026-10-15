@@ -53,6 +53,7 @@ export class PdfAnnotationManager {
   private observers = new Map<HTMLElement, MutationObserver>();
   private resizeObservers = new Map<HTMLElement, ResizeObserver>();
   private excerptContainers = new WeakSet<HTMLElement>();
+  private toolbarContainers = new WeakMap<HTMLElement, HTMLDivElement>();
   private refreshQueued = false;
 
   constructor(plugin: any) {
@@ -237,7 +238,129 @@ export class PdfAnnotationManager {
     }
   }
 
+  private ensureToolbar(canvas: any, nodeData: any, container: HTMLElement): void {
+    let toolbar = this.toolbarContainers.get(container);
+    if (!toolbar) {
+      toolbar = document.createElement("div");
+      toolbar.className = "bc-pdf-annotation-toolbar";
+      toolbar.setAttribute("role", "toolbar");
+      toolbar.setAttribute("aria-label", "PDF 页面批注工具");
+
+      const actions = [
+        { id: "toggle", label: "批注", title: "开启或关闭页面手绘批注" },
+        { id: "pen-red", label: "红笔", title: "使用红笔绘制" },
+        { id: "pen-blue", label: "蓝笔", title: "使用蓝笔绘制" },
+        { id: "highlighter", label: "荧光", title: "使用黄色荧光笔" },
+        { id: "eraser", label: "橡皮", title: "擦除触及的手绘批注" },
+        { id: "undo", label: "撤销", title: "撤销最近一处笔迹或文字高亮" },
+        { id: "clear", label: "清空", title: "清除此 PDF 页面的全部批注" }
+      ];
+
+      for (const action of actions) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "bc-pdf-annotation-tool";
+        button.dataset.action = action.id;
+        button.textContent = action.label;
+        button.title = action.title;
+        button.setAttribute("aria-label", action.title);
+        button.addEventListener("pointerdown", event => event.stopPropagation());
+        button.addEventListener("mousedown", event => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        button.addEventListener("click", event => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.handleToolbarAction(canvas, nodeData.id, action.id);
+        });
+        toolbar.appendChild(button);
+      }
+
+      container.appendChild(toolbar);
+      this.toolbarContainers.set(container, toolbar);
+    }
+
+    const current = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeData.id) ?? nodeData;
+    const readonly = Boolean(canvas?.wrapperEl?.classList?.contains("bc-readonly"));
+    const tool = String(current.bcPdfTool ?? "pen");
+    const color = String(current.bcPdfColor ?? "#e53935");
+    const annotating = Boolean(current.bcPdfAnnotating);
+    const strokes = Array.isArray(current.bcPdfStrokes) ? current.bcPdfStrokes : [];
+    const highlights = Array.isArray(current.bcPdfTextHighlights) ? current.bcPdfTextHighlights : [];
+    const hasAnnotations = strokes.length > 0 || highlights.length > 0;
+
+    for (const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>("button[data-action]"))) {
+      const action = button.dataset.action ?? "";
+      const active = action === "toggle" ? annotating
+        : action === "pen-red" ? annotating && tool === "pen" && color === "#e53935"
+        : action === "pen-blue" ? annotating && tool === "pen" && color === "#1e88e5"
+        : action === "highlighter" ? annotating && tool === "highlighter"
+        : action === "eraser" ? annotating && tool === "eraser"
+        : false;
+      button.classList.toggle("is-active", active);
+      if (["toggle", "pen-red", "pen-blue", "highlighter", "eraser"].includes(action)) {
+        button.setAttribute("aria-pressed", String(active));
+      }
+      button.disabled = readonly || (action === "undo" && !hasAnnotations) || (action === "clear" && !hasAnnotations);
+    }
+  }
+
+  private handleToolbarAction(canvas: any, nodeId: string, action: string): void {
+    if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，不能修改 PDF 批注。");
+      return;
+    }
+    const current = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeId) as any;
+    if (!isPinnedPdf(current)) return;
+
+    if (action === "toggle") {
+      patchNode(canvas, nodeId, {
+        bcPdfAnnotating: !Boolean(current.bcPdfAnnotating),
+        bcPdfTool: current.bcPdfTool ?? "pen",
+        bcPdfColor: current.bcPdfColor ?? "#e53935",
+        bcPdfWidth: current.bcPdfWidth ?? 5
+      });
+    } else if (action === "pen-red" || action === "pen-blue" || action === "highlighter" || action === "eraser") {
+      const settings = action === "pen-blue"
+        ? { bcPdfTool: "pen", bcPdfColor: "#1e88e5", bcPdfWidth: 5 }
+        : action === "highlighter"
+        ? { bcPdfTool: "highlighter", bcPdfColor: "#ffeb3b", bcPdfWidth: 16 }
+        : action === "eraser"
+        ? { bcPdfTool: "eraser", bcPdfColor: "#ffffff", bcPdfWidth: 22 }
+        : { bcPdfTool: "pen", bcPdfColor: "#e53935", bcPdfWidth: 5 };
+      patchNode(canvas, nodeId, { ...settings, bcPdfAnnotating: true });
+    } else if (action === "undo") {
+      const strokes = Array.isArray(current.bcPdfStrokes) ? current.bcPdfStrokes as PdfStroke[] : [];
+      const highlights = Array.isArray(current.bcPdfTextHighlights)
+        ? current.bcPdfTextHighlights as PdfTextHighlight[]
+        : [];
+      const lastStroke = strokes[strokes.length - 1];
+      const lastHighlight = highlights[highlights.length - 1];
+      if (!lastStroke && !lastHighlight) return;
+      const undoHighlight = Boolean(lastHighlight) &&
+        (!lastStroke || (lastHighlight?.createdAt ?? 0) > (lastStroke?.createdAt ?? 0));
+      if (undoHighlight) {
+        patchNode(canvas, nodeId, { bcPdfTextHighlights: highlights.slice(0, -1) });
+      } else {
+        patchNode(canvas, nodeId, { bcPdfStrokes: strokes.slice(0, -1) });
+      }
+    } else if (action === "clear") {
+      if (typeof window.confirm === "function" &&
+          !window.confirm("清除此 PDF 页面的所有手绘批注与文字高亮？此操作无法撤销。")) return;
+      patchNode(canvas, nodeId, {
+        bcPdfStrokes: [],
+        bcPdfTextHighlights: [],
+        bcPdfAnnotating: false
+      });
+    } else {
+      return;
+    }
+    this.scheduleRefresh();
+  }
+
   private attachOverlay(canvas: any, nodeData: any, container: HTMLElement): void {
+    this.ensureToolbar(canvas, nodeData, container);
     if (!this.excerptContainers.has(container)) {
       this.excerptContainers.add(container);
       const onCreateExcerpt = (event: Event) => {
