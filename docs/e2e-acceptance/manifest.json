@@ -180,6 +180,12 @@
           "caption": "MCP 传输路径在 HTTP 200 + 非 JSON 响应体时仍显示 JS 解析器原文（含响应体片段）"
         }
       ],
+      "32": [
+        {
+          "file": "round4-portal-created-node.png",
+          "caption": "复验（1c31be8）：通过右键菜单「在 Portal 源画布中创建文本节点」创建的 T32-MENU-NODE，实时显示在已打开的 Portal 内（镜像节点被自动选中）"
+        }
+      ],
       "53": [
         {
           "file": "round4-portal-closed.png",
