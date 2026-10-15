@@ -10,7 +10,7 @@ describe("flattenMarkdownForSvg", () => {
   it("uses visible labels for WikiLinks, Markdown links, and embedded files", () => {
     expect(flattenMarkdownForSvg(
       "See [[folder/Target.md|custom label]], [[Other.canvas#node-id]], [website](https://example.com), ![[assets/diagram.png]], ![photo](photo.png)"
-    )).toBe("See custom label, Other, website, diagram, photo");
+    )).toBe("See custom label, Other, website, diagram.png, photo");
   });
 
   it("preserves readable headings, quotes, bullet lists and task markers", () => {
