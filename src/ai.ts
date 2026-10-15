@@ -1,6 +1,7 @@
 import { requestUrl } from "obsidian";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
 import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from "./provider-params";
+import { emitAIUsageEvent, extractProviderUsage, mergeUsageCounts, type AIUsageTokenCounts } from "./ai-usage";
 
 export type AIProtocol = "openai" | "anthropic" | "gemini";
 
@@ -252,7 +253,9 @@ export async function chatCompletion(
   }
   const body = bodyOf(response);
   if (response.status < 200 || response.status >= 300) throw responseError(response.status, body, response.text);
-  return parseCompletion(protocol, body);
+  const completion = parseCompletion(protocol, body);
+  emitAIUsageEvent(protocol, settings.model, extractProviderUsage(protocol, body) ?? {});
+  return completion;
 }
 
 export async function chatCompletionStream(
@@ -317,6 +320,7 @@ export async function chatCompletionStream(
   const decoder = new TextDecoder();
   let buffer = "";
   let accumulated = "";
+  let reportedUsage: AIUsageTokenCounts = {};
   let done = false;
 
   const consumeLine = (line: string): boolean => {
@@ -328,6 +332,7 @@ export async function chatCompletionStream(
     let event: any;
     try { event = JSON.parse(payload); } catch { return false; }
 
+    reportedUsage = mergeUsageCounts(reportedUsage, extractProviderUsage(protocol, event));
     let delta = "";
     if (protocol === "anthropic") {
       if (event?.type === "content_block_delta" && typeof event?.delta?.text === "string") delta = event.delta.text;
@@ -368,6 +373,7 @@ export async function chatCompletionStream(
   if (buffer) consumeLine(buffer);
   if (signal.aborted) throw new DOMException("The AI request was aborted.", "AbortError");
   if (!accumulated.trim()) throw new Error("AI 服务结束了请求，但没有返回可显示的文本内容。");
+  emitAIUsageEvent(protocol, settings.model, reportedUsage);
   return accumulated.trim();
 }
 
