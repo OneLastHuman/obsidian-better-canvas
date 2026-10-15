@@ -48,6 +48,14 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 
 将 `model` 改成 `ollama list` 显示的模型名。此示例用于文本请求；图片生成要求本地服务额外实现兼容的 Images API。
 
+### 高级请求参数与能力探测
+
+每个 Provider Profile 可单独配置 Temperature、最大输出 token 数和高级请求参数 JSON。额外参数会按当前协议合并，并用于 API 后端的文本请求；核心请求字段与认证字段受到保护。最大输出 token 数不等于模型上下文窗口长度，当前也没有自动上下文限制发现、统一重试策略或成本限制。
+
+模型列表发现支持 OpenAI-compatible 的 `/models`、Anthropic 的 `/models` 和 Gemini 的 `/models`。当服务不支持相应端点时，请手动填写模型名称。
+
+设置中还可以手动探测当前 provider/model 的文本请求和图片输入：确认后最多发送两次小型 API 请求，并保存探测结果。图片输入请求成功只表示接口返回了内容，不保证模型实际理解了图片；图片生成、PDF、视频、URL context 与搜索 grounding 能力仍需单独确认。
+
 ### 常用能力
 
 - 从选中节点及其关联内容提问，将结果保存为相连的新节点；可重新生成，或按节点指定模型。
@@ -68,6 +76,8 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 | Remote Streamable HTTP | 新版远程 MCP 服务 | 填写服务提供的 Streamable HTTP endpoint。 |
 | Remote SSE (legacy) | 仍使用 SSE 的旧服务 | 填写服务提供的 SSE URL；可按服务要求配置 Bearer Token。 |
 | Local stdio (desktop) | 本机 MCP 服务 | 填写 JSON 命令配置，在桌面端启动本地进程。 |
+
+远程 SSE 若使用独立的消息 endpoint，插件会拒绝与配置 SSE URL 不同 origin 的消息地址，避免向其他源发送凭据。
 
 本地 stdio 配置示例：
 
@@ -110,10 +120,10 @@ ACP 在临时目录中创建会话，不会把 Vault 作为 OpenCode 工作区�
 
 任务使用只读沙盒和临时工作目录。Codex 使用自身配置的模型供应商，因此不要把它视为离线执行保证或对本机其他文件的绝对隔离。
 
-## 5. 隐私与排错
+## 6. 隐私与排错
 
 - API Key 保存在本地 Obsidian 插件设置中。使用 AI 时，提示词、选中的节点内容和所需上下文会发送给所配置的服务。
-- 不要向外部服务发送不应离开本机的笔记、密钥或个人信息；先检查服务商的数据处理政策。
+- 不要向外部服务发送不应离开本机的笔记、密钥或个人信息；先检查服务商的数据处理政策。API Key 存在本地插件设置中，不要提交到 Git 仓库、Issue 或截图。
 - 模型发现失败时，可手动输入服务商支持的模型名；图片生成要单独确认服务是否支持对应接口。
 - 遇到权限、连接或工具调用问题时，先检查 endpoint、模型名、凭据和服务日志；本地命令不可用时，优先配置可执行文件的绝对路径。
 
