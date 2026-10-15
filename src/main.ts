@@ -10,7 +10,8 @@ import BetterCanvasFeatures from "./feature-integrator";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import type { ModelCapabilityReport } from "./model-capabilities";
-import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, AIUsageModal, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage";
+import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
+import { AIUsageModal } from "./ai-usage-modal";
 import {
   CanvasNodeData,
   LayoutDirection,
