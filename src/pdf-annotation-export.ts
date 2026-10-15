@@ -128,7 +128,10 @@ function normalizeStrokes(value: unknown, budget: ExportBudget): ExportStroke[] 
   for (const item of value.slice(0, MAX_STROKES_PER_PAGE)) {
     if (!isRecord(item) || !Array.isArray(item.points)) continue;
     const validPoints: Point[] = [];
-    for (const rawPoint of item.points) {
+    const remainingPoints = Math.max(0, MAX_TOTAL_POINTS - budget.totalPoints);
+    const rawPointLimit = Math.min(item.points.length, MAX_POINTS_PER_STROKE + 1, remainingPoints + 1);
+    if (item.points.length > rawPointLimit) budget.truncated = true;
+    for (const rawPoint of item.points.slice(0, rawPointLimit)) {
       if (!isRecord(rawPoint) ||
           typeof rawPoint.x !== "number" || !Number.isFinite(rawPoint.x) ||
           typeof rawPoint.y !== "number" || !Number.isFinite(rawPoint.y)) continue;
