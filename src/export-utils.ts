@@ -50,7 +50,7 @@ export function estimateDataUrlByteLength(dataUrl: string): number {
   const comma = dataUrl.indexOf(",");
   if (comma < 0) return 0;
   const metadata = dataUrl.slice(0, comma).toLowerCase();
-  const payload = dataUrl.slice(comma + 1).replace(/\\s/g, "");
+  const payload = dataUrl.slice(comma + 1).replace(/\s/g, "");
   if (!payload) return 0;
 
   if (metadata.includes(";base64")) {
