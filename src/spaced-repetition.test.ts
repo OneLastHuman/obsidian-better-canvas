@@ -48,4 +48,4 @@ describe("Spaced Repetition deck export", () => {
     expect(uniqueSpacedRepetitionPath("Decks", "Revision", ["decks/revision.md", "Decks/Revision 2.md"]))
       .toBe("Decks/Revision 3.md");
   });
-}
+});
