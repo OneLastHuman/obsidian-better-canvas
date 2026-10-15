@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestUrl } from "obsidian";
-import { chatCompletion, type AISettings } from "./ai";
+import { chatCompletion, generateImage, type AISettings } from "./ai";
 
 vi.mock("obsidian", () => ({
   requestUrl: vi.fn()
@@ -55,5 +55,29 @@ describe("AI completion response errors", () => {
 
     await expect(chatCompletion(settings, messages))
       .rejects.toThrow("AI API 请求失败（HTTP 500）: boom");
+  });
+});
+
+describe("AI image generation payload validation", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects non-image base64 before callers can persist it as a PNG", async () => {
+    vi.mocked(requestUrl).mockResolvedValue({
+      status: 200,
+      text: JSON.stringify({ data: [{ b64_json: "dGhpcy1pcy1ub3QtYS1wbmc=" }] })
+    } as any);
+
+    await expect(generateImage({ ...settings, imageModel: "test-image-model" }, "draw a cat"))
+      .rejects.toThrow(/不是受支持的图片格式/);
+  });
+
+  it("uses the signature, not the MIME label, to choose the image extension", async () => {
+    vi.mocked(requestUrl).mockResolvedValue({
+      status: 200,
+      text: JSON.stringify({ data: [{ b64_json: " /9j/2Q==" }] })
+    } as any);
+
+    await expect(generateImage({ ...settings, imageModel: "test-image-model" }, "draw a cat"))
+      .resolves.toMatchObject({ extension: "jpg" });
   });
 });
