@@ -2,6 +2,7 @@ import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedPromptProfile } from "./prompt-profiles";
 import { modelCapabilityReportKey, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
+import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
 
 type SettingSection = {
   id: string;
@@ -338,12 +339,15 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           new Notice("至少保留一个 AI 服务商。");
           return;
         }
-        const index = (settings.providerProfiles as any[]).findIndex(item => item.id === profile.id);
-        if (index >= 0) settings.providerProfiles.splice(index, 1);
-        if (settings.activeProviderId === profile.id) {
-          settings.activeProviderId = settings.providerProfiles[0].id;
-          this.syncLegacyProvider(settings.providerProfiles[0], settings);
-        }
+        const result = confirmAndRemoveProviderProfile(
+          settings.providerProfiles as any[],
+          String(profile.id),
+          settings.activeProviderId,
+          message => window.confirm(message)
+        );
+        if (!result.confirmed) return;
+        settings.activeProviderId = result.activeProviderId;
+        if (result.activeProfile) this.syncLegacyProvider(result.activeProfile, settings);
         await this.features.save();
         this.display();
       });
