@@ -90,7 +90,7 @@ npm run build
 - **AI 与 MCP：** 在插件设置中配置 AI provider profile、远程 MCP endpoint 或本地服务。
 - **本地 OpenCode / Codex：** 需要在桌面端预先安装并登录对应 CLI。
 
-完整配置示例、MCP 安全说明和本地 AI 后端步骤见 [AI 与 MCP 配置指南](docs/AI_SETUP.md)。
+配置步骤、安全说明与本地 AI 后端说明见 [AI 与 MCP 配置指南](docs/AI_SETUP.md)。完整能力清单见 [功能指南](docs/FEATURE_GUIDE.md)，详细安装方式见 [安装与构建指南](docs/INSTALLATION.md)。
 
 ## 常用快捷键
 
@@ -129,7 +129,7 @@ CI 会检查类型、单元测试和构建产物，但不会启动 Obsidian 图�
 - MCP 本地 stdio 服务以当前用户权限运行，可能访问其有权访问的文件和网络。只配置可信服务，并在执行工具前检查参数。
 - HTML 预览使用沙盒 iframe；仍建议只预览可信或已检查的代码。
 
-查看 [功能整合矩阵](docs/INTEGRATION_MATRIX.md) 了解已知限制与逐项验证状态。CSS 样式预设的格式和示例见 [自定义样式预设指南](docs/CUSTOM_STYLE_PRESETS.md)。
+查看 [已知限制与安全注意事项](docs/KNOWN_LIMITATIONS.md) 了解运行时风险；[功能整合矩阵](docs/INTEGRATION_MATRIX.md) 记录逐项实现与验证状态。CSS 样式预设见 [自定义样式预设指南](docs/CUSTOM_STYLE_PRESETS.md)，上游来源与许可证说明见 [致谢文档](docs/ACKNOWLEDGEMENTS.md)。
 
 ## 致谢与许可证
 
