@@ -120,6 +120,56 @@ describe("full content SVG export", () => {
     expect(result.svg).toContain('<g transform="translate(');
   });
 
+  it("preserves advanced node text, fill, border, and edge stroke attributes", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [
+        {
+          id: "a", type: "text", x: 0, y: 0, width: 160, height: 100, text: "Styled node",
+          styleAttributes: {
+            shape: "rectangle",
+            fillColor: "#abcdef",
+            textColor: "#123456",
+            fontFamily: "Georgia",
+            fontWeight: "bold",
+            fontStyle: "italic",
+            textDecoration: "underline",
+            textAlign: "center",
+            borderWidth: 3
+          }
+        },
+        { id: "b", type: "text", x: 240, y: 0, width: 160, height: 100, text: "B" }
+      ],
+      edges: [{
+        id: "edge", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left",
+        styleAttributes: { strokeColor: "rgb(12, 34, 56)", strokeWidth: 4, lineStyle: "dotted", arrow: "none" },
+        fromEnd: "none", toEnd: "none"
+      }]
+    });
+
+    expect(result.svg).toContain('fill="#abcdef"');
+    expect(result.svg).toContain('font-family="Georgia"');
+    expect(result.svg).toContain('font-weight="bold"');
+    expect(result.svg).toContain('font-style="italic"');
+    expect(result.svg).toContain('text-decoration="underline"');
+    expect(result.svg).toContain('text-anchor="middle"');
+    expect(result.svg).toContain('fill="#123456"');
+    expect(result.svg).toContain('stroke="rgb(12, 34, 56)"');
+    expect(result.svg).toContain('stroke-width="4"');
+    expect(result.svg).toContain('stroke-dasharray="2 5"');
+  });
+
+  it("rejects unsafe color attribute text by falling back to a default", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "a", type: "text", x: 0, y: 0, width: 160, height: 100, text: "Safe",
+        styleAttributes: { fillColor: 'url("javascript:alert(1)")', textColor: 'url("javascript:alert(1)")' }
+      }],
+      edges: [],
+    });
+    expect(result.svg).not.toContain("javascript:");
+    expect(result.svg).toContain('fill="none"');
+  });
+
   it("supports an optional background and empty canvas", () => {
     const colored = canvasDataToFullSvg(sample, { backgroundColor: "#fff" });
     expect(colored.svg).toContain('fill="#fff"');
