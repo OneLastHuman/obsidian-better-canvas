@@ -264,7 +264,7 @@ export function cssSnippetVaultPathFromHref(href: string, configDir: string): st
     return null;
   }
 
-  const normalizedConfig = String(configDir || "").replace(/^\\/+|\\/+$/g, "");
+  const normalizedConfig = String(configDir || "").split("/").filter(Boolean).join("/");
   if (!normalizedConfig || !/^[A-Za-z0-9._-]+$/.test(normalizedConfig)) return null;
   const marker = "/" + normalizedConfig + "/snippets/";
   const markerIndex = pathname.lastIndexOf(marker);
