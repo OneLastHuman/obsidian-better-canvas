@@ -6,6 +6,7 @@ import {
   layoutTree,
   makeTextNode,
   readCanvasData,
+  removeCanvasNode,
   selectedNodeIds,
   type CanvasData
 } from "./canvas";
@@ -43,6 +44,104 @@ describe("Canvas data helpers", () => {
   it("creates JSON Canvas-compatible hexadecimal IDs", () => {
     const id = createId();
     expect(id).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("removes a live node and all incident edges through the Canvas node API", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "source", x: 0, y: 0, width: 100, height: 100, type: "text", text: "Source" },
+        { id: "placeholder", x: 200, y: 0, width: 100, height: 100, type: "text", text: "" }
+      ],
+      edges: [
+        { id: "to-placeholder", fromNode: "source", fromSide: "right", toNode: "placeholder", toSide: "left" },
+        { id: "unrelated", fromNode: "source", fromSide: "bottom", toNode: "source", toSide: "top" }
+      ]
+    };
+    const canvas = makeCanvas(data);
+    const liveNode = { id: "placeholder" };
+    canvas.nodes = new Map([["placeholder", liveNode]]);
+    canvas.removeNode = (node: any) => {
+      canvas.data.nodes = canvas.data.nodes.filter((item: any) => item.id !== node.id);
+      canvas.data.edges = canvas.data.edges.filter((edge: any) => edge.fromNode !== node.id && edge.toNode !== node.id);
+      canvas.nodes.delete(node.id);
+    };
+
+    expect(removeCanvasNode(canvas, "placeholder")).toBe(true);
+    expect(canvas.data.nodes.map((node: any) => node.id)).toEqual(["source"]);
+    expect(canvas.data.edges.map((edge: any) => edge.id)).toEqual(["unrelated"]);
+    expect(canvas.saved).toBe(1);
+    expect(canvas.frames).toBe(1);
+  });
+
+  it("uses setData when the live node API is unavailable", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "source", x: 0, y: 0, width: 100, height: 100, type: "text", text: "Source" },
+        { id: "placeholder", x: 200, y: 0, width: 100, height: 100, type: "text", text: "" }
+      ],
+      edges: [{ id: "incident", fromNode: "source", fromSide: "right", toNode: "placeholder", toSide: "left" }]
+    });
+    canvas.setData = (next: CanvasData) => { canvas.data = JSON.parse(JSON.stringify(next)); };
+
+    expect(removeCanvasNode(canvas, "placeholder")).toBe(true);
+    expect(canvas.data.nodes.map((node: any) => node.id)).toEqual(["source"]);
+    expect(canvas.data.edges).toEqual([]);
+    expect(canvas.saved).toBe(1);
+    expect(canvas.frames).toBe(1);
+  });
+
+  it("removes incident edges if the node API leaves them behind", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "source", x: 0, y: 0, width: 100, height: 100, type: "text", text: "Source" },
+        { id: "placeholder", x: 200, y: 0, width: 100, height: 100, type: "text", text: "" }
+      ],
+      edges: [
+        { id: "incident", fromNode: "source", fromSide: "right", toNode: "placeholder", toSide: "left" },
+        { id: "unrelated", fromNode: "source", fromSide: "bottom", toNode: "source", toSide: "top" }
+      ]
+    });
+    const liveNode = { id: "placeholder" };
+    canvas.nodes = new Map([["placeholder", liveNode]]);
+    canvas.removeNode = (node: any) => {
+      // Simulate a node API that only removes the node object.
+      canvas.data.nodes = canvas.data.nodes.filter((item: any) => item.id !== node.id);
+      canvas.nodes.delete(node.id);
+    };
+    canvas.setData = (next: CanvasData) => {
+      canvas.data = JSON.parse(JSON.stringify(next));
+    };
+
+    expect(removeCanvasNode(canvas, "placeholder")).toBe(true);
+    expect(canvas.data.nodes.map((node: any) => node.id)).toEqual(["source"]);
+    expect(canvas.data.edges.map((edge: any) => edge.id)).toEqual(["unrelated"]);
+    expect(canvas.saved).toBe(1);
+    expect(canvas.frames).toBe(1);
+  });
+
+  it("returns false when importData silently refuses to delete a node", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "source", x: 0, y: 0, width: 100, height: 100, type: "text", text: "Source" },
+        { id: "placeholder", x: 200, y: 0, width: 100, height: 100, type: "text", text: "" }
+      ],
+      edges: [{ id: "incident", fromNode: "source", fromSide: "right", toNode: "placeholder", toSide: "left" }]
+    });
+    canvas.importData = (next: CanvasData) => {
+      const originalIds = new Set(canvas.data.nodes.map((node: any) => node.id));
+      canvas.data = {
+        ...next,
+        nodes: [
+          ...canvas.data.nodes,
+          ...next.nodes.filter(node => !originalIds.has(node.id))
+        ]
+      };
+    };
+
+    expect(removeCanvasNode(canvas, "placeholder")).toBe(false);
+    expect(canvas.data.nodes.some((node: any) => node.id === "placeholder")).toBe(true);
+    expect(canvas.saved).toBe(0);
+    expect(canvas.frames).toBe(0);
   });
 
   it("collects unique selected node IDs", () => {
