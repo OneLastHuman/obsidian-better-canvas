@@ -165,7 +165,7 @@ export function parseAIModelPriceTable(json: string): AIModelPriceTable {
   const result: AIModelPriceTable = {};
   for (const [rawKey, rawValue] of entries) {
     const key = rawKey.trim();
-    if (!/^(openai|anthropic|gemini):.+$/i.test(key)) {
+    if (!/^(openai|anthropic|gemini):.+$/.test(key)) {
       throw new Error(`模型价格键“${key}”格式错误，应为 protocol:model。`);
     }
     if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
