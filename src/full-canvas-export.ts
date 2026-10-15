@@ -1,5 +1,6 @@
 import type { CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { routePointsForMethod, type CanvasEdgeRouteMethod, type RouteBox } from "./enhancements";
+import { flattenMarkdownForSvg } from "./markdown-export";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -261,7 +262,9 @@ function polygonPoints(x: number, y: number, w: number, h: number, sides: number
 }
 
 function wrapNodeText(node: CanvasNodeData, clipId: string): string {
-  const raw = nodeText(node);
+  const raw = typeof node.text === "string" && node.text.trim()
+    ? flattenMarkdownForSvg(node.text)
+    : nodeText(node);
   if (!raw) return "";
   const attrs = (node as any).styleAttributes ?? {};
   const fontSize = Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
