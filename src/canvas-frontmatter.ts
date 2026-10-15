@@ -41,8 +41,8 @@ export interface CanvasFrontmatterSnapshot {
 /** Read a Canvas JSON document and normalize absent metadata/frontmatter to empty objects. */
 export function readCanvasFrontmatter(rawCanvas: string): CanvasFrontmatterSnapshot {
   const document = parseJsonObject(rawCanvas, "Canvas 文件");
-  const metadata = isJsonObject(document.metadata) ? document.metadata : {};
-  const frontmatter = isJsonObject(metadata.frontmatter) ? metadata.frontmatter : {};
+  const metadata: JsonObject = isJsonObject(document.metadata) ? document.metadata : {};
+  const frontmatter: JsonObject = isJsonObject(metadata.frontmatter) ? metadata.frontmatter : {};
   return { document, metadata, frontmatter };
 }
 
