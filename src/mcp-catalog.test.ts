@@ -6,7 +6,8 @@ import {
   formatMcpResourceCatalog,
   formatMcpResourceRead,
   normalizeMcpPromptPage,
-  normalizeMcpResourcePage
+  normalizeMcpResourcePage,
+  parseMcpPromptArguments
 } from "./mcp-catalog";
 
 describe("MCP resources and prompts catalog", () => {
@@ -49,6 +50,13 @@ describe("MCP resources and prompts catalog", () => {
       nextCursor: "page-" + String(Number((cursor ?? "page-0").replace("page-", "")) + 1)
     });
     await expect(collectMcpCatalogPages(fetchPage, item => String(item), 2)).rejects.toThrow(/2-page safety limit/);
+  });
+
+  it("validates prompt arguments as a JSON object of string values", () => {
+    expect(parseMcpPromptArguments('{"topic":"science","detail":"brief"}')).toEqual({ topic: "science", detail: "brief" });
+    expect(() => parseMcpPromptArguments("{")).toThrow(/JSON/);
+    expect(() => parseMcpPromptArguments("[]")).toThrow(/object/);
+    expect(() => parseMcpPromptArguments('{"count":2}')).toThrow(/字符串/);
   });
 
   it("formats catalogs with URIs, MIME types and required prompt arguments", () => {
