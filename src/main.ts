@@ -52,6 +52,9 @@ interface BetterCanvasSettings {
   mindMapShortcutSiblingEnterEnabled: boolean;
   mindMapShortcutAltArrowNavigationEnabled: boolean;
   mindMapShortcutDirectionalCreationEnabled: boolean;
+  flashcardOutputMode: "canvas" | "spaced-repetition";
+  spacedRepetitionFolder: string;
+  spacedRepetitionDeck: string;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -70,7 +73,10 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   mindMapShortcutChildTabEnabled: true,
   mindMapShortcutSiblingEnterEnabled: true,
   mindMapShortcutAltArrowNavigationEnabled: true,
-  mindMapShortcutDirectionalCreationEnabled: true
+  mindMapShortcutDirectionalCreationEnabled: true,
+  flashcardOutputMode: "canvas",
+  spacedRepetitionFolder: "Better Canvas/Flashcards",
+  spacedRepetitionDeck: "better-canvas"
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
