@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
 import { appendCanvasNodeMetadata, isVaultLinkDestination, parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
 
 describe("Canvas text-node metadata fallback parser", () => {
