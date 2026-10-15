@@ -31,7 +31,7 @@ This matrix records Better Canvas implementation and parity gaps against the cur
 | Borders / text alignment / custom CSS class | Implemented, expanded | Supports solid, dashed, dotted, double and invisible borders; the invisible-border effect is CSS-rendered, while standard border values and text alignment are persisted on Canvas data |
 | Edge colors / solid, dashed, dotted path / custom arrow styles | Implemented, basic | Writes both standard `color` / `styleAttributes` and extension fallbacks; exact arrow geometry varies by renderer |
 | Flip incident edge direction | Implemented | Reverses edges touching the selected node |
-| Select incident edges | Implemented | Supports all, incoming and outgoing edge selection |
+| Select incident edges | Implemented, expanded | Selects all, incoming or outgoing edges for the selected node(s); a separate command now selects every edge in the active Canvas regardless of node selection |
 | Bring node to front / send to back | Implemented, basic | Uses Canvas data ordering; renderer behavior may differ between Obsidian versions |
 | Focus mode / edge emphasis | Implemented, basic | Dims unrelated nodes and edges |
 | Create an independent empty group | Implemented | Creates a standalone group node without requiring a selected node |
