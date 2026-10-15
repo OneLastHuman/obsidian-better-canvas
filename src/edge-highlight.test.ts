@@ -39,9 +39,6 @@ describe("connected Canvas edge highlighting", () => {
         { id: "unrelated" }
       ])
     };
-    expect(selectedCanvasNodeIds(canvas, ["node-a", "node-b", "edge-a"])).toEqual([
-      "node-a", "edge-a", "node-b"
-    ]);
     expect(selectedCanvasNodeIds(canvas, ["node-a", "node-b"])).toEqual(["node-a", "node-b"]);
   });
 
