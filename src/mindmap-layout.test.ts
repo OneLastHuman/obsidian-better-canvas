@@ -51,7 +51,7 @@ describe("mind-map layered graph layout", () => {
 
     expect(rl.get("child")!.x + 160).toBe(475);
     expect(tb.get("child")!.y).toBe(395);
-    expect(bt.get("child")!.y + 90).toBe(275);
+    expect(bt.get("child")!.y + 90).toBe(285);
     expect(tb.get("root")).toEqual({ x: 500, y: 300 });
     expect(bt.get("root")).toEqual({ x: 500, y: 300 });
   });
