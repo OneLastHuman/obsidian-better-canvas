@@ -164,6 +164,7 @@ interface CanvasLinkExplorerEntry {
   target: string;
   sourcePath: string;
   external?: boolean;
+  sourceNodeId?: string;
 }
 
 class CanvasLinkExplorerModal extends Modal {
@@ -1281,7 +1282,8 @@ export default class BetterCanvasFeatures {
             title: "文本节点：" + label,
             detail: reference.original,
             target: reference.targetPath + (reference.subpath ? "#" + reference.subpath : ""),
-            sourcePath
+            sourcePath,
+            sourceNodeId: node.id
           });
         }
       }
@@ -1291,7 +1293,8 @@ export default class BetterCanvasFeatures {
           title: "文件节点：" + (node.file.split("/").pop() || node.file),
           detail: node.file + (subpath ? "#" + subpath : ""),
           target: node.file + (subpath ? "#" + subpath : ""),
-          sourcePath
+          sourcePath,
+          sourceNodeId: node.id
         });
       }
       if (node.type === "link" && typeof node.url === "string") {
@@ -1303,7 +1306,8 @@ export default class BetterCanvasFeatures {
             detail: node.url,
             target: url.toString(),
             sourcePath,
-            external: true
+            external: true,
+            sourceNodeId: node.id
           });
         } catch {
           // Ignore malformed URL nodes in the navigation list.
