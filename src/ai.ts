@@ -183,13 +183,25 @@ function toGeminiRequest(settings: AISettings, messages: ChatMessage[], streamin
 
 function toOpenAIRequest(settings: AISettings, messages: ChatMessage[], streaming: boolean): Record<string, unknown> {
   const maxOutputTokens = resolveMaxOutputTokens(settings.maxOutputTokens);
-  return mergeProviderParams("openai", {
+  const body = mergeProviderParams("openai", {
     model: settings.model.trim(),
     messages,
     temperature: resolveTemperature(settings.temperature, 0.4, "openai"),
     ...(maxOutputTokens ? { max_tokens: maxOutputTokens } : {}),
     ...(streaming ? { stream: true } : {})
   }, settings.providerParams);
+  // OpenAI only returns usage in stream chunks when this option is requested.
+  // Do not send this vendor-specific field to arbitrary OpenAI-compatible gateways.
+  if (streaming) {
+    try {
+      if (new URL(settings.baseUrl).hostname.toLowerCase() === "api.openai.com") {
+        body.stream_options = { include_usage: true };
+      }
+    } catch {
+      // URL validation is handled by endpoint() before the request is sent.
+    }
+  }
+  return body;
 }
 
 function parseCompletion(protocol: AIProtocol, body: any): string {
