@@ -2,7 +2,7 @@
 
 This matrix records Better Canvas implementation and parity gaps against the current default branches of Advanced Canvas, Canvas MindMap, and Obsidian AI Canvas. “Implemented” means code exists; it does not imply that every supported Obsidian version, provider endpoint, or internal DOM patch has been manually validated.
 
-**Last reviewed:** 2026-10-15. The code review baseline immediately before this documentation update was `ea95660f61c7af65e35410a38e1774eb82f47080`; its GitHub Actions run passed typecheck, unit tests, production build, and install-package creation. The entries below separate missing feature parity from work that exists but still needs host-runtime verification.
+**Last reviewed:** 2026-10-15. This feature branch was created from `93d6fa3c504e5bdc34381f4a6c36507dcb3c1226`; its own CI results must be checked before treating the additions as verified. The entries below separate missing feature parity from work that exists but still needs host-runtime verification.
 
 ## Canvas MindMap
 
@@ -70,7 +70,7 @@ This matrix records Better Canvas implementation and parity gaps against the cur
 | Connected image / pinned PDF page vision context | Implemented, basic | Sends up to four connected local image files or rasterized pinned PDF pages. Remote image URLs are not fetched automatically |
 | Image generation to Vault | Implemented, provider-dependent | OpenAI-compatible Images endpoint or compatible Gemini image model; not every gateway supports it |
 | Related research questions / title generation / idea expansion | Implemented | Uses model-produced structured responses |
-| Flashcard generation | Implemented, partial parity | Creates independent Canvas text nodes. It does not create Markdown flashcard notes/decks or guarantee the file/tag format expected by the Obsidian Spaced Repetition plugin |
+| Flashcard generation | Implemented, two outputs | Keeps independent Canvas text nodes as the default, or exports to a Markdown deck compatible with Obsidian Spaced Repetition when selected in AI settings |
 | Webpage text ingestion | Implemented, best-effort | JavaScript-only, login-gated and anti-bot pages may fail |
 | YouTube caption ingestion | Implemented, best-effort | Requires accessible captions; videos without retrievable captions cannot be transcribed |
 | MCP tools | Implemented, Streamable HTTP, legacy SSE, and local stdio | Direct tool picker plus AI-proposed tool/arguments with an explicit review/confirmation step. Text results become linked nodes; PNG/JPEG/WebP/GIF image results are saved into the Vault and added as linked file nodes. Local stdio uses a configured executable/args/env/cwd and starts a fresh process per list/call operation. SSE checks that the message endpoint stays on the configured origin before sending credentials; unsupported image MIME types are skipped |
@@ -114,7 +114,7 @@ The items below are gaps identified by comparing the current Better Canvas sourc
 | Feature | Status | Notes |
 |---|---|---|
 | Named system-prompt library and prompt picker | Not implemented | There is a single global system-prompt setting and task-specific prompts in commands. A library of built-in and user-managed named prompts, with a reusable prompt/context picker, is not implemented |
-| Spaced Repetition file/deck integration | Not implemented | Flashcards are represented as Canvas nodes; compatible Markdown notes/decks for the Obsidian Spaced Repetition plugin are not created as a dedicated output mode |
+| Spaced Repetition file/deck integration | Implemented, configurable | AI flashcards can be exported to a Markdown note tagged with `flashcards` or a hierarchical `flashcards/topic/subtopic` deck. Uses the plugin-supported multi-line question / `?` / answer syntax, preserves answer Markdown, validates Vault-relative output folders, and creates a new suffixed filename instead of overwriting an existing note; runtime review in Obsidian remains pending |
 | Per-model capability probing | Partial | Model-list discovery is implemented for OpenAI-compatible, Anthropic and Gemini endpoints. The plugin does not maintain per-provider/model/route capability reports for vision, image generation, PDF, video, YouTube, URL context or search |
 | Provider-specific request parameters and model limits | Partial | Core protocol adapters exist, but settings do not expose upstream-equivalent per-model `providerParams`, token/context limits, retry policy and provider-specific tuning. Several request parameters are fixed in code; behavior varies by endpoint |
 | Usage, cost and observability integrations | Not implemented | There is no user-facing token/cost accounting, price configuration, request tracing, or equivalent built-in integration for Langfuse, Laminar or a configurable observability service |
