@@ -18,7 +18,7 @@ const source = {
 describe("cloneCanvasNodeInDirection", () => {
   it.each([
     ["left", -80, 200],
-    ["right", 360, 200],
+    ["right", 280, 200],
     ["up", 100, 90],
     ["down", 100, 310]
   ] as const)("clones %s with correct placement", (direction, x, y) => {
