@@ -10,6 +10,7 @@ import BetterCanvasFeatures from "./feature-integrator";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import type { ModelCapabilityReport } from "./model-capabilities";
+import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, AIUsageModal, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage";
 import {
   CanvasNodeData,
   LayoutDirection,
@@ -59,6 +60,8 @@ interface BetterCanvasSettings {
   spacedRepetitionFolder: string;
   spacedRepetitionDeck: string;
   modelCapabilityReports: Record<string, ModelCapabilityReport>;
+  aiUsageRecords: AIUsageRecord[];
+  aiModelPricesJson: string;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -83,7 +86,9 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   flashcardOutputMode: "canvas",
   spacedRepetitionFolder: "Better Canvas/Flashcards",
   spacedRepetitionDeck: "better-canvas",
-  modelCapabilityReports: {}
+  modelCapabilityReports: {},
+  aiUsageRecords: [],
+  aiModelPricesJson: "{}"
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
@@ -250,6 +255,14 @@ export default class BetterCanvasPlugin extends Plugin {
     if (this.settings.flashcardOutputMode !== "spaced-repetition") this.settings.flashcardOutputMode = "canvas";
     if (typeof this.settings.spacedRepetitionFolder !== "string") this.settings.spacedRepetitionFolder = "Better Canvas/Flashcards";
     if (typeof this.settings.spacedRepetitionDeck !== "string") this.settings.spacedRepetitionDeck = "better-canvas";
+    if (typeof this.settings.aiModelPricesJson !== "string") this.settings.aiModelPricesJson = "{}";
+    this.settings.aiUsageRecords = appendAIUsageRecord(this.settings.aiUsageRecords, null, AI_USAGE_HISTORY_LIMIT);
+    this.registerDomEvent(window, AI_USAGE_EVENT, (event: Event) => {
+      const record = normalizeAIUsageRecord((event as CustomEvent<unknown>).detail);
+      if (!record) return;
+      this.settings.aiUsageRecords = appendAIUsageRecord(this.settings.aiUsageRecords, record, AI_USAGE_HISTORY_LIMIT);
+      void this.saveSettings().catch(error => new Notice(error instanceof Error ? error.message : "保存 AI 用量记录失败。"));
+    });
 
     this.registerCommands();
     this.registerCanvasContextMenu();
@@ -262,6 +275,22 @@ export default class BetterCanvasPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  private showAIUsageReport(): void {
+    new AIUsageModal(
+      this.app,
+      this.settings.aiUsageRecords,
+      this.settings.aiModelPricesJson,
+      async json => {
+        this.settings.aiModelPricesJson = json;
+        await this.saveSettings();
+      },
+      async () => {
+        this.settings.aiUsageRecords = [];
+        await this.saveSettings();
+      }
+    ).open();
   }
 
   private getCanvas(): any | null {
@@ -305,6 +334,7 @@ export default class BetterCanvasPlugin extends Plugin {
     this.addCommand({ id: "auto-layout-tree", name: "Better Canvas: 自动整理思维导图", callback: () => this.autoLayout() });
     this.addCommand({ id: "split-heading-into-mindmap", name: "Better Canvas: 将所选 Markdown 文件的 H1 拆为思维导图", callback: () => void this.splitHeadingsIntoMindMap() });
     this.addCommand({ id: "ask-ai", name: "Better Canvas: 向 AI 提问所选节点", callback: () => this.features.askSelectedNode() });
+    this.addCommand({ id: "ai-usage-report", name: "Better Canvas: 查看 AI 用量与成本", callback: () => this.showAIUsageReport() });
     this.addCommand({ id: "generate-flashcards", name: "Better Canvas: 从所选节点生成复习闪卡", callback: () => this.features.generateFlashcardsFromSelection() });
     this.addCommand({ id: "generate-image", name: "Better Canvas: 根据所选节点生成图片", callback: () => this.features.generateImageFromSelection() });
     this.addCommand({ id: "add-web-link", name: "Better Canvas: 在画布中添加网页链接卡片", callback: () => this.addWebLink() });
