@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Notice, TFile } from "obsidian";
 import { CanvasPortalManager } from "./canvas-portals";
 
@@ -54,6 +54,7 @@ function makeHarness(portalOpen = false) {
 }
 
 describe("Canvas Portal target validation", () => {
+  beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.restoreAllMocks());
 
   it("does not mark or save a Portal when its target file is missing", () => {
