@@ -7,6 +7,7 @@ import {
   listSseMcpTools,
   readSseMcpResource,
   resolveSsePostUrl,
+  SseMcpConnection,
   splitSseFrames
 } from "./mcp-sse";
 
@@ -34,6 +35,39 @@ describe("legacy MCP SSE parsing", () => {
     expect(() => resolveSsePostUrl("https://mcp.example/sse", "file:///tmp/message"))
       .toThrow(/HTTP/);
   });
+
+  it("makes the connection terminal and aborts transport after an idle stream closes", async () => {
+    const encoder = new TextEncoder();
+    let eventController: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(init?.method ?? "GET").toUpperCase()).toBe("GET");
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          eventController = controller;
+          controller.enqueue(encoder.encode("event: endpoint\ndata: /messages\n\n"));
+        }
+      });
+      return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
+    });
+    vi.stubGlobal("fetch", fakeFetch);
+    const connection = new SseMcpConnection("https://mcp.example/sse", "secret");
+    try {
+      await connection.connect();
+      eventController?.close();
+
+      await vi.waitFor(() => {
+        expect((connection as any).closed).toBe(true);
+      }, { timeout: 1000 });
+
+      expect((connection as any).controller.signal.aborted).toBe(true);
+      expect((connection as any).pending.size).toBe(0);
+      await expect(connection.request("tools/list", {})).rejects.toThrow(/closed/i);
+      expect(fakeFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      connection.close();
+    }
+  });
+
 });
 
 describe("legacy MCP SSE JSON-RPC round trip", () => {
