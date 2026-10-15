@@ -313,6 +313,23 @@ export function moveSelectionEdgesToTop(canvas: any, direction: "all" | "incomin
   return edgeIds.length;
 }
 
+export function selectAllCanvasEdges(canvas: any): number {
+  if (!canvas || typeof canvas.select !== "function" || !canvas.edges?.values) return 0;
+  const edges = [...canvas.edges.values()].filter((edge: any) => edge && edge.id);
+  if (!edges.length) return 0;
+  canvas.deselectAll?.();
+  let selected = 0;
+  for (const edge of edges) {
+    try {
+      canvas.select(edge);
+      selected++;
+    } catch {
+      // An individual renderer edge may become stale during selection.
+    }
+  }
+  return selected;
+}
+
 export function resizeNodeToText(canvas: any, nodeId: string): boolean {
   const data = readCanvasData(canvas);
   const node = data.nodes.find(item => item.id === nodeId);
