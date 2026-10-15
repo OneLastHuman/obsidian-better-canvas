@@ -91,6 +91,8 @@ describe("MCP resources and prompts catalog", () => {
     });
     expect(result.text).toContain("[user] Use cautious language.");
     expect(result.text).toContain("Summarize material");
+    expect(result.text).toContain("[Image attachment: image/png]");
+    expect(result.text).not.toContain("iVBORw0KGgo=");
     expect(result.images).toEqual([{ mimeType: "image/png", data: "iVBORw0KGgo=" }]);
   });
 });
