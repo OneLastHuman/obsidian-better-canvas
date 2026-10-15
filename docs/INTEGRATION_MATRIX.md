@@ -92,7 +92,7 @@ The items below are gaps identified by comparing the current Better Canvas sourc
 | Feature | Status | Notes |
 |---|---|---|
 | Directional clone / expand existing nodes | Implemented, basic | `克隆所选节点并向指定方向扩展` creates a deep copy of the selected node's content/style/extension fields, positions it left/right/up/down using configured spacing, and connects it to the original. Collision avoidance and multi-selection cloning remain incomplete |
-| Flip a multi-node selection / swap two nodes | Not implemented | Edge direction flipping exists; geometric flip of a selection and swapping node positions are different operations and are not implemented |
+| Flip a multi-node selection / swap two nodes | Implemented, basic | Horizontal/vertical commands mirror selected node rectangles around the selection bounds; swapping requires exactly two selected nodes and exchanges their centers while retaining each node's own dimensions. Complex collision avoidance and multi-group geometry remain unimplemented |
 | Pull outgoing links / backlinks into Canvas | Implemented, basic | The `将当前 Canvas 链接与反向链接添加为节点` command materializes unique outgoing/incoming targets as file, URL, or fallback text nodes; outgoing targets connect to their source node, incoming targets connect to the current selection when present, and targets already represented by file/link nodes are skipped. The command caps one operation at 100 nodes; richer per-entry selection remains incomplete |
 | Dedicated zoom-to-fit / zoom-to-selection and select-all-edges commands | Partial | Internal actions call `zoomToSelection`, and connected-edge selection is supported. There is no equivalent dedicated command set for zoom-to-fit and selecting every edge on the Canvas; native Obsidian commands may overlap |
 | Edge highlight on selecting a connected node | Partial | Focus mode dims unrelated nodes/edges. It does not provide a separate always-available highlight behavior for all edges connected to the selected node |
@@ -106,7 +106,7 @@ The items below are gaps identified by comparing the current Better Canvas sourc
 
 | Feature | Status | Notes |
 |---|---|---|
-| Configurable MindMap shortcut controls | Partial | The primary keyboard flows are implemented, but the plugin does not provide equivalent per-shortcut enablement and configuration controls. Inline DOM shortcuts may also need conflict testing with user hotkeys and themes |
+| Configurable MindMap shortcut controls | Implemented, basic | Settings independently enable/disable Tab child creation, Enter sibling creation, Alt+arrow navigation and Ctrl/Cmd+arrow directional creation. Inline DOM shortcuts still need conflict testing with user hotkeys and themes |
 | Optimal layout for arbitrary graphs | Partial | LR/RL/TB/BT tree layout works for basic trees. Multi-parent graphs, cycles, shared descendants and dense non-tree structures may not produce an optimal or stable mind-map layout |
 
 ### Obsidian AI Canvas parity gaps
