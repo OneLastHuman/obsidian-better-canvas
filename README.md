@@ -81,7 +81,7 @@ Better Canvas 为 Obsidian Canvas 增加节点与连线编辑、思维导图、�
 - 文本 AI 可选本机 OpenCode ACP：通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode 使用的模型与登录配置，不需要单独填写文本 API Key。
 - 可选择 Vault 文件夹，对最多 20 篇 Markdown 顺序执行同一条 Prompt，逐篇创建源文件节点与结果节点；正文发送给当前 AI 供应商前会要求用户选择文件夹并确认任务。
 - 识别 AI 或手写节点中的 HTML 代码块，可通过按钮在隔离的 sandbox iframe 中预览交互页面。
-- 可把固定 PDF 页面提取为 AI 文本上下文，并将页面栅格图像发送给支持视觉输入的模型；Gemini profile 支持对公开视频进行原生视频上下文分析。
+- 可把固定 PDF 页面提取为 AI 文本上下文，并将页面栅格图像发送给支持视觉输入的模型；支持按页码或页码范围批量 OCR（每批最多 20 页），并为每页保存独立结果节点；Gemini profile 支持对公开视频进行原生视频上下文分析。
 
 AI 功能受服务 API、模型、账号权限和内容可访问性影响。网页反爬、登录限制、缺失字幕或不受支持的接口都可能导致操作失败。
 
