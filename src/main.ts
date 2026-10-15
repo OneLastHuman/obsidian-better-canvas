@@ -4,8 +4,6 @@ import {
   Modal,
   Notice,
   Plugin,
-  PluginSettingTab,
-  Setting,
   TFile
 } from "obsidian";
 import { chatCompletion, generateImage } from "./ai";
@@ -226,7 +224,6 @@ export default class BetterCanvasPlugin extends Plugin {
   async onload(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
     this.settings.templates = Array.isArray(this.settings.templates) ? this.settings.templates : [];
-    this.addSettingTab(new BetterCanvasSettingTab(this.app, this));
     this.registerCommands();
     this.registerCanvasContextMenu();
     this.features = new BetterCanvasFeatures(this);
@@ -766,137 +763,3 @@ export default class BetterCanvasPlugin extends Plugin {
   }
 }
 
-class BetterCanvasSettingTab extends PluginSettingTab {
-  plugin: BetterCanvasPlugin;
-
-  constructor(app: App, plugin: BetterCanvasPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl("h2", { text: "Better Canvas" });
-    containerEl.createEl("p", {
-      text: "Canvas 增强和思维导图功能无需配置 AI。文本 AI 可使用 API 端点或本机 OpenCode ACP；图片生成仍使用下方 API 配置。API Key 仅保存于当前 Vault 的插件数据中。"
-    });
-
-    new Setting(containerEl)
-      .setName("文本 AI 后端")
-      .setDesc("API 模式使用下面的服务商配置；OpenCode ACP 使用本机 OpenCode 的登录状态和模型配置。")
-      .addDropdown(dropdown => dropdown
-        .addOption("api", "API / 模型端点")
-        .addOption("opencode-acp", "本机 OpenCode ACP")
-        .setValue(this.plugin.settings.backend)
-        .onChange(async value => {
-          this.plugin.settings.backend = value === "opencode-acp" ? "opencode-acp" : "api";
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    if (this.plugin.settings.backend === "opencode-acp") {
-      new Setting(containerEl)
-        .setName("OpenCode CLI 可执行文件")
-        .setDesc("默认使用 PATH 中的 opencode；如果 Obsidian 找不到它，请填写可执行文件的绝对路径。")
-        .addText(text => text.setPlaceholder("opencode").setValue(this.plugin.settings.opencodeBinaryPath).onChange(async value => {
-          this.plugin.settings.opencodeBinaryPath = value.trim() || "opencode";
-          await this.plugin.saveSettings();
-        }));
-    }
-
-    new Setting(containerEl)
-      .setName("API Base URL")
-      .setDesc("API 模式的文本请求及图片生成使用此端点；不要在 URL 中放入 API Key。")
-      .addText(text => text.setPlaceholder("https://api.openai.com/v1").setValue(this.plugin.settings.baseUrl).onChange(async value => {
-        this.plugin.settings.baseUrl = value.trim();
-        await this.plugin.saveSettings();
-      }));
-
-    new Setting(containerEl)
-      .setName("API Key")
-      .setDesc("本地插件设置；请不要将真实密钥提交到 Git。")
-      .addText(text => {
-        text.inputEl.type = "password";
-        text.setPlaceholder("sk-…").setValue(this.plugin.settings.apiKey).onChange(async value => {
-          this.plugin.settings.apiKey = value.trim();
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName("Chat model")
-      .setDesc("API 模式的文本模型；OpenCode ACP 会使用 OpenCode 自己配置的模型。图片模型未填写时也会回退到此值。")
-      .addText(text => text.setPlaceholder("gpt-4o-mini").setValue(this.plugin.settings.model).onChange(async value => {
-        this.plugin.settings.model = value.trim();
-        await this.plugin.saveSettings();
-      }));
-
-    new Setting(containerEl)
-      .setName("Image model")
-      .setDesc("图像服务支持的模型；兼容服务也可能不支持图像接口。")
-      .addText(text => text.setPlaceholder("gpt-image-1").setValue(this.plugin.settings.imageModel).onChange(async value => {
-        this.plugin.settings.imageModel = value.trim();
-        await this.plugin.saveSettings();
-      }));
-
-    new Setting(containerEl)
-      .setName("System prompt")
-      .setDesc("AI 助手的默认系统提示词。")
-      .addText(text => text.setValue(this.plugin.settings.systemPrompt).onChange(async value => {
-        this.plugin.settings.systemPrompt = value;
-        await this.plugin.saveSettings();
-      }));
-
-    new Setting(containerEl)
-      .setName("默认布局方向")
-      .setDesc("自动整理思维导图时使用的方向。")
-      .addDropdown(dropdown => dropdown
-        .addOption("LR", "左到右")
-        .addOption("RL", "右到左")
-        .addOption("TB", "上到下")
-        .addOption("BT", "下到上")
-        .setValue(this.plugin.settings.direction)
-        .onChange(async value => {
-          this.plugin.settings.direction = value as LayoutDirection;
-          await this.plugin.saveSettings();
-        }));
-
-    new Setting(containerEl)
-      .setName("节点水平间距")
-      .addText(text => text.setValue(String(this.plugin.settings.gapX)).onChange(async value => {
-        const number = Number(value);
-        if (Number.isFinite(number) && number >= 0 && number <= 1000) {
-          this.plugin.settings.gapX = number;
-          await this.plugin.saveSettings();
-        }
-      }));
-
-    new Setting(containerEl)
-      .setName("节点垂直间距")
-      .addText(text => text.setValue(String(this.plugin.settings.gapY)).onChange(async value => {
-        const number = Number(value);
-        if (Number.isFinite(number) && number >= 0 && number <= 1000) {
-          this.plugin.settings.gapY = number;
-          await this.plugin.saveSettings();
-        }
-      }));
-
-    new Setting(containerEl)
-      .setName("图片附件目录")
-      .setDesc("Vault 内生成图片的相对目录。")
-      .addText(text => text.setValue(this.plugin.settings.attachmentFolder).onChange(async value => {
-        this.plugin.settings.attachmentFolder = value.trim() || DEFAULT_SETTINGS.attachmentFolder;
-        await this.plugin.saveSettings();
-      }));
-
-    new Setting(containerEl)
-      .setName("节点模板")
-      .setDesc(`已保存 ${this.plugin.settings.templates.length} 个模板。`)
-      .addButton(button => button.setButtonText("清空模板").setWarning().onClick(async () => {
-        this.plugin.settings.templates = [];
-        await this.plugin.saveSettings();
-        this.display();
-      }));
-  }
-}
