@@ -88,10 +88,22 @@ AI 功能受服务 API、模型、账号权限和内容可访问性影响。网�
 
 ## 安装
 
-### 直接安装（推荐）
+### 从仓库直接安装
+
+成功的 `main` 分支构建完成后，CI 会将生产构建的 `main.js` 自动提交到仓库根目录。下载以下三个文件：
+
+- [`main.js`（生产构建）](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/main.js)
+- [`manifest.json`](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/manifest.json)
+- [`styles.css`](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/styles.css)
+
+把三个文件放入 Vault 的插件目录 `<Vault>/.obsidian/plugins/obsidian-better-canvas/`，然后打开 Obsidian 的 **设置 → 社区插件**，重新加载插件列表并启用 **Better Canvas**。
+
+首次启用这套同步流程时，`main.js` 会在该次 Build workflow 成功后提交；Pull Request 构建只验证并打包，不会写回安装产物。
+
+### 从 GitHub Releases 安装
 
 1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)，下载对应版本的 `obsidian-better-canvas.zip`。
-2. 将 ZIP 解压到 Vault 的插件目录 `<Vault>/.obsidian/plugins/`。压缩包内已包含 `obsidian-better-canvas/` 文件夹，确认最终结构如下：
+2. 将 ZIP 解压到 Vault 的插件目录 `<Vault>/.obsidian/plugins/`。压缩包内已包含 `obsidian-better-canvas/` 文件夹，最终结构应为：
 
    ```text
    <Vault>/.obsidian/plugins/obsidian-better-canvas/
@@ -100,11 +112,11 @@ AI 功能受服务 API、模型、账号权限和内容可访问性影响。网�
    └── styles.css
    ```
 
-3. 打开 Obsidian 的 **设置 → 社区插件**，重新加载插件列表并启用 **Better Canvas**。
+3. 在 **设置 → 社区插件** 中重新加载插件列表并启用 **Better Canvas**。
 
-Releases 会提供 ZIP 安装包和 `main.js`、`manifest.json`、`styles.css` 三个独立文件。若要手动安装独立文件，请先创建 `<Vault>/.obsidian/plugins/obsidian-better-canvas/`，再将三个文件都放入该目录。
+Releases 也会提供 `main.js`、`manifest.json`、`styles.css` 三个独立文件。
 
-**尚未发布正式版本时：** 可以在 GitHub 的 **Actions → Build** 中打开最近一次成功的构建，下载 `obsidian-better-canvas-install` 工件。解压工件后，再解压其中的 `obsidian-better-canvas.zip` 到 `<Vault>/.obsidian/plugins/`。工件会保留 14 天；正式发布后建议改用 Releases 中的版本包。
+**尚未发布正式版本时：** 可以在 GitHub 的 **Actions → Build** 中打开最近一次成功的构建，下载 `obsidian-better-canvas-install` 工件。解压工件后，再解压其中的 `obsidian-better-canvas.zip` 到 `<Vault>/.obsidian/plugins/`。工件保留 14 天；正式发布后建议使用 Releases 中的版本包。
 
 ### 从源码构建
 
@@ -117,7 +129,7 @@ npm install
 npm run build
 ```
 
-构建完成后，将生成的 `main.js` 与项目中的 `manifest.json`、`styles.css` 一起复制到：
+构建完成后，生成的 `main.js` 与项目中的 `manifest.json`、`styles.css` 一起复制到：
 
 ```text
 <Vault>/.obsidian/plugins/obsidian-better-canvas/
