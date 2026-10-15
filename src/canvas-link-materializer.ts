@@ -36,7 +36,14 @@ export function dedupeMaterializableCanvasLinks(
   entries: MaterializableCanvasLink[],
   existingKeys: Iterable<string> = []
 ): MaterializableCanvasLink[] {
-  const seen = new Set(existingKeys);
+  const seen = new Set<string>();
+  for (const existingKey of existingKeys) {
+    // Existing HTTP keys may have been stored without URL's canonical trailing slash.
+    const normalizedKey = existingKey.startsWith("url:")
+      ? materializableLinkKey(existingKey.slice("url:".length), true)
+      : undefined;
+    seen.add(normalizedKey ?? existingKey);
+  }
   const output: MaterializableCanvasLink[] = [];
   for (const entry of entries) {
     const key = materializableLinkKey(entry.target, Boolean(entry.external));
