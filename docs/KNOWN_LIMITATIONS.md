@@ -4,14 +4,14 @@ Better Canvas 仍在持续整合和验证中。功能代码存在不代表它已
 
 ## 兼容性
 
-- **内部 API 与 DOM：** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由、节点样式和键盘快捷键部分依赖 Obsidian 内部接口或 DOM 行为。Obsidian 更新可能改变这些行为。
+- **内部 API 与 DOM：** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由、节点样式和键盘快捷键部分依赖 Obsidian 内部接口或 DOM 行为。插件附带的链接浏览器会扫描 Markdown 元数据和其他 Canvas JSON；它不代表已完全接入 Obsidian 全局搜索、关系图和所有元数据缓存行为。Obsidian 更新可能改变这些行为。
 - **复杂 Canvas：** 多父节点、循环关系、嵌套分组以及复杂跨分组/跨 Portal 连线可能无法获得理想布局或路由；建议先在测试 Vault 验证重要工作流。
 - **静态导出：** PNG/SVG 导出会把内容绘制成静态图像，不会执行交互 HTML。嵌入图片和 PDF 页面预览受到资源体积预算限制；复杂 Markdown 和 Obsidian 原生 DOM 并不能保证像素级一致。
 - **移动端及主题：** CI 不会启动 Obsidian 图形界面。触控、缩放、选区、菜单、主题 CSS 和特定 DOM 行为需在目标版本实测。
 
 ## Canvas Portal
 
-Portal 以单层镜像为主：引用的 `.canvas` 中的节点和连线会映射到 Portal 内，节点编辑与删除会同步回源文件；Portal 内创建的普通节点及同 Portal 内的连线会尝试写回源画布。新建分组框只有在整个矩形都处于 Portal 内容范围内时才会自动归属。
+Portal 以单层镜像为主：引用的 `.canvas` 中的节点和连线会映射到 Portal 内，节点编辑与删除会同步回源文件，跨 Portal 的连线会映射到 Portal 框。Portal 内创建的普通节点及同 Portal 内的连线会尝试写回源画布；也保留了显式命令“在选中 Canvas Portal 中创建文本节点”。新建分组框只有在整个矩形都处于 Portal 内容范围内时才会自动归属。
 
 嵌套 Portal、复杂跨 Portal 连线和并发源文件修改仍需完善。由于 Portal 会修改源 Canvas 文件，使用重要数据前请先备份，并在测试 Vault 验证。
 
