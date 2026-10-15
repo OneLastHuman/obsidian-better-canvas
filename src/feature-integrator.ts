@@ -1312,7 +1312,7 @@ export default class BetterCanvasFeatures {
     if (!selection) return;
     const state = toggleGroupCollapse(selection.canvas, selection.node.id);
     if (state === "not-group") new Notice("请选择分组节点。");
-    else if (state === "collapsed") new Notice("分组内没有可折叠节点。");
+    else if (state === "empty") new Notice("分组内没有可折叠节点。");
     else if (state === "missing") new Notice("找不到节点。");
     else new Notice(state === "expanded" ? "已展开分组。" : "已折叠分组。");
     this.decorate(selection.canvas);
