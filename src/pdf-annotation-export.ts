@@ -162,7 +162,7 @@ function escapeMarkdownText(value: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/([\\*_{}\[\]()#+.!|>~-])/g, "\\$1")
+    .replace(/([\\*_{}\[\]()#+!|>~-])/g, "\\$1")
     .replace(new RegExp(String.fromCharCode(96), "g"), "&#96;");
 }
 function quoteText(value: string): string {
