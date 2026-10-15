@@ -28,10 +28,10 @@ Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思�
 
 以下截图在真实 Obsidian 桌面版中运行本插件的生产构建后直接截取，不是示意图。示例内容来自合成测试 Vault，不含真实笔记、凭据或 API Key；AI 截图的回答来自本地 mock 服务，未调用真实模型。采集环境与复现步骤见 [截图说明](docs/screenshots/README.md)。实际界面会因 Obsidian 版本、主题及服务配置而异。
 
-**Canvas 增强：** 节点颜色、形状、边框与文字对齐，以及带标签和颜色的连线。
+**Canvas 增强：** 节点颜色、形状、边框与文字对齐，以及带标签和颜色的连线。节点 AI 操作（提问、生成图片、复习闪卡、选择模型和重新生成）位于节点右键菜单中，悬停时不会再覆盖节点编辑区。预览截图展示的是迁移前的界面。
 
 <p align="center">
-  <img src="docs/screenshots/canvas-enhancements.png" alt="Canvas 中带颜色、形状、边框的节点与带标签连线，悬停节点时显示 AI、Img、卡片、模型按钮" width="100%" />
+  <img src="docs/screenshots/canvas-enhancements.png" alt="迁移前的界面截图：Canvas 中带颜色、形状、边框的节点与带标签连线，悬停节点时显示 AI、Img、卡片、模型按钮" width="100%" />
 </p>
 
 <table>
