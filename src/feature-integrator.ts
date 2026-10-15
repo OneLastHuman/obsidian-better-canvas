@@ -14,7 +14,12 @@ import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
-import { createId, readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
+import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { connectedEdgeIds, selectedCanvasNodeIds } from "./edge-highlight";
+import { AdvancedCanvasEventBridge } from "./advanced-canvas-events";
+import { mergeCanvasExportData, viewportExportAppearance } from "./canvas-export-data";
+import { prepareViewportSvgExportClone, shouldIncludeViewportSvgNode } from "./canvas-viewport-export";
 import {
   colorIncidentEdges,
   decorateCanvas,
@@ -38,6 +43,8 @@ import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirection } from "./canvas-clone";
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
+import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
+import { isCanvasReadOnly, shouldSubmitPromptValue } from "./canvas-command-guards";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
 import {
@@ -124,7 +131,8 @@ class FeaturePromptModal extends Modal {
     private titleText: string,
     private placeholderText: string,
     private onSubmitValue: (value: string) => unknown,
-    private initialValue = ""
+    private initialValue = "",
+    private allowEmptySubmission = false
   ) {
     super(app);
   }
@@ -143,7 +151,7 @@ class FeaturePromptModal extends Modal {
     submit.onclick = () => {
       const value = input.value.trim();
       this.close();
-      if (value) void this.onSubmitValue(value);
+      if (shouldSubmitPromptValue(value, this.allowEmptySubmission)) void this.onSubmitValue(value);
     };
     input.addEventListener("keydown", event => {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -254,6 +262,7 @@ export default class BetterCanvasFeatures {
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
   private pdfAnnotations: PdfAnnotationManager | null = null;
   private portalManager: CanvasPortalManager | null = null;
+  private advancedCanvasEventBridge: AdvancedCanvasEventBridge | null = null;
   private p: any;
 
   constructor(plugin: any) {
@@ -274,6 +283,8 @@ export default class BetterCanvasFeatures {
       this.cleanup();
       closeAllLocalMcpSessions();
     });
+    this.advancedCanvasEventBridge = new AdvancedCanvasEventBridge(this.p.app, this.p);
+    this.advancedCanvasEventBridge.start();
     this.registerCommands();
     this.registerCanvasMenus();
     this.registerMarkdownNodeEmbeds();
@@ -374,6 +385,8 @@ export default class BetterCanvasFeatures {
   }
 
   private cleanup(): void {
+    this.advancedCanvasEventBridge?.stop();
+    this.advancedCanvasEventBridge = null;
     for (const active of this.activeGenerations.values()) active.controller.abort();
     this.activeGenerations.clear();
     this.paletteStyle?.remove();
@@ -514,10 +527,11 @@ export default class BetterCanvasFeatures {
     if (!node) return;
     canvas.selectOnly?.(node);
     canvas.zoomToSelection?.();
+    this.applySelectionEdgeHighlight(canvas);
   }
 
-  private input(title: string, placeholder: string, cb: (value: string) => unknown, initial = ""): void {
-    new FeaturePromptModal(this.p.app, title, placeholder, cb, initial).open();
+  private input(title: string, placeholder: string, cb: (value: string) => unknown, initial = "", allowEmptySubmission = false): void {
+    new FeaturePromptModal(this.p.app, title, placeholder, cb, initial, allowEmptySubmission).open();
   }
 
   private registerCommands(): void {
@@ -649,6 +663,7 @@ export default class BetterCanvasFeatures {
       this.decorate(view.canvas);
       this.applyZoomBreakpoints(view.canvas);
       this.applyFocus(view.canvas);
+      this.applySelectionEdgeHighlight(view.canvas);
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
     }
   }
@@ -663,8 +678,8 @@ export default class BetterCanvasFeatures {
       if (!(element instanceof HTMLElement)) continue;
       const host = (element.closest(".canvas-node") as HTMLElement | null) ?? element;
       if (typeof (item as any).bcNodeColor === "string") host.style.borderColor = String((item as any).bcNodeColor);
-      host.dataset.bcShape = typeof (item as any).bcShape === "string" ? String((item as any).bcShape) : "default";
-      host.dataset.bcBorder = typeof (item as any).bcBorderStyle === "string" ? String((item as any).bcBorderStyle) : "solid";
+      host.dataset.bcShape = resolveCanvasNodeShape(item as any);
+      host.dataset.bcBorder = resolveCanvasNodeBorder(item as any);
       const previousClass = host.dataset.bcCustomClass;
       if (previousClass) host.classList.remove("bc-user-" + previousClass);
       const nextClass = typeof (item as any).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item as any).bcCustomClass))
@@ -888,8 +903,10 @@ export default class BetterCanvasFeatures {
   }
 
   private applyZoomBreakpoints(canvas: any): void {
-    const zoom = Number(canvas?.zoom);
-    if (!Number.isFinite(zoom)) return;
+    // Obsidian Canvas exposes zoom in log2 units; plugin/CSS breakpoints use
+    // the human-facing linear scale (1 = 100%, 0.6 = 60%).
+    const scale = canvasScaleFromLogZoom(canvas?.zoom);
+    if (scale === undefined) return;
     for (const nodeData of readCanvasData(canvas).nodes) {
       const node = canvas?.nodes?.get?.(nodeData.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
@@ -902,7 +919,7 @@ export default class BetterCanvasFeatures {
         delete element.dataset.bcBreakpointHidden;
         continue;
       }
-      element.dataset.bcBreakpointHidden = String(zoom <= breakpoint);
+      element.dataset.bcBreakpointHidden = String(isBelowZoomBreakpoint(scale, breakpoint));
     }
   }
   private setNodeCustomClass(): void {
@@ -917,7 +934,7 @@ export default class BetterCanvasFeatures {
       patchNode(selection.canvas, selection.node.id, { bcCustomClass: token || undefined });
       this.decorate(selection.canvas);
       new Notice(token ? "已应用样式类 bc-user-" + token : "已清除节点自定义样式类。");
-    }, String((selection.node as any).bcCustomClass ?? ""));
+    }, String((selection.node as any).bcCustomClass ?? ""), true);
   }
   private setNodeTextAlign(): void {
     const selection = this.selected();
@@ -940,6 +957,7 @@ export default class BetterCanvasFeatures {
   private edgePathfinding(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (isCanvasReadOnly(canvas)) { new Notice("当前 Canvas 处于只读模式。"); return; }
     this.input("设置连线路径算法", "bezier / direct / square / a-star", value => {
       const method = value.trim().toLowerCase();
       const allowed = ["bezier", "direct", "square", "a-star"];
@@ -956,6 +974,7 @@ export default class BetterCanvasFeatures {
   private edgeArrowStyle(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    if (isCanvasReadOnly(canvas)) { new Notice("当前 Canvas 处于只读模式。"); return; }
     this.input("设置连线箭头样式", "default / triangle-outline / half-triangle / thin-triangle / diamond / diamond-outline / circle / circle-outline / blunt / none", value => {
       const allowed = ["default", "triangle-outline", "half-triangle", "thin-triangle", "diamond", "diamond-outline", "circle", "circle-outline", "blunt", "none"];
       const style = value.trim().toLowerCase();
@@ -995,6 +1014,7 @@ export default class BetterCanvasFeatures {
         if (!canvas) return;
         this.decorate(canvas);
         this.applyZoomBreakpoints(canvas);
+        this.applySelectionEdgeHighlight(canvas);
       });
     };
     container.addEventListener("pointerup", schedule, true);
@@ -1097,6 +1117,7 @@ export default class BetterCanvasFeatures {
 
   private edgeStyle(canvas = this.canvas()): void {
     if (!canvas) return;
+    if (isCanvasReadOnly(canvas)) { new Notice("当前 Canvas 处于只读模式。"); return; }
     this.input("设置选中连线样式", "颜色,solid|dashed|dotted，例如 #5c6bc0,dashed", value => {
       const parts = value.split(",");
       const color = (parts[0] ?? "").trim();
@@ -1267,6 +1288,25 @@ export default class BetterCanvasFeatures {
     }
   }
 
+  /**
+   * Highlight every edge incident to the current node selection.
+   * This is visual-only: Canvas JSON and the current selection remain untouched.
+   */
+  private applySelectionEdgeHighlight(canvas: any): void {
+    if (!canvas) return;
+    const data = readCanvasData(canvas);
+    const nodeIds = new Set(data.nodes.map(node => node.id));
+    const selected = selectedCanvasNodeIds(canvas, nodeIds);
+    const highlighted = connectedEdgeIds(data.edges, selected);
+    for (const edgeData of data.edges) {
+      const edge = canvas.edges?.get?.(edgeData.id);
+      const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
+      if (path instanceof SVGElement) {
+        path.classList.toggle("bc-selection-related", highlighted.has(edgeData.id));
+      }
+    }
+  }
+
   private createStandaloneGroup(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice("请先打开 Canvas。"); return; }
@@ -1312,7 +1352,7 @@ export default class BetterCanvasFeatures {
     if (!selection) return;
     const state = toggleGroupCollapse(selection.canvas, selection.node.id);
     if (state === "not-group") new Notice("请选择分组节点。");
-    else if (state === "collapsed") new Notice("分组内没有可折叠节点。");
+    else if (state === "empty") new Notice("分组内没有可折叠节点。");
     else if (state === "missing") new Notice("找不到节点。");
     else new Notice(state === "expanded" ? "已展开分组。" : "已折叠分组。");
     this.decorate(selection.canvas);
@@ -1802,7 +1842,22 @@ export default class BetterCanvasFeatures {
     await this.ensureFolder(folder);
     if (format === "canvas") {
       const filePath = await this.uniquePath(folder + "/" + baseName + "-export", "canvas");
-      await this.p.app.vault.create(filePath, JSON.stringify(readCanvasData(canvas), null, 2));
+      const liveData = readCanvasData(canvas);
+      let exportData = liveData;
+      const sourceFile = view?.file;
+      if (sourceFile instanceof TFile && sourceFile.extension === "canvas") {
+        try {
+          const source = JSON.parse(await this.p.app.vault.read(sourceFile)) as CanvasData;
+          if (!Array.isArray(source?.nodes) || !Array.isArray(source?.edges)) {
+            throw new Error("原 Canvas 文件缺少 nodes 或 edges。");
+          }
+          exportData = mergeCanvasExportData(liveData, source);
+        } catch (error) {
+          new Notice("无法读取原 Canvas 的完整字段；导出将仅包含当前画布数据。", 8000);
+          console.warn("Better Canvas could not preserve all source JSON fields during export:", error);
+        }
+      }
+      await this.p.app.vault.create(filePath, JSON.stringify(exportData, null, 2));
       new Notice("已导出 " + filePath);
       return;
     }
@@ -1825,11 +1880,12 @@ export default class BetterCanvasFeatures {
       const exportOptions: any = {
         cacheBust: true,
         pixelRatio,
-        ...(backgroundColor ? { backgroundColor } : {})
+        ...viewportExportAppearance(backgroundColor)
       };
+      const svgContainer = format === "svg" ? prepareViewportSvgExportClone(container) : container;
       const dataUrl = format === "png"
         ? await toPng(container, exportOptions)
-        : await toSvg(container, exportOptions);
+        : await toSvg(svgContainer, { ...exportOptions, filter: shouldIncludeViewportSvgNode });
       const filePath = await this.uniquePath(folder + "/" + baseName + "-export", format);
       const comma = dataUrl.indexOf(",");
       if (comma < 0) throw new Error("导出图像的数据 URL 格式无效。");
@@ -3009,6 +3065,7 @@ export default class BetterCanvasFeatures {
       new Notice("AI 回复已添加为关联节点。");
     } catch (error) {
       const stopped = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      let cleanupFailed = false;
       if (responseNodeId) {
         if (stopped) {
           patchNode(canvas, responseNodeId, {
@@ -3025,16 +3082,24 @@ export default class BetterCanvasFeatures {
             bcGenerationError: error instanceof Error ? error.message : String(error)
           });
         } else {
-          const latest = readCanvasData(canvas);
-          canvas.importData({
-            ...latest,
-            nodes: latest.nodes.filter((node: CanvasNodeData) => node.id !== responseNodeId),
-            edges: latest.edges.filter((edge: any) => edge.fromNode !== responseNodeId && edge.toNode !== responseNodeId)
-          });
+          cleanupFailed = !removeCanvasNode(canvas, responseNodeId);
+          if (cleanupFailed) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn("Better Canvas could not remove a failed AI placeholder; using visible error state.", responseNodeId);
+            // A last-resort visible error state is preferable to an empty node
+            // that remains marked as permanently generating.
+            patchNode(canvas, responseNodeId, {
+              text: "AI 生成失败，且无法自动移除该占位节点。",
+              bcGenerating: false,
+              bcGenerated: false,
+              bcGenerationError: message
+            });
+          }
         }
       }
       notice.hide();
       if (stopped) new Notice("AI 生成已停止；已保留已生成的部分内容。");
+      else if (cleanupFailed) new Notice("AI 生成失败，无法自动移除占位节点；已停止加载状态。", 8000);
       else new Notice(error instanceof Error ? error.message : String(error), 8000);
     } finally {
       if (this.activeGenerations.get(canvas)?.controller === controller) this.activeGenerations.delete(canvas);

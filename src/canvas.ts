@@ -1,3 +1,4 @@
+import { computeMindMapLayout } from "./mindmap-layout";
 export type LayoutDirection = "LR" | "RL" | "TB" | "BT";
 
 export interface CanvasNodeData {
@@ -45,6 +46,63 @@ export function readCanvasData(canvas: any): CanvasData {
     nodes: Array.isArray(raw.nodes) ? raw.nodes : [],
     edges: Array.isArray(raw.edges) ? raw.edges : []
   } as CanvasData;
+}
+
+/**
+ * Remove a live Canvas node and its incident edges. Canvas.importData() in some
+ * Obsidian versions only adds/updates items, so verify every removal and fall
+ * back to setData when the node-level API is unavailable or ineffective.
+ */
+export function removeCanvasNode(canvas: any, nodeId: string): boolean {
+  const containsNode = () => readCanvasData(canvas).nodes.some(node => node.id === nodeId);
+  const containsIncidentEdges = () => readCanvasData(canvas).edges.some(edge =>
+    edge.fromNode === nodeId || edge.toNode === nodeId
+  );
+  const isRemoved = () => !containsNode() && !containsIncidentEdges();
+  if (isRemoved()) return true;
+
+  const saveAndRefresh = () => {
+    canvas.requestSave?.();
+    canvas.requestFrame?.();
+    return true;
+  };
+
+  const liveNode = canvas?.nodes?.get?.(nodeId);
+  if (liveNode && typeof canvas.removeNode === "function") {
+    try {
+      canvas.removeNode(liveNode);
+      if (isRemoved()) return saveAndRefresh();
+    } catch {
+      // Try the data-level APIs below if the internal node API is unavailable.
+    }
+  }
+
+  const current = readCanvasData(canvas);
+  const next: CanvasData = {
+    ...current,
+    nodes: current.nodes.filter(node => node.id !== nodeId),
+    edges: current.edges.filter(edge => edge.fromNode !== nodeId && edge.toNode !== nodeId)
+  };
+
+  if (typeof canvas?.setData === "function") {
+    try {
+      canvas.setData(next);
+      if (isRemoved()) return saveAndRefresh();
+    } catch {
+      // Fall back to importData, then verify rather than assuming it deleted.
+    }
+  }
+
+  if (typeof canvas?.importData === "function") {
+    try {
+      canvas.importData(next);
+      if (isRemoved()) return saveAndRefresh();
+    } catch {
+      // Do not report success unless the live Canvas confirms removal.
+    }
+  }
+
+  return false;
 }
 
 export function selectedNodeIds(canvas: any): string[] {
@@ -132,83 +190,7 @@ export function layoutTree(
   gapY = 44
 ): number {
   const data = readCanvasData(canvas);
-  const nodeMap = new Map<string, CanvasNodeData>(data.nodes.map(node => [node.id, node] as [string, CanvasNodeData]));
-  const root = nodeMap.get(rootId);
-  if (!root) return 0;
-
-  const children = new Map<string, string[]>();
-  for (const edge of data.edges) {
-    if (!nodeMap.has(edge.fromNode) || !nodeMap.has(edge.toNode)) continue;
-    const list = children.get(edge.fromNode) ?? [];
-    list.push(edge.toNode);
-    children.set(edge.fromNode, list);
-  }
-
-  const horizontal = direction === "LR" || direction === "RL";
-  const crossSize = (node: CanvasNodeData) => horizontal ? node.height : node.width;
-  const maxWidth = Math.max(280, ...data.nodes.map(node => node.width));
-  const maxHeight = Math.max(140, ...data.nodes.map(node => node.height));
-  const stepX = maxWidth + gapX;
-  const stepY = maxHeight + gapY;
-  const positions = new Map<string, { x: number; y: number }>();
-
-  const subtreeExtent = (id: string, ancestry: Set<string>): number => {
-    const node = nodeMap.get(id);
-    if (!node) return 0;
-    if (ancestry.has(id)) return crossSize(node);
-    const nextAncestry = new Set(ancestry);
-    nextAncestry.add(id);
-    const childIds = (children.get(id) ?? []).filter(childId => !nextAncestry.has(childId));
-    if (childIds.length === 0) return crossSize(node);
-    const childrenExtent = childIds.reduce(
-      (sum, childId) => sum + subtreeExtent(childId, nextAncestry),
-      0
-    );
-    const crossGap = horizontal ? gapY : gapX;
-    return Math.max(crossSize(node), childrenExtent + crossGap * (childIds.length - 1));
-  };
-
-  const rootCenter = horizontal
-    ? root.y + root.height / 2
-    : root.x + root.width / 2;
-  const place = (id: string, depth: number, center: number, ancestry: Set<string>): void => {
-    const node = nodeMap.get(id);
-    if (!node || ancestry.has(id) || positions.has(id)) return;
-
-    const nextAncestry = new Set(ancestry);
-    nextAncestry.add(id);
-    let x = node.x;
-    let y = node.y;
-
-    if (horizontal) {
-      x = direction === "LR" ? root.x + depth * stepX : root.x - depth * stepX;
-      y = center - node.height / 2;
-    } else {
-      x = center - node.width / 2;
-      y = direction === "TB" ? root.y + depth * stepY : root.y - depth * stepY;
-    }
-    positions.set(id, { x, y });
-
-    const childIds = (children.get(id) ?? []).filter(childId =>
-      !nextAncestry.has(childId) && nodeMap.has(childId)
-    );
-    if (childIds.length === 0) return;
-
-    const crossGap = horizontal ? gapY : gapX;
-    const totalExtent = childIds.reduce(
-      (sum, childId) => sum + subtreeExtent(childId, nextAncestry),
-      0
-    ) + crossGap * (childIds.length - 1);
-    let cursor = center - totalExtent / 2;
-
-    for (const childId of childIds) {
-      const childExtent = subtreeExtent(childId, nextAncestry);
-      place(childId, depth + 1, cursor + childExtent / 2, nextAncestry);
-      cursor += childExtent + crossGap;
-    }
-  };
-
-  place(rootId, 0, rootCenter, new Set());
+  const positions = computeMindMapLayout(data.nodes, data.edges, rootId, direction, gapX, gapY);
   if (positions.size === 0) return 0;
 
   const nodes = data.nodes.map(node => {

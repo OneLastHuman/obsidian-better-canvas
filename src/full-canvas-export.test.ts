@@ -246,4 +246,73 @@ describe("full content SVG export", () => {
       edges: []
     })).toThrow(/过大/);
   });
+
+  it("renders common Markdown emphasis, code, links, headings and task markers as rich SVG text", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "rich", type: "text", x: 0, y: 0, width: 480, height: 260,
+        text: "# Heading\n**bold** _italic_ ~~strike~~ \x60code\x60 [link](https://example.com/private)\n- [x] done\n[[folder/Note.md|Wiki label]]"
+      }],
+      edges: []
+    });
+    expect(result.svg).toContain("Heading");
+    expect(result.svg).toContain('font-size="24" font-weight="bold"');
+    expect(result.svg).toContain('<tspan font-weight="bold">bold</tspan>');
+    expect(result.svg).toContain('<tspan font-style="italic">');
+    expect(result.svg).toContain("italic</tspan>");
+    expect(result.svg).toContain('text-decoration="line-through"');
+    expect(result.svg).toContain('font-family="ui-monospace,SFMono-Regular,Consolas,monospace"');
+    expect(result.svg).toContain('fill="#3467a9"');
+    expect(result.svg).toContain("☑ done");
+    expect(result.svg).toContain("Wiki label");
+    expect(result.svg).not.toContain("https://example.com/private");
+  });
+
+  it("escapes HTML-looking node text in static exports instead of interpreting it", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "html", type: "text", x: 0, y: 0, width: 500, height: 100,
+        text: "<script>alert('x')</script>"
+      }],
+      edges: []
+    });
+    expect(result.svg).toContain("&lt;script&gt;alert(&apos;x&apos;)&lt;/script&gt;");
+    expect(result.svg).not.toContain("<script>");
+  });
+
+
+
+  it("renders Markdown tables as aligned SVG grid cells with rich inline styles", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "table", type: "text", x: 0, y: 0, width: 480, height: 260,
+        text: "| **Name** | Description | Score |\n|:---|:---:|---:|\n| Alpha | [documentation](https://example.com/private) | 10 |\n| Beta | _plain text_ | 4 |"
+      }],
+      edges: []
+    });
+    const cellRects = result.svg.match(/<rect x="[^"]+" y="[^"]+" width="[^"]+" height="[^"]+" fill="(?:#7b8794|none)"[^>]*stroke="#9aa3ad"/g) ?? [];
+    expect(cellRects).toHaveLength(9);
+    expect(result.svg).toContain('text-anchor="middle"');
+    expect(result.svg).toContain('text-anchor="end"');
+    expect(result.svg).toContain('<tspan font-weight="bold">Name</tspan>');
+    expect(result.svg).toContain('<tspan fill="#3467a9" text-decoration="underline">documentation</tspan>');
+    expect(result.svg).toContain('<tspan font-style="italic">plain text</tspan>');
+    expect(result.svg).not.toContain("https://example.com/private");
+    expect(result.svg).toContain('clip-path="url(#bc-clip-0)"');
+  });
+
+  it("clips large table layouts to their node bounds while preserving regular lines around the table", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "mixed", type: "text", x: 0, y: 0, width: 220, height: 440,
+        text: "Before table\n\n| Key | Details |\n|---|---|\n| A | several words should wrap inside a narrow cell |\n| B | another long description here |\n\nAfter table"
+      }],
+      edges: []
+    });
+    expect(result.svg).toContain("Before table");
+    expect(result.svg).toContain("After table");
+    expect(result.svg).toContain('clip-path="url(#bc-clip-0-table-2-0)"');
+    expect(result.svg).toContain('width="220" height="440"');
+  });
+
 });
