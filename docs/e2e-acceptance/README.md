@@ -11,10 +11,10 @@
 
 ## 溯源
 
-`manifest.json` 记录了本批截图对应的被测 commit 与插件构建哈希：
+`manifest.json` 记录截图对应的被测 commit、插件构建哈希和 Obsidian 版本。旧批次使用 manifest 顶层字段；Issue 专属证据可在每张截图记录中覆盖 `testedCommit`、`mainJsSha256` 和 `obsidian`，以避免不同构建的截图共用错误的溯源信息。
 
 - `testedCommit` — 被测仓库 commit
-- `mainJsSha256` — 该 commit 下 `main.js` 的 SHA-256
+- `mainJsSha256` — 被测 `main.js` 的 SHA-256
 - `obsidian` — 被测 Obsidian 版本
 
 测试脚本从一个**冻结的插件快照**安装插件（而不是直接取工作区），因此测试期间上游推送不会改变被测对象；每次会话在测试 Vault 的 `.bc-build-info.json` 中也记录同样的溯源信息。
@@ -44,6 +44,7 @@
 | `89` | Vault 根目录封装选区生成 `//name.canvas` |
 | `90` | 本机 stdio MCP 传输无法启动子进程 |
 | `91` | 文件节点没有 HTML 预览 |
+| `103` | 设置搜索无法匹配分类标题和独立操作按钮 |
 | `104` | 数值设置超出范围时静默拒绝保存 |
 | `105` | 删除 AI 服务商前需要确认，并提示当前服务的切换目标 |
 
