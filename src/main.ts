@@ -55,6 +55,9 @@ interface BetterCanvasSettings {
   mindMapShortcutDirectionalCreationEnabled: boolean;
   systemPromptProfiles: NamedPromptProfile[];
   activeSystemPromptProfile: string;
+  flashcardOutputMode: "canvas" | "spaced-repetition";
+  spacedRepetitionFolder: string;
+  spacedRepetitionDeck: string;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -75,7 +78,10 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   mindMapShortcutAltArrowNavigationEnabled: true,
   mindMapShortcutDirectionalCreationEnabled: true,
   systemPromptProfiles: [],
-  activeSystemPromptProfile: ""
+  activeSystemPromptProfile: "",
+  flashcardOutputMode: "canvas",
+  spacedRepetitionFolder: "Better Canvas/Flashcards",
+  spacedRepetitionDeck: "better-canvas"
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
