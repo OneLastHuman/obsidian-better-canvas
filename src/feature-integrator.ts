@@ -73,6 +73,7 @@ import { discoverModels } from "./model-discovery";
 import { syncHtmlPreviews } from "./html-preview";
 import { runLocalCodex } from "./codex-cli";
 import BetterCanvasSettingsTab from "./settings";
+import { normalizeCommandDisplayName } from "./command-names";
 
 interface ProviderProfile {
   id: string;
@@ -539,7 +540,7 @@ export default class BetterCanvasFeatures {
 
   private registerCommands(): void {
     const add = (id: string, name: string, callback: () => void) =>
-      this.p.addCommand({ id, name: "Better Canvas: " + name, callback });
+      this.p.addCommand({ id, name: normalizeCommandDisplayName(name), callback });
 
     add("bc-set-node-color", "设置节点颜色", () => this.setNodeColor());
     add("bc-set-node-shape", "设置节点形状", () => this.setNodeShape());
@@ -597,7 +598,6 @@ export default class BetterCanvasFeatures {
     add("bc-generate-title", "生成节点标题或分组名称", () => void this.generateTitleOrGroupName());
     add("bc-expand-idea-mindmap", "用 AI 将想法扩展为思维导图", () => this.expandIdeaIntoMindMap());
     add("bc-generate-flashcard-nodes", "生成独立复习闪卡节点", () => this.generateFlashcardNodes());
-    add("bc-generate-image", "根据所选节点生成图片", () => void this.generateImageForNode());
     add("bc-regenerate", "重新生成所选 AI 节点", () => void this.regenerate());
     add("bc-stop-ai", "停止当前 AI 生成", () => this.stopAI());
     add("bc-mcp-tool", "调用远程 MCP 工具", () => void this.runMcpTool());

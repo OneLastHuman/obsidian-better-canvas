@@ -371,22 +371,22 @@ export default class BetterCanvasPlugin extends Plugin {
   }
 
   private registerCommands(): void {
-    this.addCommand({ id: "create-child-node", name: "Better Canvas: 创建子节点", callback: () => this.createChildNode() });
-    this.addCommand({ id: "create-sibling-node", name: "Better Canvas: 创建同级节点", callback: () => this.createSiblingNode() });
-    this.addCommand({ id: "create-floating-node", name: "Better Canvas: 创建游离节点", callback: () => this.createFloatingNode() });
-    this.addCommand({ id: "auto-layout-tree", name: "Better Canvas: 自动整理思维导图", callback: () => this.autoLayout() });
-    this.addCommand({ id: "split-heading-into-mindmap", name: "Better Canvas: 将所选 Markdown 文件的 H1 拆为思维导图", callback: () => void this.splitHeadingsIntoMindMap() });
-    this.addCommand({ id: "ask-ai", name: "Better Canvas: 向 AI 提问所选节点", callback: () => this.features.askSelectedNode() });
-    this.addCommand({ id: "ai-usage-report", name: "Better Canvas: 查看 AI 用量与成本", callback: () => this.showAIUsageReport() });
-    this.addCommand({ id: "generate-flashcards", name: "Better Canvas: 从所选节点生成复习闪卡", callback: () => this.features.generateFlashcardsFromSelection() });
-    this.addCommand({ id: "generate-image", name: "Better Canvas: 根据所选节点生成图片", callback: () => this.features.generateImageFromSelection() });
-    this.addCommand({ id: "add-web-link", name: "Better Canvas: 在画布中添加网页链接卡片", callback: () => this.addWebLink() });
-    this.addCommand({ id: "save-node-template", name: "Better Canvas: 保存所选节点为模板", callback: () => this.saveNodeTemplate() });
-    this.addCommand({ id: "insert-node-template", name: "Better Canvas: 插入节点模板", callback: () => this.insertNodeTemplate() });
-    this.addCommand({ id: "apply-css-style-preset", name: "Better Canvas: 应用 CSS 自定义样式预设", callback: () => { void this.applyCustomStylePreset(); } });
-    this.addCommand({ id: "search-canvas", name: "Better Canvas: 搜索当前画布", callback: () => this.searchCanvas() });
-    this.addCommand({ id: "start-presentation", name: "Better Canvas: 开始画布演示", callback: () => this.startPresentation() });
-    this.addCommand({ id: "select-node-tree", name: "Better Canvas: 选择所选节点及其子树", callback: () => this.selectNodeTree() });
+    this.addCommand({ id: "create-child-node", name: "创建子节点", callback: () => this.createChildNode() });
+    this.addCommand({ id: "create-sibling-node", name: "创建同级节点", callback: () => this.createSiblingNode() });
+    this.addCommand({ id: "create-floating-node", name: "创建游离节点", callback: () => this.createFloatingNode() });
+    this.addCommand({ id: "auto-layout-tree", name: "自动整理思维导图", callback: () => this.autoLayout() });
+    this.addCommand({ id: "split-heading-into-mindmap", name: "将所选 Markdown 文件的 H1 拆为思维导图", callback: () => void this.splitHeadingsIntoMindMap() });
+    this.addCommand({ id: "ask-ai", name: "向 AI 提问所选节点", callback: () => this.features.askSelectedNode() });
+    this.addCommand({ id: "ai-usage-report", name: "查看 AI 用量与成本", callback: () => this.showAIUsageReport() });
+    this.addCommand({ id: "generate-flashcards", name: "从所选节点生成复习闪卡", callback: () => this.features.generateFlashcardsFromSelection() });
+    this.addCommand({ id: "generate-image", name: "根据所选节点生成图片", callback: () => this.features.generateImageFromSelection() });
+    this.addCommand({ id: "add-web-link", name: "在画布中添加网页链接卡片", callback: () => this.addWebLink() });
+    this.addCommand({ id: "save-node-template", name: "保存所选节点为模板", callback: () => this.saveNodeTemplate() });
+    this.addCommand({ id: "insert-node-template", name: "插入节点模板", callback: () => this.insertNodeTemplate() });
+    this.addCommand({ id: "apply-css-style-preset", name: "应用 CSS 自定义样式预设", callback: () => { void this.applyCustomStylePreset(); } });
+    this.addCommand({ id: "search-canvas", name: "搜索当前画布", callback: () => this.searchCanvas() });
+    this.addCommand({ id: "start-presentation", name: "开始画布演示", callback: () => this.startPresentation() });
+    this.addCommand({ id: "select-node-tree", name: "选择所选节点及其子树", callback: () => this.selectNodeTree() });
   }
 
   private registerCanvasContextMenu(): void {
