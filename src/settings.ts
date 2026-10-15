@@ -1,5 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedPromptProfile } from "./prompt-profiles";
+import { modelCapabilityReportKey, type ModelCapabilityReport } from "./model-capabilities";
 
 type SettingSection = {
   id: string;
@@ -370,6 +371,52 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           profile.imageModel = value.trim();
           await this.saveProvider(profile, settings);
         }));
+
+      const effectiveModel = profile.id === "default"
+        ? String(settings.model || profile.model || "")
+        : String(profile.model || "");
+      const effectiveProtocol = profile.protocol === "anthropic" || profile.protocol === "gemini" ? profile.protocol : "openai";
+      const reportKey = modelCapabilityReportKey(String(profile.id), effectiveProtocol, effectiveModel);
+      const report = settings.modelCapabilityReports && typeof settings.modelCapabilityReports === "object"
+        ? settings.modelCapabilityReports[reportKey] as ModelCapabilityReport | undefined
+        : undefined;
+      const statusLabel = (status: string): string => status === "accepted" ? "已接受" : status === "failed" ? "失败" : "未执行";
+      const reportSummary = card.createEl("p", { cls: "bc-settings-capability-summary" });
+      const renderReportSummary = (): void => {
+        if (!report) {
+          reportSummary.setText("当前模型尚未探测。图片输入结果只是请求接受情况，不保证模型真正读取图像；其他多模态能力保持未知。");
+          return;
+        }
+        reportSummary.setText(
+          "最近探测：" + new Date(report.testedAt).toLocaleString() +
+          " · 文本 " + statusLabel(report.text.status) +
+          " · 图片输入 " + statusLabel(report.imageInput.status) +
+          ((report.text.detail || report.imageInput.detail) ? " · " + [report.text.detail, report.imageInput.detail].filter(Boolean).join("；") : "")
+        );
+      };
+      renderReportSummary();
+      new Setting(card).setName("模型能力探测")
+        .setDesc("手动发送一次文本请求和（若文本成功）一次微型图片输入请求；可能产生供应商费用。不会自动探测图片生成、PDF、视频、URL context 或搜索能力。")
+        .addButton(button => button
+          .setButtonText("探测文本 / 图片输入")
+          .onClick(async () => {
+            if (!effectiveModel.trim()) {
+              new Notice("请先为此服务商配置文本模型。");
+              return;
+            }
+            if (!window.confirm("将使用“" + String(profile.name || profile.id) + " / " + effectiveModel + "”发送最多两次 API 请求。这可能产生费用。继续？")) return;
+            button.setDisabled(true);
+            button.setButtonText("正在探测…");
+            try {
+              const result = await this.features.probeProviderCapabilities(String(profile.id));
+              new Notice("能力探测完成：文本 " + statusLabel(result.text.status) + "；图片输入 " + statusLabel(result.imageInput.status));
+              this.display();
+            } catch (error) {
+              button.setDisabled(false);
+              button.setButtonText("重新探测");
+              new Notice(error instanceof Error ? error.message : String(error), 8000);
+            }
+          }));
     };
 
     (settings.providerProfiles as any[]).forEach(renderProfile);
