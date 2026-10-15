@@ -36,6 +36,7 @@ describe("SVG intrinsic export scaling", () => {
 describe("bounded media embedding for Canvas exports", () => {
   it("estimates bytes in Base64 and percent-encoded data URLs", () => {
     expect(estimateDataUrlByteLength("data:image/png;base64,AAAA")).toBe(3);
+    expect(estimateDataUrlByteLength("data:image/png;base64,AA AA")).toBe(3);
     expect(estimateDataUrlByteLength("data:image/png;base64,AA==")).toBe(1);
     expect(estimateDataUrlByteLength("data:text/plain,Hello%20world")).toBe(11);
   });
