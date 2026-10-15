@@ -155,5 +155,75 @@
         "caption": "同一份含 html 围栏的笔记：文本节点有预览（左侧），文件节点完全没有（右侧）"
       }
     ]
+  },
+  "regressionRound4": {
+    "generatedAt": "2026-10-15T10:14:50.175Z",
+    "testedCommit": "1c31be8be81a00195b428ad8520c41b09eb83852",
+    "shortCommit": "1c31be8",
+    "mainJsSha256": "06efbd0b58aebed27cea05fdf346a390c58bb1af3649e721f8394ff28a8d0e94",
+    "obsidian": "1.14.4",
+    "note": "第 4 轮回归复验：在 1c31be8 上用各 Issue 的原始复现步骤重跑（Playwright/CDP 驱动真实 Obsidian 桌面进程）。",
+    "issues": {
+      "25": [
+        {
+          "file": "round4-two-answer-nodes.canvas.json",
+          "caption": "复验（1c31be8）：重新生成后磁盘画布中同一源节点(srcA)对应两个生成节点（坐标完全重叠），说明「重新生成」仍是新增而非替换"
+        },
+        {
+          "file": "round4-regenerate-screen.png",
+          "caption": "重新生成后的画布界面：两个答案节点完全重叠，界面看似只有一个"
+        }
+      ],
+      "28": [
+        {
+          "file": "round4-mcp-raw-parser-notice.png",
+          "caption": "MCP 传输路径在 HTTP 200 + 非 JSON 响应体时仍显示 JS 解析器原文（含响应体片段）"
+        }
+      ],
+      "53": [
+        {
+          "file": "round4-portal-closed.png",
+          "caption": "复验（1c31be8）：修正流程（两次 toggle + 内部选区）关闭 Portal 后，镜像节点与连线已从内存/数据/磁盘清除，portal 标志翻回 false"
+        }
+      ],
+      "84": [
+        {
+          "file": "round4-doubled-prefix.png",
+          "caption": "复验（1c31be8）：命令面板仍有 10 条命令显示双层前缀（示例：Better Canvas: Better Canvas: PDF 红笔批注）"
+        },
+        {
+          "file": "round4-normalized-control.png",
+          "caption": "对照：同一面板中其余 86 条命令已是单层前缀"
+        }
+      ],
+      "86": [
+        {
+          "file": "round4-pinned-pdf-rendered.png",
+          "caption": "复验（1c31be8）：分页卡片正常渲染页面内容（同一 canvas 仅渲染 1 次，无 pdf.js 报错，data-error 为空）"
+        },
+        {
+          "file": "round4-control-9927c9a-double-render.png",
+          "caption": "对照（修复前 9927c9a）：同一 canvas 被二次渲染，控制台报 Cannot use the same canvas during multiple render() operations，容器 data-error=true（红框）"
+        }
+      ],
+      "90": [
+        {
+          "file": "round4-stdio-mcp-echo-node.png",
+          "caption": "复验（1c31be8）：本机 stdio MCP 全链路可用，echo 工具创建的节点与源节点连线正确"
+        }
+      ],
+      "91": [
+        {
+          "file": "round4-file-node-no-preview.png",
+          "caption": "复验（1c31be8）：同一份含 html 围栏的笔记，文本节点（右）有 HTML 预览按钮与 iframe，文件节点（左）完全没有"
+        }
+      ],
+      "100": [
+        {
+          "file": "round4-invalid-json-modal.png",
+          "caption": "「MCP 参数」提示框提交无效 JSON（`{`）后弹窗已关闭，仅剩解析器原文 Notice"
+        }
+      ]
+    }
   }
 }
