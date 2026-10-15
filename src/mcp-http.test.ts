@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { requestUrl } from "obsidian";
 import {
   getRemotePrompt,
   listRemotePrompts,
@@ -7,9 +6,10 @@ import {
   readRemoteResource
 } from "./mcp";
 
-vi.mock("obsidian", () => ({ requestUrl: vi.fn() }));
+const { requestUrlMock } = vi.hoisted(() => ({ requestUrlMock: vi.fn() }));
+vi.mock("obsidian", () => ({ requestUrl: requestUrlMock }));
 
-const mockedRequestUrl = vi.mocked(requestUrl);
+const mockedRequestUrl = requestUrlMock;
 
 function response(result: unknown, status = 200): any {
   const envelope = { jsonrpc: "2.0", id: "fixture", result };
