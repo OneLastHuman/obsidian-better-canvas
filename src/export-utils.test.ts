@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scaleSvgIntrinsicDimensions } from "./export-utils";
+import { canEmbedExportMedia, estimateDataUrlByteLength, scaleSvgIntrinsicDimensions } from "./export-utils";
 
 describe("SVG intrinsic export scaling", () => {
   it("scales numeric dimensions without changing the viewBox", () => {
@@ -29,5 +29,29 @@ describe("SVG intrinsic export scaling", () => {
     expect(() => scaleSvgIntrinsicDimensions("<html/>", 2)).toThrow(/SVG root/);
     expect(() => scaleSvgIntrinsicDimensions("<svg/>", 0.5)).toThrow(/between 1x and 4x/);
     expect(() => scaleSvgIntrinsicDimensions("<svg/>", 5)).toThrow(/between 1x and 4x/);
+  });
+});
+
+
+describe("bounded media embedding for Canvas exports", () => {
+  it("estimates bytes in Base64 and percent-encoded data URLs", () => {
+    expect(estimateDataUrlByteLength("data:image/png;base64,AAAA")).toBe(3);
+    expect(estimateDataUrlByteLength("data:image/png;base64,AA==")).toBe(1);
+    expect(estimateDataUrlByteLength("data:text/plain,Hello%20world")).toBe(11);
+  });
+
+  it("returns zero for malformed data URLs", () => {
+    expect(estimateDataUrlByteLength("no-comma")).toBe(0);
+    expect(estimateDataUrlByteLength("data:image/png;base64,BAD!")).toBe(0);
+    expect(estimateDataUrlByteLength("data:text/plain,%E0%A4%A")).toBe(0);
+  });
+
+  it("enforces per-item, cumulative and item-count budgets", () => {
+    const limits = { perItemLimit: 4, totalLimit: 7, maxItems: 2 };
+    expect(canEmbedExportMedia(4, 0, 0, limits)).toBe(true);
+    expect(canEmbedExportMedia(5, 0, 0, limits)).toBe(false);
+    expect(canEmbedExportMedia(4, 4, 1, limits)).toBe(false);
+    expect(canEmbedExportMedia(1, 0, 2, limits)).toBe(false);
+    expect(canEmbedExportMedia(0, 0, 0, limits)).toBe(false);
   });
 });

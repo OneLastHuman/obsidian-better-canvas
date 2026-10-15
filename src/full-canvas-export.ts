@@ -297,7 +297,7 @@ function renderNode(node: CanvasNodeData, index: number): string {
 /**
  * Serialize Canvas JSON into an SVG sized to the union of all nodes. This is
  * a static export and intentionally does not depend on the current viewport.
- * Media-file contents and live HTML embeds are represented by their labels.
+ * Media files are represented by labels unless the caller attaches a bounded raster preview data URL; live HTML is never evaluated.
  */
 export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOptions = {}): FullCanvasSvg {
   const nodes = Array.isArray(data.nodes) ? data.nodes : [];
