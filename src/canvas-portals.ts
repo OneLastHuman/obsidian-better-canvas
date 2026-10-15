@@ -1,6 +1,6 @@
 import { ItemView, Notice, TFile } from "obsidian";
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
-import { findContainingPortal } from "./portal-adoption";
+import { findContainingPortal, findContainingPortalForGroup } from "./portal-adoption";
 
 const PORTAL_PREFIX = "bcportal||";
 const PORTAL_DELIMITER = "||";
@@ -480,7 +480,7 @@ export class CanvasPortalManager {
       if (canvas.wrapperEl?.classList?.contains("bc-readonly")) return;
       const data = readCanvasData(canvas);
       const createdNodes = data.nodes.filter((node: CanvasNodeData) =>
-        createdIds.has(node.id) && !isMirrorNode(node) && node.type !== "group"
+        createdIds.has(node.id) && !isMirrorNode(node)
       );
       if (!createdNodes.length) return;
 
@@ -490,7 +490,9 @@ export class CanvasPortalManager {
       const ownerByCreatedId = new Map<string, CanvasNodeData>();
 
       for (const node of createdNodes) {
-        const owner = findContainingPortal(node, portals, view.file?.path, 8);
+        const owner = node.type === "group"
+          ? findContainingPortalForGroup(node, portals, view.file?.path, 8)
+          : findContainingPortal(node, portals, view.file?.path, 8);
         if (owner) ownerByCreatedId.set(node.id, owner);
       }
       if (!ownerByCreatedId.size) return;
