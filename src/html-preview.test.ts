@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractHtmlPreviewBlocks } from "./html-preview";
+import { extractHtmlPreviewBlocks, isHtmlPreviewCandidate } from "./html-preview";
 
 describe("HTML preview extraction", () => {
   it("extracts fenced HTML case-insensitively and leaves other languages alone", () => {
@@ -39,5 +39,14 @@ describe("HTML preview extraction", () => {
     expect(extractHtmlPreviewBlocks(42)).toEqual([]);
     const result = extractHtmlPreviewBlocks("```html\n" + "x".repeat(200_001) + "\n```");
     expect(result[0].source).toHaveLength(200_000);
+  });
+});
+
+describe("HTML preview candidates", () => {
+  it("supports text nodes and Markdown file nodes only", () => {
+    expect(isHtmlPreviewCandidate({ id: "t", type: "text", text: "```html\n<p>x</p>\n```" } as any)).toBe(true);
+    expect(isHtmlPreviewCandidate({ id: "m", type: "file", file: "notes/idea.md" } as any)).toBe(true);
+    expect(isHtmlPreviewCandidate({ id: "p", type: "file", file: "docs/book.pdf" } as any)).toBe(false);
+    expect(isHtmlPreviewCandidate({ id: "g", type: "group" } as any)).toBe(false);
   });
 });
