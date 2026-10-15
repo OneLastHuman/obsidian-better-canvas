@@ -266,6 +266,26 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         settings.autoEdgesFrontmatterKey = value.trim() || "canvas-edges";
         await this.features.save();
       }));
+
+    new Setting(page).setName("只读时禁用右键菜单")
+      .setDesc("启用后，只读模式会拦截 Canvas 视图中的右键菜单；命令面板和其他视图不受影响。")
+      .addToggle(toggle => toggle
+        .setValue(settings.readOnlyDisableNodeMenusEnabled !== false)
+        .onChange(async value => {
+          settings.readOnlyDisableNodeMenusEnabled = value;
+          await this.features.save();
+          this.features.refreshReadonly();
+        }));
+
+    new Setting(page).setName("只读时锁定平移和缩放")
+      .setDesc("启用后，只读模式会拦截画布拖动、触控、滚轮和视口快捷键。通过命令调用的“缩放以适应”或“缩放到选区”仍可使用。")
+      .addToggle(toggle => toggle
+        .setValue(settings.readOnlyLockPanZoomEnabled === true)
+        .onChange(async value => {
+          settings.readOnlyLockPanZoomEnabled = value;
+          await this.features.save();
+          this.features.refreshReadonly();
+        }));
   }
 
   private renderAISettings(page: HTMLElement): void {
