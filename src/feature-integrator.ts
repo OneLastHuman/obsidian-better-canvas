@@ -15,7 +15,7 @@ import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateI
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
 import { parseProviderParamsJson } from "./provider-params";
 import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
-import { createId, readCanvasData, makeTextNode, insertCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import {
   colorIncidentEdges,
   decorateCanvas,
@@ -3017,6 +3017,7 @@ export default class BetterCanvasFeatures {
       new Notice("AI 回复已添加为关联节点。");
     } catch (error) {
       const stopped = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      let cleanupFailed = false;
       if (responseNodeId) {
         if (stopped) {
           patchNode(canvas, responseNodeId, {
@@ -3033,16 +3034,24 @@ export default class BetterCanvasFeatures {
             bcGenerationError: error instanceof Error ? error.message : String(error)
           });
         } else {
-          const latest = readCanvasData(canvas);
-          canvas.importData({
-            ...latest,
-            nodes: latest.nodes.filter((node: CanvasNodeData) => node.id !== responseNodeId),
-            edges: latest.edges.filter((edge: any) => edge.fromNode !== responseNodeId && edge.toNode !== responseNodeId)
-          });
+          cleanupFailed = !removeCanvasNode(canvas, responseNodeId);
+          if (cleanupFailed) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn("Better Canvas could not remove a failed AI placeholder:", responseNodeId, error);
+            // A last-resort visible error state is preferable to an empty node
+            // that remains marked as permanently generating.
+            patchNode(canvas, responseNodeId, {
+              text: "AI 生成失败，且无法自动移除该占位节点。",
+              bcGenerating: false,
+              bcGenerated: false,
+              bcGenerationError: message
+            });
+          }
         }
       }
       notice.hide();
       if (stopped) new Notice("AI 生成已停止；已保留已生成的部分内容。");
+      else if (cleanupFailed) new Notice("AI 生成失败，无法自动移除占位节点；已停止加载状态。", 8000);
       else new Notice(error instanceof Error ? error.message : String(error), 8000);
     } finally {
       if (this.activeGenerations.get(canvas)?.controller === controller) this.activeGenerations.delete(canvas);
