@@ -6,8 +6,6 @@ import {
   MarkdownRenderer,
   Notice,
   Platform,
-  PluginSettingTab,
-  Setting,
   SuggestModal,
   TFile,
   TFolder
@@ -46,6 +44,7 @@ import { extractWikiLinks } from "./canvas-links";
 import { discoverModels } from "./model-discovery";
 import { syncHtmlPreviews } from "./html-preview";
 import { runLocalCodex } from "./codex-cli";
+import BetterCanvasSettingsTab from "./settings";
 
 interface ProviderProfile {
   id: string;
@@ -244,7 +243,7 @@ export default class BetterCanvasFeatures {
     this.registerCommands();
     this.registerCanvasMenus();
     this.registerMarkdownNodeEmbeds();
-    this.p.addSettingTab(new BetterCanvasFeatureSettingsTab(this.p.app, this.p, this));
+    this.p.addSettingTab(new BetterCanvasSettingsTab(this.p.app, this.p, this));
     this.p.registerEvent(this.p.app.workspace.on("layout-change", () => this.refresh()));
     this.p.registerEvent(this.p.app.workspace.on("active-leaf-change", () => this.refresh()));
     this.p.registerEvent(this.p.app.metadataCache.on("changed", () => this.refreshAutoEdges()));
@@ -3048,216 +3047,3 @@ export default class BetterCanvasFeatures {
   }
 }
 
-class BetterCanvasFeatureSettingsTab extends PluginSettingTab {
-  constructor(app: App, plugin: any, private features: BetterCanvasFeatures) {
-    super(app, plugin);
-  }
-
-  display(): void {
-    const c = this.containerEl;
-    c.empty();
-    const s = this.features.settings();
-    c.createEl("h2", { text: "Better Canvas — Integration Features" });
-    c.createEl("p", { text: "这些扩展直接与当前 Vault 的 Canvas 数据交互。不同 AI profile 通过 OpenAI-compatible Chat Completions / Images API 调用；API Key 保存于本地插件数据。" });
-
-    new Setting(c).setName("Canvas metadata cache / backlinks")
-      .setDesc("尝试将 .canvas 节点文本中的 Wikilinks、文件节点和画布 frontmatter 注册到 Obsidian metadata cache / graph。使用的是 Obsidian 内部接口；如果升级后遇到索引异常，可关闭此选项。")
-      .addToggle(toggle => toggle.setValue(Boolean(s.canvasMetadataEnabled)).onChange(async value => {
-        s.canvasMetadataEnabled = value;
-        await this.features.save();
-        if (value) this.features.refreshMetadataCache();
-      }));
-
-    new Setting(c).setName("Active AI Provider")
-      .setDesc("选择用于新 AI 请求的供应商 profile；单个节点可覆盖供应商与模型。")
-      .addDropdown(dropdown => {
-        for (const profile of s.providerProfiles as ProviderProfile[]) dropdown.addOption(profile.id, profile.name);
-        dropdown.setValue(s.activeProviderId).onChange(async value => {
-          s.activeProviderId = value;
-          const profile = (s.providerProfiles as ProviderProfile[]).find(item => item.id === value);
-          if (profile) {
-            s.baseUrl = profile.baseUrl;
-            s.apiKey = profile.apiKey;
-            s.model = profile.model;
-            s.imageModel = profile.imageModel;
-          }
-          await this.features.save();
-          this.display();
-        });
-      });
-
-    new Setting(c).setName("AI Provider Profiles (JSON)")
-      .setDesc("可配置原生 Anthropic、原生 Gemini 或 OpenAI-compatible endpoint。每个对象包含 id、name、protocol（openai/anthropic/gemini）、baseUrl、apiKey、model、imageModel。OpenAI-compatible 可用于 OpenAI、Ollama、OpenRouter、Groq 或兼容网关。不要分享包含真实密钥的导出文件。")
-      .addTextArea(text => {
-        text.inputEl.rows = 10;
-        text.inputEl.style.width = "100%";
-        text.setValue(JSON.stringify(s.providerProfiles, null, 2));
-        text.onChange(async value => {
-          try {
-            const parsed = JSON.parse(value);
-            if (!Array.isArray(parsed) || !parsed.length) return;
-            const valid = parsed.every((profile: any) =>
-              typeof profile?.id === "string" && typeof profile?.name === "string" &&
-              typeof profile?.baseUrl === "string" && typeof profile?.model === "string"
-            );
-            if (!valid) return;
-            s.providerProfiles = parsed.map((profile: any) => ({
-              id: profile.id,
-              name: profile.name,
-              protocol: profile.protocol === "anthropic" || profile.protocol === "gemini" ? profile.protocol : "openai",
-              baseUrl: profile.baseUrl,
-              apiKey: String(profile.apiKey ?? ""),
-              model: profile.model,
-              imageModel: String(profile.imageModel ?? profile.model)
-            }));
-            if (!(s.providerProfiles as ProviderProfile[]).some(profile => profile.id === s.activeProviderId)) {
-              s.activeProviderId = (s.providerProfiles as ProviderProfile[])[0].id;
-            }
-            const active = (s.providerProfiles as ProviderProfile[]).find(profile => profile.id === s.activeProviderId);
-            if (active) {
-              s.baseUrl = active.baseUrl;
-              s.apiKey = active.apiKey;
-              s.model = active.model;
-              s.imageModel = active.imageModel;
-            }
-            await this.features.save();
-          } catch {
-            // Retain last valid configuration until the JSON becomes valid.
-          }
-        });
-      });
-
-    new Setting(c).setName("Automatic file-node edges")
-      .setDesc("从 file node 对应 Markdown 文件的 frontmatter 字段生成边。")
-      .addToggle(toggle => toggle.setValue(Boolean(s.autoFileNodeEdgesEnabled)).onChange(async value => {
-        s.autoFileNodeEdgesEnabled = value;
-        await this.features.save();
-      }));
-
-    new Setting(c).setName("Auto-edge frontmatter key")
-      .setDesc("默认 canvas-edges；内容支持 wiki link 字符串或列表。")
-      .addText(text => text.setValue(String(s.autoEdgesFrontmatterKey)).onChange(async value => {
-        s.autoEdgesFrontmatterKey = value.trim() || "canvas-edges";
-        await this.features.save();
-      }));
-
-    new Setting(c).setName("Custom node CSS")
-      .setDesc("输入仅在本地加载的 CSS。先给节点设置自定义 class，再用 .bc-user-your-class 作为选择器；注意 CSS 可以引用远程资源。")
-      .addTextArea(text => {
-        text.inputEl.rows = 12;
-        text.inputEl.style.width = "100%";
-        text.setValue(String(s.customCss ?? ""));
-        text.onChange(async value => {
-          s.customCss = value;
-          await this.features.save();
-          this.features.applyUserCss();
-        });
-      });
-    new Setting(c).setName("Canvas grid size")
-      .setDesc("用于“将所选节点对齐到网格”，单位为 Canvas 坐标像素。")
-      .addText(text => text.setValue(String(s.gridSize)).onChange(async value => {
-        const number = Number(value);
-        if (Number.isFinite(number) && number >= 1 && number <= 500) { s.gridSize = number; await this.features.save(); }
-      }));
-
-    new Setting(c).setName("Default node width")
-      .addText(text => text.setValue(String(s.defaultNodeWidth)).onChange(async value => {
-        const number = Number(value);
-        if (Number.isFinite(number) && number >= 120 && number <= 1200) { s.defaultNodeWidth = number; await this.features.save(); }
-      }));
-
-    new Setting(c).setName("Default node height")
-      .addText(text => text.setValue(String(s.defaultNodeHeight)).onChange(async value => {
-        const number = Number(value);
-        if (Number.isFinite(number) && number >= 80 && number <= 1000) { s.defaultNodeHeight = number; await this.features.save(); }
-      }));
-    new Setting(c).setName("Custom canvas colors")
-      .setDesc("以逗号分隔，例如 #d14d41, #438c7a, #5c6bc0；作为画布颜色 7、8、9…")
-      .addText(text => text.setValue((s.customColors as string[]).join(", ")).onChange(async value => {
-        s.customColors = value.split(",").map((item: string) => item.trim()).filter(Boolean).slice(0, 12);
-        await this.features.save();
-      }));
-
-    new Setting(c).setName("YouTube caption language")
-      .setDesc("语言代码，如 en、zh-Hans、ja。只有公开字幕可读取时才可导入。")
-      .addText(text => text.setValue(String(s.youtubeLanguage)).onChange(async value => {
-        s.youtubeLanguage = value.trim() || "en";
-        await this.features.save();
-      }));
-
-    new Setting(c).setName("PNG / SVG export scale")
-      .setDesc("导出像素比例 1x 至 4x；值越高，图像清晰度和文件体积通常越大。")
-      .addDropdown(dropdown => {
-        for (const ratio of [1, 1.5, 2, 3, 4]) dropdown.addOption(String(ratio), ratio + "x");
-        dropdown.setValue(String(Number(s.exportPixelRatio) || 2)).onChange(async value => {
-          s.exportPixelRatio = Number(value);
-          await this.features.save();
-        });
-      });
-
-    new Setting(c).setName("PNG / SVG export background")
-      .setDesc("留空保留透明背景；也可输入 CSS 颜色，例如 #ffffff 或 rgba(255,255,255,0.9)。")
-      .addText(text => text.setPlaceholder("透明背景（留空）").setValue(String(s.exportBackgroundColor ?? "")).onChange(async value => {
-        const candidate = value.trim();
-        if (candidate) {
-          const probe = document.createElement("span");
-          probe.style.backgroundColor = candidate;
-          if (!probe.style.backgroundColor) return;
-        }
-        s.exportBackgroundColor = candidate;
-        await this.features.save();
-      }));
-
-    new Setting(c).setName("MCP transport")
-      .setDesc("HTTP 适用于远程 Streamable HTTP；SSE 适用于旧式远程 SSE transport；stdio 会启动本机配置的子进程。")
-      .addDropdown(dropdown => dropdown
-        .addOption("http", "Remote Streamable HTTP")
-        .addOption("sse", "Remote SSE (legacy)")
-        .addOption("stdio", "Local stdio (desktop)")
-        .setValue(s.mcpTransport === "stdio" || s.mcpTransport === "sse" ? s.mcpTransport : "http")
-        .onChange(async value => {
-          s.mcpTransport = value === "stdio" || value === "sse" ? value : "http";
-          await this.features.save();
-          this.display();
-        }));
-
-    new Setting(c).setName("MCP stdio server config (JSON)")
-      .setDesc("仅在 stdio transport 下使用。command、args、env、cwd；请只配置可信程序。服务进程可获得本机权限与配置的环境变量。")
-      .addTextArea(text => {
-        text.inputEl.rows = 7;
-        text.inputEl.style.width = "100%";
-        text.setValue(String(s.mcpStdioConfig ?? '{"command":"","args":[],"env":{},"cwd":""}'));
-        text.onChange(async value => {
-          s.mcpStdioConfig = value;
-          await this.features.save();
-        });
-      });
-
-    new Setting(c).setName("Remote MCP endpoint URL")
-      .setDesc("HTTP transport 填 Streamable HTTP endpoint；SSE transport 填服务器的 SSE 事件流 URL。")
-      .addText(text => text.setPlaceholder("https://server.example/mcp").setValue(String(s.mcpEndpoint)).onChange(async value => {
-        s.mcpEndpoint = value.trim();
-        await this.features.save();
-      }));
-
-    new Setting(c).setName("MCP bearer token")
-      .setDesc("HTTP 或 SSE transport 的可选 Bearer Token，仅保存在此 Vault 的插件设置。")
-      .addText(text => {
-        text.inputEl.type = "password";
-        text.setValue(String(s.mcpApiKey)).onChange(async value => {
-          s.mcpApiKey = value.trim();
-          await this.features.save();
-        });
-      });
-
-    new Setting(c).setName("Local Codex CLI executable")
-      .setDesc("桌面端可选功能。留空使用 PATH 中的 codex；若 Obsidian 无法继承终端 PATH，请填写 codex 可执行文件的绝对路径。需要预先安装并完成 Codex CLI 登录。提示词发送到你在 Codex CLI 中配置的模型供应商；命令以只读沙盒运行。")
-      .addText(text => text
-        .setPlaceholder("codex 或 /absolute/path/to/codex")
-        .setValue(String(s.codexBinaryPath ?? ""))
-        .onChange(async value => {
-          s.codexBinaryPath = value.trim();
-          await this.features.save();
-        }));
-  }
-}
