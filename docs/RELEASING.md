@@ -16,7 +16,7 @@ Releases are created from versioned Git tags. The Release workflow runs the chec
    npm run build
    ```
 
-5. Commit the version changes and merge them into `main). Confirm the Build workflow passes on the merged commit.
+5. Commit the version changes and merge them into `main`. Confirm the Build workflow passes on the merged commit.
 
 ## Publish
 
