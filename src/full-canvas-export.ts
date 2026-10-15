@@ -1,6 +1,6 @@
 import type { CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { routePointsForMethod, type CanvasEdgeRouteMethod, type RouteBox } from "./enhancements";
-import { flattenMarkdownForSvg } from "./markdown-export";
+import { layoutMarkdownForSvg } from "./svg-markdown";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -70,56 +70,6 @@ function nodeText(node: CanvasNodeData): string {
   if (typeof node.file === "string") return node.file + (typeof (node as any).subpath === "string" ? String((node as any).subpath) : "");
   if (typeof node.url === "string") return node.url;
   return node.type === "group" ? "" : "[" + node.type + " node]";
-}
-
-function wrapLines(value: string, maxChars: number, maxLines: number): string[] {
-  const result: string[] = [];
-  const paragraphs = value.replace(/\r/g, "").split("\n");
-  let truncated = false;
-
-  for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
-    let remaining = paragraphs[paragraphIndex];
-    if (!remaining) {
-      if (result.length >= maxLines) {
-        truncated = true;
-        break;
-      }
-      result.push("");
-      continue;
-    }
-
-    while (remaining.length > maxChars) {
-      let breakAt = remaining.lastIndexOf(" ", maxChars);
-      if (breakAt < Math.floor(maxChars * 0.55)) breakAt = maxChars;
-      result.push(remaining.slice(0, breakAt).trimEnd());
-      remaining = remaining.slice(breakAt).trimStart();
-      if (result.length >= maxLines) {
-        truncated = Boolean(remaining) || paragraphIndex < paragraphs.length - 1;
-        break;
-      }
-    }
-    if (truncated) break;
-
-    if (remaining && result.length < maxLines) result.push(remaining);
-    else if (remaining) {
-      truncated = true;
-      break;
-    }
-
-    if (result.length >= maxLines && paragraphIndex < paragraphs.length - 1) {
-      truncated = true;
-      break;
-    }
-  }
-
-  if (result.length === 0) result.push("");
-  if (truncated) {
-    const index = result.length - 1;
-    result[index] = (result[index].length >= maxChars
-      ? result[index].slice(0, Math.max(0, maxChars - 1))
-      : result[index]) + "…";
-  }
-  return result;
 }
 
 function sidePoint(node: CanvasNodeData, side: string, from = false): { x: number; y: number } {
@@ -262,9 +212,8 @@ function polygonPoints(x: number, y: number, w: number, h: number, sides: number
 }
 
 function wrapNodeText(node: CanvasNodeData, clipId: string): string {
-  const raw = typeof node.text === "string" && node.text.trim()
-    ? flattenMarkdownForSvg(node.text)
-    : nodeText(node);
+  const hasMarkdownText = typeof node.text === "string" && node.text.trim().length > 0;
+  const raw = hasMarkdownText ? String(node.text) : nodeText(node);
   if (!raw) return "";
   const attrs = (node as any).styleAttributes ?? {};
   const fontSize = Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
@@ -281,14 +230,33 @@ function wrapNodeText(node: CanvasNodeData, clipId: string): string {
   const textColor = xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, "#202124"));
   const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * 0.58)));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
-  const lines = wrapLines(raw, maxChars, maxLines);
+  const lines = layoutMarkdownForSvg(raw, maxChars, maxLines, fontSize);
   const startY = node.y + 18 + fontSize;
+  const markup = lines.map((line, index) => {
+    const lineFontSize = Math.max(8, fontSize * line.fontScale);
+    const dy = index === 0 ? 0 : Math.max(fontSize * 1.35, lineFontSize * 1.2);
+    const lineWeight = line.bold ? "bold" : fontWeight;
+    const runs = line.runs.map(run => {
+      const style = run.style;
+      const runAttrs: string[] = [];
+      if (style.bold) runAttrs.push('font-weight="bold"');
+      if (style.italic) runAttrs.push('font-style="italic"');
+      if (style.code) runAttrs.push('font-family="ui-monospace,SFMono-Regular,Consolas,monospace"');
+      if (style.link) runAttrs.push('fill="#3467a9"');
+      const decorations: string[] = [];
+      if (textDecoration !== "none") decorations.push(textDecoration);
+      if (style.strike) decorations.push("line-through");
+      if (style.link) decorations.push("underline");
+      if (decorations.length) runAttrs.push('text-decoration="' + decorations.join(" ") + '"');
+      return '<tspan' + (runAttrs.length ? " " + runAttrs.join(" ") : "") + '>' + xml(run.text) + "</tspan>";
+    }).join("");
+    return '<tspan x="' + startX + '" dy="' + dy + '" font-size="' + lineFontSize +
+      '" font-weight="' + lineWeight + '">' + runs + "</tspan>";
+  }).join("");
   return '<text clip-path="url(#' + clipId + ')" x="' + startX + '" y="' + startY +
     '" font-family="' + fontFamily + '" font-size="' + fontSize + '" font-weight="' + fontWeight +
     '" font-style="' + fontStyle + '" text-decoration="' + textDecoration + '" fill="' + textColor +
-    '" text-anchor="' + anchor + '">' +
-    lines.map((line, index) => '<tspan x="' + startX + '" dy="' + (index === 0 ? 0 : fontSize * 1.35) + '">' + xml(line) + "</tspan>").join("") +
-    "</text>";
+    '" text-anchor="' + anchor + '">' + markup + "</text>";
 }
 
 function boxPolygonPoints(
