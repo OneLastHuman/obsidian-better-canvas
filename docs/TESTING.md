@@ -149,6 +149,7 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 - API Key 不得进入日志、截图、测试 fixture 或提交记录；
 - 对 MCP 文本/图片块、不支持的 MIME、无效 payload、工具失败及用户确认流程分别测试；
 - 将确定性的模拟测试和真实 provider smoke test 分开；真实 smoke test 需要明确配置和密钥，默认不应在普通 CI 中调用付费 API。
+- Spaced Repetition 导出：验证卡组标签、`Question` / `?` / `Answer` 分隔、Markdown 答案保留、非法/空卡过滤、目录穿越拒绝和同名文件后缀；真实 Obsidian 卡片识别仍须在测试 Vault 中手动确认。
 
 ### PDF 与导出
 - PDF 文字选择、固定页、批注坐标映射、缩放/旋转/resize、撤销及删除页节点；
