@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
+import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from "./provider-params";
 
 export type AIProtocol = "openai" | "anthropic" | "gemini";
 
@@ -20,6 +21,12 @@ export interface AISettings {
   /** Optional absolute path to the OpenCode CLI; defaults to opencode on PATH. */
   opencodeBinaryPath?: string;
   protocol?: AIProtocol;
+  /** Optional sampling temperature; defaults to 0.4. */
+  temperature?: number;
+  /** Optional output-token ceiling; undefined keeps the protocol adapter default. */
+  maxOutputTokens?: number;
+  /** Validated extra provider request fields; protocol-owned fields are reserved. */
+  providerParams?: Record<string, unknown>;
 }
 
 export interface ChatMessage {
@@ -144,14 +151,15 @@ function toAnthropicRequest(settings: AISettings, messages: ChatMessage[], strea
     role: message.role,
     content: anthropicContent(message.content)
   }));
-  return {
+  const maxOutputTokens = resolveMaxOutputTokens(settings.maxOutputTokens);
+  return mergeProviderParams("anthropic", {
     model: settings.model.trim(),
-    max_tokens: 4096,
+    max_tokens: maxOutputTokens ?? 4096,
     ...(system ? { system } : {}),
     messages: userMessages,
-    temperature: 0.4,
+    temperature: resolveTemperature(settings.temperature, 0.4, "anthropic"),
     ...(streaming ? { stream: true } : {})
-  };
+  }, settings.providerParams);
 }
 
 function toGeminiRequest(settings: AISettings, messages: ChatMessage[], streaming: boolean): Record<string, unknown> {
@@ -160,11 +168,27 @@ function toGeminiRequest(settings: AISettings, messages: ChatMessage[], streamin
     role: message.role === "assistant" ? "model" : "user",
     parts: geminiParts(message.content)
   }));
-  return {
+  const maxOutputTokens = resolveMaxOutputTokens(settings.maxOutputTokens);
+  return mergeProviderParams("gemini", {
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
     contents,
-    generationConfig: { temperature: 0.4, ...(streaming ? {} : {}) }
-  };
+    generationConfig: {
+      temperature: resolveTemperature(settings.temperature, 0.4, "gemini"),
+      ...(maxOutputTokens ? { maxOutputTokens } : {}),
+      ...(streaming ? {} : {})
+    }
+  }, settings.providerParams);
+}
+
+function toOpenAIRequest(settings: AISettings, messages: ChatMessage[], streaming: boolean): Record<string, unknown> {
+  const maxOutputTokens = resolveMaxOutputTokens(settings.maxOutputTokens);
+  return mergeProviderParams("openai", {
+    model: settings.model.trim(),
+    messages,
+    temperature: resolveTemperature(settings.temperature, 0.4, "openai"),
+    ...(maxOutputTokens ? { max_tokens: maxOutputTokens } : {}),
+    ...(streaming ? { stream: true } : {})
+  }, settings.providerParams);
 }
 
 function parseCompletion(protocol: AIProtocol, body: any): string {
@@ -222,7 +246,7 @@ export async function chatCompletion(
       url: endpoint(settings.baseUrl, "chat/completions"),
       method: "POST",
       headers: openAIHeaders(settings),
-      body: JSON.stringify({ model: settings.model.trim(), messages, temperature: 0.4 }),
+      body: JSON.stringify(toOpenAIRequest(settings, messages, false)),
       throw: false
     });
   }
@@ -255,7 +279,7 @@ export async function chatCompletionStream(
     ? toAnthropicRequest(settings, messages, true)
     : protocol === "gemini"
       ? toGeminiRequest(settings, messages, true)
-      : { model: settings.model.trim(), messages, temperature: 0.4, stream: true };
+      : toOpenAIRequest(settings, messages, true);
 
   let response: Response;
   try {

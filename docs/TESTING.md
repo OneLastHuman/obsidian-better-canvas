@@ -147,6 +147,7 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 ### AI、HTTP 和 MCP
 - 使用 mock HTTP/固定响应测试请求格式、非 2xx、超时、断网、坏 JSON、流式结束、流式中止和重复生成；
 - API Key 不得进入日志、截图、测试 fixture 或提交记录；
+- Provider request parameters：测试 JSON 格式/大小/键数/嵌套限制、保留字段与凭据字段拒绝、不同协议的参数合并位置、Temperature 和最大输出 token 数边界；不要在测试中调用真实供应商。
 - 模型能力探测：用固定 mock 验证文本/图片请求的接受、失败时跳过第二个请求、键值脱敏和报告按 provider/protocol/model 隔离。普通 CI 不调用真实供应商；真实探测须由用户明确点击并确认。
 - 对 MCP 文本/图片块、不支持的 MIME、无效 payload、工具失败及用户确认流程分别测试；
 - MCP Resources/Prompts：测试 resources/list 与 prompts/list 的分页/重复游标、resources/read 文本及二进制/图片处理、prompts/get 参数验证和三种传输层的错误路径；真实服务器兼容性仍需用用户配置的测试服务复验。
