@@ -1,4 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import process from "node:process";
 import {
   callLocalMcpTool,
@@ -12,6 +15,7 @@ import {
 } from "./mcp-stdio";
 
 const serverSource = String.raw`
+if(process.env.MCP_START_LOG)require("node:fs").appendFileSync(process.env.MCP_START_LOG,String(process.pid)+"\\n");
 const rl=require("node:readline").createInterface({input:process.stdin});
 rl.on("line",line=>{
  let m;try{m=JSON.parse(line)}catch{process.exit(2)}
@@ -127,6 +131,27 @@ describe("local MCP stdio JSON-RPC round trip", () => {
     }]);
     const result = await getLocalMcpPrompt(fixtureConfig(), "review", { topic: "science" });
     expect(result.text).toContain("[user] Topic: science");
+  }, 20000);
+
+  it("launches a fresh child after the cached sessions are explicitly closed", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "better-canvas-mcp-session-"));
+    const startLog = join(directory, "starts.log");
+    const config = fixtureConfig({ MCP_START_LOG: startLog });
+    try {
+      const first = await readLocalMcpResource(config, "note://first");
+      expect(first.text).toContain("resource contents");
+
+      closeAllLocalMcpSessions();
+
+      const second = await getLocalMcpPrompt(config, "review", { topic: "fresh-session" });
+      expect(second.text).toContain("Topic: fresh-session");
+      const processIds = (await readFile(startLog, "utf8")).trim().split(/\r?\n/);
+      expect(processIds).toHaveLength(2);
+      expect(processIds[0]).not.toBe(processIds[1]);
+    } finally {
+      closeAllLocalMcpSessions();
+      await rm(directory, { recursive: true, force: true });
+    }
   }, 20000);
 
   it("reuses the same child process for subsequent operations", async () => {
