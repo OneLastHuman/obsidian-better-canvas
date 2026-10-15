@@ -276,6 +276,22 @@ describe("collapsible Canvas groups", () => {
     expect(canvas.data.nodes.find((node: any) => node.id === "group")).not.toHaveProperty("bcCollapsedNodes");
   });
 
+  it("reports an empty group without changing or saving the Canvas", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "group", x: 0, y: 0, width: 300, height: 220, type: "group", label: "Empty" } as any
+      ],
+      edges: []
+    };
+    const canvas = makeCanvas(data);
+    const before = JSON.stringify(canvas.data);
+
+    expect(toggleGroupCollapse(canvas, "group")).toBe("empty");
+    expect(JSON.stringify(canvas.data)).toBe(before);
+    expect(canvas.saved).toBe(0);
+    expect(canvas.frames).toBe(0);
+  });
+
   it("does not restore a hidden edge after its outside endpoint is deleted", () => {
     const data: CanvasData = {
       nodes: [
