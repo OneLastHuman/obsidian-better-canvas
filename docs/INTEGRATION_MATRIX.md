@@ -17,7 +17,7 @@ This matrix records Better Canvas implementation and parity gaps against the cur
 | AI-generated mind map | Implemented, basic | Structured JSON response becomes connected nodes; malformed model output may be rejected |
 | Independent flashcard nodes | Implemented | Generated content is model-dependent and still needs review |
 | Per-edge colors | Implemented, extension metadata | Canvas JSON stores the style; exact display can vary by renderer |
-| Shortcut behavior settings | Partial | Core Tab/Enter/Alt-arrow/Ctrl-or-Cmd-arrow flows are present, but there is no dedicated MindMap settings panel for enabling/configuring each inline shortcut as in the upstream plugin |
+| Shortcut behavior settings | Implemented, basic | Settings expose independent toggles for Tab child creation, Enter sibling creation, Alt+arrow navigation, and Ctrl/Cmd+arrow directional creation. Existing user configurations default to the former enabled behavior; conflict behavior with third-party hotkey plugins still needs desktop verification |
 
 ## Advanced Canvas
 
