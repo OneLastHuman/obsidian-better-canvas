@@ -154,6 +154,36 @@
         "file": "01-html-preview-file-vs-text.png",
         "caption": "同一份含 html 围栏的笔记：文本节点有预览（左侧），文件节点完全没有（右侧）"
       }
+    ],
+    "103": [
+      {
+        "file": "01-before-add-provider.png",
+        "caption": "修复前：搜索“添加 AI 服务商”显示空结果，AI 服务分类被隐藏。",
+        "testedCommit": "b9eb519bb53fcdef91fa280a5e80510ffd8f0c3f",
+        "mainJsSha256": "2d086fd8f17d4f0790838cc60b7b85404ad27d05be06f7a84a93a5e3b50f25da",
+        "obsidian": "1.14.4"
+      },
+      {
+        "file": "02-after-add-provider.png",
+        "caption": "修复后：相同搜索显示 AI 服务分类和“添加 AI 服务商”按钮。",
+        "testedCommit": "05490f02331540af4c1c6efc3947cd392f151f43",
+        "mainJsSha256": "b03cf9bf8d6d000a3822a94227a9617652233070b719870b47571e17852b6012",
+        "obsidian": "1.14.4"
+      },
+      {
+        "file": "03-after-category-search.png",
+        "caption": "修复后：搜索分类标题“AI 服务”可定位到该设置页。",
+        "testedCommit": "05490f02331540af4c1c6efc3947cd392f151f43",
+        "mainJsSha256": "b03cf9bf8d6d000a3822a94227a9617652233070b719870b47571e17852b6012",
+        "obsidian": "1.14.4"
+      },
+      {
+        "file": "04-after-temperature-search.png",
+        "caption": "回归对照：搜索普通设置项“Temperature”仍能定位。",
+        "testedCommit": "05490f02331540af4c1c6efc3947cd392f151f43",
+        "mainJsSha256": "b03cf9bf8d6d000a3822a94227a9617652233070b719870b47571e17852b6012",
+        "obsidian": "1.14.4"
+      }
     ]
   },
   "regressionRound4": {
