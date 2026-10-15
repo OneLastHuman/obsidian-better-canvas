@@ -44,7 +44,7 @@ describe("legacy MCP SSE parsing", () => {
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
           eventController = controller;
-          controller.enqueue(encoder.encode("event: endpoint\\ndata: /messages\\n\\n"));
+          controller.enqueue(encoder.encode("event: endpoint\ndata: /messages\n\n"));
         }
       });
       return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
