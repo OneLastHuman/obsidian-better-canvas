@@ -157,7 +157,7 @@ function toAnthropicRequest(settings: AISettings, messages: ChatMessage[], strea
     max_tokens: maxOutputTokens ?? 4096,
     ...(system ? { system } : {}),
     messages: userMessages,
-    temperature: resolveTemperature(settings.temperature),
+    temperature: resolveTemperature(settings.temperature, 0.4, "anthropic"),
     ...(streaming ? { stream: true } : {})
   }, settings.providerParams);
 }
@@ -173,7 +173,7 @@ function toGeminiRequest(settings: AISettings, messages: ChatMessage[], streamin
     ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
     contents,
     generationConfig: {
-      temperature: resolveTemperature(settings.temperature),
+      temperature: resolveTemperature(settings.temperature, 0.4, "gemini"),
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
       ...(streaming ? {} : {})
     }
@@ -185,7 +185,7 @@ function toOpenAIRequest(settings: AISettings, messages: ChatMessage[], streamin
   return mergeProviderParams("openai", {
     model: settings.model.trim(),
     messages,
-    temperature: resolveTemperature(settings.temperature),
+    temperature: resolveTemperature(settings.temperature, 0.4, "openai"),
     ...(maxOutputTokens ? { max_tokens: maxOutputTokens } : {}),
     ...(streaming ? { stream: true } : {})
   }, settings.providerParams);
