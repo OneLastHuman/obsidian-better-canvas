@@ -159,7 +159,14 @@ describe("Canvas Portal target validation", () => {
     ]);
     const nodes: any[] = [
       { id: "portal-a", type: "file", file: "a.canvas", x: 0, y: 0, width: 200, height: 160, portal: true },
-      { id: "portal-b", type: "file", file: "b.canvas", x: 600, y: 320, width: 200, height: 160,  it("registers a command and context-menu action for open Portals", () => {
+      { id: "portal-b", type: "file", file: "b.canvas", x: 600, y: 320, width: 200, height: 160, portal: true }
+    ];
+
+    expect(hasMovedOpenPortal(previous, nodes)).toBe(true);
+    expect(hasMovedOpenPortal(previous, nodes.slice(0, 1))).toBe(false);
+  });
+
+  it("registers a command and context-menu action for open Portals", () => {
     const { plugin, manager } = makeHarness(true);
     const commands: any[] = [];
     const handlers = new Map<string, (...args: any[]) => void>();
