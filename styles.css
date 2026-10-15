@@ -117,6 +117,18 @@
 .bc-pinned-pdf-page[data-error="true"] {
   outline: 2px solid var(--color-red);
 }
+.bc-settings-root .bc-settings-number-error {
+  display: block;
+  color: var(--text-error);
+  font-size: var(--font-smaller);
+}
+.bc-settings-root .bc-settings-number-error[hidden] {
+  display: none;
+}
+.bc-settings-root input[aria-invalid="true"] {
+  border-color: var(--text-error);
+}
+
 .bc-pinned-pdf-error {
   color: var(--text-error);
   padding: 0.5rem;
