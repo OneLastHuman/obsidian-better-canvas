@@ -37,7 +37,7 @@ import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirection } from "./canvas-clone";
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
-import { canvasZoomToScale, zoomCanvasToFit } from "./canvas-zoom";
+import { zoomCanvasToFit } from "./canvas-zoom";
 import { isCanvasReadOnly, shouldSubmitPromptValue } from "./canvas-command-guards";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
@@ -890,7 +890,7 @@ export default class BetterCanvasFeatures {
   }
 
   private applyZoomBreakpoints(canvas: any): void {
-    const zoom = canvasZoomToScale(Number(canvas?.zoom));
+    const zoom = Number(canvas?.zoom);
     if (!Number.isFinite(zoom)) return;
     for (const nodeData of readCanvasData(canvas).nodes) {
       const node = canvas?.nodes?.get?.(nodeData.id);
