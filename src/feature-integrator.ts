@@ -25,6 +25,7 @@ import {
   styleSelectedEdges,
   styleSelectedEdgeArrow,
   styleSelectedEdgePathfinding,
+  selectAllCanvasEdges,
   toggleGroupCollapse
 } from "./enhancements";
 import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
@@ -451,6 +452,7 @@ export default class BetterCanvasFeatures {
     add("bc-flip-edges", "翻转节点关联的连线", () => this.flipEdges());
     add("bc-color-edges", "设置节点关联连线颜色", () => this.colorEdges());
     add("bc-select-edges", "选择节点关联的连线", () => this.selectEdges("all"));
+    add("bc-select-all-canvas-edges", "选择画布中的全部连线", () => this.selectAllCanvasEdges());
     add("bc-select-incoming-edges", "选择指向节点的连线", () => this.selectEdges("incoming"));
     add("bc-select-outgoing-edges", "选择从节点发出的连线", () => this.selectEdges("outgoing"));
     add("bc-style-selected-edges", "设置当前选中连线样式", () => this.edgeStyle());
@@ -1019,6 +1021,13 @@ export default class BetterCanvasFeatures {
       this.decorate(canvas);
       new Notice(count ? "已更新 " + count + " 条连线。" : "请先选择连线。");
     });
+  }
+
+  private selectAllCanvasEdges(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    const count = selectAllCanvasEdges(canvas);
+    new Notice(count ? "已选择画布中的全部 " + count + " 条连线。" : "当前画布没有可选择的连线。");
   }
 
   private selectEdges(direction: "all" | "incoming" | "outgoing", canvas = this.canvas()): void {
