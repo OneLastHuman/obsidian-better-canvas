@@ -117,7 +117,9 @@ export function normalizeAIUsageRecord(value: unknown): AIUsageRecord | null {
   const inputTokens = safeCount(raw.inputTokens);
   const outputTokens = safeCount(raw.outputTokens);
   const totalTokens = safeCount(raw.totalTokens)
-    ?? (inputTokens !== undefined && outputTokens !== undefined ? inputTokens + outputTokens : undefined);
+    ?? (inputTokens !== undefined && outputTokens !== undefined
+      ? Math.min(Number.MAX_SAFE_INTEGER, inputTokens + outputTokens)
+      : undefined);
   const id = typeof raw.id === "string" && raw.id.length <= 160
     ? raw.id
     : `${timestamp}-${protocol}-${raw.model.trim().slice(0, 60)}`;
@@ -188,5 +190,6 @@ export function estimateAIUsageCost(
   if (record.inputTokens === null || record.outputTokens === null) return null;
   const price = prices[`${record.protocol}:${record.model}`];
   if (!price) return null;
-  return (record.inputTokens * price.inputPerMillion + record.outputTokens * price.outputPerMillion) / 1_000_000;
+  const cost = (record.inputTokens * price.inputPerMillion + record.outputTokens * price.outputPerMillion) / 1_000_000;
+  return Number.isFinite(cost) && cost >= 0 ? cost : null;
 }
