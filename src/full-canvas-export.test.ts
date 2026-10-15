@@ -246,4 +246,38 @@ describe("full content SVG export", () => {
       edges: []
     })).toThrow(/过大/);
   });
+
+  it("renders common Markdown emphasis, code, links, headings and task markers as rich SVG text", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "rich", type: "text", x: 0, y: 0, width: 480, height: 260,
+        text: "# Heading\n**bold** _italic_ ~~strike~~ \x60code\x60 [link](https://example.com/private)\n- [x] done\n[[folder/Note.md|Wiki label]]"
+      }],
+      edges: []
+    });
+    expect(result.svg).toContain("Heading");
+    expect(result.svg).toContain('font-size="24" font-weight="bold"');
+    expect(result.svg).toContain('<tspan font-weight="bold">bold</tspan>');
+    expect(result.svg).toContain('<tspan font-style="italic">');
+    expect(result.svg).toContain("italic</tspan>");
+    expect(result.svg).toContain('text-decoration="line-through"');
+    expect(result.svg).toContain('font-family="ui-monospace,SFMono-Regular,Consolas,monospace"');
+    expect(result.svg).toContain('fill="#3467a9"');
+    expect(result.svg).toContain("☑ done");
+    expect(result.svg).toContain("Wiki label");
+    expect(result.svg).not.toContain("https://example.com/private");
+  });
+
+  it("escapes HTML-looking node text in static exports instead of interpreting it", () => {
+    const result = canvasDataToFullSvg({
+      nodes: [{
+        id: "html", type: "text", x: 0, y: 0, width: 500, height: 100,
+        text: "<script>alert('x')</script>"
+      }],
+      edges: []
+    });
+    expect(result.svg).toContain("&lt;script&gt;alert(&apos;x&apos;)&lt;/script&gt;");
+    expect(result.svg).not.toContain("<script>");
+  });
+
 });
