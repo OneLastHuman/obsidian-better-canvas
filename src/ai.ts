@@ -1,4 +1,5 @@
 import { requestUrl } from "obsidian";
+import { decodeBase64Image, detectImageFormat } from "./image-payload";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
 import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from "./provider-params";
 import { emitAIUsageEvent, extractProviderUsage, mergeUsageCounts, type AIUsageTokenCounts } from "./ai-usage-core";
@@ -430,12 +431,8 @@ export async function generateImage(
     if (typeof inline?.data !== "string") {
       throw new Error("Gemini 图像模型未返回图片内容；请确认该模型支持图像生成。");
     }
-    const decoded = atob(inline.data);
-    const bytes = new Uint8Array(decoded.length);
-    for (let i = 0; i < decoded.length; i += 1) bytes[i] = decoded.charCodeAt(i);
-    const mime = String(inline.mimeType ?? inline.mime_type ?? "image/png").toLowerCase();
-    const extension = mime.includes("jpeg") || mime.includes("jpg") ? "jpg" : mime.includes("webp") ? "webp" : "png";
-    return { bytes, extension };
+    const validated = decodeBase64Image(inline.data);
+    return { bytes: validated.bytes, extension: validated.extension };
   }
 
   const response = await requestUrl({
@@ -455,20 +452,17 @@ export async function generateImage(
 
   const first = body?.data?.[0];
   if (typeof first?.b64_json === "string") {
-    const decoded = atob(first.b64_json);
-    const bytes = new Uint8Array(decoded.length);
-    for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
-    return { bytes, extension: "png" };
+    const validated = decodeBase64Image(first.b64_json);
+    return { bytes: validated.bytes, extension: validated.extension };
   }
   if (typeof first?.url === "string") {
     const imageResponse = await requestUrl({ url: first.url, method: "GET", throw: false });
     if (imageResponse.status < 200 || imageResponse.status >= 300) {
       throw new Error("下载生成图片失败（HTTP " + imageResponse.status + "）。");
     }
-    const mime = String(imageResponse.headers?.["content-type"] ?? "").toLowerCase();
-    const extension = mime.includes("jpeg") || mime.includes("jpg") ? "jpg"
-      : mime.includes("webp") ? "webp" : "png";
-    return { bytes: new Uint8Array(imageResponse.arrayBuffer), extension };
+    const bytes = new Uint8Array(imageResponse.arrayBuffer);
+    const detected = detectImageFormat(bytes);
+    return { bytes, extension: detected.extension };
   }
   throw new Error("图像服务没有返回 b64_json 或可下载的图片 URL。");
 }
