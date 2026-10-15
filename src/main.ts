@@ -9,6 +9,7 @@ import {
 import BetterCanvasFeatures from "./feature-integrator";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
+import type { ModelCapabilityReport } from "./model-capabilities";
 import {
   CanvasNodeData,
   LayoutDirection,
@@ -57,6 +58,7 @@ interface BetterCanvasSettings {
   flashcardOutputMode: "canvas" | "spaced-repetition";
   spacedRepetitionFolder: string;
   spacedRepetitionDeck: string;
+  modelCapabilityReports: Record<string, ModelCapabilityReport>;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -80,7 +82,8 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   activeSystemPromptProfile: "",
   flashcardOutputMode: "canvas",
   spacedRepetitionFolder: "Better Canvas/Flashcards",
-  spacedRepetitionDeck: "better-canvas"
+  spacedRepetitionDeck: "better-canvas",
+  modelCapabilityReports: {}
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
