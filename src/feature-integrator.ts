@@ -35,6 +35,7 @@ import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
 import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirection } from "./canvas-clone";
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
+import { zoomCanvasToFit } from "./canvas-zoom";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { callRemoteTool, listRemoteTools, RemoteMcpResult } from "./mcp";
 import { callLocalMcpTool, listLocalMcpTools } from "./mcp-stdio";
@@ -453,6 +454,7 @@ export default class BetterCanvasFeatures {
     add("bc-color-edges", "设置节点关联连线颜色", () => this.colorEdges());
     add("bc-select-edges", "选择节点关联的连线", () => this.selectEdges("all"));
     add("bc-select-all-canvas-edges", "选择画布中的全部连线", () => this.selectAllCanvasEdges());
+    add("bc-zoom-to-fit-canvas", "缩放以适应整个 Canvas", () => this.zoomToFitCanvas());
     add("bc-select-incoming-edges", "选择指向节点的连线", () => this.selectEdges("incoming"));
     add("bc-select-outgoing-edges", "选择从节点发出的连线", () => this.selectEdges("outgoing"));
     add("bc-style-selected-edges", "设置当前选中连线样式", () => this.edgeStyle());
@@ -1021,6 +1023,21 @@ export default class BetterCanvasFeatures {
       this.decorate(canvas);
       new Notice(count ? "已更新 " + count + " 条连线。" : "请先选择连线。");
     });
+  }
+
+  private zoomToFitCanvas(): void {
+    const canvas = this.canvas();
+    if (!canvas) { new Notice("请先打开 Canvas。"); return; }
+    try {
+      const count = zoomCanvasToFit(canvas);
+      if (!count) {
+        new Notice("当前 Canvas 没有可缩放的节点，或当前 Obsidian 版本不支持此操作。");
+        return;
+      }
+      new Notice("已缩放以适应整个 Canvas；原来的节点/连线选择已恢复。");
+    } catch (error) {
+      new Notice("缩放 Canvas 失败：" + (error instanceof Error ? error.message : String(error)), 6000);
+    }
   }
 
   private selectAllCanvasEdges(): void {
