@@ -36,6 +36,8 @@ interface SourceLine {
   end: number;
   number: number;
   fenced: boolean;
+  fenceOpen: boolean;
+  fenceClose: boolean;
 }
 
 function sourceLines(text: string): SourceLine[] {
@@ -51,22 +53,21 @@ function sourceLines(text: string): SourceLine[] {
     const start = offset;
     const end = start + line.length;
     const fence = line.match(/^\s*(\x60{3,}|~{3,})/);
-    const isFence = Boolean(fence);
-    const insideFence = inFence || isFence;
+    const marker = fence?.[1] ?? "";
+    const fenceOpen = Boolean(fence && !inFence);
+    const fenceClose = Boolean(fence && inFence && marker[0] === fenceChar && marker.length >= fenceLength);
+    const insideFence = inFence || fenceOpen;
 
-    lines.push({ text: line, start, end, number: index, fenced: insideFence });
+    lines.push({ text: line, start, end, number: index, fenced: insideFence, fenceOpen, fenceClose });
 
-    if (fence) {
-      const marker = fence[1];
-      if (!inFence) {
-        inFence = true;
-        fenceChar = marker[0];
-        fenceLength = marker.length;
-      } else if (marker[0] === fenceChar && marker.length >= fenceLength) {
-        inFence = false;
-        fenceChar = "";
-        fenceLength = 0;
-      }
+    if (fenceOpen) {
+      inFence = true;
+      fenceChar = marker[0];
+      fenceLength = marker.length;
+    } else if (fenceClose) {
+      inFence = false;
+      fenceChar = "";
+      fenceLength = 0;
     }
     offset += raw.length + (index < rawLines.length - 1 ? 1 : 0);
   });
@@ -144,8 +145,7 @@ export function parseCanvasMarkdownMetadata(text: string): CanvasMarkdownMetadat
     blocks: {}
   };
 
-  const listRootByLine = new Map<number, number>();
-  const parentStack: Array<{ line: number; indent: number; root: number }> = [];
+  const parentStack: Array<{ line: number; indent: number }> = [];
   let currentListRoot = -1;
   let previousLineWasList = false;
 
@@ -244,13 +244,12 @@ export function parseCanvasMarkdownMetadata(text: string): CanvasMarkdownMetadat
     if (!previousLineWasList || parentStack.length === 0 && indent === 0) {
       if (!previousLineWasList || currentListRoot < 0) currentListRoot = lineNumber;
     }
-    listRootByLine.set(lineNumber, currentListRoot);
     metadata.listItems.push({
       parent: parentStack.length ? parent : -currentListRoot,
       ...(listItem[3] !== undefined ? { task: listItem[3] } : {}),
       position: positionBetween(line.start, line.end, lines)
     });
-    parentStack.push({ line: lineNumber, indent, root: currentListRoot });
+    parentStack.push({ line: lineNumber, indent });
     previousLineWasList = true;
   }
 
@@ -262,13 +261,13 @@ export function parseCanvasMarkdownMetadata(text: string): CanvasMarkdownMetadat
       index += 1;
       continue;
     }
-    if (/^\s*(?:\x60{3,}|~{3,})/.test(line.text)) {
+    if (line.fenceOpen) {
       const start = line.start;
       let end = line.end;
       index += 1;
       while (index < lines.length) {
         end = lines[index].end;
-        const closes = /^\s*(?:\x60{3,}|~{3,})/.test(lines[index].text) && !lines[index].fenced;
+        const closes = lines[index].fenceClose;
         index += 1;
         if (closes) break;
       }
