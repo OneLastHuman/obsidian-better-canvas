@@ -2,9 +2,9 @@
 
 本目录由 `main` 分支的 Build workflow 自动同步，包含主分支最近一次成功 CI 构建的插件文件：
 
-- `main.js`
-- `manifest.json`
-- `styles.css`
+- [main.js](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/main.js)
+- [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/manifest.json)
+- [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/styles.css)
 
 ## 手动安装或升级
 
