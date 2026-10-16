@@ -563,10 +563,30 @@ export default class NodeMenuUnifier {
     const presetNames: Record<string, string> = { flow: "Flow", focus: "Focus", warning: "Warning / Risk" };
     for (const id of Object.keys(NODE_STYLE_PRESETS)) {
       const preset = NODE_STYLE_PRESETS[id];
-      const button = addButton(presets, presetNames[id] ?? id, "bc-node-style-preset", () => {
+      const name = presetNames[id] ?? id;
+      const button = addButton(presets, "", "bc-node-style-preset", () => {
         this.applyStyle({ color: preset.color, shape: preset.shape, border: preset.border, align: preset.align }, "preset-" + id);
       });
       button.dataset.styleOption = "preset-" + id;
+      button.setAttribute("aria-label", name + " 节点样式预设");
+      button.title = name;
+
+      const preview = document.createElement("span");
+      preview.className = "bc-node-style-preset-preview shape-" + preset.shape + " border-" + preset.border;
+      preview.style.backgroundColor = preset.color;
+      preview.setAttribute("aria-hidden", "true");
+      const sample = document.createElement("span");
+      sample.className = "bc-node-style-preset-sample";
+      sample.textContent = "Aa";
+      sample.style.textAlign = preset.align;
+      preview.appendChild(sample);
+      button.appendChild(preview);
+
+      const label = document.createElement("span");
+      label.className = "bc-node-style-preset-label";
+      label.textContent = name;
+      button.appendChild(label);
+
       button.setAttribute("aria-pressed", String(
         currentStyle.color.toLowerCase() === preset.color.toLowerCase() &&
         currentStyle.shape === preset.shape &&
