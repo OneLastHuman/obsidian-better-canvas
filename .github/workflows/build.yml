@@ -60,14 +60,18 @@ jobs:
         with:
           name: built-main-js
           path: .
-      - name: Commit production bundle
+      - name: Sync installable files
         shell: bash
         run: |
+          mkdir -p release
+          cp main.js release/main.js
+          cp manifest.json release/manifest.json
+          cp styles.css release/styles.css
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add main.js
+          git add main.js release/main.js release/manifest.json release/styles.css
           if git diff --cached --quiet; then
-            echo "main.js is already up to date."
+            echo "Root bundle and release directory are already up to date."
             exit 0
           fi
           git commit -m "build: refresh installable plugin bundle"

@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-better-canvas",
+  "name": "Better Canvas",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Canvas enhancements, mind-map workflows, and configurable AI assistance in one plugin.",
+  "author": "OneLastHuman",
+  "authorUrl": "https://github.com/OneLastHuman",
+  "isDesktopOnly": false
+}
