@@ -280,6 +280,64 @@ describe("Advanced Canvas event bridge", () => {
     bridge.stop();
   });
 
+  it("does not report another canvas file loaded into the same view as newly created", () => {
+    const workspace = new FakeEmitter() as any;
+    workspace.onLayoutReady = () => {};
+    const canvas = makeCanvas({
+      nodes: [{ id: "first-node", type: "text", x: 0, y: 0, width: 100, height: 60, text: "First" }],
+      edges: []
+    });
+    const view: any = { canvas, containerEl: new FakeContainer(), file: { path: "Boards/First.canvas" }, getViewType: () => "canvas" };
+    workspace.getLeavesOfType = () => [{ view }];
+    const app = { workspace, vault: new FakeEmitter() };
+    const plugin = { register() {} };
+    const scheduled: Array<() => void> = [];
+    const bridge = new AdvancedCanvasEventBridge(app, plugin, { scheduleFrame: callback => scheduled.push(callback) });
+
+    bridge.start();
+    while (scheduled.length) scheduled.shift()!();
+    expect(workspace.count("advanced-canvas:node-created")).toBe(0);
+
+    // Opening another canvas in the same pane reuses the view and its canvas
+    // object, so the swap is only visible through the view's file.
+    view.file = { path: "Boards/Second.canvas" };
+    canvas.setData({
+      nodes: [
+        { id: "second-a", type: "text", x: 0, y: 0, width: 100, height: 60, text: "A" },
+        { id: "second-b", type: "text", x: 200, y: 0, width: 100, height: 60, text: "B" }
+      ],
+      edges: [{ id: "second-edge", fromNode: "second-a", fromSide: "right", toNode: "second-b", toSide: "left" }]
+    });
+    while (scheduled.length) scheduled.shift()!();
+    expect(workspace.count("advanced-canvas:node-created")).toBe(0);
+    expect(workspace.count("advanced-canvas:node-added")).toBe(0);
+    expect(workspace.count("advanced-canvas:edge-created")).toBe(0);
+    expect(workspace.count("advanced-canvas:edge-added")).toBe(0);
+
+    // A node created in the swapped-in file is still announced.
+    canvas.importData({
+      nodes: [
+        { id: "second-a", type: "text", x: 0, y: 0, width: 100, height: 60, text: "A" },
+        { id: "second-b", type: "text", x: 200, y: 0, width: 100, height: 60, text: "B" },
+        { id: "second-child", type: "text", x: 400, y: 0, width: 100, height: 60, text: "C" }
+      ],
+      edges: [{ id: "second-edge", fromNode: "second-a", fromSide: "right", toNode: "second-b", toSide: "left" }]
+    });
+    while (scheduled.length) scheduled.shift()!();
+    expect(workspace.count("advanced-canvas:node-created")).toBe(1);
+
+    // Switching back must not treat the first file's node as new either, and the
+    // ids tracked for the other file must not linger.
+    view.file = { path: "Boards/First.canvas" };
+    canvas.setData({
+      nodes: [{ id: "first-node", type: "text", x: 0, y: 0, width: 100, height: 60, text: "First" }],
+      edges: []
+    });
+    while (scheduled.length) scheduled.shift()!();
+    expect(workspace.count("advanced-canvas:node-created")).toBe(1);
+    bridge.stop();
+  });
+
   it("forwards double-click cancellation requests to the DOM event", () => {
     const workspace = new FakeEmitter() as any;
     workspace.getLeavesOfType = () => [{ view }];
