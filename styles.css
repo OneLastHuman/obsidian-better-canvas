@@ -587,3 +587,10 @@
   stroke-width: 2.5px !important;
   transition: filter 100ms ease, stroke-width 100ms ease, opacity 100ms ease;
 }
+
+/* Inline validation message for prompt modals (kept visible while the modal stays open). */
+.bc-prompt-error {
+  margin: 6px 0 0;
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+}

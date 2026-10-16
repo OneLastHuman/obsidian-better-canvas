@@ -7,7 +7,8 @@ import {
   formatMcpResourceRead,
   normalizeMcpPromptPage,
   normalizeMcpResourcePage,
-  parseMcpPromptArguments
+  parseMcpPromptArguments,
+  parseMcpToolConfirmation
 } from "./mcp-catalog";
 
 describe("MCP resources and prompts catalog", () => {
@@ -133,5 +134,22 @@ describe("MCP resources and prompts catalog", () => {
     expect(result.text).toContain("[Image attachment: image/png]");
     expect(result.text).not.toContain("iVBORw0KGgo=");
     expect(result.images).toEqual([{ mimeType: "image/png", data: "iVBORw0KGgo=" }]);
+  });
+});
+
+describe("MCP tool call confirmation", () => {
+  it("accepts a confirmed call whose tool name is exposed by the server", () => {
+    expect(parseMcpToolConfirmation('{"toolName":"echo","arguments":{"text":"hi"}}', ["echo", "sum"]))
+      .toEqual({ toolName: "echo", arguments: { text: "hi" } });
+  });
+
+  it("rejects invalid JSON, unknown tool names and non-object arguments before sending anything", () => {
+    expect(() => parseMcpToolConfirmation("{", ["echo"])).toThrowError("MCP 调用确认 JSON 无效。请检查后重试。");
+    expect(() => parseMcpToolConfirmation('{"toolName":"ghost","arguments":{}}', ["echo"]))
+      .toThrowError(/toolName 必须是当前 MCP 服务公开的工具名称/);
+    expect(() => parseMcpToolConfirmation('{"toolName":"echo","arguments":[]}', ["echo"]))
+      .toThrowError(/arguments 必须是 JSON object/);
+    expect(() => parseMcpToolConfirmation('{"arguments":{}}', ["echo"]))
+      .toThrowError(/toolName 必须是当前 MCP 服务公开的工具名称/);
   });
 });

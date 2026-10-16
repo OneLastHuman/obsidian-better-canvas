@@ -45,7 +45,8 @@ import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirectio
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
-import { isCanvasReadOnly, shouldSubmitPromptValue } from "./canvas-command-guards";
+import { isCanvasReadOnly } from "./canvas-command-guards";
+import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
 import {
@@ -58,7 +59,7 @@ import {
   callSseMcpTool, getSseMcpPrompt, listSseMcpPrompts, listSseMcpResources, listSseMcpTools, readSseMcpResource
 } from "./mcp-sse";
 import {
-  formatMcpPromptCatalog, formatMcpResourceCatalog, parseMcpPromptArguments,
+  formatMcpPromptCatalog, formatMcpResourceCatalog, parseMcpPromptArguments, parseMcpToolConfirmation,
   type McpPrompt, type McpResource
 } from "./mcp-catalog";
 import { CanvasMetadataIndexer } from "./canvas-metadata";
@@ -135,7 +136,8 @@ class FeaturePromptModal extends Modal {
     private placeholderText: string,
     private onSubmitValue: (value: string) => unknown,
     private initialValue = "",
-    private allowEmptySubmission = false
+    private allowEmptySubmission = false,
+    private validateValue?: (value: string) => string | null
   ) {
     super(app);
   }
@@ -149,13 +151,33 @@ class FeaturePromptModal extends Modal {
     input.value = this.initialValue;
     input.style.width = "100%";
     input.style.resize = "vertical";
+    const error = this.contentEl.createDiv({ cls: "bc-prompt-error" });
+    error.hide();
     const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
     const submit = footer.createEl("button", { text: "提交", cls: "mod-cta" });
     submit.onclick = () => {
-      const value = input.value.trim();
+      const submission = resolvePromptSubmission(input.value.trim(), {
+        allowEmpty: this.allowEmptySubmission,
+        validate: this.validateValue
+      });
+      if (submission.kind === "cancelled") {
+        this.close();
+        return;
+      }
+      if (submission.kind === "invalid") {
+        // Keep the modal and the typed text so the value can be corrected in place.
+        error.setText(submission.message);
+        error.show();
+        input.focus();
+        return;
+      }
       this.close();
-      if (shouldSubmitPromptValue(value, this.allowEmptySubmission)) void this.onSubmitValue(value);
+      void this.onSubmitValue(submission.value);
     };
+    input.addEventListener("input", () => {
+      error.setText("");
+      error.hide();
+    });
     input.addEventListener("keydown", event => {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
         event.preventDefault();
@@ -562,8 +584,15 @@ export default class BetterCanvasFeatures {
     this.applySelectionEdgeHighlight(canvas);
   }
 
-  private input(title: string, placeholder: string, cb: (value: string) => unknown, initial = "", allowEmptySubmission = false): void {
-    new FeaturePromptModal(this.p.app, title, placeholder, cb, initial, allowEmptySubmission).open();
+  private input(
+    title: string,
+    placeholder: string,
+    cb: (value: string) => unknown,
+    initial = "",
+    allowEmptySubmission = false,
+    validate?: (value: string) => string | null
+  ): void {
+    new FeaturePromptModal(this.p.app, title, placeholder, cb, initial, allowEmptySubmission, validate).open();
   }
 
   private registerCommands(): void {
@@ -850,23 +879,12 @@ export default class BetterCanvasFeatures {
       "编辑 styleAttributes JSON",
       "输入有效的 JSON 对象，例如 { \"shape\": \"diamond\" }",
       raw => {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(raw);
-        } catch (error) {
-          new Notice("JSON 格式无效：" + (error instanceof Error ? error.message : String(error)));
-          return;
-        }
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-          new Notice("styleAttributes 必须是 JSON 对象。");
-          return;
-        }
-
+        const parsed = parseJsonObjectPrompt(raw, "styleAttributes");
         if (node) {
-          patchNode(canvas, node.id, { styleAttributes: parsed as Record<string, unknown> });
+          patchNode(canvas, node.id, { styleAttributes: parsed });
         } else if (edge) {
           const nextEdges = data.edges.map((item: CanvasEdgeData) =>
-            item.id === edge.id ? { ...item, styleAttributes: parsed as Record<string, unknown> } : item
+            item.id === edge.id ? { ...item, styleAttributes: parsed } : item
           );
           canvas.importData({ ...data, nodes: data.nodes, edges: nextEdges });
           canvas.requestSave?.();
@@ -875,7 +893,9 @@ export default class BetterCanvasFeatures {
         this.decorate(canvas);
         new Notice("已保存 styleAttributes。实际渲染效果取决于 Obsidian 与当前 Canvas 渲染器支持的属性。");
       },
-      initial
+      initial,
+      false,
+      promptValidator(value => parseJsonObjectPrompt(value, "styleAttributes"))
     );
   }
 
@@ -2371,7 +2391,9 @@ export default class BetterCanvasFeatures {
               }
             })();
           },
-          JSON.stringify(snapshot.frontmatter, null, 2)
+          JSON.stringify(snapshot.frontmatter, null, 2),
+          false,
+          promptValidator(value => replaceCanvasFrontmatter(raw, value))
         );
       } catch (error) {
         new Notice("读取 Canvas frontmatter 失败：" + (error instanceof Error ? error.message : String(error)), 8000);
@@ -3212,14 +3234,7 @@ export default class BetterCanvasFeatures {
         const tool = tools.find(item => item.name === name.trim());
         if (!tool) return new Notice("工具名称不在列表中。");
         this.input("MCP 参数", "输入 JSON object，例如 {}", async raw => {
-          let args: Record<string, unknown>;
-          try {
-            const parsed = JSON.parse(raw);
-            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("需要 JSON object");
-            args = parsed;
-          } catch (error) {
-            return new Notice(error instanceof Error ? error.message : "参数 JSON 无效");
-          }
+          const args = parseJsonObjectPrompt(raw, "参数");
           const sourceSelection = this.selected(canvasForWrite);
           const notice = new Notice("正在调用 MCP 工具…", 0);
           try {
@@ -3234,7 +3249,7 @@ export default class BetterCanvasFeatures {
             notice.hide();
             new Notice(error instanceof Error ? error.message : String(error), 8000);
           }
-        }, "{}");
+        }, "{}", false, promptValidator(value => parseJsonObjectPrompt(value, "参数")));
       }, tools[0].name);
     } catch (error) {
       new Notice(error instanceof Error ? error.message : String(error), 8000);
@@ -3402,13 +3417,7 @@ export default class BetterCanvasFeatures {
         return;
       }
       this.input("MCP Prompt 参数", "输入 JSON object；参数值必须是字符串。\n\n" + summary, raw => {
-        let args: Record<string, string>;
-        try {
-          args = parseMcpPromptArguments(raw);
-        } catch (error) {
-          new Notice(error instanceof Error ? error.message : String(error), 8000);
-          return;
-        }
+        const args = parseMcpPromptArguments(raw);
         const missing = prompt.arguments.filter(arg => arg.required && !String(args[arg.name] ?? "").trim());
         if (missing.length) {
           new Notice("缺少必填 Prompt 参数：" + missing.map(arg => arg.name).join(", "));
@@ -3426,7 +3435,7 @@ export default class BetterCanvasFeatures {
             new Notice(error instanceof Error ? error.message : String(error), 8000);
           }
         })();
-      }, "{}");
+      }, "{}", false, promptValidator(parseMcpPromptArguments));
     }, prompts[0].name);
   }
 
@@ -3483,40 +3492,27 @@ export default class BetterCanvasFeatures {
         arguments: proposal.arguments,
         reason: String(proposal.reason ?? "")
       };
+      const toolNames = tools.map(item => item.name);
       this.input(
         "确认 MCP 调用：" + tool.name,
         "请检查参数。按“提交”即会把此 JSON 中的 toolName 与 arguments 发送给你配置的 MCP 服务。",
         async edited => {
-          let approved: any;
-          try {
-            approved = JSON.parse(edited);
-            if (!approved || typeof approved !== "object" || Array.isArray(approved)) throw new Error("需要 JSON object");
-            if (typeof approved.toolName !== "string" || !tools.some(item => item.name === approved.toolName)) {
-              throw new Error("toolName 必须是当前 MCP 服务公开的工具名称。");
-            }
-            if (!approved.arguments || typeof approved.arguments !== "object" || Array.isArray(approved.arguments)) {
-              throw new Error("arguments 必须是 JSON object。");
-            }
-          } catch (error) {
-            new Notice(error instanceof Error ? error.message : "确认参数无效。");
-            return;
-          }
-
-          const running = new Notice("正在执行已确认的 MCP 工具：" + approved.toolName, 0);
+          const confirmed = parseMcpToolConfirmation(edited, toolNames);
+          const running = new Notice("正在执行已确认的 MCP 工具：" + confirmed.toolName, 0);
           try {
             const result = useStdio
-              ? await callLocalMcpTool(String(settings.mcpStdioConfig ?? ""), approved.toolName, approved.arguments as Record<string, unknown>)
+              ? await callLocalMcpTool(String(settings.mcpStdioConfig ?? ""), confirmed.toolName, confirmed.arguments)
               : useSse
-                ? await callSseMcpTool(settings.mcpEndpoint, settings.mcpApiKey, approved.toolName, approved.arguments as Record<string, unknown>)
+                ? await callSseMcpTool(settings.mcpEndpoint, settings.mcpApiKey, confirmed.toolName, confirmed.arguments)
                 : await callRemoteTool(
                     settings.mcpEndpoint,
                     settings.mcpApiKey,
-                    approved.toolName,
-                    approved.arguments as Record<string, unknown>
+                    confirmed.toolName,
+                    confirmed.arguments
                   );
             const canvas = selection.canvas;
             const current = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === selection.node.id);
-            await this.saveMcpResult(approved.toolName, result, canvas, current);
+            await this.saveMcpResult(confirmed.toolName, result, canvas, current);
             running.hide();
             new Notice("MCP 调用完成；结果已保存为新节点。");
           } catch (error) {
@@ -3524,7 +3520,9 @@ export default class BetterCanvasFeatures {
             new Notice(error instanceof Error ? error.message : String(error), 8000);
           }
         },
-        JSON.stringify(suggested, null, 2)
+        JSON.stringify(suggested, null, 2),
+        false,
+        promptValidator(value => parseMcpToolConfirmation(value, toolNames))
       );
     } catch (error) {
       loading.hide();
