@@ -116,6 +116,12 @@ export default class NodeMenuUnifier {
       const popupEl = record.menu.menuEl;
       if (popupEl instanceof HTMLElement) {
         popupEl.classList.remove("bc-node-popup-menu", "bc-node-style-view", "bc-node-popup-dismissed");
+        // Drop the injected entry points and the placement we applied, so the
+        // Canvas popup goes back to exactly what the host renders.
+        popupEl.replaceChildren();
+        for (const property of ["left", "top", "width", "max-height", "transform"]) {
+          popupEl.style.removeProperty(property);
+        }
       }
       try {
         record.original.call(record.menu);
@@ -214,7 +220,13 @@ export default class NodeMenuUnifier {
     const popupEl = menu?.menuEl;
     if (!(popupEl instanceof HTMLElement)) return;
     const activePanel = this.activePanel;
-    if (activePanel && activePanel.popupEl === popupEl && activePanel.surface === popupEl) return;
+    if (activePanel && activePanel.popupEl === popupEl && activePanel.surface === popupEl) {
+      // The host just re-rendered its own items into the surface we borrowed for
+      // the style panel (a native node change such as the colour triggers this).
+      // Rebuild the panel so native entries never appear inside it.
+      this.renderStylePanel();
+      return;
+    }
 
     const nodeId = selectedNodeId(canvas);
     if (!nodeId || !nodeFromData(canvas, nodeId)) {
@@ -304,14 +316,42 @@ export default class NodeMenuUnifier {
     this.renderStylePanel();
   }
 
+  /**
+   * Place the panel inside the visible Canvas area. A `position: fixed` box is
+   * resolved against its nearest containing block, and inside Canvas that is the
+   * `contain: strict` canvas wrapper rather than the viewport, so the anchor has
+   * to be converted into that box before it can be applied. Clamping against the
+   * wrapper also keeps the panel inside the area the wrapper does not clip.
+   */
   private positionPopover(surface: HTMLElement, anchor: { x: number; y: number }): void {
-    const width = Math.min(332, Math.max(240, window.innerWidth - 24));
-    const panelHeight = Math.min(640, window.innerHeight - 24);
-    const left = Math.max(12, Math.min(anchor.x, window.innerWidth - width - 12));
-    const top = Math.max(12, Math.min(anchor.y, window.innerHeight - panelHeight - 12));
-    surface.style.left = left + "px";
-    surface.style.top = top + "px";
+    const margin = 12;
+    const containerEl = surface.offsetParent instanceof HTMLElement ? surface.offsetParent : document.documentElement;
+    const container = containerEl.getBoundingClientRect();
+    const containerStyle = getComputedStyle(containerEl);
+    const inset = (property: "borderLeftWidth" | "borderRightWidth" | "borderTopWidth" | "borderBottomWidth"): number =>
+      Number.parseFloat(containerStyle[property]) || 0;
+    const origin = {
+      left: container.left + inset("borderLeftWidth"),
+      top: container.top + inset("borderTopWidth")
+    };
+    const bounds = {
+      left: Math.max(margin, origin.left + margin),
+      top: Math.max(margin, origin.top + margin),
+      right: Math.min(window.innerWidth - margin, container.right - inset("borderRightWidth") - margin),
+      bottom: Math.min(window.innerHeight - margin, container.bottom - inset("borderBottomWidth") - margin)
+    };
+
+    const availableWidth = Math.max(220, bounds.right - bounds.left);
+    const availableHeight = Math.max(160, bounds.bottom - bounds.top);
+    const width = Math.min(332, availableWidth);
     surface.style.width = width + "px";
+    surface.style.maxHeight = availableHeight + "px";
+
+    const height = Math.min(surface.getBoundingClientRect().height, availableHeight);
+    const left = Math.min(Math.max(anchor.x, bounds.left), Math.max(bounds.left, bounds.left + availableWidth - width));
+    const top = Math.min(Math.max(anchor.y, bounds.top), Math.max(bounds.top, bounds.top + availableHeight - height));
+    surface.style.left = Math.round(left - origin.left) + "px";
+    surface.style.top = Math.round(top - origin.top) + "px";
   }
 
   private dismissPanel(restoreToolbar: boolean): void {
@@ -553,7 +593,7 @@ export default class NodeMenuUnifier {
     addButton(footer, "完成", "bc-node-style-done mod-cta", () => this.dismissPanel(active.source === "toolbar"));
     surface.appendChild(footer);
 
-    if (active.source === "context") this.positionPopover(surface, active.anchor);
+    this.positionPopover(surface, active.anchor);
     if (focusKey) {
       const selector = '[data-style-option="' + focusKey + '"]';
       surface.querySelector<HTMLElement>(selector)?.focus();

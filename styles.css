@@ -804,10 +804,6 @@
   background: var(--interactive-accent);
   color: var(--text-on-accent) !important;
 }
+/* Only the plain rectangle alias lacks a rule above; the other panel shapes
+   reuse the Advanced JSON Canvas styleAttributes definitions. */
 .canvas-node[data-bc-shape="square"] { border-radius: 0 !important; clip-path: none !important; }
-.canvas-node[data-bc-shape="circle"] { border-radius: 50% !important; }
-.canvas-node[data-bc-shape="document"] {
-  border-radius: 0.15rem !important;
-  clip-path: polygon(0 0, 82% 0, 100% 18%, 100% 100%, 0 100%);
-}
-.canvas-node[data-bc-shape="database"] { border-radius: 50% / 18% !important; }
