@@ -162,7 +162,7 @@ export default class NodeMenuUnifier {
     if (!canvas || !(popupEl instanceof HTMLElement)) return;
 
     const activePanel = this.activePanel;
-    if (activePanel?.canvas === canvas) {
+    if (activePanel && activePanel.canvas === canvas) {
       this.dismissPanel(activePanel.source === "toolbar");
     }
     popupEl.replaceChildren();
