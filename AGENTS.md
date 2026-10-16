@@ -24,6 +24,7 @@
 以当前 `package.json` 为准。当前标准命令为：
 
 ```bash
+npm run lint
 npm run typecheck
 npm test
 npm run build
