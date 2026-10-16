@@ -12,6 +12,7 @@ describe("getNodeAIContextMenuActions", () => {
       "model"
     ]);
     expect(actions.some(action => action.id === "regenerate")).toBe(false);
+    expect(actions.map(action => action.title)).toEqual(["问 AI", "生成图片", "闪卡", "模型"]);
   });
 
   it("offers regeneration only for generated AI nodes", () => {
@@ -25,6 +26,6 @@ describe("getNodeAIContextMenuActions", () => {
       "regenerate"
     ]);
     expect(actions.find(action => action.id === "regenerate")?.title)
-      .toBe("Better Canvas: 重新生成 AI 节点");
+      .toBe("重生成");
   });
 });
