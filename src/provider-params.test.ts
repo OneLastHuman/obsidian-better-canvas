@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   mergeProviderParams,
+  normalizeTemperatureForProtocol,
   parseProviderParamsJson,
+  providerTemperatureLimit,
   resolveMaxOutputTokens,
   resolveTemperature,
   validateProviderParams
@@ -66,6 +68,24 @@ describe("validated provider-specific request parameters", () => {
       contents: [{ role: "user", parts: [{ text: "hi" }] }],
       generationConfig: { temperature: 0.4, maxOutputTokens: 2048, topP: 0.8, topK: 32 }
     });
+  });
+
+  it("derives the sampling temperature limit from the current protocol", () => {
+    expect(providerTemperatureLimit("openai")).toBe(2);
+    expect(providerTemperatureLimit("gemini")).toBe(2);
+    expect(providerTemperatureLimit("anthropic")).toBe(1);
+    expect(resolveTemperature(2, 0.4, "gemini")).toBe(2);
+    expect(() => resolveTemperature(2.1, 0.4, "gemini")).toThrow(/0 到 2/);
+  });
+
+  it("repairs stored temperatures the current protocol cannot express", () => {
+    expect(normalizeTemperatureForProtocol(1.5, "anthropic")).toBe(1);
+    expect(normalizeTemperatureForProtocol(1.5, "openai")).toBe(1.5);
+    expect(normalizeTemperatureForProtocol(1.5, "gemini")).toBe(1.5);
+    expect(normalizeTemperatureForProtocol(undefined, "anthropic")).toBe(0.4);
+    expect(normalizeTemperatureForProtocol(Number.NaN, "anthropic")).toBe(0.4);
+    expect(normalizeTemperatureForProtocol(-1, "openai")).toBe(0.4);
+    expect(normalizeTemperatureForProtocol("1.5", "anthropic", 0.2)).toBe(1);
   });
 
   it("validates sampling temperature and output token limits", () => {

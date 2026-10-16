@@ -1,7 +1,12 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedPromptProfile } from "./prompt-profiles";
 import { modelCapabilityReportKey, type ModelCapabilityReport } from "./model-capabilities";
-import { parseProviderParamsJson } from "./provider-params";
+import {
+  normalizeTemperatureForProtocol,
+  parseProviderParamsJson,
+  providerTemperatureLimit,
+  type ProviderRequestProtocol
+} from "./provider-params";
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
 import { validateNumericRangeInput } from "./numeric-range-validation";
 import { getSettingsSearchMatches } from "./settings-search";
@@ -13,7 +18,18 @@ type SettingSection = {
   description: string;
 };
 
+/** A numeric row whose valid range can follow a neighbouring setting, such as the protocol. */
+type NumericRangeSetting = {
+  applyRange(next: { max: number; description: string; value: number }): void;
+};
+
 let numericRangeDescriptionId = 0;
+
+function temperatureRangeDescription(protocol: ProviderRequestProtocol): string {
+  return (protocol === "anthropic" ? "Anthropic 范围 0 到 " : "范围 0 到 ")
+    + providerTemperatureLimit(protocol)
+    + "；留空或无效输入不会覆盖上一次有效值。";
+}
 
 export default class BetterCanvasSettingsTab extends PluginSettingTab {
   private plugin: any;
@@ -154,30 +170,36 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     max: number,
     onValidChange: (value: number) => Promise<void>,
     options: { description?: string; step?: string; integer?: boolean; allowEmpty?: boolean } = {}
-  ): void {
+  ): NumericRangeSetting {
     const setting = new Setting(page).setName(name);
-    if (options.description) setting.setDesc(options.description);
+    const description = setting.descEl.createSpan({ cls: "bc-settings-number-description", text: options.description ?? "" });
+    const feedback = setting.descEl.createSpan({ cls: "bc-settings-number-error" });
+    feedback.hidden = true;
+    feedback.setAttribute("role", "status");
+    feedback.setAttribute("aria-live", "polite");
+
+    const descriptionId = setting.descEl.id || ("bc-settings-number-description-" + (++numericRangeDescriptionId));
+    setting.descEl.id = descriptionId;
+
+    let currentMax = max;
+    let inputEl: HTMLInputElement | null = null;
+    let writeValue: ((value: number) => void) | null = null;
 
     setting.addText(text => {
       const input = text.inputEl;
+      inputEl = input;
+      writeValue = value => text.setValue(String(value));
       input.type = "number";
       input.min = String(min);
-      input.max = String(max);
+      input.max = String(currentMax);
       if (options.step) input.step = options.step;
 
-      const feedback = setting.descEl.createEl("span", { cls: "bc-settings-number-error" });
-      feedback.hidden = true;
-      feedback.setAttribute("role", "status");
-      feedback.setAttribute("aria-live", "polite");
-
-      const descriptionId = setting.descEl.id || ("bc-settings-number-description-" + (++numericRangeDescriptionId));
-      setting.descEl.id = descriptionId;
       const describedBy = new Set((input.getAttribute("aria-describedby") || "").split(" ").filter(Boolean));
       describedBy.add(descriptionId);
       input.setAttribute("aria-describedby", Array.from(describedBy).join(" "));
 
       text.setValue(String(currentValue)).onChange(async rawValue => {
-        const number = validateNumericRangeInput(rawValue, min, max, input, feedback, {
+        const number = validateNumericRangeInput(rawValue, min, currentMax, input, feedback, {
           integer: options.integer,
           allowEmpty: options.allowEmpty
         });
@@ -185,6 +207,19 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         await onValidChange(number);
       });
     });
+
+    return {
+      applyRange(next) {
+        currentMax = next.max;
+        description.setText(next.description);
+        if (!inputEl || !writeValue) return;
+        inputEl.max = String(next.max);
+        writeValue(next.value);
+        inputEl.removeAttribute("aria-invalid");
+        feedback.textContent = "";
+        feedback.hidden = true;
+      }
+    };
   }
 
   private renderCanvasSettings(page: HTMLElement): void {
@@ -367,6 +402,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           await this.saveProvider(profile, settings);
         }));
 
+      let temperatureSetting: NumericRangeSetting | null = null;
+
       new Setting(card).setName("协议")
         .addDropdown(dropdown => dropdown
           .addOption("openai", "OpenAI 兼容")
@@ -374,8 +411,20 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           .addOption("gemini", "Gemini")
           .setValue(profile.protocol === "anthropic" || profile.protocol === "gemini" ? profile.protocol : "openai")
           .onChange(async value => {
-            profile.protocol = value;
+            const protocol: ProviderRequestProtocol = value === "anthropic" || value === "gemini" ? value : "openai";
+            profile.protocol = protocol;
+            const previous = typeof profile.temperature === "number" ? profile.temperature : 0.4;
+            const temperature = normalizeTemperatureForProtocol(previous, protocol);
+            profile.temperature = temperature;
             await this.saveProvider(profile, settings);
+            temperatureSetting?.applyRange({
+              max: providerTemperatureLimit(protocol),
+              description: temperatureRangeDescription(protocol),
+              value: temperature
+            });
+            if (temperature !== previous) {
+              new Notice("Temperature 已按当前协议上限从 " + previous + " 调整为 " + temperature + "。");
+            }
           }));
 
       new Setting(card).setName("API 地址")
@@ -405,20 +454,18 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           await this.saveProvider(profile, settings);
         }));
 
-      this.addNumericRangeSetting(
+      temperatureSetting = this.addNumericRangeSetting(
         card,
         "Temperature",
         typeof profile.temperature === "number" ? profile.temperature : 0.4,
         0,
-        profile.protocol === "anthropic" ? 1 : 2,
+        providerTemperatureLimit(profile.protocol),
         async number => {
           profile.temperature = number;
           await this.saveProvider(profile, settings);
         },
         {
-          description: profile.protocol === "anthropic"
-            ? "Anthropic 范围 0 到 1；留空或无效输入不会覆盖上一次有效值。"
-            : "范围 0 到 2；留空或无效输入不会覆盖上一次有效值。",
+          description: temperatureRangeDescription(profile.protocol),
           step: "0.1",
           allowEmpty: true
         }

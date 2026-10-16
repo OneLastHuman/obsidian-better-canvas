@@ -88,14 +88,37 @@ export function parseProviderParamsJson(raw: string): Record<string, unknown> {
   return validateProviderParams(parsed);
 }
 
+const DEFAULT_TEMPERATURE = 0.4;
+
+/** Upper sampling temperature bound of each protocol adapter. */
+export function providerTemperatureLimit(protocol: ProviderRequestProtocol): number {
+  return protocol === "anthropic" ? 1 : 2;
+}
+
+/**
+ * Fit a stored temperature to a protocol adapter. Values the adapter cannot express are
+ * capped at its limit and unusable values fall back to the default, so the settings UI and
+ * the request-time validation never disagree about what is a valid configuration.
+ */
+export function normalizeTemperatureForProtocol(
+  value: unknown,
+  protocol: ProviderRequestProtocol,
+  fallback = DEFAULT_TEMPERATURE
+): number {
+  if (value === undefined || value === null || value === "") return fallback;
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number) || number < 0) return fallback;
+  return Math.min(number, providerTemperatureLimit(protocol));
+}
+
 export function resolveTemperature(
   value: unknown,
-  fallback = 0.4,
+  fallback = DEFAULT_TEMPERATURE,
   protocol: ProviderRequestProtocol = "openai"
 ): number {
   if (value === undefined || value === null || value === "") return fallback;
   const number = typeof value === "number" ? value : Number(value);
-  const maximum = protocol === "anthropic" ? 1 : 2;
+  const maximum = providerTemperatureLimit(protocol);
   if (!Number.isFinite(number) || number < 0 || number > maximum) {
     throw new Error("Temperature 必须是 0 到 " + maximum + " 之间的数字。");
   }
