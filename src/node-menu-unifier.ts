@@ -146,7 +146,10 @@ export default class NodeMenuUnifier {
     const anchor = contextRect && contextRect.width > 0
       ? { x: contextRect.left, y: contextRect.top }
       : { x: nodeRect.right + 8, y: nodeRect.top };
-    const popupEl = canvas?.menu?.menuEl instanceof HTMLElement ? canvas.menu.menuEl as HTMLElement : undefined;
+    const canvasMenu = canvas?.menu;
+    const popupEl = canvasMenu && this.patchedMenus.has(canvasMenu) && canvasMenu.menuEl instanceof HTMLElement
+      ? canvasMenu.menuEl as HTMLElement
+      : undefined;
     this.showStylePanel(canvas, nodeId, "context", anchor, popupEl);
   }
 
@@ -158,8 +161,9 @@ export default class NodeMenuUnifier {
     const canvas = node?.canvas ?? (workspace.getLeavesOfType?.("canvas") ?? [])
       .map((leaf: any) => leaf?.view?.canvas)
       .find((candidate: any) => candidate?.nodes?.has?.(nodeId));
-    const popupEl = canvas?.menu?.menuEl;
-    if (!canvas || !(popupEl instanceof HTMLElement)) return;
+    const canvasMenu = canvas?.menu;
+    const popupEl = canvasMenu?.menuEl;
+    if (!canvas || !canvasMenu || !this.patchedMenus.has(canvasMenu) || !(popupEl instanceof HTMLElement)) return;
 
     const activePanel = this.activePanel;
     if (activePanel && activePanel.canvas === canvas) {
