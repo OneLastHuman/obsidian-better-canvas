@@ -9,6 +9,11 @@ const tools = [{
   description: "回显参数，用于 Better Canvas 验收",
   inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] }
 }];
+const prompts = [{
+  name: "summarize",
+  description: "回显提示模板参数，用于 Better Canvas 验收",
+  arguments: [{ name: "topic", description: "要总结的主题", required: true }]
+}];
 
 function log(entry) {
   try {
@@ -53,8 +58,16 @@ function handle(line) {
       reply(message.id, { resources: [] });
       return;
     case "prompts/list":
-      reply(message.id, { prompts: [] });
+      reply(message.id, { prompts });
       return;
+    case "prompts/get": {
+      const args = message.params?.arguments ?? {};
+      reply(message.id, {
+        description: "summarize " + String(message.params?.name ?? ""),
+        messages: [{ role: "user", content: { type: "text", text: "summarize 收到参数：" + JSON.stringify(args) } }]
+      });
+      return;
+    }
     default:
       reply(message.id, {});
   }
