@@ -196,6 +196,9 @@ interface CanvasBridgeState {
   frameQueued: boolean;
   dataLoadDepth: number;
   dispatchingDataRequest: boolean;
+  knownNodeIds: Set<string>;
+  knownEdgeIds: Set<string>;
+  initialLoadSeen: boolean;
   observer?: any;
 }
 
@@ -338,6 +341,15 @@ export class AdvancedCanvasEventBridge {
     state.dataLoadDepth = 0;
     state.dispatchingDataRequest = false;
     state.snapshot = this.takeSnapshot(state);
+    state.knownNodeIds = new Set(
+      state.snapshot.data.nodes.map(node => String(node?.id ?? "")).filter(Boolean)
+    );
+    state.knownEdgeIds = new Set(
+      state.snapshot.data.edges.map(edge => String(edge?.id ?? "")).filter(Boolean)
+    );
+    // A canvas that already holds data was loaded before the bridge attached, so
+    // its next import is a regular edit rather than the view's initial file load.
+    state.initialLoadSeen = state.knownNodeIds.size > 0 || state.knownEdgeIds.size > 0;
     this.states.set(view, state);
     this.patchCanvasMethods(state);
     this.bindDomEvents(state);
@@ -432,6 +444,8 @@ export class AdvancedCanvasEventBridge {
     const nextEdges = mapById(next.data.edges);
 
     for (const id of changes.addedNodes) {
+      if (state.knownNodeIds.has(id)) continue;
+      state.knownNodeIds.add(id);
       const node = canvas.nodes?.get?.(id) ?? nextNodes.get(id);
       this.emit("advanced-canvas:node-created", canvas, node);
       this.emit("advanced-canvas:node-added", canvas, node);
@@ -456,6 +470,8 @@ export class AdvancedCanvasEventBridge {
       this.emit("advanced-canvas:node-text-content-changed", canvas, node, undefined);
     }
     for (const id of changes.addedEdges) {
+      if (state.knownEdgeIds.has(id)) continue;
+      state.knownEdgeIds.add(id);
       const edge = canvas.edges?.get?.(id) ?? nextEdges.get(id);
       this.emit("advanced-canvas:edge-created", canvas, edge);
       this.emit("advanced-canvas:edge-added", canvas, edge);
@@ -626,6 +642,20 @@ export class AdvancedCanvasEventBridge {
         let setData = (next: any) => { data = next; };
         if (outermost) {
           bridge.emit("advanced-canvas:data-loaded:before", canvas, incoming, setData);
+        }
+        if (!state.initialLoadSeen) {
+          // The first import after a not-yet-loaded view is the canvas file
+          // itself: its items already existed and must not be reported as
+          // newly created. Canvases the bridge only attaches to after their
+          // file was loaded are excluded in attach(), so this branch only
+          // catches the view's own initial load.
+          state.initialLoadSeen = true;
+          for (const node of Array.isArray(data?.nodes) ? data.nodes : []) {
+            if (typeof node?.id === "string" && node.id) state.knownNodeIds.add(node.id);
+          }
+          for (const edge of Array.isArray(data?.edges) ? data.edges : []) {
+            if (typeof edge?.id === "string" && edge.id) state.knownEdgeIds.add(edge.id);
+          }
         }
         state.dataLoadDepth += 1;
         let result: any;

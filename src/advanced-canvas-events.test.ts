@@ -217,6 +217,69 @@ describe("Advanced Canvas event bridge", () => {
     cleanups.forEach(cleanup => cleanup());
   });
 
+  it("does not report canvas items loaded from the file as newly created", () => {
+    const workspace = new FakeEmitter() as any;
+    workspace.onLayoutReady = () => {};
+    const canvas = makeCanvas({ nodes: [], edges: [] });
+    const view: any = { canvas, containerEl: new FakeContainer(), file: { path: "Boards/Existing.canvas" }, getViewType: () => "canvas" };
+    workspace.getLeavesOfType = () => [{ view }];
+    const app = { workspace, vault: new FakeEmitter() };
+    const plugin = { register() {} };
+    const scheduled: Array<() => void> = [];
+    const bridge = new AdvancedCanvasEventBridge(app, plugin, { scheduleFrame: callback => scheduled.push(callback) });
+
+    bridge.start();
+    while (scheduled.length) scheduled.shift()!();
+
+    // Opening an existing canvas replaces the empty view data with the file contents.
+    canvas.importData({
+      nodes: [
+        { id: "existing-a", type: "text", x: 0, y: 0, width: 100, height: 60, text: "A" },
+        { id: "existing-b", type: "text", x: 200, y: 0, width: 100, height: 60, text: "B" }
+      ],
+      edges: [{ id: "existing-edge", fromNode: "existing-a", fromSide: "right", toNode: "existing-b", toSide: "left" }]
+    });
+    while (scheduled.length) scheduled.shift()!();
+    expect(workspace.count("advanced-canvas:node-created")).toBe(0);
+    expect(workspace.count("advanced-canvas:edge-created")).toBe(0);
+
+    // A node created after the file finished loading is still announced.
+    canvas.importData({
+      nodes: [
+        { id: "existing-a", type: "text", x: 0, y: 0, width: 100, height: 60, text: "A" },
+        { id: "existing-b", type: "text", x: 200, y: 0, width: 100, height: 60, text: "B" },
+        { id: "created-later", type: "text", x: 400, y: 0, width: 100, height: 60, text: "C" }
+      ],
+      edges: [{ id: "existing-edge", fromNode: "existing-a", fromSide: "right", toNode: "existing-b", toSide: "left" }]
+    });
+    while (scheduled.length) scheduled.shift()!();
+    expect(workspace.count("advanced-canvas:node-created")).toBe(1);
+    bridge.stop();
+  });
+
+  it("does not re-announce a node that comes back after being removed", () => {
+    const workspace = new FakeEmitter() as any;
+    workspace.onLayoutReady = () => {};
+    const canvas = makeCanvas({
+      nodes: [{ id: "existing", type: "text", x: 0, y: 0, width: 100, height: 60, text: "A" }],
+      edges: []
+    });
+    const view: any = { canvas, containerEl: new FakeContainer(), file: { path: "Boards/Existing.canvas" }, getViewType: () => "canvas" };
+    workspace.getLeavesOfType = () => [{ view }];
+    const app = { workspace, vault: new FakeEmitter() };
+    const plugin = { register() {} };
+    const bridge = new AdvancedCanvasEventBridge(app, plugin, { scheduleFrame: callback => callback() });
+
+    bridge.start();
+    canvas.importData({ nodes: [], edges: [] });
+    canvas.importData({
+      nodes: [{ id: "existing", type: "text", x: 0, y: 0, width: 100, height: 60, text: "A" }],
+      edges: []
+    });
+    expect(workspace.count("advanced-canvas:node-created")).toBe(0);
+    bridge.stop();
+  });
+
   it("forwards double-click cancellation requests to the DOM event", () => {
     const workspace = new FakeEmitter() as any;
     workspace.getLeavesOfType = () => [{ view }];
