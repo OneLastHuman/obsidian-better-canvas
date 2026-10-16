@@ -13,7 +13,7 @@ import {
 import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
-import { parseProviderParamsJson } from "./provider-params";
+import { normalizeTemperatureForProtocol, parseProviderParamsJson } from "./provider-params";
 import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { connectedEdgeIds, selectedCanvasNodeIds } from "./edge-highlight";
@@ -448,8 +448,7 @@ export default class BetterCanvasFeatures {
     if (!s.providerProfiles.length) s.providerProfiles = JSON.parse(JSON.stringify(DEFAULT_PROFILES));
     for (const profile of s.providerProfiles as ProviderProfile[]) {
       if (typeof profile.requestParamsJson !== "string") profile.requestParamsJson = "{}";
-      const maxTemperature = profile.protocol === "anthropic" ? 1 : 2;
-      if (typeof profile.temperature !== "number" || !Number.isFinite(profile.temperature) || profile.temperature < 0 || profile.temperature > maxTemperature) profile.temperature = 0.4;
+      profile.temperature = normalizeTemperatureForProtocol(profile.temperature, profile.protocol ?? "openai");
       if (typeof profile.maxOutputTokens !== "number" || !Number.isInteger(profile.maxOutputTokens) || profile.maxOutputTokens < 0 || profile.maxOutputTokens > 200_000) profile.maxOutputTokens = 0;
     }
     if (!s.providerProfiles.some((p: ProviderProfile) => p.id === s.activeProviderId)) {

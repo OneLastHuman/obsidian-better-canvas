@@ -52,6 +52,8 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 
 每个 Provider Profile 可单独配置 Temperature、最大输出 token 数和高级请求参数 JSON。额外参数会按当前协议合并，并用于 API 后端的文本请求；核心请求字段与认证字段受到保护。最大输出 token 数不等于模型上下文窗口长度，当前也没有自动上下文限制发现、统一重试策略或成本限制。
 
+Temperature 的可填范围取决于协议：OpenAI 兼容与 Gemini 是 0 到 2，Anthropic 是 0 到 1。切换协议时范围说明和输入上限会立即更新；如果已保存的值超出新协议的上限，插件会把它调整到该上限并弹出提示，超出范围的输入则保持未保存并显示范围错误。
+
 模型列表发现支持 OpenAI-compatible 的 `/models`、Anthropic 的 `/models` 和 Gemini 的 `/models`。当服务不支持相应端点时，请手动填写模型名称。
 
 设置中还可以手动探测当前 provider/model 的文本请求和图片输入：确认后最多发送两次小型 API 请求，并保存探测结果。图片输入请求成功只表示接口返回了内容，不保证模型实际理解了图片；图片生成、PDF、视频、URL context 与搜索 grounding 能力仍需单独确认。
