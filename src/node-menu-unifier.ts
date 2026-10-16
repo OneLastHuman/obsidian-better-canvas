@@ -213,6 +213,7 @@ export default class NodeMenuUnifier {
 
     const nodeId = selectedNodeId(canvas);
     if (!nodeId || !nodeFromData(canvas, nodeId)) {
+      popupEl.replaceChildren();
       popupEl.classList.remove("bc-node-popup-menu", "bc-node-style-view", "bc-node-popup-dismissed");
       return;
     }
