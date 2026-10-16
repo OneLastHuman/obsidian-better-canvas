@@ -45,6 +45,7 @@ import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirectio
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
+import { applyDefaultNodeTextAlignment } from "./node-defaults";
 import { isCanvasReadOnly } from "./canvas-command-guards";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
@@ -310,6 +311,9 @@ export default class BetterCanvasFeatures {
       this.cleanup();
       closeAllLocalMcpSessions();
     });
+    this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-created", (canvas: any, node: any) => {
+      this.applyDefaultTextAlignmentToNewNode(canvas, node);
+    }));
     this.advancedCanvasEventBridge = new AdvancedCanvasEventBridge(this.p.app, this.p);
     this.advancedCanvasEventBridge.start();
     this.registerCommands();
@@ -384,6 +388,23 @@ export default class BetterCanvasFeatures {
 
   settings(): any {
     return this.p.settings as any;
+  }
+
+  private applyDefaultTextAlignmentToNewNode(canvas: any, node: any): void {
+    if (!canvas || isCanvasReadOnly(canvas)) return;
+    const nodeId = typeof node?.id === "string" ? node.id : node?.getData?.()?.id;
+    if (typeof nodeId !== "string") return;
+    const currentNode = readCanvasData(canvas).nodes.find(item => item.id === nodeId);
+    if (!currentNode) return;
+
+    const updated = applyDefaultNodeTextAlignment(currentNode, this.settings().defaultNodeTextAlign);
+    if (updated === currentNode) return;
+    if (patchNode(canvas, nodeId, {
+      bcTextAlign: updated.bcTextAlign,
+      styleAttributes: updated.styleAttributes
+    })) {
+      this.decorate(canvas);
+    }
   }
 
   async probeProviderCapabilities(profileId: string): Promise<ModelCapabilityReport> {
