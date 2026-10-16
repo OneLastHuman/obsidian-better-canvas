@@ -1,0 +1,852 @@
+/* Better Canvas currently uses Obsidian's native modal and setting styles. */
+.better-canvas-presentation {
+  min-width: min(680px, 80vw);
+}
+.better-canvas-presentation .better-canvas-slide {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 10rem;
+  padding: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+.better-canvas-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Better Canvas persisted node/edge enhancements */
+.canvas-node[data-bc-shape="pill"] {
+  border-radius: 999px !important;
+}
+.canvas-node[data-bc-shape="diamond"] {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.canvas-node[data-bc-shape="parallelogram"] {
+  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="hexagon"] {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+.canvas-node[data-bc-border="dashed"] {
+  border-style: dashed !important;
+}
+.canvas-node[data-bc-border="dotted"] {
+  border-style: dotted !important;
+}
+.canvas-node[data-bc-border="double"] {
+  border-style: double !important;
+}
+.canvas-node.bc-focus-dimmed {
+  opacity: 0.12 !important;
+  filter: blur(0.5px);
+  transition: opacity 100ms ease;
+}
+.canvas-edges path.bc-focus-dimmed,
+.bc-focus-mode .canvas-edges path.bc-focus-dimmed {
+  opacity: 0.1 !important;
+}
+.better-canvas-node-embed {
+  margin: 0.6rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+.better-canvas-node-embed > :first-child {
+  margin-top: 0;
+}
+.better-canvas-node-embed > :last-child {
+  margin-bottom: 0;
+}
+
+.canvas-node[data-bc-shape="ellipse"] {
+  border-radius: 50% !important;
+}
+.canvas-node[data-bc-shape="pentagon"] {
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+.canvas-node[data-bc-shape="octagon"] {
+  clip-path: polygon(28% 0%, 72% 0%, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0% 72%, 0% 28%);
+}
+.canvas-node[data-bc-shape="triangle"] {
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="trapezoid"] {
+  clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="chevron"] {
+  clip-path: polygon(0% 0%, 78% 0%, 100% 50%, 78% 100%, 0% 100%, 22% 50%);
+}
+.canvas-node[data-bc-shape="cloud"] {
+  clip-path: polygon(22% 18%, 28% 5%, 44% 8%, 55% 2%, 69% 13%, 84% 11%, 94% 27%, 90% 43%, 100% 55%, 88% 72%, 84% 87%, 66% 91%, 53% 100%, 38% 91%, 22% 94%, 12% 78%, 0% 70%, 7% 51%, 2% 35%, 12% 20%);
+}
+
+/* Better Canvas read-only mode keeps the canvas background available for panning/zooming. */
+.bc-readonly .canvas-node,
+.bc-readonly .canvas-edges,
+.bc-readonly .canvas-edges * {
+  pointer-events: none !important;
+}
+.bc-readonly .canvas-node {
+  cursor: default !important;
+}
+
+/* Per-node zoom breakpoints: preserve node geometry while simplifying its content at low zoom. */
+.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-content,
+.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-iframe,
+.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-container {
+  visibility: hidden !important;
+}
+
+/* Pinned PDF page nodes render a stable page snapshot inside the Canvas card. */
+.bc-pinned-pdf-embed-container {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+.bc-pinned-pdf-page {
+  max-width: 100%;
+  object-fit: contain;
+}
+.bc-pinned-pdf-page[data-loading="true"] {
+  opacity: 0.45;
+}
+.bc-pinned-pdf-page[data-error="true"] {
+  outline: 2px solid var(--color-red);
+}
+.bc-settings-root .bc-settings-number-error {
+  display: block;
+  color: var(--text-error);
+  font-size: var(--font-smaller);
+}
+.bc-settings-root .bc-settings-number-error[hidden] {
+  display: none;
+}
+.bc-settings-root input[aria-invalid="true"] {
+  border-color: var(--text-error);
+}
+
+.bc-pinned-pdf-error {
+  color: var(--text-error);
+  padding: 0.5rem;
+  font-size: var(--font-smaller);
+}
+
+/* Drawing layer for pinned PDF page annotations. */
+.bc-pinned-pdf-embed-container {
+  position: relative;
+}
+.bc-pdf-annotation-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bc-pdf-annotation-overlay[data-draw-enabled="true"] {
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+.bc-pdf-annotation-overlay path {
+  pointer-events: none;
+}
+.bc-pdf-annotation-overlay .bc-pdf-annotation-preview {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
+}
+
+/* Shapes defined by the Advanced JSON Canvas styleAttributes schema. */
+.canvas-node[data-bc-shape="circle"] {
+  border-radius: 50% !important;
+}
+.canvas-node[data-bc-shape="predefined-process"] {
+  border-left: 4px double var(--background-modifier-border) !important;
+  border-right: 4px double var(--background-modifier-border) !important;
+}
+.canvas-node[data-bc-shape="document"] {
+  clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%);
+}
+.canvas-node[data-bc-shape="database"] {
+  border-radius: 50% / 12% !important;
+}
+
+/* Selectable text extraction for pinned PDF pages. */
+.bc-pdf-text-selection {
+  margin-top: 0.45rem;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 0.35rem;
+  font-size: var(--font-smaller);
+}
+.bc-pdf-text-selection > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
+}
+.bc-pdf-selectable-text {
+  max-height: 9rem;
+  overflow: auto;
+  margin-top: 0.35rem;
+  padding: 0.45rem;
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  cursor: text;
+}
+.bc-pdf-create-excerpt,
+.bc-pdf-highlight-selection {
+  display: block;
+  margin-top: 0.4rem;
+  width: 100%;
+}
+.bc-pdf-create-excerpt:disabled,
+.bc-pdf-highlight-selection:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Selectable, transparent text aligned over the pinned PDF page raster. */
+.bc-pinned-pdf-embed-container {
+  position: relative;
+}
+.bc-pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+.bc-pdf-selectable-text-run {
+  position: absolute;
+  display: block;
+  color: transparent !important;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  line-height: 1;
+  white-space: pre;
+  overflow: hidden;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  pointer-events: auto;
+}
+.bc-pdf-selectable-text-run::selection {
+  color: transparent;
+  background: rgba(45, 125, 255, 0.32);
+}
+
+/* Common Advanced Canvas flowchart aliases; canonical JSON shapes are stored
+   separately in styleAttributes so exported files remain interoperable. */
+.canvas-node[data-bc-shape="terminal"] {
+  border-radius: 999px !important;
+}
+.canvas-node[data-bc-shape="decision"] {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.canvas-node[data-bc-shape="input-output"] {
+  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
+}
+.canvas-node[data-bc-shape="reference"] {
+  border-radius: 50% !important;
+}
+
+/* Canvas link/backlink explorer */
+.bc-link-explorer-modal {
+  width: min(900px, 90vw);
+}
+.bc-link-explorer-section {
+  margin-top: 1rem;
+}
+.bc-link-explorer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 30vh;
+  overflow: auto;
+}
+.bc-link-explorer-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+}
+.bc-link-explorer-entry small {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.canvas-node[data-bc-border="invisible"] {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.bc-html-preview-toolbar {
+  position: absolute;
+  inset: 4px 4px 4px 4px;
+  z-index: 50;
+  pointer-events: none;
+}
+.bc-html-preview-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  pointer-events: auto;
+  font-size: 12px;
+  padding: 2px 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+  background: var(--background-secondary);
+}
+.bc-html-preview-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: white;
+  pointer-events: auto;
+}
+.bc-html-preview-frame[hidden] {
+  display: none;
+}
+
+
+/* Unified Better Canvas settings */
+.bc-settings-root { max-width: 100%; }
+.bc-settings-shell {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 25px;
+  align-items: start;
+  margin-top: 8px;
+}
+.bc-settings-sidebar {
+  position: sticky;
+  top: 12px;
+  min-width: 0;
+  padding: 0 14px 18px 0;
+  border-right: 1px solid var(--background-modifier-border);
+}
+.bc-settings-brand { margin: 4px 0 18px; }
+.bc-settings-brand h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  letter-spacing: -0.02em;
+}
+.bc-settings-brand p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-smaller);
+}
+.bc-settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 15px;
+}
+.bc-settings-nav-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 37px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--button-radius);
+  color: var(--text-muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.bc-settings-nav-button:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+.bc-settings-nav-button.is-active {
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+.bc-settings-nav-icon {
+  display: inline-flex;
+  width: 19px;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: 1rem;
+}
+.bc-settings-nav-button.is-active .bc-settings-nav-icon { color: var(--interactive-accent); }
+.bc-settings-nav-label { font-size: var(--font-ui-small); }
+.bc-settings-main { min-width: 0; }
+.bc-settings-page-header {
+  margin: 0 0 15px;
+  padding: 1px 0 11px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.bc-settings-page-header h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: var(--font-semibold);
+  letter-spacing: -0.025em;
+}
+.bc-settings-page-header p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-smaller);
+}
+.bc-settings-page .setting-item { gap: 16px; }
+.bc-settings-page .setting-item-description { max-width: 46rem; }
+.bc-settings-accordion {
+  margin-top: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.bc-settings-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 2px;
+  border: 0;
+  color: var(--text-normal);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+.bc-settings-accordion-toggle:hover { color: var(--text-accent); }
+.bc-settings-accordion-chevron { color: var(--text-muted); transition: transform 120ms ease; }
+.bc-settings-accordion-toggle[aria-expanded="true"] .bc-settings-accordion-chevron { transform: rotate(180deg); }
+.bc-settings-accordion-body { padding: 2px 0 10px; }
+.bc-settings-accordion-body[hidden],
+.bc-settings-backend-config[hidden] { display: none !important; }
+.bc-settings-backend-config { margin-top: 6px; }
+.bc-settings-inline-heading { margin: 18px 0 8px; }
+.bc-settings-inline-heading h4 {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+}
+.bc-settings-inline-heading p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-smaller);
+}
+.bc-settings-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bc-settings-provider {
+  min-width: 0;
+  padding: 0 13px 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+}
+.bc-settings-provider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 0 7px;
+}
+.bc-settings-provider-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.bc-settings-provider-title strong {
+  overflow-wrap: anywhere;
+  font-size: var(--font-ui-medium);
+}
+.bc-settings-provider-status {
+  padding: 3px 7px;
+  border-radius: var(--radius-s);
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+  font-size: var(--font-smaller);
+  white-space: nowrap;
+}
+.bc-settings-provider-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 5px;
+}
+.bc-settings-button {
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--button-radius);
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  font-size: var(--font-smaller);
+  cursor: pointer;
+}
+.bc-settings-button:hover:not(:disabled) { background: var(--background-modifier-hover); }
+.bc-settings-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.bc-settings-button-muted { color: var(--text-muted); background: transparent; }
+.bc-settings-provider .setting-item {
+  padding: 10px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.bc-settings-add-provider { margin-top: 12px; }
+@media (max-width: 700px) {
+  .bc-settings-shell { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .bc-settings-sidebar {
+    position: static;
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+  .bc-settings-brand { margin-bottom: 12px; }
+  .bc-settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+  .bc-settings-nav-button { flex: 0 0 auto; width: auto; }
+  .bc-settings-provider-header { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-settings-nav-button { transition: none; }
+}
+
+.bc-settings-nav-button:focus-visible,
+.bc-settings-button:focus-visible,
+.bc-settings-accordion-toggle:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+/* Compact per-page PDF annotation controls. */
+.bc-pdf-annotation-toolbar {
+  position: absolute;
+  z-index: 24;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--background-primary) 92%, transparent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+  pointer-events: auto;
+}
+.bc-pdf-annotation-tool {
+  min-width: 0;
+  min-height: 23px;
+  padding: 2px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--button-radius);
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  font-size: 10px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bc-pdf-annotation-tool:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+}
+.bc-pdf-annotation-tool.is-active {
+  border-color: var(--interactive-accent);
+  color: var(--text-accent);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.bc-pdf-annotation-tool:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.bc-pdf-annotation-tool:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+/* Highlight edges incident to the current Canvas node selection. */
+.canvas-edges path.bc-selection-related {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 2px var(--interactive-accent));
+  stroke-width: 2.5px !important;
+  transition: filter 100ms ease, stroke-width 100ms ease, opacity 100ms ease;
+}
+
+/* Inline validation message for prompt modals (kept visible while the modal stays open). */
+.bc-prompt-error {
+  margin: 6px 0 0;
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+}
+
+
+/* Unified Canvas node menu. */
+.bc-node-popup-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: max-content !important;
+  min-width: 0 !important;
+  padding: 0.35rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+  box-shadow: var(--shadow-s);
+}
+.bc-node-popup-menu .bc-node-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  white-space: nowrap;
+  font-size: var(--font-ui-small);
+}
+.bc-node-popup-menu .bc-node-toolbar-button svg {
+  width: 16px;
+  height: 16px;
+}
+.bc-node-popup-menu .bc-node-toolbar-button:hover,
+.bc-node-style-popover button:hover,
+.bc-node-popup-menu.bc-node-style-view button:hover {
+  background: var(--background-modifier-hover);
+}
+.bc-node-popup-menu .bc-node-toolbar-button:focus-visible,
+.bc-node-style-popover button:focus-visible,
+.bc-node-popup-menu.bc-node-style-view button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+.bc-node-popup-dismissed { display: none !important; }
+.bc-node-popup-menu.bc-node-style-view {
+  position: fixed !important;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: min(332px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  padding: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+}
+.bc-node-style-popover {
+  position: fixed;
+  z-index: var(--layer-menu, 1000);
+  display: flex;
+  flex-direction: column;
+  width: min(332px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--shadow-l);
+  font-size: var(--font-ui-small);
+}
+.bc-node-style-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 42px;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.bc-node-style-header strong { flex: 1; text-align: center; font-weight: var(--font-semibold); }
+.bc-node-style-header button,
+.bc-node-style-popover button,
+.bc-node-popup-menu.bc-node-style-view button { cursor: pointer; color: var(--text-normal); font: inherit; }
+.bc-node-style-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+.bc-node-style-back svg {
+  width: 16px;
+  height: 16px;
+}
+.bc-node-style-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 0;
+  padding: 0.25rem 0.65rem;
+  overflow: auto;
+}
+.bc-node-style-section { padding: 0.45rem 0; border-bottom: 1px solid var(--background-modifier-border); }
+.bc-node-style-section:last-child { border-bottom: 0; }
+.bc-node-style-section-title {
+  margin-bottom: 0.45rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+}
+.bc-node-style-colors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
+.bc-node-style-color {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.35rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  text-align: left;
+}
+.bc-node-style-swatch {
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 50%;
+}
+.bc-node-style-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-ui-smaller); }
+.bc-node-style-shapes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.3rem; }
+.bc-node-style-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0.3rem 0.15rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+.bc-node-style-choice.is-selected,
+.bc-node-style-color.is-selected,
+.bc-node-style-preset[aria-pressed="true"] {
+  border-color: var(--interactive-accent);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.bc-node-shape-preview {
+  display: block;
+  width: 2rem;
+  height: 1.25rem;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 4px;
+  background: var(--background-primary);
+}
+.bc-node-shape-preview.shape-square { border-radius: 0; }
+.bc-node-shape-preview.shape-pill { border-radius: 999px; }
+.bc-node-shape-preview.shape-diamond { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.bc-node-shape-preview.shape-circle { width: 1.4rem; height: 1.4rem; border-radius: 50%; }
+.bc-node-shape-preview.shape-hexagon { border-radius: 0; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+.bc-node-shape-preview.shape-document { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%); }
+.bc-node-shape-preview.shape-database { border-radius: 50% / 18%; }
+.bc-node-style-borders { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; }
+.bc-node-border-preview {
+  display: block;
+  width: 1.8rem;
+  height: 0.85rem;
+  border: 2px solid var(--text-muted);
+  border-radius: 2px;
+}
+.bc-node-border-preview.border-dashed { border-style: dashed; }
+.bc-node-border-preview.border-dotted { border-style: dotted; }
+.bc-node-border-preview.border-double { border-style: double; }
+.bc-node-border-preview.border-invisible { border-color: transparent; }
+.bc-node-style-alignments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
+.bc-node-style-alignments button {
+  min-height: 30px;
+  padding: 0.3rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+.bc-node-style-alignments button.is-selected { border-color: var(--interactive-accent); }
+.bc-node-style-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
+.bc-node-style-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 0;
+  min-height: 66px;
+  padding: 0.4rem 0.25rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+.bc-node-style-preset-preview {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 3rem;
+  max-width: 100%;
+  height: 1.35rem;
+  padding: 0 0.25rem;
+  overflow: hidden;
+  border: 1.5px solid var(--text-normal);
+  border-radius: 4px;
+}
+.bc-node-style-preset-preview.shape-square { border-radius: 0; }
+.bc-node-style-preset-preview.shape-pill { border-radius: 999px; }
+.bc-node-style-preset-preview.shape-diamond { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.bc-node-style-preset-preview.border-dashed { border-style: dashed; }
+.bc-node-style-preset-preview.border-dotted { border-style: dotted; }
+.bc-node-style-preset-preview.border-double { border-style: double; }
+.bc-node-style-preset-preview.border-invisible { border-color: transparent; }
+.bc-node-style-preset-sample {
+  width: 100%;
+  color: #111827;
+  font-size: 0.65rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.bc-node-style-preset-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-smaller);
+  line-height: 1.1;
+}
+/* Only the plain rectangle alias lacks a rule above; the other panel shapes
+   reuse the Advanced JSON Canvas styleAttributes definitions. */
+.canvas-node[data-bc-shape="square"] { border-radius: 0 !important; clip-path: none !important; }
