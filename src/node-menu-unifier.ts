@@ -126,15 +126,28 @@ export default class NodeMenuUnifier {
     this.patchedMenus.clear();
   }
 
-  openStyleFromContextMenu(canvas: any, nodeId: string): void {
+  openStyleFromContextMenu(
+    canvas: any,
+    nodeId: string,
+    event?: MouseEvent | KeyboardEvent
+  ): void {
     const element = nodeElement(canvas, nodeId);
     if (!element || !nodeFromData(canvas, nodeId)) {
       new Notice("目标节点已不存在，无法打开样式面板。");
       return;
     }
-    const rect = element.getBoundingClientRect();
+
+    const nodeRect = element.getBoundingClientRect();
+    const eventTarget = event?.target;
+    const contextMenuElement = eventTarget instanceof HTMLElement
+      ? eventTarget.closest<HTMLElement>(".menu")
+      : null;
+    const contextRect = contextMenuElement?.getBoundingClientRect();
+    const anchor = contextRect && contextRect.width > 0
+      ? { x: contextRect.left, y: contextRect.top }
+      : { x: nodeRect.right + 8, y: nodeRect.top };
     const popupEl = canvas?.menu?.menuEl instanceof HTMLElement ? canvas.menu.menuEl as HTMLElement : undefined;
-    this.showStylePanel(canvas, nodeId, "context", { x: rect.right + 8, y: rect.top }, popupEl);
+    this.showStylePanel(canvas, nodeId, "context", anchor, popupEl);
   }
 
   private onNativeContextMenu(menu: any, node: any): void {
@@ -148,8 +161,8 @@ export default class NodeMenuUnifier {
     const popupEl = canvas?.menu?.menuEl;
     if (!canvas || !(popupEl instanceof HTMLElement)) return;
 
-    if (this.activePanel?.source === "toolbar" && this.activePanel.popupEl === popupEl) {
-      this.dismissPanel(true);
+    if (this.activePanel?.canvas === canvas) {
+      this.dismissPanel(this.activePanel.source === "toolbar");
     }
     popupEl.replaceChildren();
     popupEl.classList.remove("bc-node-style-view");
@@ -231,7 +244,7 @@ export default class NodeMenuUnifier {
 
     let surface: HTMLElement;
     let originalInlineStyle: ActivePanel["originalInlineStyle"];
-    if (source === "toolbar" && popupEl) {
+    if (popupEl) {
       surface = popupEl;
       originalInlineStyle = {
         position: surface.style.position,
@@ -242,6 +255,7 @@ export default class NodeMenuUnifier {
       };
       surface.classList.add("bc-node-popup-menu", "bc-node-style-view");
       surface.classList.remove("bc-node-popup-dismissed");
+      surface.style.transform = "none";
       this.positionPopover(surface, anchor);
     } else {
       surface = document.createElement("div");
@@ -293,7 +307,7 @@ export default class NodeMenuUnifier {
     document.removeEventListener("keydown", active.keyHandler, true);
     this.activePanel = null;
 
-    if (active.source === "toolbar" && active.popupEl) {
+    if (active.popupEl && active.surface === active.popupEl) {
       if (active.originalInlineStyle) {
         active.popupEl.style.position = active.originalInlineStyle.position;
         active.popupEl.style.left = active.originalInlineStyle.left;
@@ -301,11 +315,12 @@ export default class NodeMenuUnifier {
         active.popupEl.style.width = active.originalInlineStyle.width;
         active.popupEl.style.transform = active.originalInlineStyle.transform;
       }
-      if (restoreToolbar) this.renderPopupToolbar(active.canvas, { menuEl: active.popupEl });
-      else {
+      if (active.source === "toolbar" && !restoreToolbar) {
         active.popupEl.replaceChildren();
         active.popupEl.classList.remove("bc-node-style-view");
         active.popupEl.classList.add("bc-node-popup-dismissed");
+      } else {
+        this.renderPopupToolbar(active.canvas, { menuEl: active.popupEl });
       }
     } else {
       active.surface.remove();
@@ -374,8 +389,12 @@ export default class NodeMenuUnifier {
     const currentStyle = styleOf(node);
     const surface = active.surface;
     surface.replaceChildren();
-    if (active.source === "context") surface.classList.add("bc-node-style-popover");
-    else surface.classList.add("bc-node-popup-menu", "bc-node-style-view");
+    if (active.surface === active.popupEl) {
+      surface.classList.add("bc-node-popup-menu", "bc-node-style-view");
+      surface.classList.remove("bc-node-popup-dismissed");
+    } else {
+      surface.classList.add("bc-node-style-popover");
+    }
 
     const header = document.createElement("div");
     header.className = "bc-node-style-header";
