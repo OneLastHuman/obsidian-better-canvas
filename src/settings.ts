@@ -9,6 +9,7 @@ import {
 } from "./provider-params";
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
 import { validateNumericRangeInput } from "./numeric-range-validation";
+import { normalizeDefaultNodeTextAlignment } from "./node-defaults";
 
 type SettingSection = {
   id: string;
@@ -205,6 +206,18 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       settings.defaultNodeHeight = number;
       await this.features.save();
     });
+
+    new Setting(page).setName("新建文本节点默认对齐")
+      .setDesc("选择新建文本节点的默认文字对齐方式。已有节点中明确保存的文字对齐样式不会被覆盖。")
+      .addDropdown(dropdown => dropdown
+        .addOption("left", "左对齐")
+        .addOption("center", "居中")
+        .addOption("right", "右对齐")
+        .setValue(normalizeDefaultNodeTextAlignment(this.plugin.settings.defaultNodeTextAlign))
+        .onChange(async value => {
+          this.plugin.settings.defaultNodeTextAlign = normalizeDefaultNodeTextAlignment(value);
+          await this.features.save();
+        }));
 
     new Setting(page).setName("Tab 创建子节点")
       .setDesc("关闭后，Tab 不会被 Better Canvas 拦截，可继续使用 Obsidian 或其他插件的快捷键。")
