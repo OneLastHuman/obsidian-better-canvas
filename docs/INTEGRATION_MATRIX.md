@@ -2,7 +2,7 @@
 
 This matrix records Better Canvas implementation and parity gaps against the current default branches of Advanced Canvas, Canvas MindMap, and Obsidian AI Canvas. “Implemented” means code exists; it does not imply that every supported Obsidian version, provider endpoint, or internal DOM patch has been manually validated.
 
-**Last reviewed:** 2026-10-15. The code review baseline immediately before this documentation update was `ea95660f61c7af65e35410a38e1774eb82f47080`; its GitHub Actions run passed typecheck, unit tests, production build, and install-package creation. The entries below separate missing feature parity from work that exists but still needs host-runtime verification.
+**Last reviewed:** 2026-10-16. The source baseline for this update is `3c6a92e02285c235ebf398d4d646a35920a66a2f`. The previous baseline `ea95660f61c7af65e35410a38e1774eb82f47080` had a GitHub Actions run that passed typecheck, unit tests, production build, and install-package creation. The entries below separate missing feature parity from implemented behavior that still needs host-runtime verification.
 
 ## Canvas MindMap
 
@@ -29,6 +29,7 @@ This matrix records Better Canvas implementation and parity gaps against the cur
 | Node colors / custom palette | Implemented | Includes configurable color slots |
 | Node shapes | Implemented, expanded flowchart set | Supports standard shapes plus aliases for terminal, process, decision, input/output and reference; default rectangles omit the non-standard shape attribute, while supported shapes are saved under JSON Canvas `styleAttributes.shape`. Some CSS clip-path shapes may affect node content interaction |
 | Borders / text alignment / custom CSS class | Implemented, expanded | Supports solid, dashed, dotted, double and invisible borders; the invisible-border effect is CSS-rendered, while standard border values and text alignment are persisted on Canvas data |
+| Default alignment for newly created text nodes | Implemented, basic | Configurable left, center or right alignment; defaults to left to preserve existing behavior. Existing nodes with explicit alignment and non-text nodes are left unchanged. Verify native Canvas creation paths in Obsidian Desktop. |
 | Edge colors / solid, dashed, dotted path / custom arrow styles | Implemented, basic | Writes both standard `color` / `styleAttributes` and extension fallbacks; exact arrow geometry varies by renderer |
 | Flip incident edge direction | Implemented | Reverses edges touching the selected node |
 | Select incident edges | Implemented, expanded | Selects all, incoming or outgoing edges for the selected node(s); a separate command now selects every edge in the active Canvas regardless of node selection |
