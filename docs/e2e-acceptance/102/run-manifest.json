@@ -1,0 +1,104 @@
+{
+  "issue": 102,
+  "title": "切换 AI 服务商协议后，Temperature 范围说明和输入上限未更新",
+  "baseCommit": "cb397eda33ff254cb0131a1f68ec6943b39d6d7f",
+  "baseMainJsSha256": "1800f7f218e104162746dfc215259847fb0b0bee11ba59b0c942d25efec9c922",
+  "fixCommit": "e14c511ad5b057d1308188e66a7767bd6757eb92",
+  "fixSourceMainJsSha256": "e70f3992bdeb42d24685e0cdb7fa5e8fa35782f646e23b329af8c1d1c18010b5",
+  "obsidian": "1.14.4",
+  "browser": "Chrome 150.0.7871.250 / Electron 43.7.7",
+  "harness": "Playwright CLI 0.1.22 over CDP (isolated Xvfb :242, CDP 127.0.0.1:9602, vault ~/bc-vault-102)",
+  "validation": {
+    "before": {
+      "protocol": "anthropic",
+      "savedTemperature": 1.5,
+      "description": "范围 0 到 2；留空或无效输入不会覆盖上一次有效值。",
+      "inputMax": "2",
+      "inputValue": "1.5",
+      "afterRestart": {
+        "protocol": "anthropic",
+        "temperatureOnDisk": 0.4,
+        "inputValue": "0.4",
+        "notice": null
+      }
+    },
+    "after": {
+      "start": {
+        "protocol": "openai",
+        "temperatureOnDisk": 1.5,
+        "description": "范围 0 到 2；留空或无效输入不会覆盖上一次有效值。",
+        "inputMax": "2",
+        "inputValue": "1.5"
+      },
+      "protocolSwitch": {
+        "protocol": "anthropic",
+        "description": "Anthropic 范围 0 到 1；留空或无效输入不会覆盖上一次有效值。",
+        "inputMax": "1",
+        "inputValue": "1",
+        "temperatureOnDisk": 1,
+        "notice": "Temperature 已按当前协议上限从 1.5 调整为 1。"
+      },
+      "outOfRangeInput": {
+        "typed": "1.5",
+        "ariaInvalid": "true",
+        "message": "请输入 0–1 范围内的数值；当前值尚未保存。",
+        "temperatureOnDisk": 1
+      },
+      "correctedInput": {
+        "typed": "1",
+        "ariaInvalid": null,
+        "message": "",
+        "temperatureOnDisk": 1
+      },
+      "afterRestart": {
+        "protocol": "anthropic",
+        "description": "Anthropic 范围 0 到 1；留空或无效输入不会覆盖上一次有效值。",
+        "inputMax": "1",
+        "inputValue": "1",
+        "temperatureOnDisk": 1
+      }
+    },
+    "consoleErrors": {
+      "settingsWindow": 0,
+      "vaultWindow": 0
+    },
+    "network": "没有动态网络请求；没有调用供应商 API"
+  },
+  "screenshots": {
+    "01-before-stale-range.png": {
+      "bytes": 19105,
+      "sha256": "2b78b2fc9f10426fdbe0a991165588dd6c34bce92849036128302d289cf6b24b",
+      "dimensions": "402x380"
+    },
+    "02-before-silent-reset.png": {
+      "bytes": 19974,
+      "sha256": "e5bd3ae9e34fdae04d421ee74feff4794077e17737517b99c0e791cc36b03363",
+      "dimensions": "402x390"
+    },
+    "03-after-start-openai.png": {
+      "bytes": 19613,
+      "sha256": "f1a2bd7edfb15d06892050658dd02dc8160f139f791721b7a7ff1860d9cbab37",
+      "dimensions": "402x380"
+    },
+    "04-after-switch-clamped.png": {
+      "bytes": 19689,
+      "sha256": "1315427247cfc63fbfa22e4a07d4fa141d0be8e2cf3f3a35637f799faf6b1dcf",
+      "dimensions": "402x380"
+    },
+    "05-after-switch-notice.png": {
+      "bytes": 87870,
+      "sha256": "7585652ab5b4f7caacd954df055b7dc238c6ba1748121c84cf35c8333a59dd42",
+      "dimensions": "900x700"
+    },
+    "06-after-range-error.png": {
+      "bytes": 10159,
+      "sha256": "d51bb1d9f6d3a4d8e1bad2dca164637a94b2d13d25243ca3d4135ee18ed71f62",
+      "dimensions": "422x95"
+    },
+    "07-after-reload-keeps-value.png": {
+      "bytes": 19761,
+      "sha256": "016e083e130fcb50a625db37962bd537a011de3a3f7fb06aa7414da19a1481a8",
+      "dimensions": "402x390"
+    }
+  }
+}

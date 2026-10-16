@@ -60,7 +60,7 @@
 
 - 原生 API profile 支持 OpenAI-compatible、Anthropic Messages 和 Google Gemini。
 - 支持从 OpenAI-compatible、Anthropic 和 Gemini 模型端点发现可用模型；端点不支持列表查询时，可手动输入模型名。
-- 每个 profile 可单独设置 Temperature、最大输出 token 数和高级请求参数 JSON。高级参数仅用于 API 后端的文本请求，并按相应协议合并；核心请求字段和认证字段受保护。
+- 每个 profile 可单独设置 Temperature、最大输出 token 数和高级请求参数 JSON。高级参数仅用于 API 后端的文本请求，并按相应协议合并；核心请求字段和认证字段受保护。Temperature 范围随协议变化（OpenAI 兼容 / Gemini 为 0 到 2，Anthropic 为 0 到 1），切换协议时界面会同步更新并调整超出新上限的已保存值。
 - 可主动探测服务的文本请求与图片输入能力。探测需用户确认，最多发送两次小型 API 请求，并保存当前 provider/model 的结果。图片输入请求成功不代表模型确实理解了图片，也不能证明图片生成、PDF、视频、URL context 或搜索 grounding 等能力。
 
 详细配置见 [AI 与 MCP 配置指南](AI_SETUP.md)。
