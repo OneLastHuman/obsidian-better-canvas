@@ -775,7 +775,7 @@
 .bc-node-shape-preview.shape-diamond { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .bc-node-shape-preview.shape-circle { width: 1.4rem; height: 1.4rem; border-radius: 50%; }
 .bc-node-shape-preview.shape-hexagon { border-radius: 0; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
-.bc-node-shape-preview.shape-document { border-radius: 0; clip-path: polygon(0 0, 78% 0, 100% 20%, 100% 100%, 0 100%); }
+.bc-node-shape-preview.shape-document { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%); }
 .bc-node-shape-preview.shape-database { border-radius: 50% / 18%; }
 .bc-node-style-borders { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; }
 .bc-node-border-preview {
