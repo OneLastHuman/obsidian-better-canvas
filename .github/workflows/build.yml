@@ -20,6 +20,8 @@ jobs:
       - name: Validate release metadata
         run: npm run validate:metadata
       - run: npm install
+      - name: Run ESLint
+        run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
