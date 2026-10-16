@@ -9,7 +9,6 @@ import {
 } from "./provider-params";
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
 import { validateNumericRangeInput } from "./numeric-range-validation";
-import { getSettingsSearchMatches } from "./settings-search";
 
 type SettingSection = {
   id: string;
@@ -34,7 +33,7 @@ function temperatureRangeDescription(protocol: ProviderRequestProtocol): string 
 export default class BetterCanvasSettingsTab extends PluginSettingTab {
   private plugin: any;
   private activeSection = "canvas";
-  private searchTerm = "";
+  private openAIAccordion: "text" | "image" | null = null;
 
   constructor(app: App, plugin: any, private features: any) {
     super(app, plugin);
@@ -45,43 +44,27 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     const root = this.containerEl;
     root.empty();
     root.addClass("bc-settings-root");
-
     const shell = root.createDiv({ cls: "bc-settings-shell" });
     const sidebar = shell.createDiv({ cls: "bc-settings-sidebar" });
     const brand = sidebar.createDiv({ cls: "bc-settings-brand" });
     brand.createEl("h2", { text: "Better Canvas" });
     brand.createEl("p", { text: "设置中心" });
-
-    const searchWrap = sidebar.createDiv({ cls: "bc-settings-search" });
-    const search = searchWrap.createEl("input", {
-      attr: { type: "search", placeholder: "查找设置…", "aria-label": "查找设置" }
-    });
-    search.value = this.searchTerm;
-
     const sections: SettingSection[] = [
-      { id: "canvas", icon: "▦", title: "画布", description: "布局、节点尺寸与关系" },
-      { id: "ai", icon: "✳", title: "AI 服务", description: "模型、提示词与生成" },
-      { id: "integrations", icon: "↔", title: "连接与索引", description: "MCP、字幕与链接" },
-      { id: "appearance", icon: "◐", title: "外观与导出", description: "颜色、样式与文件" },
-      { id: "advanced", icon: "⚙", title: "高级", description: "命令行与模板管理" }
+      { id: "canvas", icon: "▦", title: "画布与布局", description: "节点、间距、自动布局与快捷键" },
+      { id: "appearance", icon: "◐", title: "样式与外观", description: "节点颜色与自定义 CSS" },
+      { id: "ai", icon: "✳", title: "AI 与模型", description: "文本生成与图片生成" },
+      { id: "integrations", icon: "↔", title: "连接与索引", description: "MCP、元数据、反向链接与内容来源" },
+      { id: "export", icon: "⇧", title: "导出", description: "格式、清晰度、背景与范围" }
     ];
-
     const nav = sidebar.createDiv({ cls: "bc-settings-nav", attr: { "aria-label": "设置分类" } });
     const pagesHost = shell.createDiv({ cls: "bc-settings-main" });
     const pages = new Map<string, HTMLElement>();
     const navButtons = new Map<string, HTMLButtonElement>();
-    const emptyState = pagesHost.createDiv({ cls: "bc-settings-empty", text: "没有找到匹配的设置。" });
-    emptyState.hide();
-
     for (const section of sections) {
-      const button = nav.createEl("button", {
-        cls: "bc-settings-nav-button",
-        attr: { type: "button", "aria-pressed": "false" }
-      });
+      const button = nav.createEl("button", { cls: "bc-settings-nav-button", attr: { type: "button", "aria-pressed": "false" } });
       button.createEl("span", { cls: "bc-settings-nav-icon", text: section.icon });
       button.createEl("span", { cls: "bc-settings-nav-label", text: section.title });
       navButtons.set(section.id, button);
-
       const page = pagesHost.createDiv({ cls: "bc-settings-page" });
       page.dataset.section = section.id;
       const header = page.createDiv({ cls: "bc-settings-page-header" });
@@ -89,63 +72,25 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       header.createEl("p", { text: section.description });
       pages.set(section.id, page);
     }
-
     const updateView = (): void => {
-      const query = this.searchTerm.trim().toLocaleLowerCase();
-      let totalMatches = 0;
-
       for (const section of sections) {
         const page = pages.get(section.id)!;
         const button = navButtons.get(section.id)!;
-        const rows = Array.from(page.querySelectorAll<HTMLElement>(
-          ".setting-item, .bc-settings-provider, .bc-settings-inline-heading"
-        ));
-        const standaloneButtons = Array.from(page.querySelectorAll<HTMLButtonElement>("button"))
-          .filter(action => !action.closest(".setting-item, .bc-settings-provider"));
-        const searchableElements: HTMLElement[] = [...rows, ...standaloneButtons];
-        const searchResult = getSettingsSearchMatches(
-          query,
-          { title: section.title, description: section.description },
-          searchableElements.map(element => ({ text: element.textContent ?? "" }))
-        );
-
-        searchableElements.forEach((element, index) => {
-          element.toggleClass("bc-settings-search-hidden", !searchResult.entryMatches[index]);
-        });
-
-        const pageMatches = searchResult.totalMatches;
-        const visible = query ? pageMatches > 0 : section.id === this.activeSection;
-        page.style.display = visible ? "" : "none";
-        button.toggleClass("is-active", !query && section.id === this.activeSection);
-        button.toggleClass("has-match", Boolean(query) && pageMatches > 0);
-        button.setAttribute("aria-pressed", String(!query && section.id === this.activeSection));
-        totalMatches += pageMatches;
+        const active = section.id === this.activeSection;
+        page.style.display = active ? "" : "none";
+        button.toggleClass("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
       }
-
-      if (query && totalMatches === 0) emptyState.show();
-      else emptyState.hide();
     };
-
-    for (const section of sections) {
-      navButtons.get(section.id)!.addEventListener("click", () => {
-        this.activeSection = section.id;
-        this.searchTerm = "";
-        search.value = "";
-        updateView();
-      });
-    }
-
-    this.renderCanvasSettings(pages.get("canvas")!);
-    this.renderAISettings(pages.get("ai")!);
-    this.renderIntegrationSettings(pages.get("integrations")!);
-    this.renderAppearanceSettings(pages.get("appearance")!);
-    this.renderAdvancedSettings(pages.get("advanced")!);
-
-    search.addEventListener("input", () => {
-      this.searchTerm = search.value;
+    for (const section of sections) navButtons.get(section.id)!.addEventListener("click", () => {
+      this.activeSection = section.id;
       updateView();
     });
-
+    this.renderCanvasSettings(pages.get("canvas")!);
+    this.renderAppearanceSettings(pages.get("appearance")!);
+    this.renderAISettings(pages.get("ai")!);
+    this.renderIntegrationSettings(pages.get("integrations")!);
+    this.renderExportSettings(pages.get("export")!);
     updateView();
   }
 
@@ -154,7 +99,6 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     settings.baseUrl = String(profile.baseUrl ?? "");
     settings.apiKey = String(profile.apiKey ?? "");
     settings.model = String(profile.model ?? "");
-    settings.imageModel = String(profile.imageModel ?? "");
   }
 
   private async saveProvider(profile: any, settings: any): Promise<void> {
@@ -330,13 +274,72 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           await this.features.save();
           this.features.refreshReadonly();
         }));
+    this.renderTemplateSettings(page);
+
+  }
+
+  private renderTemplateSettings(page: HTMLElement): void {
+    new Setting(page).setName("节点模板")
+      .setDesc("已保存 " + ((this.plugin.settings.templates || []).length) + " 个模板。")
+      .addButton(button => button.setButtonText("清空模板").setWarning().onClick(async () => {
+        if (!(this.plugin.settings.templates || []).length) {
+          new Notice("没有可清空的模板。");
+          return;
+        }
+        if (!window.confirm("删除所有已保存的节点模板？此操作无法撤销。")) return;
+        this.plugin.settings.templates = [];
+        await this.features.save();
+        this.display();
+      }));
+  }
+
+  private createAIAccordion(page: HTMLElement, id: string, title: string): { toggle: HTMLButtonElement; body: HTMLDivElement } {
+    const accordion = page.createDiv({ cls: "bc-settings-accordion" });
+    const bodyId = "bc-settings-accordion-" + id;
+    const toggle = accordion.createEl("button", { cls: "bc-settings-accordion-toggle", attr: { type: "button", "aria-expanded": "false", "aria-controls": bodyId } });
+    toggle.createEl("span", { text: title });
+    toggle.createEl("span", { cls: "bc-settings-accordion-chevron", text: "⌄", attr: { "aria-hidden": "true" } });
+    const body = accordion.createDiv({ cls: "bc-settings-accordion-body" });
+    body.id = bodyId;
+    body.hidden = true;
+    return { toggle, body };
   }
 
   private renderAISettings(page: HTMLElement): void {
     const settings = this.features.settings() as any;
+    const textAccordion = this.createAIAccordion(page, "text", "文本生成");
+    const imageAccordion = this.createAIAccordion(page, "image", "图片生成");
+    const textBody = textAccordion.body;
+    const imageBody = imageAccordion.body;
+    const updateAccordion = (which: "text" | "image" | null): void => {
+      this.openAIAccordion = which;
+      textBody.hidden = which !== "text";
+      imageBody.hidden = which !== "image";
+      textAccordion.toggle.setAttribute("aria-expanded", String(which === "text"));
+      imageAccordion.toggle.setAttribute("aria-expanded", String(which === "image"));
+    };
+    textAccordion.toggle.addEventListener("click", () => updateAccordion(this.openAIAccordion === "text" ? null : "text"));
+    imageAccordion.toggle.addEventListener("click", () => updateAccordion(this.openAIAccordion === "image" ? null : "image"));
+    updateAccordion(this.openAIAccordion);
 
-    const providerIntro = page.createDiv({ cls: "bc-settings-inline-heading" });
-    providerIntro.createEl("h4", { text: "AI 服务商" });
+    new Setting(textBody).setName("文本生成后端")
+      .setDesc("选择默认文本生成方式；只显示所选后端的配置。")
+      .addDropdown(dropdown => dropdown
+        .addOption("api", "大模型 API")
+        .addOption("opencode-acp", "OpenCode ACP")
+        .addOption("codex-cli", "Codex CLI")
+        .setValue(settings.backend === "opencode-acp" || settings.backend === "codex-cli" ? settings.backend : "api")
+        .onChange(async value => {
+          settings.backend = value === "opencode-acp" || value === "codex-cli" ? value : "api";
+          this.openAIAccordion = "text";
+          await this.features.save();
+          this.display();
+        }));
+
+    const apiConfig = textBody.createDiv({ cls: "bc-settings-backend-config" });
+    apiConfig.hidden = settings.backend !== "api";
+    const providerIntro = apiConfig.createDiv({ cls: "bc-settings-inline-heading" });
+    providerIntro.createEl("h4", { text: "文本 API 服务商" });
     providerIntro.createEl("p", { text: "密钥保存在当前 Vault 的插件设置中。" });
 
     if (!Array.isArray(settings.providerProfiles) || settings.providerProfiles.length === 0) {
@@ -352,7 +355,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       settings.activeProviderId = "default";
     }
 
-    const profileList = page.createDiv({ cls: "bc-settings-provider-list" });
+    const profileList = apiConfig.createDiv({ cls: "bc-settings-provider-list" });
     const renderProfile = (profile: any): void => {
       const card = profileList.createDiv({ cls: "bc-settings-provider" });
       const cardHeader = card.createDiv({ cls: "bc-settings-provider-header" });
@@ -445,12 +448,6 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       new Setting(card).setName("文本模型")
         .addText(text => text.setPlaceholder("例如：gpt-4o-mini").setValue(String(profile.model || "")).onChange(async value => {
           profile.model = value.trim();
-          await this.saveProvider(profile, settings);
-        }));
-
-      new Setting(card).setName("图片模型")
-        .addText(text => text.setPlaceholder("不使用图片生成可留空").setValue(String(profile.imageModel || "")).onChange(async value => {
-          profile.imageModel = value.trim();
           await this.saveProvider(profile, settings);
         }));
 
@@ -564,7 +561,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
 
     (settings.providerProfiles as any[]).forEach(renderProfile);
 
-    const addProvider = page.createEl("button", { text: "添加 AI 服务商", cls: "mod-cta bc-settings-add-provider" });
+    const addProvider = apiConfig.createEl("button", { text: "添加 AI 服务商", cls: "mod-cta bc-settings-add-provider" });
     addProvider.type = "button";
     addProvider.addEventListener("click", async () => {
       const profile = {
@@ -586,26 +583,23 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       this.display();
     });
 
-    new Setting(page).setName("文本 AI 后端")
-      .addDropdown(dropdown => dropdown
-        .addOption("api", "使用上方服务商")
-        .addOption("opencode-acp", "本机 OpenCode")
-        .setValue(settings.backend === "opencode-acp" ? "opencode-acp" : "api")
-        .onChange(async value => {
-          settings.backend = value === "opencode-acp" ? "opencode-acp" : "api";
-          await this.features.save();
-          this.display();
-        }));
-
     if (settings.backend === "opencode-acp") {
-      new Setting(page).setName("OpenCode 可执行文件")
+      new Setting(textBody).setName("OpenCode 可执行文件")
+        .setDesc("留空时使用系统 PATH 中的 opencode。")
         .addText(text => text.setPlaceholder("opencode").setValue(String(settings.opencodeBinaryPath || "opencode")).onChange(async value => {
           settings.opencodeBinaryPath = value.trim() || "opencode";
           await this.features.save();
         }));
+    } else if (settings.backend === "codex-cli") {
+      new Setting(textBody).setName("Codex CLI 可执行文件")
+        .setDesc("留空时使用系统 PATH 中的 codex。")
+        .addText(text => text.setPlaceholder("codex 或绝对路径").setValue(String(settings.codexBinaryPath || "")).onChange(async value => {
+          settings.codexBinaryPath = value.trim();
+          await this.features.save();
+        }));
     }
 
-    new Setting(page).setName("系统提示词")
+    new Setting(textBody).setName("系统提示词")
       .setDesc("用于约束 AI 的默认回答方式。")
       .addTextArea(text => {
         text.inputEl.rows = 4;
@@ -622,7 +616,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     const activePromptId = String(settings.activeSystemPromptProfile || "");
     let profileNameInput = promptProfiles.find(profile => profile.id === activePromptId)?.name ?? "";
 
-    new Setting(page).setName("命名系统提示词")
+    new Setting(textBody).setName("命名系统提示词")
       .setDesc("保存多套可复用的系统提示词。选择后会替换当前系统提示词；手动修改后可用相同名称覆盖保存。")
       .addDropdown(dropdown => {
         dropdown.addOption("", "选择已保存的提示词");
@@ -643,7 +637,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(page).setName("保存当前提示词")
+    new Setting(textBody).setName("保存当前提示词")
       .setDesc("输入一个名称；已存在同名配置时会更新该配置，不会创建重复项。")
       .addText(text => text
         .setPlaceholder("例如：研究助手")
@@ -673,7 +667,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           }
         }));
 
-    new Setting(page).setName("删除当前命名提示词")
+    new Setting(textBody).setName("删除当前命名提示词")
       .setDesc("只删除已保存的提示词配置，不会清空当前系统提示词。")
       .addButton(button => button
         .setButtonText("删除所选配置")
@@ -697,7 +691,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           this.display();
         }));
 
-    new Setting(page).setName("复习闪卡输出模式")
+    new Setting(textBody).setName("复习闪卡输出模式")
       .setDesc("默认创建 Canvas 节点；也可导出为 Obsidian Spaced Repetition 可识别的 Markdown 卡组。")
       .addDropdown(dropdown => dropdown
         .addOption("canvas", "Canvas 节点")
@@ -710,7 +704,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         }));
 
     if (settings.flashcardOutputMode === "spaced-repetition") {
-      new Setting(page).setName("复习卡组保存目录")
+      new Setting(textBody).setName("复习卡组保存目录")
         .setDesc("Vault 内的相对目录。已有同名笔记会自动使用新文件名，不会被覆盖。")
         .addText(text => text.setPlaceholder("Better Canvas/Flashcards")
           .setValue(String(settings.spacedRepetitionFolder || "Better Canvas/Flashcards"))
@@ -718,7 +712,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
             settings.spacedRepetitionFolder = value.trim() || "Better Canvas/Flashcards";
             await this.features.save();
           }));
-      new Setting(page).setName("复习卡组标签")
+      new Setting(textBody).setName("复习卡组标签")
         .setDesc("输入主题路径，例如 science/biology；最终标签为 #flashcards/science/biology。")
         .addText(text => text.setPlaceholder("better-canvas")
           .setValue(String(settings.spacedRepetitionDeck || "better-canvas"))
@@ -728,11 +722,45 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           }));
     }
 
-    new Setting(page).setName("生成图片保存位置")
-      .addText(text => text.setPlaceholder("Better Canvas/Generated Images").setValue(String(settings.attachmentFolder || "Better Canvas/Generated Images")).onChange(async value => {
-        settings.attachmentFolder = value.trim() || "Better Canvas/Generated Images";
-        await this.features.save();
-      }));
+
+    new Setting(imageBody).setName("图片服务商")
+      .setDesc("此处的服务商、密钥与模型独立于文本生成配置。")
+      .addDropdown(dropdown => dropdown
+        .addOption("openai", "OpenAI 兼容 API")
+        .addOption("gemini", "Gemini")
+        .setValue(settings.imageProtocol === "gemini" ? "gemini" : "openai")
+        .onChange(async value => {
+          const oldProtocol = settings.imageProtocol === "gemini" ? "gemini" : "openai";
+          const defaults = { openai: "https://api.openai.com/v1", gemini: "https://generativelanguage.googleapis.com/v1beta" };
+          if (!String(settings.imageBaseUrl || "").trim() || String(settings.imageBaseUrl) === defaults[oldProtocol]) {
+            settings.imageBaseUrl = defaults[value === "gemini" ? "gemini" : "openai"];
+          }
+          settings.imageProtocol = value === "gemini" ? "gemini" : "openai";
+          this.openAIAccordion = "image";
+          await this.features.save();
+          this.display();
+        }));
+    new Setting(imageBody).setName("API Base URL")
+      .addText(text => text.setPlaceholder(settings.imageProtocol === "gemini" ? "https://generativelanguage.googleapis.com/v1beta" : "https://api.openai.com/v1")
+        .setValue(String(settings.imageBaseUrl || ""))
+        .onChange(async value => { settings.imageBaseUrl = value.trim(); await this.features.save(); }));
+    new Setting(imageBody).setName("API Key")
+      .addText(text => {
+        text.inputEl.type = "password";
+        text.setPlaceholder("可留空").setValue(String(settings.imageApiKey || "")).onChange(async value => {
+          settings.imageApiKey = value.trim();
+          await this.features.save();
+        });
+      });
+    new Setting(imageBody).setName("图片模型")
+      .addText(text => text.setPlaceholder("例如：gpt-image-1 或 gemini-2.5-flash-image")
+        .setValue(String(settings.imageModel || "gpt-image-1"))
+        .onChange(async value => { settings.imageModel = value.trim(); await this.features.save(); }));
+    new Setting(imageBody).setName("保存位置")
+      .addText(text => text.setPlaceholder("Better Canvas/Generated Images")
+        .setValue(String(settings.attachmentFolder || "Better Canvas/Generated Images"))
+        .onChange(async value => { settings.attachmentFolder = value.trim() || "Better Canvas/Generated Images"; await this.features.save(); }));
+
   }
 
   private renderIntegrationSettings(page: HTMLElement): void {
@@ -796,71 +824,39 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
 
   private renderAppearanceSettings(page: HTMLElement): void {
     const settings = this.features.settings() as any;
-
     new Setting(page).setName("自定义节点颜色")
       .setDesc("用逗号分隔 HEX 颜色，例如 #d14d41, #438c7a。")
       .addText(text => text.setPlaceholder("#d14d41, #438c7a, #5c6bc0").setValue((settings.customColors as string[]).join(", ")).onChange(async value => {
         settings.customColors = value.split(",").map((item: string) => item.trim()).filter(Boolean).slice(0, 12);
         await this.features.save();
       }));
-
     new Setting(page).setName("自定义节点 CSS")
       .setDesc("为节点添加自定义 class 后，可在这里设置对应样式。")
       .addTextArea(text => {
         text.inputEl.rows = 5;
         text.inputEl.style.width = "100%";
         text.setValue(String(settings.customCss || ""));
-        text.onChange(async value => {
-          settings.customCss = value;
-          await this.features.save();
-          this.features.applyUserCss();
-        });
+        text.onChange(async value => { settings.customCss = value; await this.features.save(); this.features.applyUserCss(); });
       });
+  }
 
+  private renderExportSettings(page: HTMLElement): void {
+    const settings = this.features.settings() as any;
+    const intro = page.createDiv({ cls: "bc-settings-inline-heading" });
+    intro.createEl("p", { text: "导出格式与范围通过 Canvas 导出命令选择。此处配置图像清晰度和背景。" });
     new Setting(page).setName("PNG / SVG 导出清晰度")
       .addDropdown(dropdown => {
         for (const ratio of [1, 1.5, 2, 3, 4]) dropdown.addOption(String(ratio), String(ratio) + "×");
-        dropdown.setValue(String(Number(settings.exportPixelRatio) || 2)).onChange(async value => {
-          settings.exportPixelRatio = Number(value);
-          await this.features.save();
-        });
+        dropdown.setValue(String(Number(settings.exportPixelRatio) || 2)).onChange(async value => { settings.exportPixelRatio = Number(value); await this.features.save(); });
       });
-
     new Setting(page).setName("导出背景颜色")
       .setDesc("留空可保留透明背景。")
       .addText(text => text.setPlaceholder("透明背景").setValue(String(settings.exportBackgroundColor || "")).onChange(async value => {
         const candidate = value.trim();
-        if (candidate) {
-          const probe = document.createElement("span");
-          probe.style.backgroundColor = candidate;
-          if (!probe.style.backgroundColor) return;
-        }
+        if (candidate) { const probe = document.createElement("span"); probe.style.backgroundColor = candidate; if (!probe.style.backgroundColor) return; }
         settings.exportBackgroundColor = candidate;
         await this.features.save();
       }));
   }
 
-  private renderAdvancedSettings(page: HTMLElement): void {
-    const settings = this.features.settings() as any;
-
-    new Setting(page).setName("Codex CLI 可执行文件")
-      .setDesc("留空时使用系统 PATH 中的 codex。")
-      .addText(text => text.setPlaceholder("codex 或绝对路径").setValue(String(settings.codexBinaryPath || "")).onChange(async value => {
-        settings.codexBinaryPath = value.trim();
-        await this.features.save();
-      }));
-
-    new Setting(page).setName("节点模板")
-      .setDesc("已保存 " + ((this.plugin.settings.templates || []).length) + " 个模板。")
-      .addButton(button => button.setButtonText("清空模板").setWarning().onClick(async () => {
-        if (!(this.plugin.settings.templates || []).length) {
-          new Notice("没有可清空的模板。");
-          return;
-        }
-        if (!window.confirm("删除所有已保存的节点模板？此操作无法撤销。")) return;
-        this.plugin.settings.templates = [];
-        await this.features.save();
-        this.display();
-      }));
-  }
 }
