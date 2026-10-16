@@ -635,6 +635,7 @@
 }
 .bc-node-popup-dismissed { display: none !important; }
 .bc-node-popup-menu.bc-node-style-view {
+  position: fixed !important;
   display: flex;
   flex-direction: column;
   align-items: stretch;
