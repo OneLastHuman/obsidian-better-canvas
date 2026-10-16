@@ -30,6 +30,7 @@ type ActivePanel = {
   surface: HTMLElement;
   popupEl?: HTMLElement;
   anchor: { x: number; y: number };
+  originalInlineStyle?: { position: string; left: string; top: string; width: string; transform: string };
   outsideHandler: (event: PointerEvent) => void;
   keyHandler: (event: KeyboardEvent) => void;
 };
@@ -191,10 +192,19 @@ export default class NodeMenuUnifier {
     this.dismissPanel(false);
 
     let surface: HTMLElement;
+    let originalInlineStyle: ActivePanel["originalInlineStyle"];
     if (source === "toolbar" && popupEl) {
       surface = popupEl;
+      originalInlineStyle = {
+        position: surface.style.position,
+        left: surface.style.left,
+        top: surface.style.top,
+        width: surface.style.width,
+        transform: surface.style.transform
+      };
       surface.classList.add("bc-node-popup-menu", "bc-node-style-view");
       surface.classList.remove("bc-node-popup-dismissed");
+      this.positionPopover(surface, anchor);
     } else {
       surface = document.createElement("div");
       surface.className = "bc-node-style-popover";
@@ -209,6 +219,7 @@ export default class NodeMenuUnifier {
       surface,
       ...(popupEl ? { popupEl } : {}),
       anchor,
+      ...(originalInlineStyle ? { originalInlineStyle } : {}),
       outsideHandler: () => undefined,
       keyHandler: () => undefined
     };
@@ -245,6 +256,13 @@ export default class NodeMenuUnifier {
     this.activePanel = null;
 
     if (active.source === "toolbar" && active.popupEl) {
+      if (active.originalInlineStyle) {
+        active.popupEl.style.position = active.originalInlineStyle.position;
+        active.popupEl.style.left = active.originalInlineStyle.left;
+        active.popupEl.style.top = active.originalInlineStyle.top;
+        active.popupEl.style.width = active.originalInlineStyle.width;
+        active.popupEl.style.transform = active.originalInlineStyle.transform;
+      }
       if (restoreToolbar) this.renderPopupToolbar(active.canvas, { menuEl: active.popupEl });
       else {
         active.popupEl.replaceChildren();
@@ -327,10 +345,8 @@ export default class NodeMenuUnifier {
       const canvas = active.canvas;
       const nodeId = active.nodeId;
       const anchor = active.anchor;
-      const popupEl = active.popupEl;
       this.dismissPanel(source === "toolbar");
       if (source === "context") this.openNativeContextMenu(canvas, nodeId, anchor);
-      else if (popupEl) this.renderPopupToolbar(canvas, { menuEl: popupEl });
     });
     const heading = document.createElement("strong");
     heading.textContent = "节点样式";
