@@ -199,6 +199,7 @@ interface CanvasBridgeState {
   knownNodeIds: Set<string>;
   knownEdgeIds: Set<string>;
   initialLoadSeen: boolean;
+  filePath: string;
   observer?: any;
 }
 
@@ -340,6 +341,7 @@ export class AdvancedCanvasEventBridge {
     state.frameQueued = false;
     state.dataLoadDepth = 0;
     state.dispatchingDataRequest = false;
+    state.filePath = this.filePathOf(state);
     state.snapshot = this.takeSnapshot(state);
     state.knownNodeIds = new Set(
       state.snapshot.data.nodes.map(node => String(node?.id ?? "")).filter(Boolean)
@@ -356,6 +358,11 @@ export class AdvancedCanvasEventBridge {
     this.bindReadOnlyObserver(state);
     this.emit("advanced-canvas:canvas-changed", canvas);
     this.emitRenderedNodes(state);
+  }
+
+  private filePathOf(state: CanvasBridgeState): string {
+    const path = state.view?.file?.path;
+    return typeof path === "string" ? path : "";
   }
 
   private detach(state: CanvasBridgeState): void {
@@ -642,6 +649,17 @@ export class AdvancedCanvasEventBridge {
         let setData = (next: any) => { data = next; };
         if (outermost) {
           bridge.emit("advanced-canvas:data-loaded:before", canvas, incoming, setData);
+        }
+        const filePath = bridge.filePathOf(state);
+        if (filePath && filePath !== state.filePath) {
+          // A pane can swap canvas files without recreating its view or canvas
+          // object, so the ids tracked for the previous file must be dropped
+          // before this one is imported: everything it already holds belongs to
+          // the newly opened file and is not newly created.
+          state.filePath = filePath;
+          state.knownNodeIds.clear();
+          state.knownEdgeIds.clear();
+          state.initialLoadSeen = false;
         }
         if (!state.initialLoadSeen) {
           // The first import after a not-yet-loaded view is the canvas file
