@@ -1,4 +1,5 @@
-import { requestUrl } from "obsidian";
+import { Platform, requestUrl } from "obsidian";
+import { runLocalCodex } from "./codex-cli";
 import { decodeBase64Image, detectImageFormat } from "./image-payload";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
 import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from "./provider-params";
@@ -18,10 +19,12 @@ export interface AISettings {
   model: string;
   imageModel: string;
   systemPrompt: string;
-  /** Text-generation backend; image generation remains on the configured API endpoint. */
-  backend?: "api" | "opencode-acp";
+  /** Text-generation backend; image generation receives separate API settings. */
+  backend?: "api" | "opencode-acp" | "codex-cli";
   /** Optional absolute path to the OpenCode CLI; defaults to opencode on PATH. */
   opencodeBinaryPath?: string;
+  /** Optional absolute path to Codex CLI; defaults to codex on PATH. */
+  codexBinaryPath?: string;
   protocol?: AIProtocol;
   /** Optional sampling temperature; defaults to 0.4. */
   temperature?: number;
@@ -232,6 +235,25 @@ function parseCompletion(protocol: AIProtocol, body: any): string {
   throw new Error("AI 服务返回了成功状态，但没有找到可用的文本内容。");
 }
 
+async function completeWithCodex(
+  settings: AISettings,
+  messages: ChatMessage[],
+  signal: AbortSignal
+): Promise<string> {
+  if (!Platform.isDesktopApp) throw new Error("Codex CLI 后端仅支持 Obsidian 桌面版。");
+  if (hasUnsupportedACPContent(messages)) {
+    throw new Error("Codex CLI 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到大模型 API 后端。");
+  }
+  const prompt = messages.map(message =>
+    message.role.toUpperCase() + ":\n" + contentText(message.content)
+  ).join("\n\n");
+  return runLocalCodex(prompt, {
+    binaryPath: settings.codexBinaryPath,
+    signal,
+    timeoutMs: 300_000
+  });
+}
+
 export async function chatCompletion(
   settings: AISettings,
   messages: ChatMessage[]
@@ -241,6 +263,9 @@ export async function chatCompletion(
       throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
     }
     return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath });
+  }
+  if (settings.backend === "codex-cli") {
+    return completeWithCodex(settings, messages, new AbortController().signal);
   }
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
   const protocol = protocolOf(settings);
@@ -288,6 +313,12 @@ export async function chatCompletionStream(
       throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
     }
     return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, signal, onDelta });
+  }
+  if (settings.backend === "codex-cli") {
+    const answer = await completeWithCodex(settings, messages, signal);
+    if (signal.aborted) throw new DOMException("The AI request was aborted.", "AbortError");
+    onDelta(answer);
+    return answer;
   }
   if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
   const protocol = protocolOf(settings);
