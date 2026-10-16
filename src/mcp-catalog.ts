@@ -1,4 +1,5 @@
 import type { RemoteMcpResult } from "./mcp-result";
+import { isJsonObject, parseJsonObjectPrompt } from "./prompt-input";
 
 export interface McpResource {
   uri: string;
@@ -33,6 +34,23 @@ export function parseMcpPromptArguments(raw: string): Record<string, string> {
     output[key] = value;
   }
   return output;
+}
+
+export interface McpToolConfirmation {
+  toolName: string;
+  arguments: Record<string, unknown>;
+}
+
+/** Parse the confirmed tool-call JSON before anything is sent to the MCP server. */
+export function parseMcpToolConfirmation(raw: string, toolNames: string[]): McpToolConfirmation {
+  const confirmed = parseJsonObjectPrompt(raw, "MCP 调用确认");
+  if (typeof confirmed.toolName !== "string" || !toolNames.includes(confirmed.toolName)) {
+    throw new Error("toolName 必须是当前 MCP 服务公开的工具名称。");
+  }
+  if (!isJsonObject(confirmed.arguments)) {
+    throw new Error("arguments 必须是 JSON object。");
+  }
+  return { toolName: confirmed.toolName, arguments: confirmed.arguments };
 }
 
 export interface McpCatalogPage<T> {
