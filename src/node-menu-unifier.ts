@@ -5,7 +5,6 @@ import { decorateCanvas } from "./enhancements";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import {
   applyNodeVisualStyle,
-  DEFAULT_NODE_VISUAL_STYLE,
   NODE_STYLE_ALIGNMENTS,
   NODE_STYLE_BORDERS,
   NODE_STYLE_COLORS,
@@ -595,19 +594,6 @@ export default class NodeMenuUnifier {
         currentStyle.align === preset.align
       ));
     }
-
-    const footer = document.createElement("div");
-    footer.className = "bc-node-style-footer";
-    addButton(footer, "重置", "bc-node-style-reset", () => {
-      this.applyStyle({
-        color: DEFAULT_NODE_VISUAL_STYLE.color,
-        shape: DEFAULT_NODE_VISUAL_STYLE.shape,
-        border: DEFAULT_NODE_VISUAL_STYLE.border,
-        align: DEFAULT_NODE_VISUAL_STYLE.align
-      }, "reset");
-    });
-    addButton(footer, "完成", "bc-node-style-done mod-cta", () => this.dismissPanel(active.source === "toolbar"));
-    surface.appendChild(footer);
 
     this.positionPopover(surface, active.anchor);
     if (focusKey) {

@@ -688,7 +688,6 @@
 }
 .bc-node-style-header strong { flex: 1; text-align: center; font-weight: var(--font-semibold); }
 .bc-node-style-header button,
-.bc-node-style-footer button,
 .bc-node-style-popover button,
 .bc-node-popup-menu.bc-node-style-view button { cursor: pointer; color: var(--text-normal); font: inherit; }
 .bc-node-style-back {
@@ -847,27 +846,6 @@
   white-space: nowrap;
   font-size: var(--font-ui-smaller);
   line-height: 1.1;
-}
-.bc-node-style-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.55rem 0.65rem;
-  border-top: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-}
-.bc-node-style-reset {
-  padding: 0.35rem 0.65rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
-}
-.bc-node-style-done {
-  padding: 0.35rem 0.8rem;
-  border: 1px solid var(--interactive-accent);
-  border-radius: var(--radius-s);
-  background: var(--interactive-accent);
-  color: var(--text-on-accent) !important;
 }
 /* Only the plain rectangle alias lacks a rule above; the other panel shapes
    reuse the Advanced JSON Canvas styleAttributes definitions. */
