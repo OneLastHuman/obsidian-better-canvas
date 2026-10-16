@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Notice, setIcon } from "obsidian";
 import type { Plugin } from "obsidian";
 import { readCanvasData, type CanvasNodeData } from "./canvas";
 import { decorateCanvas } from "./enhancements";
@@ -70,13 +70,16 @@ function addButton(
   parent: HTMLElement,
   label: string,
   className: string,
-  action: (event: MouseEvent) => void
+  action: (event: MouseEvent) => void,
+  icon?: string
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = className;
-  button.textContent = label;
+  if (icon) setIcon(button, icon);
+  else button.textContent = label;
   button.setAttribute("aria-label", label);
+  button.setAttribute("title", label);
   button.addEventListener("click", event => {
     event.preventDefault();
     event.stopPropagation();
@@ -246,17 +249,17 @@ export default class NodeMenuUnifier {
     popupEl.classList.add("bc-node-popup-menu");
     popupEl.replaceChildren();
 
-    addButton(popupEl, "样式", "bc-node-toolbar-button", () => {
+    addButton(popupEl, "节点样式", "bc-node-toolbar-button", () => {
       const rect = popupEl.getBoundingClientRect();
       this.showStylePanel(canvas, nodeId, "toolbar", { x: rect.left, y: rect.top }, popupEl);
-    });
-    addButton(popupEl, "更多 ⋯", "bc-node-toolbar-button", event => {
+    }, "palette");
+    addButton(popupEl, "更多操作", "bc-node-toolbar-button", event => {
       const rect = popupEl.getBoundingClientRect();
       this.openNativeContextMenu(canvas, nodeId, {
         x: event.clientX || rect.right,
         y: event.clientY || rect.bottom
       });
-    });
+    }, "ellipsis");
   }
 
   private showStylePanel(
@@ -452,14 +455,14 @@ export default class NodeMenuUnifier {
 
     const header = document.createElement("div");
     header.className = "bc-node-style-header";
-    addButton(header, "← 返回", "bc-node-style-back", () => {
+    addButton(header, "返回", "bc-node-style-back", () => {
       const source = active.source;
       const canvas = active.canvas;
       const nodeId = active.nodeId;
       const anchor = active.anchor;
       this.dismissPanel(source === "toolbar");
       if (source === "context") this.openNativeContextMenu(canvas, nodeId, anchor);
-    });
+    }, "arrow-left");
     const heading = document.createElement("strong");
     heading.textContent = "节点样式";
     header.appendChild(heading);
