@@ -253,13 +253,6 @@ export default class NodeMenuUnifier {
       const rect = popupEl.getBoundingClientRect();
       this.showStylePanel(canvas, nodeId, "toolbar", { x: rect.left, y: rect.top }, popupEl);
     }, "palette");
-    addButton(popupEl, "更多操作", "bc-node-toolbar-button", event => {
-      const rect = popupEl.getBoundingClientRect();
-      this.openNativeContextMenu(canvas, nodeId, {
-        x: event.clientX || rect.right,
-        y: event.clientY || rect.bottom
-      });
-    }, "ellipsis");
   }
 
   private showStylePanel(
