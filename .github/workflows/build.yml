@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Validate release metadata
+        run: npm run validate:metadata
       - run: npm install
       - run: npm run typecheck
       - run: npm test
