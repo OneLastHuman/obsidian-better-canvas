@@ -12,6 +12,7 @@ import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
 import { decorateCanvas } from "./enhancements";
 import { getNodeAIContextMenuActions } from "./node-ai-context-menu";
+import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import type { ModelCapabilityReport } from "./model-capabilities";
 import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
@@ -291,6 +292,7 @@ export default class BetterCanvasPlugin extends Plugin {
   declare settings: BetterCanvasSettings;
   private boundContainers = new WeakSet<HTMLElement>();
   private features: BetterCanvasFeatures;
+  private nodeMenuUnifier: NodeMenuUnifier;
 
   async onload(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
@@ -314,6 +316,8 @@ export default class BetterCanvasPlugin extends Plugin {
     this.registerCanvasContextMenu();
     this.features = new BetterCanvasFeatures(this);
     this.features.init();
+    this.nodeMenuUnifier = new NodeMenuUnifier(this);
+    this.nodeMenuUnifier.start();
     this.registerEvent(this.app.workspace.on("layout-change", () => this.bindCanvasKeyboard()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bindCanvasKeyboard()));
     this.app.workspace.onLayoutReady(() => this.bindCanvasKeyboard());
@@ -429,11 +433,13 @@ export default class BetterCanvasPlugin extends Plugin {
         this.selectNode(this.getCanvas(), nodeId);
         this.autoLayout();
       }));
-      menu.addItem((item: any) => item.setTitle("样式预设").setIcon("palette").onClick(() => {
-        const currentCanvas = this.getCanvas();
-        const internalNode = currentCanvas?.nodes?.get?.(nodeId);
-        if (internalNode) currentCanvas.selectOnly?.(internalNode);
-        void this.applyCustomStylePreset();
+      menu.addItem((item: any) => item.setTitle("样式").setIcon("palette").onClick((event: MouseEvent | KeyboardEvent) => {
+        const currentCanvas = (node as any)?.canvas ?? this.getCanvas();
+        if (!currentCanvas) {
+          new Notice("请先打开一个 Obsidian Canvas。");
+          return;
+        }
+        this.nodeMenuUnifier.openStyleFromContextMenu(currentCanvas, nodeId, event);
       }));
     });
     this.registerEvent(ref);
