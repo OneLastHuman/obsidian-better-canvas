@@ -51,6 +51,7 @@ npm view vitest version --fetch-retries=0 --fetch-timeout=5000
 本仓库的 package scripts 定义如下：
 
 - `npm run lint`：运行 Obsidian 官方 ESLint 规则；现有非安全规则先以警告方式提示，安全敏感规则会使检查失败。
+- `npm run validate:metadata`：校验 package.json、manifest.json 与 versions.json 的插件版本和最低 Obsidian 版本是否一致；不依赖 node_modules，CI 在安装依赖之前运行。
 - `npm run typecheck`：TypeScript 类型检查。
 - `npm test`：运行 Vitest 单元测试。
 - `npm run build`：生成生产构建。
@@ -61,6 +62,7 @@ npm view vitest version --fetch-retries=0 --fetch-timeout=5000
 ```bash
 npm install
 npm run lint
+npm run validate:metadata
 npm run typecheck
 npm test
 npm run build
