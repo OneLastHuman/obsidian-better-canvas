@@ -2,7 +2,7 @@ import { Notice } from "obsidian";
 import type { Plugin } from "obsidian";
 import { readCanvasData, type CanvasNodeData } from "./canvas";
 import { decorateCanvas } from "./enhancements";
-import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
+import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import {
   applyNodeVisualStyle,
   DEFAULT_NODE_VISUAL_STYLE,
@@ -58,8 +58,8 @@ function styleOf(node: CanvasNodeData): { color: string; shape: string; border: 
     : {};
   return {
     color: typeof node.color === "string" ? node.color : "",
-    shape: resolveCanvasNodeShape(node),
-    border: resolveCanvasNodeBorder(node),
+    shape: resolveCanvasNodeShape(node as CanvasNodeStyleSource),
+    border: resolveCanvasNodeBorder(node as CanvasNodeStyleSource),
     align: typeof node.bcTextAlign === "string"
       ? node.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left"
