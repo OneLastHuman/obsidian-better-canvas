@@ -1,4 +1,5 @@
 import { parseCodexJsonEvent } from "./codex-cli-events";
+import { loadNodeRuntimeModules } from "./node-runtime";
 
 export interface LocalCodexOptions {
   binaryPath?: string;
@@ -21,11 +22,11 @@ function abortError(): Error {
 export async function runLocalCodex(prompt: string, options: LocalCodexOptions): Promise<string> {
   if (options.signal.aborted) throw abortError();
 
-  // Dynamic imports keep Node-only modules out of the normal/mobile plugin load path.
-  const [{ spawn }, { tmpdir }] = await Promise.all([
-    import("node:child_process"),
-    import("node:os")
-  ]);
+  // The Obsidian renderer cannot resolve `node:` specifiers through a native
+  // dynamic import; go through the shared Electron bridge used by ACP and MCP.
+  const runtime = await loadNodeRuntimeModules();
+  const { spawn } = runtime.childProcess;
+  const { tmpdir } = runtime.os;
 
   if (options.signal.aborted) throw abortError();
   const binary = options.binaryPath?.trim() || "codex";

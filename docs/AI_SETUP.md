@@ -4,21 +4,7 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 
 ## 1. 配置 AI 服务
 
-在 **设置 → Better Canvas → Integration Features → Provider Profiles JSON** 中添加服务配置。以下是 OpenAI-compatible API 的示例：
-
-```json
-[
-  {
-    "id": "openai",
-    "name": "OpenAI-compatible",
-    "protocol": "openai",
-    "baseUrl": "https://api.openai.com/v1",
-    "apiKey": "YOUR_API_KEY",
-    "model": "YOUR_CHAT_MODEL",
-    "imageModel": "YOUR_IMAGE_MODEL"
-  }
-]
-```
+打开 Obsidian **设置 → Better Canvas → AI 与模型**，展开「文本生成」并选择「大模型 API」，即可新增服务商并设置协议、API 地址、密钥和文本模型。图片生成配置位于独立的「图片生成」折叠项中。
 
 支持的协议：
 
@@ -28,25 +14,13 @@ Better Canvas 的 Canvas 编辑与思维导图功能不需要 API Key。只有 A
 | `anthropic` | Anthropic Messages | 文本与模型列表；原生 Anthropic API 不提供图像生成接口。 |
 | `gemini` | Google Gemini | `generateContent`、`streamGenerateContent`；图像生成和视频理解取决于模型与服务支持。 |
 
-请将模型名、Base URL 和密钥替换为服务商实际提供的值。某些兼容网关不支持模型列表或图片接口，可手动填写模型，并按服务能力留空 `imageModel`。
+请将模型名、Base URL 和密钥替换为服务商实际提供的值。某些兼容网关不支持模型列表，可手动填写模型名称。图片服务商、API Key 与图片模型不再绑定到文本服务商。
 
 ### 本地 Ollama 示例
 
-如果 Ollama 已在本机运行，并且目标模型已通过 `ollama pull` 下载，可添加一个 profile：
+如果 Ollama 已在本机运行，并且目标模型已通过 `ollama pull` 下载，可在「文本生成 → 大模型 API」中新增服务商，将协议设为 OpenAI 兼容、API 地址设为 `http://localhost:11434/v1`、API Key 留空，并填写 `ollama list` 显示的模型名。
 
-```json
-{
-  "id": "ollama",
-  "name": "Ollama Local",
-  "protocol": "openai",
-  "baseUrl": "http://localhost:11434/v1",
-  "apiKey": "",
-  "model": "qwen2.5:7b",
-  "imageModel": ""
-}
-```
-
-将 `model` 改成 `ollama list` 显示的模型名。此示例用于文本请求；图片生成要求本地服务额外实现兼容的 Images API。
+此配置用于文本请求；如需图片生成，本地服务还需提供兼容的图像生成接口。
 
 ### 高级请求参数与能力探测
 
@@ -104,7 +78,7 @@ Temperature 的可填范围取决于协议：OpenAI 兼容与 Gemini 是 0 到 2
 
 ## 3. 使用本地 OpenCode ACP
 
-桌面版 Obsidian 可在 **文本 AI 后端** 中选择 **本机 OpenCode ACP**。
+桌面版 Obsidian 可在 **AI 与模型 → 文本生成** 中选择 **OpenCode ACP**。
 
 1. 安装 OpenCode，并在终端完成登录。
 2. 默认命令为 `opencode acp`。如果 Obsidian 无法找到它，在设置中填写 **OpenCode CLI executable** 的绝对路径。
@@ -112,17 +86,17 @@ Temperature 的可填范围取决于协议：OpenAI 兼容与 Gemini 是 0 到 2
 
 ACP 通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode，在临时目录中创建会话，不会把 Vault 作为 OpenCode 工作区。ACP 请求中的工具或文件权限默认拒绝。当前后端用于文本问答和闪卡，不支持图片或文件输入；遇到多模态上下文时，请切回 API 后端。该模式不保证离线处理，提示词仍会发送给 OpenCode 配置的模型服务。
 
-图片生成不走 ACP；请在 AI API profile 中配置兼容的服务及图片模型。
+图片生成不走 ACP；请在单独展开的「图片生成」设置中配置图片服务商、API Key、图片模型与保存目录。
 
 ## 4. 使用本地 Codex CLI
 
-桌面版 Obsidian 可使用命令 **Better Canvas: 使用本地 Codex CLI 分析所选节点**。
+桌面版 Obsidian 可在 **AI 与模型 → 文本生成** 中选择 **Codex CLI** 作为文本后端，也可继续使用命令 **Better Canvas: 使用本地 Codex CLI 分析所选节点**。
 
 1. 安装并登录 Codex CLI。
-2. 在设置中将 **Local Codex CLI executable** 留空以使用 PATH 中的 `codex`，或填写可执行文件的绝对路径。
+2. 在文本生成后端配置中，将 **Codex CLI 可执行文件** 留空以使用 PATH 中的 `codex`，或填写可执行文件的绝对路径。
 3. 选择 Canvas 节点并运行命令。结果会保存为与原节点关联的新节点；任务可通过“停止当前 AI 生成”中断。
 
-任务使用只读沙盒和临时工作目录。Codex 使用自身配置的模型供应商，因此不要把它视为离线执行保证或对本机其他文件的绝对隔离。
+作为文本后端时，Codex CLI 只接受纯文本输入；图片或文件上下文需要切换到大模型 API。任务使用只读沙盒和临时工作目录。Codex 使用自身配置的模型供应商，因此不要把它视为离线执行保证或对本机其他文件的绝对隔离。
 
 ## 5. 隐私与排错
 
