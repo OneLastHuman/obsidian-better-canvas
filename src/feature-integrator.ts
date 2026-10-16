@@ -108,8 +108,13 @@ interface FeatureSettings {
   canvasMetadataEnabled: boolean;
   exportPixelRatio: number;
   exportBackgroundColor: string;
+  imageProtocol: "openai" | "gemini";
+  imageBaseUrl: string;
+  imageApiKey: string;
+  imageModel: string;
+  imageSettingsMigrated: boolean;
   codexBinaryPath: string;
-  backend: "api" | "opencode-acp";
+  backend: "api" | "opencode-acp" | "codex-cli";
   opencodeBinaryPath: string;
   flashcardOutputMode: "canvas" | "spaced-repetition";
   spacedRepetitionFolder: string;
@@ -513,7 +518,32 @@ export default class BetterCanvasFeatures {
     if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
     if (typeof s.exportBackgroundColor !== "string") s.exportBackgroundColor = "";
     if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
-    if (s.backend !== "opencode-acp" && s.backend !== "api") s.backend = "api";
+    if (!s.imageSettingsMigrated) {
+      const legacyProvider = (s.providerProfiles as ProviderProfile[]).find((profile: ProviderProfile) => profile.id === s.activeProviderId)
+        ?? (s.providerProfiles as ProviderProfile[])[0];
+      const legacyProtocol = legacyProvider?.protocol ?? "openai";
+      s.imageProtocol = legacyProtocol === "gemini" ? "gemini" : "openai";
+      const defaults = {
+        openai: "https://api.openai.com/v1",
+        gemini: "https://generativelanguage.googleapis.com/v1beta"
+      };
+      s.imageBaseUrl = legacyProtocol === "anthropic"
+        ? defaults.openai
+        : String(legacyProvider?.baseUrl || s.baseUrl || defaults[legacyProtocol === "gemini" ? "gemini" : "openai"]);
+      s.imageApiKey = String(legacyProvider?.apiKey || s.apiKey || "");
+      s.imageModel = String(legacyProvider?.imageModel || s.imageModel || "gpt-image-1");
+      s.imageSettingsMigrated = true;
+    }
+    if (s.imageProtocol !== "gemini" && s.imageProtocol !== "openai") s.imageProtocol = "openai";
+    if (typeof s.imageBaseUrl !== "string" || !s.imageBaseUrl.trim()) {
+      s.imageBaseUrl = s.imageProtocol === "gemini"
+        ? "https://generativelanguage.googleapis.com/v1beta"
+        : "https://api.openai.com/v1";
+    }
+    if (typeof s.imageApiKey !== "string") s.imageApiKey = "";
+    if (typeof s.imageModel !== "string" || !s.imageModel.trim()) s.imageModel = "gpt-image-1";
+    if (typeof s.imageSettingsMigrated !== "boolean") s.imageSettingsMigrated = true;
+    if (s.backend !== "opencode-acp" && s.backend !== "codex-cli" && s.backend !== "api") s.backend = "api";
     if (typeof s.opencodeBinaryPath !== "string") s.opencodeBinaryPath = "opencode";
     if (!s.modelCapabilityReports || typeof s.modelCapabilityReports !== "object" || Array.isArray(s.modelCapabilityReports)) s.modelCapabilityReports = {};
     void this.save();
@@ -553,8 +583,9 @@ export default class BetterCanvasFeatures {
       imageModel: profile.imageModel,
       protocol: profile.protocol || "openai",
       systemPrompt: s.systemPrompt || "Answer accurately and preserve uncertainty.",
-      backend: s.backend === "opencode-acp" ? "opencode-acp" : "api",
+      backend: s.backend === "codex-cli" ? "codex-cli" : s.backend === "opencode-acp" ? "opencode-acp" : "api",
       opencodeBinaryPath: String(s.opencodeBinaryPath || "opencode"),
+      codexBinaryPath: String(s.codexBinaryPath || ""),
       temperature: profile.temperature,
       maxOutputTokens: profile.maxOutputTokens ? profile.maxOutputTokens : undefined,
       providerParams: parseProviderParamsJson(String(profile.requestParamsJson || "{}"))
@@ -3203,9 +3234,23 @@ export default class BetterCanvasFeatures {
     const notice = new Notice("正在生成图片…", 0);
     try {
       const context = await this.getNodeContext(canvas, node.id);
-      const result = await generateImage(this.aiSettings(node),
+      const settings = this.settings();
+      const imageProtocol = settings.imageProtocol === "gemini" ? "gemini" : "openai";
+      const imageModel = String(settings.imageModel || "gpt-image-1");
+      const imageSettings: AISettings = {
+        ...this.aiSettings(node),
+        baseUrl: String(settings.imageBaseUrl || (imageProtocol === "gemini"
+          ? "https://generativelanguage.googleapis.com/v1beta"
+          : "https://api.openai.com/v1")),
+        apiKey: String(settings.imageApiKey || ""),
+        model: imageModel,
+        imageModel,
+        protocol: imageProtocol,
+        backend: "api"
+      };
+      const result = await generateImage(imageSettings,
         "Create a clear visual based on these notes. Avoid long text in the image.\n\n" + context.slice(0, 7000));
-      const folder = String(this.settings().attachmentFolder || "Better Canvas/Generated Images");
+      const folder = String(settings.attachmentFolder || "Better Canvas/Generated Images");
       await this.ensureFolder(folder);
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
       const path = folder + "/better-canvas-" + stamp + "." + result.extension;
