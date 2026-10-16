@@ -423,11 +423,11 @@ export default class BetterCanvasPlugin extends Plugin {
         });
       }
 
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 自动整理思维导图").setIcon("git-branch").onClick(() => {
+      menu.addItem((item: any) => item.setTitle("整理").setIcon("git-branch").onClick(() => {
         this.selectNode(this.getCanvas(), nodeId);
         this.autoLayout();
       }));
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 应用 CSS 自定义样式预设").setIcon("palette").onClick(() => {
+      menu.addItem((item: any) => item.setTitle("样式预设").setIcon("palette").onClick(() => {
         const currentCanvas = this.getCanvas();
         const internalNode = currentCanvas?.nodes?.get?.(nodeId);
         if (internalNode) currentCanvas.selectOnly?.(internalNode);
