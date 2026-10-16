@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestUrl } from "obsidian";
-import { chatCompletion, generateImage, type AISettings } from "./ai";
+import { chatCompletion, chatCompletionStream, generateImage, type AISettings } from "./ai";
+import { runLocalCodex } from "./codex-cli";
 
 vi.mock("obsidian", () => ({
-  requestUrl: vi.fn()
+  requestUrl: vi.fn(),
+  Platform: { isDesktopApp: true }
 }));
+
+vi.mock("./codex-cli", () => ({ runLocalCodex: vi.fn() }));
 
 const settings: AISettings = {
   baseUrl: "https://ai.example.test/v1",
@@ -55,6 +59,38 @@ describe("AI completion response errors", () => {
 
     await expect(chatCompletion(settings, messages))
       .rejects.toThrow("AI API 请求失败（HTTP 500）: boom");
+  });
+});
+
+
+describe("Codex CLI text backend", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(runLocalCodex).mockResolvedValue("Codex answer");
+  });
+
+  it("routes regular text completions through the configured CLI", async () => {
+    await expect(chatCompletion({ ...settings, backend: "codex-cli", codexBinaryPath: "/usr/bin/codex" }, messages))
+      .resolves.toBe("Codex answer");
+    expect(requestUrl).not.toHaveBeenCalled();
+    expect(runLocalCodex).toHaveBeenCalledWith("USER:\nSay hello.", expect.objectContaining({
+      binaryPath: "/usr/bin/codex",
+      timeoutMs: 300_000,
+      signal: expect.any(AbortSignal)
+    }));
+  });
+
+  it("emits the CLI answer through the streaming callback", async () => {
+    const deltas: string[] = [];
+    const controller = new AbortController();
+    const answer = await chatCompletionStream(
+      { ...settings, backend: "codex-cli" },
+      messages,
+      controller.signal,
+      delta => deltas.push(delta)
+    );
+    expect(answer).toBe("Codex answer");
+    expect(deltas).toEqual(["Codex answer"]);
   });
 });
 
