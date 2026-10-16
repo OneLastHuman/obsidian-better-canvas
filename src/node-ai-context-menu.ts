@@ -7,15 +7,15 @@ export interface NodeAIContextMenuAction {
 }
 
 const BASE_ACTIONS: NodeAIContextMenuAction[] = [
-  { id: "ask", title: "Better Canvas: 向 AI 提问", icon: "sparkles" },
-  { id: "image", title: "Better Canvas: 根据此节点生成图片", icon: "image" },
-  { id: "flashcards", title: "Better Canvas: 生成复习闪卡", icon: "graduation-cap" },
-  { id: "model", title: "Better Canvas: 选择 AI 模型", icon: "bot" }
+  { id: "ask", title: "问 AI", icon: "sparkles" },
+  { id: "image", title: "生成图片", icon: "image" },
+  { id: "flashcards", title: "闪卡", icon: "graduation-cap" },
+  { id: "model", title: "模型", icon: "bot" }
 ];
 
 const REGENERATE_ACTION: NodeAIContextMenuAction = {
   id: "regenerate",
-  title: "Better Canvas: 重新生成 AI 节点",
+  title: "重生成",
   icon: "refresh-cw"
 };
 

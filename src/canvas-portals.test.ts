@@ -213,7 +213,7 @@ describe("Canvas Portal target validation", () => {
       })
     });
     expect(menu.addItem).toHaveBeenCalledOnce();
-    expect(items[0].title).toBe("Better Canvas: 在 Portal 源画布中创建文本节点");
+    expect(items[0].title).toBe("在 Portal 源画布中创建文本节点");
     items[0].action();
     expect(openModal).toHaveBeenCalledOnce();
 

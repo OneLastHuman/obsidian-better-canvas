@@ -176,7 +176,7 @@ export class CanvasPortalManager {
       const nodeData = node?.getData?.() ?? node;
       if (!menu?.addItem || !isCanvasFileNode(nodeData) || nodeData.portal !== true) return;
       menu.addItem((item: any) => item
-        .setTitle("Better Canvas: 在 Portal 源画布中创建文本节点")
+        .setTitle("在 Portal 源画布中创建文本节点")
         .setIcon("plus")
         .onClick(() => this.promptForTextNodeInPortal(String(node?.id ?? nodeData.id))));
     }));
