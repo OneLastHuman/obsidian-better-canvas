@@ -86,6 +86,8 @@ export default defineConfig(
     ".obsidian",
     "**/.obsidian/**",
     "main.js",
+    // Manifest JSON is checked by the dedicated metadata validator, not the TS parser.
+    "manifest.json",
     "package.json",
     "package-lock.json",
     "tsconfig.json",
