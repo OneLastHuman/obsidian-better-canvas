@@ -99,6 +99,9 @@ export default class NodeMenuUnifier {
     const workspace = this.plugin.app.workspace as any;
     this.plugin.registerEvent(workspace.on("layout-change", () => this.scanCanvases()));
     this.plugin.registerEvent(workspace.on("active-leaf-change", () => this.scanCanvases()));
+    this.plugin.registerEvent(workspace.on("canvas:node-menu", (menu: any, node: any) => {
+      this.onNativeContextMenu(menu, node);
+    }));
     workspace.onLayoutReady(() => this.scanCanvases());
     this.plugin.register(() => this.stop());
     this.scanCanvases();
@@ -121,7 +124,33 @@ export default class NodeMenuUnifier {
       return;
     }
     const rect = element.getBoundingClientRect();
-    this.showStylePanel(canvas, nodeId, "context", { x: rect.right + 8, y: rect.top });
+    const popupEl = canvas?.menu?.menuEl instanceof HTMLElement ? canvas.menu.menuEl as HTMLElement : undefined;
+    this.showStylePanel(canvas, nodeId, "context", { x: rect.right + 8, y: rect.top }, popupEl);
+  }
+
+  private onNativeContextMenu(menu: any, node: any): void {
+    const nodeId = typeof node?.id === "string" ? node.id : "";
+    if (!nodeId) return;
+
+    const workspace = this.plugin.app.workspace as any;
+    const canvas = node?.canvas ?? (workspace.getLeavesOfType?.("canvas") ?? [])
+      .map((leaf: any) => leaf?.view?.canvas)
+      .find((candidate: any) => candidate?.nodes?.has?.(nodeId));
+    const popupEl = canvas?.menu?.menuEl;
+    if (!canvas || !(popupEl instanceof HTMLElement)) return;
+
+    if (this.activePanel?.source === "toolbar" && this.activePanel.popupEl === popupEl) {
+      this.dismissPanel(true);
+    }
+    popupEl.replaceChildren();
+    popupEl.classList.remove("bc-node-style-view");
+    popupEl.classList.add("bc-node-popup-menu", "bc-node-popup-dismissed");
+
+    menu?.onHide?.(() => {
+      const active = this.activePanel;
+      if (active?.source === "context" && active.canvas === canvas && active.nodeId === nodeId) return;
+      this.renderPopupToolbar(canvas, canvas.menu);
+    });
   }
 
   private scanCanvases(): void {
@@ -224,13 +253,13 @@ export default class NodeMenuUnifier {
       keyHandler: () => undefined
     };
     active.outsideHandler = event => {
-      if (!surface.contains(event.target as Node)) this.dismissPanel(false);
+      if (!surface.contains(event.target as Node)) this.dismissPanel(source === "toolbar");
     };
     active.keyHandler = event => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
-      this.dismissPanel(false);
+      this.dismissPanel(source === "toolbar");
     };
     this.activePanel = active;
     document.addEventListener("pointerdown", active.outsideHandler, true);
@@ -271,6 +300,7 @@ export default class NodeMenuUnifier {
       }
     } else {
       active.surface.remove();
+      if (active.popupEl) this.renderPopupToolbar(active.canvas, { menuEl: active.popupEl });
     }
   }
 
@@ -478,7 +508,7 @@ export default class NodeMenuUnifier {
         align: DEFAULT_NODE_VISUAL_STYLE.align
       }, "reset");
     });
-    addButton(footer, "完成", "bc-node-style-done mod-cta", () => this.dismissPanel(false));
+    addButton(footer, "完成", "bc-node-style-done mod-cta", () => this.dismissPanel(active.source === "toolbar"));
     surface.appendChild(footer);
 
     if (active.source === "context") this.positionPopover(surface, active.anchor);
