@@ -48,7 +48,7 @@ interface BetterCanvasSettings {
   model: string;
   imageModel: string;
   systemPrompt: string;
-  backend: "api" | "opencode-acp";
+  backend: "api" | "opencode-acp" | "codex-cli";
   opencodeBinaryPath: string;
   direction: LayoutDirection;
   gapX: number;
