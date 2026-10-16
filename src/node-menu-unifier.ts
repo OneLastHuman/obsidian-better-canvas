@@ -108,11 +108,20 @@ export default class NodeMenuUnifier {
   }
 
   stop(): void {
-    this.dismissPanel(false);
+    this.dismissPanel(this.activePanel?.source === "toolbar");
     for (const record of this.patchedMenus.values()) {
       if (record.menu.render !== record.wrapper) continue;
       if (record.hadOwnRender) record.menu.render = record.original;
       else delete record.menu.render;
+      const popupEl = record.menu.menuEl;
+      if (popupEl instanceof HTMLElement) {
+        popupEl.classList.remove("bc-node-popup-menu", "bc-node-style-view", "bc-node-popup-dismissed");
+      }
+      try {
+        record.original.call(record.menu);
+      } catch {
+        // Do not block plugin unload if the host Canvas is already closing.
+      }
     }
     this.patchedMenus.clear();
   }

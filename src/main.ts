@@ -432,7 +432,7 @@ export default class BetterCanvasPlugin extends Plugin {
         this.autoLayout();
       }));
       menu.addItem((item: any) => item.setTitle("样式").setIcon("palette").onClick(() => {
-        const currentCanvas = this.getCanvas();
+        const currentCanvas = (node as any)?.canvas ?? this.getCanvas();
         if (!currentCanvas) {
           new Notice("请先打开一个 Obsidian Canvas。");
           return;

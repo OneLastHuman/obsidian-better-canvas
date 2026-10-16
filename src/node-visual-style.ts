@@ -95,7 +95,10 @@ export function applyNodeVisualStyle(
     if (!changed) return node;
 
     const styleAttributes = asRecord(next.styleAttributes);
-    if (typeof patch.shape === "string") styleAttributes.shape = patch.shape;
+    if (typeof patch.shape === "string") {
+      if (patch.shape === "default") delete styleAttributes.shape;
+      else styleAttributes.shape = patch.shape === "square" ? "rectangle" : patch.shape;
+    }
     if (typeof patch.border === "string") styleAttributes.border = patch.border;
     if (typeof patch.align === "string") styleAttributes.textAlign = patch.align;
     if (Object.keys(styleAttributes).length > 0 || next.styleAttributes !== undefined) {
