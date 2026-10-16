@@ -648,18 +648,18 @@ export default class BetterCanvasFeatures {
     const nodeMenu = workspace.on("canvas:node-menu", (menu: any, node: any) => {
       if (!menu?.addItem || !node?.id) return;
       const actions: Array<[string, string, () => void]> = [
-        ["设置节点形状", "shapes", () => this.setNodeShape()],
-        ["设置节点文字对齐", "align-center", () => this.setNodeTextAlign()],
-        ["设置节点颜色", "palette", () => this.setNodeColor()],
-        ["复制节点 Wikilink", "link", () => void this.copyNodeLink()],
-        ["翻转关联连线", "git-compare", () => this.flipEdges()],
-        ["切换专注模式", "focus", () => this.focus()],
-        ["将节点置于最前", "layers", () => this.reorder(true)],
-        ["将节点置于最后", "layers-2", () => this.reorder(false)],
-        ["重新生成 AI 节点", "rotate-cw", () => void this.regenerate()]
+        ["形状", "shapes", () => this.setNodeShape()],
+        ["对齐", "align-center", () => this.setNodeTextAlign()],
+        ["颜色", "palette", () => this.setNodeColor()],
+        ["复制链接", "link", () => void this.copyNodeLink()],
+        ["翻转连线", "git-compare", () => this.flipEdges()],
+        ["专注", "focus", () => this.focus()],
+        ["置顶", "layers", () => this.reorder(true)],
+        ["置底", "layers-2", () => this.reorder(false)],
+        ["重生成", "rotate-cw", () => void this.regenerate()]
       ];
       for (const action of actions) {
-        menu.addItem((item: any) => item.setTitle("Better Canvas: " + action[0]).setIcon(action[1]).onClick(() => {
+        menu.addItem((item: any) => item.setTitle(action[0]).setIcon(action[1]).onClick(() => {
           this.selectNode(this.canvas(), String(node.id));
           action[2]();
         }));
@@ -667,7 +667,7 @@ export default class BetterCanvasFeatures {
       const nodeData = node?.getData?.() ?? node;
       if (nodeData?.type === "file" && typeof nodeData.file === "string" && nodeData.file.toLowerCase().endsWith(".canvas")) {
         menu.addItem((item: any) => item
-          .setTitle("Better Canvas: " + (nodeData.portal ? "关闭 Canvas Portal" : "打开 Canvas Portal"))
+          .setTitle(nodeData.portal ? "关闭 Portal" : "打开 Portal")
           .setIcon(nodeData.portal ? "door-closed" : "door-open")
           .onClick(() => this.portalManager?.togglePortalForNode(String(node.id))));
       }
@@ -676,9 +676,9 @@ export default class BetterCanvasFeatures {
 
     const selectionMenu = workspace.on("canvas:selection-menu", (menu: any, canvas: any) => {
       if (!menu?.addItem || !canvas) return;
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 选择关联连线").setIcon("git-branch").onClick(() => this.selectEdges("all", canvas)));
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 封装选区").setIcon("file-plus").onClick(() => void this.encapsulate(canvas)));
-      menu.addItem((item: any) => item.setTitle("Better Canvas: 设置连线样式").setIcon("palette").onClick(() => this.edgeStyle(canvas)));
+      menu.addItem((item: any) => item.setTitle("选连线").setIcon("git-branch").onClick(() => this.selectEdges("all", canvas)));
+      menu.addItem((item: any) => item.setTitle("封装").setIcon("file-plus").onClick(() => void this.encapsulate(canvas)));
+      menu.addItem((item: any) => item.setTitle("连线样式").setIcon("palette").onClick(() => this.edgeStyle(canvas)));
     });
     this.p.registerEvent(selectionMenu);
   }
