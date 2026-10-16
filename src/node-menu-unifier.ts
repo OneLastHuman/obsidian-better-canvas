@@ -209,7 +209,8 @@ export default class NodeMenuUnifier {
   private renderPopupToolbar(canvas: any, menu: any): void {
     const popupEl = menu?.menuEl;
     if (!(popupEl instanceof HTMLElement)) return;
-    if (this.activePanel?.source === "toolbar" && this.activePanel.popupEl === popupEl) return;
+    const activePanel = this.activePanel;
+    if (activePanel && activePanel.popupEl === popupEl && activePanel.surface === popupEl) return;
 
     const nodeId = selectedNodeId(canvas);
     if (!nodeId || !nodeFromData(canvas, nodeId)) {
