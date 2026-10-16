@@ -214,8 +214,15 @@ export default class NodeMenuUnifier {
 
     const nodeId = selectedNodeId(canvas);
     if (!nodeId || !nodeFromData(canvas, nodeId)) {
-      popupEl.replaceChildren();
       popupEl.classList.remove("bc-node-popup-menu", "bc-node-style-view", "bc-node-popup-dismissed");
+      const patch = this.patchedMenus.get(menu);
+      if (patch) {
+        try {
+          patch.original.call(menu);
+        } catch {
+          // Fall back to the native renderer when the selection is no longer valid.
+        }
+      }
       return;
     }
 
@@ -323,11 +330,11 @@ export default class NodeMenuUnifier {
         active.popupEl.classList.remove("bc-node-style-view");
         active.popupEl.classList.add("bc-node-popup-dismissed");
       } else {
-        this.renderPopupToolbar(active.canvas, { menuEl: active.popupEl });
+        this.renderPopupToolbar(active.canvas, active.canvas.menu);
       }
     } else {
       active.surface.remove();
-      if (active.popupEl) this.renderPopupToolbar(active.canvas, { menuEl: active.popupEl });
+      if (active.popupEl) this.renderPopupToolbar(active.canvas, active.canvas.menu);
     }
   }
 
