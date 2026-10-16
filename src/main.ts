@@ -53,6 +53,7 @@ interface BetterCanvasSettings {
   direction: LayoutDirection;
   gapX: number;
   gapY: number;
+  defaultNodeTextAlign: "left" | "center" | "right";
   attachmentFolder: string;
   templates: NodeTemplate[];
   mindMapShortcutChildTabEnabled: boolean;
@@ -80,6 +81,7 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   direction: "LR",
   gapX: 100,
   gapY: 44,
+  defaultNodeTextAlign: "left",
   attachmentFolder: "Better Canvas/Generated Images",
   templates: [],
   mindMapShortcutChildTabEnabled: true,
