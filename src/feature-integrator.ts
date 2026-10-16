@@ -399,10 +399,12 @@ export default class BetterCanvasFeatures {
 
     const updated = applyDefaultNodeTextAlignment(currentNode, this.settings().defaultNodeTextAlign);
     if (updated === currentNode) return;
-    patchNode(canvas, nodeId, {
+    if (patchNode(canvas, nodeId, {
       bcTextAlign: updated.bcTextAlign,
       styleAttributes: updated.styleAttributes
-    });
+    })) {
+      this.decorate(canvas);
+    }
   }
 
   async probeProviderCapabilities(profileId: string): Promise<ModelCapabilityReport> {
