@@ -1,4 +1,4 @@
-# Better Canvas
+<h1 align="center">Better Canvas</h1>
 
 <p align="center">
   <strong>让 Obsidian Canvas 更适合编辑、整理知识与使用 AI。</strong>
