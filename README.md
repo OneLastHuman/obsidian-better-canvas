@@ -120,6 +120,7 @@ npm run build
 ```bash
 npm install
 npm run dev
+npm run lint
 npm run typecheck
 npm test
 npm run build
@@ -131,6 +132,7 @@ npm run build
 | `npm run typecheck` | TypeScript 类型检查 |
 | `npm test` | 单元测试 |
 | `npm run build` | 生产构建 |
+| `npm run lint` | Obsidian 官方规则与代码质量检查；存量问题先以警告方式逐步清理，安全规则作为错误拦截。 |
 
 CI 会检查类型、单元测试和构建产物，但不会启动 Obsidian 图形界面。涉及原生 Canvas 交互、Portal、PDF、主题/DOM 或真实 AI 请求时，仍需在目标环境中手动验证。 版本号同步、打 tag 和 GitHub Release 发布步骤见 [发版流程](docs/RELEASING.md)。
 
