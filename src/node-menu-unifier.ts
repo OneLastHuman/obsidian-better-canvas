@@ -161,8 +161,9 @@ export default class NodeMenuUnifier {
     const popupEl = canvas?.menu?.menuEl;
     if (!canvas || !(popupEl instanceof HTMLElement)) return;
 
-    if (this.activePanel?.canvas === canvas) {
-      this.dismissPanel(this.activePanel.source === "toolbar");
+    const activePanel = this.activePanel;
+    if (activePanel?.canvas === canvas) {
+      this.dismissPanel(activePanel.source === "toolbar");
     }
     popupEl.replaceChildren();
     popupEl.classList.remove("bc-node-style-view");
