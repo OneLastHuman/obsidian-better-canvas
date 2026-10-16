@@ -360,14 +360,6 @@
   color: var(--text-muted);
   font-size: var(--font-smaller);
 }
-.bc-settings-search input {
-  width: 100%;
-  min-width: 0;
-  padding: 7px 9px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--input-radius);
-  background: var(--background-primary);
-}
 .bc-settings-nav {
   display: flex;
   flex-direction: column;
@@ -398,7 +390,6 @@
   border-color: var(--background-modifier-border);
   background: var(--background-secondary);
 }
-.bc-settings-nav-button.has-match:not(.is-active) { color: var(--text-normal); }
 .bc-settings-nav-icon {
   display: inline-flex;
   width: 19px;
@@ -427,6 +418,33 @@
 }
 .bc-settings-page .setting-item { gap: 16px; }
 .bc-settings-page .setting-item-description { max-width: 46rem; }
+.bc-settings-accordion {
+  margin-top: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.bc-settings-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 2px;
+  border: 0;
+  color: var(--text-normal);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+.bc-settings-accordion-toggle:hover { color: var(--text-accent); }
+.bc-settings-accordion-chevron { color: var(--text-muted); transition: transform 120ms ease; }
+.bc-settings-accordion-toggle[aria-expanded="true"] .bc-settings-accordion-chevron { transform: rotate(180deg); }
+.bc-settings-accordion-body { padding: 2px 0 10px; }
+.bc-settings-accordion-body[hidden],
+.bc-settings-backend-config[hidden] { display: none !important; }
+.bc-settings-backend-config { margin-top: 6px; }
 .bc-settings-inline-heading { margin: 18px 0 8px; }
 .bc-settings-inline-heading h4 {
   margin: 0;
@@ -497,14 +515,6 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 .bc-settings-add-provider { margin-top: 12px; }
-.bc-settings-search-hidden { display: none !important; }
-.bc-settings-empty {
-  padding: 26px 10px;
-  color: var(--text-muted);
-  text-align: center;
-  border: 1px dashed var(--background-modifier-border);
-  border-radius: var(--radius-m);
-}
 @media (max-width: 700px) {
   .bc-settings-shell { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .bc-settings-sidebar {
@@ -528,7 +538,7 @@
 
 .bc-settings-nav-button:focus-visible,
 .bc-settings-button:focus-visible,
-.bc-settings-search input:focus-visible {
+.bc-settings-accordion-toggle:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }
