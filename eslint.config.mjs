@@ -8,7 +8,6 @@ const securityRules = new Set([
   "no-unsanitized/method",
   "no-unsanitized/property",
   "obsidianmd/regex-lookbehind",
-  "obsidianmd/no-forbidden-elements",
 ]);
 
 function withSeverity(ruleConfig, severity) {
@@ -66,10 +65,9 @@ export default defineConfig(
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["eslint.config.mjs", "manifest.json"],
+          allowDefaultProject: ["eslint.config.mjs"],
         },
         tsconfigRootDir: import.meta.dirname,
-        extraFileExtensions: [".json"],
       },
     },
   },
@@ -77,13 +75,6 @@ export default defineConfig(
   {
     files: ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"],
     rules: migrationRules,
-  },
-  {
-    files: ["manifest.json"],
-    rules: {
-      "obsidianmd/validate-manifest": "off",
-      "obsidianmd/validate-license": "off",
-    },
   },
   globalIgnores([
     "node_modules",
