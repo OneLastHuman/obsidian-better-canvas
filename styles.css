@@ -623,14 +623,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 32px;
+  min-width: 32px;
   min-height: 30px;
-  padding: 0.3rem 0.55rem;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-s);
   background: var(--background-secondary);
   color: var(--text-normal);
   white-space: nowrap;
   font-size: var(--font-ui-small);
+}
+.bc-node-popup-menu .bc-node-toolbar-button svg {
+  width: 16px;
+  height: 16px;
 }
 .bc-node-popup-menu .bc-node-toolbar-button:hover,
 .bc-node-style-popover button:hover,
@@ -686,11 +692,20 @@
 .bc-node-style-popover button,
 .bc-node-popup-menu.bc-node-style-view button { cursor: pointer; color: var(--text-normal); font: inherit; }
 .bc-node-style-back {
-  padding: 0.35rem 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
   background: var(--background-secondary);
-  white-space: nowrap;
+}
+.bc-node-style-back svg {
+  width: 16px;
+  height: 16px;
 }
 .bc-node-style-scroll {
   display: flex;
