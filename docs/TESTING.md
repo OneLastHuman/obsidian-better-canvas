@@ -6,7 +6,7 @@
 
 1. **先检查环境，再选择测试路径。** 不要假定当前环境有 Git、外网、npm registry、浏览器、Obsidian Desktop 或 Obsidian CLI。
 2. **以当前 commit 的完整仓库为测试对象。** 不要把通过 GitHub API 读取的文件片段、手工复制的源码快照或临时 mock 项目称为完整仓库测试。
-3. **证据必须对应 commit。** 报告测试结果时记录测试环境、测试命令、成功/失败状态和被测试的 commit SHA。远程 CI 的成功不能表述为当前沙盒刚刚本地执行成功。
+3. **证据必须对应 commit。** 报告测试结果时记录测试环境、测试命令、成功/失败状态和被测试的 commit SHA。远程 CI 的成功不能表述为当前沙盒刚刚本地执行成功。测试证据文件不需要提交到 Git 仓库：结论写在对应 PR/Issue，截图和长日志优先保存为 GitHub Actions artifact 或附加到 PR/Issue；仅将可复用的自动化测试 fixture 和产品文档所需截图纳入版本控制。
 4. **没有执行就明确说未执行。** 类型检查通过、单元测试通过、打包成功、浏览器测试通过和 Obsidian 运行时验证是不同结论，不要互相替代。
 5. **优先使用小而真实的测试。** 可直接测试纯函数时，不要先构建整套假 Obsidian；只有需要时才添加 mock、adapter 或浏览器 Harness。
 6. **对文件操作使用专用测试 Vault。** 不要让自动化测试操作用户真实 Vault 或包含私人资料的目录。
@@ -112,7 +112,7 @@ CI 只能证明 workflow 实际运行过的步骤。读取 Actions 时至少核�
 - 对 DOM/CSS、选择、键盘交互、拖放、模态框和 SVG 渲染做断言，并按需生成截图。
 - 在不同环境使用 DOM 模拟器时，注明其不等价于真实浏览器。
 - 如果 Harness 自己绘制 Canvas，它能验证插件业务逻辑和 Harness UI，但不能证明 Obsidian Canvas 内部渲染、原生拖动或内部 API 兼容。
-- 保存失败截图、浏览器控制台与关键 DOM 状态作为 artifact。
+- 需要保留失败截图、浏览器控制台与关键 DOM 状态时，将其上传为 GitHub Actions artifact 或附加到对应 PR/Issue；不要把临时截图、运行日志或 run manifest 作为证据文件提交到仓库。
 
 ### Tier 4 — 真实 Obsidian CLI / Desktop 集成测试（具备运行环境时）
 
@@ -167,14 +167,14 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 
 ## 6. 真实集成测试的最小完成标准
 
-对声称通过的关键功能，至少应有以下证据：
+对声称通过的关键功能，至少应有以下可追溯证据；记录需对应被测 commit，但不要求把证据文件存入 Git 仓库：
 
 1. 测试前记录 commit SHA、Obsidian 版本和测试 Vault 路径。
 2. 确认目标插件成功加载，所需命令已注册。
 3. 用明确操作触发功能，而非仅在控制台直接调用内部函数。
 4. 检查可观察结果：磁盘上的 Canvas JSON、Markdown/附件文件、界面或 DOM 状态。
 5. 检查 Obsidian 捕获的错误和控制台错误。
-6. 失败时保留日志、截图、输入 fixture 和实际结果。
+6. 失败时，将必要日志、截图和实际结果保存为 GitHub Actions artifact，或附加到对应 Issue/PR；只有可复现问题必需的最小输入 fixture 才纳入版本控制。不要提交临时截图、运行日志、run manifest 或专门存放验收证据的目录。
 7. 在报告里明确 PASS / FAIL / BLOCKED，并注明是哪一层测试；不以单元测试通过替代宿主集成测试。
 
 ## 7. 面对环境阻塞时的降级策略
