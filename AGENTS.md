@@ -7,6 +7,7 @@
 1. 仓库治理规范：[docs/REPOSITORY_GOVERNANCE.md](docs/REPOSITORY_GOVERNANCE.md)。包含 Issue 分流、分支、Agent 交接、PR 审查和发布门禁。
 2. 测试与验证规范：[docs/TESTING.md](docs/TESTING.md)。包含环境预检、测试层级、项目专项回归清单和证据要求。
 3. 功能状态参考：[docs/INTEGRATION_MATRIX.md](docs/INTEGRATION_MATRIX.md)。查看功能当前实现状态与尚未验证的限制。
+4. 节点样式开发指南：[docs/STYLE_DEVELOPMENT.md](docs/STYLE_DEVELOPMENT.md)。开发 Canvas 节点面板、形状、边框、颜色和对齐前先读。
 
 ## 通用工作规则
 
