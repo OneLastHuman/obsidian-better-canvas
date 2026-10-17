@@ -741,16 +741,14 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 50%;
 }
-.bc-node-style-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-ui-smaller); }
 .bc-node-style-shapes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.3rem; }
 .bc-node-style-choice {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
   min-width: 0;
-  min-height: 52px;
+  min-height: 38px;
   padding: 0.3rem 0.15rem;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -791,12 +789,16 @@
 .bc-node-border-preview.border-invisible { border-color: transparent; }
 .bc-node-style-alignments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
 .bc-node-style-alignments button {
-  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
   padding: 0.3rem;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
   background: var(--background-secondary);
 }
+.bc-node-style-alignments button svg { width: 16px; height: 16px; }
 .bc-node-style-alignments button.is-selected { border-color: var(--interactive-accent); }
 .bc-node-style-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
 .bc-node-style-preset {
@@ -804,9 +806,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
   min-width: 0;
-  min-height: 66px;
+  min-height: 44px;
   padding: 0.4rem 0.25rem;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -837,15 +838,6 @@
   font-size: 0.65rem;
   line-height: 1;
   white-space: nowrap;
-}
-.bc-node-style-preset-label {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-ui-smaller);
-  line-height: 1.1;
 }
 /* Only the plain rectangle alias lacks a rule above; the other panel shapes
    reuse the Advanced JSON Canvas styleAttributes definitions. */

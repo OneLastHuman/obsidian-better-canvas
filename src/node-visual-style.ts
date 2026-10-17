@@ -14,52 +14,57 @@ export type NodeVisualStylePatch = {
   align?: string;
 };
 
+/**
+ * Style panel option lists. `label` is the accessible name and hover tooltip
+ * only: the panel renders shapes, borders, alignments and presets as previews
+ * or icons, so no option name is printed inside the panel.
+ */
 export const NODE_STYLE_COLORS = [
-  { id: "red", label: "Red", value: "#ef4444" },
-  { id: "orange", label: "Orange", value: "#f97316" },
-  { id: "amber", label: "Amber", value: "#fbbf24" },
-  { id: "yellow", label: "Yellow", value: "#eab308" },
-  { id: "lime", label: "Lime", value: "#84cc16" },
-  { id: "green", label: "Green", value: "#22c55e" },
-  { id: "emerald", label: "Emerald", value: "#10b981" },
-  { id: "teal", label: "Teal", value: "#14b8a6" },
-  { id: "cyan", label: "Cyan", value: "#06b6d4" },
-  { id: "sky", label: "Sky", value: "#0ea5e9" },
-  { id: "blue", label: "Blue", value: "#3b82f6" },
-  { id: "indigo", label: "Indigo", value: "#6366f1" },
-  { id: "violet", label: "Violet", value: "#8b5cf6" },
-  { id: "purple", label: "Purple", value: "#a855f7" },
-  { id: "fuchsia", label: "Fuchsia", value: "#d946ef" },
-  { id: "pink", label: "Pink", value: "#ec4899" },
-  { id: "rose", label: "Rose", value: "#f43f5e" },
-  { id: "brown", label: "Brown", value: "#a16207" },
-  { id: "slate", label: "Slate", value: "#94a3b8" },
-  { id: "gray", label: "Gray", value: "#6b7280" }
+  { id: "red", label: "红色", value: "#ef4444" },
+  { id: "orange", label: "橙色", value: "#f97316" },
+  { id: "amber", label: "琥珀色", value: "#fbbf24" },
+  { id: "yellow", label: "黄色", value: "#eab308" },
+  { id: "lime", label: "青柠色", value: "#84cc16" },
+  { id: "green", label: "绿色", value: "#22c55e" },
+  { id: "emerald", label: "翠绿色", value: "#10b981" },
+  { id: "teal", label: "蓝绿色", value: "#14b8a6" },
+  { id: "cyan", label: "青色", value: "#06b6d4" },
+  { id: "sky", label: "天蓝色", value: "#0ea5e9" },
+  { id: "blue", label: "蓝色", value: "#3b82f6" },
+  { id: "indigo", label: "靛蓝色", value: "#6366f1" },
+  { id: "violet", label: "紫罗兰色", value: "#8b5cf6" },
+  { id: "purple", label: "紫色", value: "#a855f7" },
+  { id: "fuchsia", label: "洋红色", value: "#d946ef" },
+  { id: "pink", label: "粉色", value: "#ec4899" },
+  { id: "rose", label: "玫红色", value: "#f43f5e" },
+  { id: "brown", label: "棕色", value: "#a16207" },
+  { id: "slate", label: "石板灰", value: "#94a3b8" },
+  { id: "gray", label: "灰色", value: "#6b7280" }
 ] as const;
 
 export const NODE_STYLE_SHAPES = [
-  { id: "default", label: "Rounded rectangle" },
-  { id: "square", label: "Rectangle" },
-  { id: "pill", label: "Pill" },
-  { id: "diamond", label: "Diamond" },
-  { id: "circle", label: "Circle" },
-  { id: "hexagon", label: "Hexagon" },
-  { id: "document", label: "Document" },
-  { id: "database", label: "Database" }
+  { id: "default", label: "圆角矩形" },
+  { id: "square", label: "矩形" },
+  { id: "pill", label: "胶囊形" },
+  { id: "diamond", label: "菱形" },
+  { id: "circle", label: "圆形" },
+  { id: "hexagon", label: "六边形" },
+  { id: "document", label: "文档" },
+  { id: "database", label: "数据库" }
 ] as const;
 
 export const NODE_STYLE_BORDERS = [
-  { id: "solid", label: "Solid" },
-  { id: "dashed", label: "Dashed" },
-  { id: "dotted", label: "Dotted" },
-  { id: "double", label: "Double" },
-  { id: "invisible", label: "None" }
+  { id: "solid", label: "实线" },
+  { id: "dashed", label: "虚线" },
+  { id: "dotted", label: "点线" },
+  { id: "double", label: "双线" },
+  { id: "invisible", label: "无边框" }
 ] as const;
 
 export const NODE_STYLE_ALIGNMENTS = [
-  { id: "left", label: "Left" },
-  { id: "center", label: "Center" },
-  { id: "right", label: "Right" }
+  { id: "left", label: "左对齐", icon: "align-left" },
+  { id: "center", label: "居中", icon: "align-center" },
+  { id: "right", label: "右对齐", icon: "align-right" }
 ] as const;
 
 export const NODE_STYLE_PRESETS: Record<string, NodeVisualStyle> = {
