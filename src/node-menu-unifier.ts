@@ -521,10 +521,6 @@ export default class NodeMenuUnifier {
       swatch.className = "bc-node-style-swatch";
       swatch.style.backgroundColor = color.value;
       button.appendChild(swatch);
-      const label = document.createElement("span");
-      label.className = "bc-node-style-option-label";
-      label.textContent = color.label;
-      button.appendChild(label);
     }
 
     const shapeSection = addSection("形状");
