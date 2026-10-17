@@ -18,6 +18,7 @@ Better Canvas 文档按用途拆分。面向普通使用者时，建议从根目
 | 文档 | 内容 |
 | --- | --- |
 | [功能整合矩阵](INTEGRATION_MATRIX.md) | 各功能的实现状态、上游差异、待验证行为和覆盖范围 |
+| [节点样式开发指南](STYLE_DEVELOPMENT.md) | 面板、形状、边框、颜色等样式的开发法则与落地清单 |
 | [Obsidian 官方开发参考](OBSIDIAN_OFFICIAL_REFERENCES.md) | 官方插件示例、帮助文档与 API 类型定义；开发查阅顺序和使用边界 |
 | [README 截图说明](screenshots/README.md) | README 界面预览截图的采集环境、对应命令与截图不能证明的范围 |
 | [测试与验证规范](TESTING.md) | 测试层级、回归清单、验证证据和 Obsidian 运行时测试要求 |
