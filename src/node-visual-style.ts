@@ -53,12 +53,17 @@ export const NODE_STYLE_SHAPES = [
   { id: "database", label: "数据库" }
 ] as const;
 
+/**
+ * Border choices render as icon glyphs in a segmented control, matching the
+ * alignment control: a row of miniature outline strokes reads faster than
+ * five boxed samples and keeps the row one line tall.
+ */
 export const NODE_STYLE_BORDERS = [
-  { id: "solid", label: "实线" },
-  { id: "dashed", label: "虚线" },
-  { id: "dotted", label: "点线" },
-  { id: "double", label: "双线" },
-  { id: "invisible", label: "无边框" }
+  { id: "solid", label: "实线", icon: "border-solid" },
+  { id: "dashed", label: "虚线", icon: "border-dashed" },
+  { id: "dotted", label: "点线", icon: "border-dotted" },
+  { id: "double", label: "双线", icon: "border-double" },
+  { id: "invisible", label: "无边框", icon: "border-none" }
 ] as const;
 
 export const NODE_STYLE_ALIGNMENTS = [
@@ -67,11 +72,32 @@ export const NODE_STYLE_ALIGNMENTS = [
   { id: "right", label: "右对齐", icon: "align-right" }
 ] as const;
 
-export const NODE_STYLE_PRESETS: Record<string, NodeVisualStyle> = {
-  flow: { color: "#65b9a7", shape: "pill", border: "solid", align: "center" },
-  focus: { color: "#a58bea", shape: "default", border: "solid", align: "left" },
-  warning: { color: "#e8b75a", shape: "default", border: "dashed", align: "left" }
+export type NodeStylePreset = {
+  id: string;
+  label: string;
+  style: NodeVisualStyle;
 };
+
+/**
+ * Presets are the panel's primary affordance: one click sets colour, shape,
+ * border and alignment together. The list is ordered by how often a canvas
+ * reaches for it — everyday cards first, annotations and structure last.
+ */
+export const NODE_STYLE_PRESET_LIST: readonly NodeStylePreset[] = [
+  { id: "flow", label: "流程", style: { color: "#65b9a7", shape: "pill", border: "solid", align: "center" } },
+  { id: "focus", label: "重点", style: { color: "#a58bea", shape: "default", border: "solid", align: "center" } },
+  { id: "warning", label: "警示", style: { color: "#e8b75a", shape: "default", border: "dashed", align: "left" } },
+  { id: "note", label: "便签", style: { color: "#d4c75b", shape: "square", border: "invisible", align: "left" } },
+  { id: "question", label: "疑问", style: { color: "#72b4e8", shape: "diamond", border: "solid", align: "center" } },
+  { id: "idea", label: "灵感", style: { color: "#e58eb4", shape: "circle", border: "solid", align: "center" } },
+  { id: "data", label: "数据", style: { color: "#62b8bd", shape: "database", border: "solid", align: "left" } },
+  { id: "doc", label: "文档", style: { color: "#8b9bb4", shape: "document", border: "solid", align: "left" } },
+  { id: "group", label: "分组", style: { color: "#89919d", shape: "hexagon", border: "dotted", align: "center" } }
+] as const;
+
+export const NODE_STYLE_PRESETS: Record<string, NodeVisualStyle> = Object.fromEntries(
+  NODE_STYLE_PRESET_LIST.map(preset => [preset.id, preset.style])
+);
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)

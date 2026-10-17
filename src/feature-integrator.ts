@@ -728,10 +728,10 @@ export default class BetterCanvasFeatures {
     const workspace = this.p.app.workspace as any;
     const nodeMenu = workspace.on("canvas:node-menu", (menu: any, node: any) => {
       if (!menu?.addItem || !node?.id) return;
+      // Style now opens from the Canvas control stack, and colour, shape and
+      // alignment live there. Their commands remain available for users who
+      // prefer them; the menu keeps the actions without a panel equivalent.
       const actions: Array<[string, string, () => void]> = [
-        ["形状", "shapes", () => this.setNodeShape()],
-        ["对齐", "align-center", () => this.setNodeTextAlign()],
-        ["颜色", "palette", () => this.setNodeColor()],
         ["复制链接", "link", () => void this.copyNodeLink()],
         ["翻转连线", "git-compare", () => this.flipEdges()],
         ["专注", "focus", () => this.focus()],
