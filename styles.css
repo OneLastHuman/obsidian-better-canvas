@@ -17,27 +17,216 @@
   gap: 0.5rem;
 }
 
-/* Better Canvas persisted node/edge enhancements */
-.canvas-node[data-bc-shape="pill"] {
-  border-radius: 999px !important;
+/* Better Canvas persisted node/edge enhancements.
+
+   Shapes and border styles target .canvas-node-container: Obsidian paints the
+   card (background, border, radius, shadow) on the container and .canvas-node
+   is only the positioning anchor, so styling the anchor leaves the visible
+   card untouched. */
+.canvas-node[data-bc-shape] {
+  /* Fully transparent mask, used when a shape defines no outline ring. */
+  --bc-ring-off: linear-gradient(transparent, transparent);
 }
-.canvas-node[data-bc-shape="diamond"] {
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+.canvas-node[data-bc-shape="default"] .canvas-node-container {
+  border-radius: var(--radius-m);
 }
-.canvas-node[data-bc-shape="parallelogram"] {
-  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
+.canvas-node[data-bc-shape="square"] .canvas-node-container {
+  border-radius: 0;
 }
-.canvas-node[data-bc-shape="hexagon"] {
-  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+.canvas-node[data-bc-shape="pill"] .canvas-node-container,
+.canvas-node[data-bc-shape="terminal"] .canvas-node-container {
+  border-radius: 999px;
 }
-.canvas-node[data-bc-border="dashed"] {
+.canvas-node[data-bc-shape="circle"] .canvas-node-container,
+.canvas-node[data-bc-shape="ellipse"] .canvas-node-container,
+.canvas-node[data-bc-shape="reference"] .canvas-node-container {
+  border-radius: 50%;
+}
+.canvas-node[data-bc-shape="database"] .canvas-node-container {
+  border-radius: 50% / 12%;
+}
+.canvas-node[data-bc-shape="predefined-process"] .canvas-node-container {
+  border-left-width: 4px !important;
+  border-left-style: double !important;
+  border-right-width: 4px !important;
+  border-right-style: double !important;
+}
+.canvas-node[data-bc-border="dashed"] .canvas-node-container {
   border-style: dashed !important;
 }
-.canvas-node[data-bc-border="dotted"] {
+.canvas-node[data-bc-border="dotted"] .canvas-node-container {
   border-style: dotted !important;
 }
-.canvas-node[data-bc-border="double"] {
+.canvas-node[data-bc-border="double"] .canvas-node-container {
   border-style: double !important;
+}
+.canvas-node[data-bc-border="invisible"] .canvas-node-container,
+.canvas-node[data-bc-border="none"] .canvas-node-container {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Polygon shapes. A rectangular border cannot follow a clip-path outline; it is
+   cut into stubs, so the container border is hidden and the outline is stroked
+   by the ::after ring below. */
+.canvas-node[data-bc-shape="diamond"] .canvas-node-container,
+.canvas-node[data-bc-shape="decision"] .canvas-node-container,
+.canvas-node[data-bc-shape="parallelogram"] .canvas-node-container,
+.canvas-node[data-bc-shape="input-output"] .canvas-node-container,
+.canvas-node[data-bc-shape="hexagon"] .canvas-node-container,
+.canvas-node[data-bc-shape="pentagon"] .canvas-node-container,
+.canvas-node[data-bc-shape="octagon"] .canvas-node-container,
+.canvas-node[data-bc-shape="triangle"] .canvas-node-container,
+.canvas-node[data-bc-shape="trapezoid"] .canvas-node-container,
+.canvas-node[data-bc-shape="chevron"] .canvas-node-container,
+.canvas-node[data-bc-shape="cloud"] .canvas-node-container,
+.canvas-node[data-bc-shape="document"] .canvas-node-container {
+  border-radius: 0;
+  border-color: transparent !important;
+  /* Shared with the ring masks and the panel previews below. */
+  clip-path: var(--bc-shape-outline);
+}
+
+/* Shape constants shared by canvas nodes and the style panel previews: the
+   outline clip and one white stroke mask per border style. The mask keeps only
+   the outline and the ring background paints it, so the border follows the
+   shape while dashed/dotted/double stay available. stroke-width 2 with
+   non-scaling-stroke keeps the visible border at 1px on every edge. */
+:is(
+  .canvas-node[data-bc-shape="diamond"],
+  .canvas-node[data-bc-shape="decision"],
+  .bc-node-shape-preview.shape-diamond,
+  .bc-node-style-preset-preview.shape-diamond
+) {
+  --bc-shape-outline: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,50 50,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,50 50,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,50 50,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+:is(
+  .canvas-node[data-bc-shape="parallelogram"],
+  .canvas-node[data-bc-shape="input-output"]
+) {
+  --bc-shape-outline: polygon(14% 0, 100% 0, 86% 100%, 0 100%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='14,0 100,0 86,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='14,0 100,0 86,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='14,0 100,0 86,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+:is(
+  .canvas-node[data-bc-shape="hexagon"],
+  .bc-node-shape-preview.shape-hexagon
+) {
+  --bc-shape-outline: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='25,0 75,0 100,50 75,100 25,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='25,0 75,0 100,50 75,100 25,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='25,0 75,0 100,50 75,100 25,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="pentagon"] {
+  --bc-shape-outline: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,38 82,100 18,100 0,38' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,38 82,100 18,100 0,38' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,38 82,100 18,100 0,38' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="octagon"] {
+  --bc-shape-outline: polygon(28% 0, 72% 0, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0 72%, 0 28%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='28,0 72,0 100,28 100,72 72,100 28,100 0,72 0,28' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='28,0 72,0 100,28 100,72 72,100 28,100 0,72 0,28' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='28,0 72,0 100,28 100,72 72,100 28,100 0,72 0,28' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="triangle"] {
+  --bc-shape-outline: polygon(50% 0, 100% 100%, 0 100%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="trapezoid"] {
+  --bc-shape-outline: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='20,0 80,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='20,0 80,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='20,0 80,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="chevron"] {
+  --bc-shape-outline: polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%, 22% 50%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 78,0 100,50 78,100 0,100 22,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 78,0 100,50 78,100 0,100 22,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 78,0 100,50 78,100 0,100 22,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="cloud"] {
+  --bc-shape-outline: polygon(22% 18%, 28% 5%, 44% 8%, 55% 2%, 69% 13%, 84% 11%, 94% 27%, 90% 43%, 100% 55%, 88% 72%, 84% 87%, 66% 91%, 53% 100%, 38% 91%, 22% 94%, 12% 78%, 0 70%, 7% 51%, 2% 35%, 12% 20%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='22,18 28,5 44,8 55,2 69,13 84,11 94,27 90,43 100,55 88,72 84,87 66,91 53,100 38,91 22,94 12,78 0,70 7,51 2,35 12,20' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='22,18 28,5 44,8 55,2 69,13 84,11 94,27 90,43 100,55 88,72 84,87 66,91 53,100 38,91 22,94 12,78 0,70 7,51 2,35 12,20' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='22,18 28,5 44,8 55,2 69,13 84,11 94,27 90,43 100,55 88,72 84,87 66,91 53,100 38,91 22,94 12,78 0,70 7,51 2,35 12,20' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+:is(
+  .canvas-node[data-bc-shape="document"],
+  .bc-node-shape-preview.shape-document
+) {
+  --bc-shape-outline: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 100,0 100,88 88,94 74,88 60,94 46,88 32,94 16,88 0,94' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 100,0 100,88 88,94 74,88 60,94 46,88 32,94 16,88 0,94' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 100,0 100,88 88,94 74,88 60,94 46,88 32,94 16,88 0,94' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* Outline ring: paints the border along the outline of polygon shapes. The
+   stroke is centred on the outline, so the ring keeps a 1px border inside the
+   clip path and never grows the card. */
+.canvas-node[data-bc-shape="diamond"]::after,
+.canvas-node[data-bc-shape="decision"]::after,
+.canvas-node[data-bc-shape="parallelogram"]::after,
+.canvas-node[data-bc-shape="input-output"]::after,
+.canvas-node[data-bc-shape="hexagon"]::after,
+.canvas-node[data-bc-shape="pentagon"]::after,
+.canvas-node[data-bc-shape="octagon"]::after,
+.canvas-node[data-bc-shape="triangle"]::after,
+.canvas-node[data-bc-shape="trapezoid"]::after,
+.canvas-node[data-bc-shape="chevron"]::after,
+.canvas-node[data-bc-shape="cloud"]::after,
+.canvas-node[data-bc-shape="document"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--canvas-color);
+  -webkit-mask-image: var(--bc-ring-solid, var(--bc-ring-off));
+  mask-image: var(--bc-ring-solid, var(--bc-ring-off));
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.canvas-node[data-bc-border="dashed"]::after {
+  -webkit-mask-image: var(--bc-ring-dashed, var(--bc-ring-off));
+  mask-image: var(--bc-ring-dashed, var(--bc-ring-off));
+}
+.canvas-node[data-bc-border="dotted"]::after {
+  -webkit-mask-image: var(--bc-ring-dotted, var(--bc-ring-off));
+  mask-image: var(--bc-ring-dotted, var(--bc-ring-off));
+}
+.canvas-node[data-bc-border="double"]::after {
+  -webkit-mask-image: var(--bc-ring-solid, var(--bc-ring-off)), var(--bc-ring-solid, var(--bc-ring-off));
+  mask-image: var(--bc-ring-solid, var(--bc-ring-off)), var(--bc-ring-solid, var(--bc-ring-off));
+  -webkit-mask-size: 100% 100%, calc(100% - 6px) calc(100% - 6px);
+  mask-size: 100% 100%, calc(100% - 6px) calc(100% - 6px);
+  -webkit-mask-position: 0 0, 3px 3px;
+  mask-position: 0 0, 3px 3px;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-repeat: no-repeat, no-repeat;
+}
+.canvas-node[data-bc-border="invisible"]::after,
+.canvas-node[data-bc-border="none"]::after {
+  display: none;
+}
+.canvas-node[data-bc-shape].is-themed::after {
+  background-color: color-mix(in oklch, var(--canvas-color) 70%, transparent);
+}
+.canvas-node[data-bc-shape].is-selected::after,
+.canvas-node[data-bc-shape].is-focused::after,
+.canvas-node[data-bc-shape].is-dummy::after {
+  background-color: var(--color-accent);
+}
+.canvas-node[data-bc-shape].is-themed.is-selected::after,
+.canvas-node[data-bc-shape].is-themed.is-focused::after {
+  background-color: var(--canvas-color);
 }
 .canvas-node.bc-focus-dimmed {
   opacity: 0.12 !important;
@@ -60,28 +249,6 @@
 }
 .better-canvas-node-embed > :last-child {
   margin-bottom: 0;
-}
-
-.canvas-node[data-bc-shape="ellipse"] {
-  border-radius: 50% !important;
-}
-.canvas-node[data-bc-shape="pentagon"] {
-  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
-}
-.canvas-node[data-bc-shape="octagon"] {
-  clip-path: polygon(28% 0%, 72% 0%, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0% 72%, 0% 28%);
-}
-.canvas-node[data-bc-shape="triangle"] {
-  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
-}
-.canvas-node[data-bc-shape="trapezoid"] {
-  clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
-}
-.canvas-node[data-bc-shape="chevron"] {
-  clip-path: polygon(0% 0%, 78% 0%, 100% 50%, 78% 100%, 0% 100%, 22% 50%);
-}
-.canvas-node[data-bc-shape="cloud"] {
-  clip-path: polygon(22% 18%, 28% 5%, 44% 8%, 55% 2%, 69% 13%, 84% 11%, 94% 27%, 90% 43%, 100% 55%, 88% 72%, 84% 87%, 66% 91%, 53% 100%, 38% 91%, 22% 94%, 12% 78%, 0% 70%, 7% 51%, 2% 35%, 12% 20%);
 }
 
 /* Better Canvas read-only mode keeps the canvas background available for panning/zooming. */
@@ -162,21 +329,6 @@
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
 }
 
-/* Shapes defined by the Advanced JSON Canvas styleAttributes schema. */
-.canvas-node[data-bc-shape="circle"] {
-  border-radius: 50% !important;
-}
-.canvas-node[data-bc-shape="predefined-process"] {
-  border-left: 4px double var(--background-modifier-border) !important;
-  border-right: 4px double var(--background-modifier-border) !important;
-}
-.canvas-node[data-bc-shape="document"] {
-  clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%);
-}
-.canvas-node[data-bc-shape="database"] {
-  border-radius: 50% / 12% !important;
-}
-
 /* Selectable text extraction for pinned PDF pages. */
 .bc-pdf-text-selection {
   margin-top: 0.45rem;
@@ -249,21 +401,6 @@
   background: rgba(45, 125, 255, 0.32);
 }
 
-/* Common Advanced Canvas flowchart aliases; canonical JSON shapes are stored
-   separately in styleAttributes so exported files remain interoperable. */
-.canvas-node[data-bc-shape="terminal"] {
-  border-radius: 999px !important;
-}
-.canvas-node[data-bc-shape="decision"] {
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-}
-.canvas-node[data-bc-shape="input-output"] {
-  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
-}
-.canvas-node[data-bc-shape="reference"] {
-  border-radius: 50% !important;
-}
-
 /* Canvas link/backlink explorer */
 .bc-link-explorer-modal {
   width: min(900px, 90vw);
@@ -291,11 +428,6 @@
   color: var(--text-muted);
   overflow-wrap: anywhere;
   white-space: normal;
-}
-
-.canvas-node[data-bc-border="invisible"] {
-  border-color: transparent !important;
-  box-shadow: none !important;
 }
 
 .bc-html-preview-toolbar {
@@ -762,6 +894,7 @@
 }
 .bc-node-shape-preview {
   display: block;
+  position: relative;
   width: 2rem;
   height: 1.25rem;
   border: 1.5px solid var(--text-muted);
@@ -770,11 +903,33 @@
 }
 .bc-node-shape-preview.shape-square { border-radius: 0; }
 .bc-node-shape-preview.shape-pill { border-radius: 999px; }
-.bc-node-shape-preview.shape-diamond { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .bc-node-shape-preview.shape-circle { width: 1.4rem; height: 1.4rem; border-radius: 50%; }
-.bc-node-shape-preview.shape-hexagon { border-radius: 0; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
-.bc-node-shape-preview.shape-document { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%); }
 .bc-node-shape-preview.shape-database { border-radius: 50% / 18%; }
+/* Polygon previews reuse the outline constant and the ring mask of the canvas
+   node rendering, so the swatch shows the same border the node draws. */
+.bc-node-shape-preview.shape-diamond,
+.bc-node-shape-preview.shape-hexagon,
+.bc-node-shape-preview.shape-document {
+  border: 0;
+  border-radius: 0;
+  background: var(--background-primary);
+  clip-path: var(--bc-shape-outline);
+}
+.bc-node-shape-preview.shape-diamond::after,
+.bc-node-shape-preview.shape-hexagon::after,
+.bc-node-shape-preview.shape-document::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--text-muted);
+  -webkit-mask-image: var(--bc-ring-solid);
+  mask-image: var(--bc-ring-solid);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
 .bc-node-style-borders { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; }
 .bc-node-border-preview {
   display: block;
@@ -815,6 +970,7 @@
 }
 .bc-node-style-preset-preview {
   box-sizing: border-box;
+  position: relative;
   display: flex;
   align-items: center;
   width: 3rem;
@@ -827,7 +983,26 @@
 }
 .bc-node-style-preset-preview.shape-square { border-radius: 0; }
 .bc-node-style-preset-preview.shape-pill { border-radius: 999px; }
-.bc-node-style-preset-preview.shape-diamond { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+/* Polygon preset previews follow the same outline + ring rule as the shape
+   previews; the preset colour stays on the element as the card fill. */
+.bc-node-style-preset-preview.shape-diamond {
+  border: 0;
+  border-radius: 0;
+  clip-path: var(--bc-shape-outline);
+}
+.bc-node-style-preset-preview.shape-diamond::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--text-normal);
+  -webkit-mask-image: var(--bc-ring-solid);
+  mask-image: var(--bc-ring-solid);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
 .bc-node-style-preset-preview.border-dashed { border-style: dashed; }
 .bc-node-style-preset-preview.border-dotted { border-style: dotted; }
 .bc-node-style-preset-preview.border-double { border-style: double; }
@@ -839,6 +1014,3 @@
   line-height: 1;
   white-space: nowrap;
 }
-/* Only the plain rectangle alias lacks a rule above; the other panel shapes
-   reuse the Advanced JSON Canvas styleAttributes definitions. */
-.canvas-node[data-bc-shape="square"] { border-radius: 0 !important; clip-path: none !important; }

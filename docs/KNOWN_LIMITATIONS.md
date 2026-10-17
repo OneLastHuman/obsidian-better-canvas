@@ -9,6 +9,15 @@ Better Canvas 仍在持续整合和验证中。功能代码存在不代表它已
 - **静态导出：** PNG/SVG 导出会把内容绘制成静态图像，不会执行交互 HTML。嵌入图片和 PDF 页面预览受到资源体积预算限制；复杂 Markdown 和 Obsidian 原生 DOM 并不能保证像素级一致。
 - **移动端及主题：** CI 不会启动 Obsidian 图形界面。触控、缩放、选区、菜单、主题 CSS 和特定 DOM 行为需在目标版本实测。
 
+## 节点形状与边框
+
+非矩形形状（Diamond、Hexagon、Document、Pentagon 等）的轮廓由 `.canvas-node-container` 上的 CSS `clip-path` 决定，边框改用沿轮廓的 SVG `mask-image` 描边环绘制（`styles.css` 的 `--bc-shape-outline` / `--bc-ring-*`）。因此：
+
+- 形状节点的卡片投影不显示：原生 `box-shadow` 会被 `clip-path` 裁掉，选中态用描边环颜色（`--color-accent`）表达。
+- 虚线、点线在多边形长边与短边上的段长不完全一致，因为描边掩膜按节点框等比缩放。
+- 形状只影响外观：连线端点、框选、缩放手柄、编组边界仍按矩形计算；导出 PNG/SVG 由导出渲染器单独绘制这些形状。
+- 极端尺寸（极窄或极扁）的节点上，描边环与轮廓的重合度会下降。
+
 ## Canvas Portal
 
 Portal 以单层镜像为主：引用的 `.canvas` 中的节点和连线会映射到 Portal 内，节点编辑与删除会同步回源文件，跨 Portal 的连线会映射到 Portal 框。Portal 内创建的普通节点及同 Portal 内的连线会尝试写回源画布；也保留了显式命令“在选中 Canvas Portal 中创建文本节点”。新建分组框只有在整个矩形都处于 Portal 内容范围内时才会自动归属。
