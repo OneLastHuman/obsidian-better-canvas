@@ -20,6 +20,7 @@ Closes #
 实际执行结果与测试 commit：
 - 执行过的命令：
 - 对应 commit SHA：
+- 证据链接（GitHub Actions artifact 或 Issue/PR 附件；不要提交临时截图/日志）：
 - 未执行或受阻的检查及原因：
 
 ## Obsidian 运行时验证
