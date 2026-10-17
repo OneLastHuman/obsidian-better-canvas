@@ -31,7 +31,7 @@ describe("applyNodeVisualStyle", () => {
     expect(result.updated).toBe(1);
     expect(result.data.nodes[0]).toMatchObject({
       text: "Keep this content", x: 10, y: 20, width: 280, height: 120,
-      color: "#34d399", bcShape: "pill", bcBorderStyle: "solid", bcTextAlign: "center",
+      color: "#65b9a7", bcShape: "pill", bcBorderStyle: "solid", bcTextAlign: "center",
       pluginMetadata: { keep: true },
       styleAttributes: { shape: "pill", border: "solid", textAlign: "center", custom: "keep" }
     });
@@ -44,7 +44,7 @@ describe("applyNodeVisualStyle", () => {
     const result = applyNodeVisualStyle(fixture, ["node-1"], DEFAULT_NODE_VISUAL_STYLE);
     expect(result.data.nodes[0]).toMatchObject({
       text: "Keep this content", bcShape: "default", bcBorderStyle: "solid",
-      bcTextAlign: "left", color: "#94a3b8"
+      bcTextAlign: "center", color: "#64748b"
     });
     expect((result.data.nodes[0].styleAttributes as Record<string, unknown>).custom).toBe("keep");
   });
