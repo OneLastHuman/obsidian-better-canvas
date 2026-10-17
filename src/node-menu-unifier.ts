@@ -8,30 +8,34 @@ import {
   NODE_STYLE_ALIGNMENTS,
   NODE_STYLE_BORDERS,
   NODE_STYLE_COLORS,
-  NODE_STYLE_PRESETS,
+  NODE_STYLE_PRESET_LIST,
   NODE_STYLE_SHAPES,
   type NodeVisualStylePatch
 } from "./node-visual-style";
 
-type PopupPatch = {
-  menu: any;
-  original: (...args: any[]) => any;
-  wrapper: (...args: any[]) => any;
-  hadOwnRender: boolean;
-};
+/**
+ * Node style entry point.
+ *
+ * The style button joins Obsidian's own `.canvas-controls` stack on the right
+ * edge of the Canvas, next to the zoom/undo groups. Clicking it opens a docked
+ * inspector panel. The native node context menu is left untouched, so the AI,
+ * layout and other menu entries registered by this plugin and by other plugins
+ * keep working.
+ */
 
-type PanelSource = "toolbar" | "context";
+type ControlGroup = {
+  group: HTMLElement;
+  button: HTMLElement;
+  cleanup: () => void;
+};
 
 type ActivePanel = {
   canvas: any;
   nodeId: string;
-  source: PanelSource;
   surface: HTMLElement;
-  popupEl?: HTMLElement;
-  anchor: { x: number; y: number };
-  originalInlineStyle?: { position: string; left: string; top: string; width: string; transform: string };
   outsideHandler: (event: PointerEvent) => void;
   keyHandler: (event: KeyboardEvent) => void;
+  resizeHandler: () => void;
 };
 
 function selectedNodeId(canvas: any): string | null {
@@ -39,12 +43,6 @@ function selectedNodeId(canvas: any): string | null {
   if (selected.length !== 1) return null;
   const id = selected[0]?.id ?? selected[0]?.getData?.()?.id;
   return typeof id === "string" && canvas?.nodes?.has?.(id) ? id : null;
-}
-
-function nodeElement(canvas: any, nodeId: string): HTMLElement | null {
-  const node = canvas?.nodes?.get?.(nodeId);
-  const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
-  return element instanceof HTMLElement ? element : null;
 }
 
 function nodeFromData(canvas: any, nodeId: string): CanvasNodeData | undefined {
@@ -65,6 +63,26 @@ function styleOf(node: CanvasNodeData): { color: string; shape: string; border: 
   };
 }
 
+/**
+ * Inline icon paths used when the host's icon set does not know a name. Each
+ * entry is a list of `[d, attributes]` pairs so dashed/dotted strokes can carry
+ * their own dash pattern.
+ */
+const ICON_FALLBACKS: Record<string, Array<[string, Record<string, string>?]>> = {
+  palette: [[
+    "M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 1.5-3.3 1.8 1.8 0 0 1 1.4-3h1.4A3.5 3.5 0 0 0 21 11.2 8.5 8.5 0 0 0 12 3Z"
+  ], ["M7.5 10h.01"], ["M10 6.5h.01"], ["M15 7.5h.01"], ["M17 10.5h.01"]],
+  "x": [["M6 6l12 12"], ["M18 6 6 18"]],
+  "align-left": [["M15 12H3"], ["M17 18H3"], ["M21 6H3"]],
+  "align-center": [["M17 12H7"], ["M19 18H5"], ["M21 6H3"]],
+  "align-right": [["M21 12H9"], ["M21 18H7"], ["M21 6H3"]],
+  "border-solid": [["M4 7h16v10H4z"]],
+  "border-dashed": [["M4 7h16v10H4z", { "stroke-dasharray": "3.4 2.4" }]],
+  "border-dotted": [["M4 7h16v10H4z", { "stroke-dasharray": "0.6 2.8", "stroke-linecap": "round" }]],
+  "border-double": [["M4 6.5h16v11H4z"], ["M4 9.5h16"], ["M4 14.5h16"]],
+  "border-none": [["M5 5l14 14"]]
+};
+
 function addButton(
   parent: HTMLElement,
   label: string,
@@ -77,8 +95,8 @@ function addButton(
   button.className = className;
   if (icon) {
     setIcon(button, icon);
-    // Keep icon-only Canvas popup controls visible if the host renderer fails
-    // to inject Obsidian's SVG for this popup surface.
+    // Keep icon-only controls visible if the host renderer fails to inject the
+    // SVG for this surface.
     if (!button.querySelector("svg")) {
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
@@ -91,19 +109,10 @@ function addButton(
       svg.setAttribute("stroke-width", "1.8");
       svg.setAttribute("stroke-linecap", "round");
       svg.setAttribute("stroke-linejoin", "round");
-      const paths: Record<string, string[]> = {
-        palette: [
-          "M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 1.5-3.3 1.8 1.8 0 0 1 1.4-3h1.4A3.5 3.5 0 0 0 21 11.2 8.5 8.5 0 0 0 12 3Z",
-          "M7.5 10h.01", "M10 6.5h.01", "M15 7.5h.01", "M17 10.5h.01"
-        ],
-        "arrow-left": ["m12 19-7-7 7-7", "M19 12H5"],
-        "align-left": ["M15 12H3", "M17 18H3", "M21 6H3"],
-        "align-center": ["M17 12H7", "M19 18H5", "M21 6H3"],
-        "align-right": ["M21 12H9", "M21 18H7", "M21 6H3"]
-      };
-      for (const d of paths[icon] ?? []) {
+      for (const [d, extra] of ICON_FALLBACKS[icon] ?? []) {
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", d);
+        for (const [name, value] of Object.entries(extra ?? {})) path.setAttribute(name, value);
         svg.appendChild(path);
       }
       button.appendChild(svg);
@@ -122,7 +131,7 @@ function addButton(
 
 export default class NodeMenuUnifier {
   private readonly plugin: Plugin;
-  private readonly patchedMenus = new Map<any, PopupPatch>();
+  private readonly controlGroups = new Map<HTMLElement, ControlGroup>();
   private activePanel: ActivePanel | null = null;
 
   constructor(plugin: Plugin) {
@@ -133,301 +142,218 @@ export default class NodeMenuUnifier {
     const workspace = this.plugin.app.workspace as any;
     this.plugin.registerEvent(workspace.on("layout-change", () => this.scanCanvases()));
     this.plugin.registerEvent(workspace.on("active-leaf-change", () => this.scanCanvases()));
-    this.plugin.registerEvent(workspace.on("canvas:node-menu", (menu: any, node: any) => {
-      this.onNativeContextMenu(menu, node);
-    }));
     workspace.onLayoutReady(() => this.scanCanvases());
     this.plugin.register(() => this.stop());
     this.scanCanvases();
   }
 
   stop(): void {
-    this.dismissPanel(this.activePanel?.source === "toolbar");
-    for (const record of this.patchedMenus.values()) {
-      if (record.menu.render !== record.wrapper) continue;
-      if (record.hadOwnRender) record.menu.render = record.original;
-      else delete record.menu.render;
-      const popupEl = record.menu.menuEl;
-      if (popupEl instanceof HTMLElement) {
-        popupEl.classList.remove("bc-node-popup-menu", "bc-node-style-view", "bc-node-popup-dismissed");
-        // Drop the injected entry points and the placement we applied, so the
-        // Canvas popup goes back to exactly what the host renders.
-        popupEl.replaceChildren();
-        for (const property of ["left", "top", "width", "max-height", "transform"]) {
-          popupEl.style.removeProperty(property);
-        }
-      }
-      try {
-        record.original.call(record.menu);
-      } catch {
-        // Do not block plugin unload if the host Canvas is already closing.
-      }
+    this.dismissPanel();
+    for (const record of this.controlGroups.values()) {
+      record.cleanup();
+      record.group.remove();
     }
-    this.patchedMenus.clear();
-  }
-
-  openStyleFromContextMenu(
-    canvas: any,
-    nodeId: string,
-    event?: MouseEvent | KeyboardEvent
-  ): void {
-    const element = nodeElement(canvas, nodeId);
-    if (!element || !nodeFromData(canvas, nodeId)) {
-      new Notice("目标节点已不存在，无法打开样式面板。");
-      return;
-    }
-
-    const nodeRect = element.getBoundingClientRect();
-    const eventTarget = event?.target;
-    const contextMenuElement = eventTarget instanceof HTMLElement
-      ? eventTarget.closest<HTMLElement>(".menu")
-      : null;
-    const contextRect = contextMenuElement?.getBoundingClientRect();
-    const anchor = contextRect && contextRect.width > 0
-      ? { x: contextRect.left, y: contextRect.top }
-      : { x: nodeRect.right + 8, y: nodeRect.top };
-    const canvasMenu = canvas?.menu;
-    const popupEl = canvasMenu && this.patchedMenus.has(canvasMenu) && canvasMenu.menuEl instanceof HTMLElement
-      ? canvasMenu.menuEl as HTMLElement
-      : undefined;
-    this.showStylePanel(canvas, nodeId, "context", anchor, popupEl);
-  }
-
-  private onNativeContextMenu(menu: any, node: any): void {
-    const nodeId = typeof node?.id === "string" ? node.id : "";
-    if (!nodeId) return;
-
-    const workspace = this.plugin.app.workspace as any;
-    const canvas = node?.canvas ?? (workspace.getLeavesOfType?.("canvas") ?? [])
-      .map((leaf: any) => leaf?.view?.canvas)
-      .find((candidate: any) => candidate?.nodes?.has?.(nodeId));
-    const canvasMenu = canvas?.menu;
-    const popupEl = canvasMenu?.menuEl;
-    if (!canvas || !canvasMenu || !this.patchedMenus.has(canvasMenu) || !(popupEl instanceof HTMLElement)) return;
-
-    const activePanel = this.activePanel;
-    if (activePanel && activePanel.canvas === canvas) {
-      this.dismissPanel(activePanel.source === "toolbar");
-    }
-    popupEl.replaceChildren();
-    popupEl.classList.remove("bc-node-style-view");
-    popupEl.classList.add("bc-node-popup-menu", "bc-node-popup-dismissed");
-
-    menu?.onHide?.(() => {
-      const active = this.activePanel;
-      if (active?.source === "context" && active.canvas === canvas && active.nodeId === nodeId) return;
-      this.renderPopupToolbar(canvas, canvas.menu);
-    });
+    this.controlGroups.clear();
   }
 
   private scanCanvases(): void {
     const workspace = this.plugin.app.workspace as any;
+    const liveContainers = new Set<HTMLElement>();
+    const liveCanvases = new Set<any>();
     for (const leaf of workspace.getLeavesOfType?.("canvas") ?? []) {
-      const canvas = leaf?.view?.canvas;
-      if (canvas) this.patchCanvasMenu(canvas);
+      const view = leaf?.view;
+      const container = view?.containerEl;
+      const canvas = view?.canvas;
+      if (!(container instanceof HTMLElement) || !canvas) continue;
+      liveContainers.add(container);
+      liveCanvases.add(canvas);
+      this.installCanvasControl(container, canvas);
+    }
+    // The panel is bound to one Canvas; close it when that view goes away.
+    if (this.activePanel && !liveCanvases.has(this.activePanel.canvas)) this.dismissPanel();
+    // Drop controls whose Canvas view has closed.
+    for (const [container, record] of this.controlGroups) {
+      if (liveContainers.has(container)) continue;
+      record.cleanup();
+      record.group.remove();
+      this.controlGroups.delete(container);
     }
   }
 
-  private patchCanvasMenu(canvas: any): void {
-    const menu = canvas?.menu;
-    if (!menu || typeof menu.render !== "function" || !(menu.menuEl instanceof HTMLElement)) return;
-    if (this.patchedMenus.has(menu)) return;
-
-    const original = menu.render as (...args: any[]) => any;
-    const hadOwnRender = Object.prototype.hasOwnProperty.call(menu, "render");
-    const integration = this;
-    const wrapper = function(this: any, ...args: any[]): any {
-      const result = original.apply(this, args);
-      integration.renderPopupToolbar(canvas, menu);
-      return result;
-    };
-
-    try {
-      menu.render = wrapper;
-      this.patchedMenus.set(menu, { menu, original, wrapper, hadOwnRender });
-    } catch {
-      // If a future host version seals this internal object, retain native behavior.
-    }
-  }
-
-  private renderPopupToolbar(canvas: any, menu: any): void {
-    const popupEl = menu?.menuEl;
-    if (!(popupEl instanceof HTMLElement)) return;
-    const activePanel = this.activePanel;
-    if (activePanel && activePanel.popupEl === popupEl && activePanel.surface === popupEl) {
-      // The host just re-rendered its own items into the surface we borrowed for
-      // the style panel (a native node change such as the colour triggers this).
-      // Rebuild the panel so native entries never appear inside it.
-      this.renderStylePanel();
+  private installCanvasControl(container: HTMLElement, canvas: any): void {
+    const controls = container.querySelector<HTMLElement>(".canvas-controls");
+    if (!controls) return;
+    if (this.controlGroups.has(container)) {
+      this.syncControlState(container, canvas);
       return;
     }
 
-    const nodeId = selectedNodeId(canvas);
-    if (!nodeId || !nodeFromData(canvas, nodeId)) {
-      popupEl.classList.remove("bc-node-popup-menu", "bc-node-style-view", "bc-node-popup-dismissed");
-      const patch = this.patchedMenus.get(menu);
-      if (patch) {
-        try {
-          patch.original.call(menu);
-        } catch {
-          // Fall back to the native renderer when the selection is no longer valid.
-        }
+    // Mirror Obsidian's own group/item markup so the entry inherits the native
+    // size, radius, border and hover treatment.
+    const group = document.createElement("div");
+    group.className = "canvas-control-group mod-raised bc-node-style-control-group";
+    const button = document.createElement("div");
+    button.className = "canvas-control-item bc-node-style-control-item";
+    button.setAttribute("role", "button");
+    button.setAttribute("tabindex", "0");
+    button.setAttribute("aria-label", "节点样式");
+    button.setAttribute("data-tooltip-position", "left");
+    setIcon(button, "palette");
+    if (!button.querySelector("svg")) {
+      button.textContent = "◐";
+    }
+    group.appendChild(button);
+    controls.insertBefore(group, controls.firstChild);
+
+    const open = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      const nodeId = selectedNodeId(canvas);
+      if (!nodeId) {
+        new Notice("请先选择一个节点，再打开节点样式。");
+        return;
       }
+      if (this.activePanel?.canvas === canvas) {
+        this.dismissPanel();
+        return;
+      }
+      this.showStylePanel(canvas, nodeId);
+    };
+    const keydown = (event: KeyboardEvent): void => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      open(event);
+    };
+    const sync = (): void => this.syncControlState(container, canvas);
+    button.addEventListener("click", open);
+    button.addEventListener("keydown", keydown);
+    container.addEventListener("pointerup", sync, true);
+    container.addEventListener("keyup", sync, true);
+
+    this.controlGroups.set(container, {
+      group,
+      button,
+      cleanup: () => {
+        button.removeEventListener("click", open);
+        button.removeEventListener("keydown", keydown);
+        container.removeEventListener("pointerup", sync, true);
+        container.removeEventListener("keyup", sync, true);
+      }
+    });
+    this.syncControlState(container, canvas);
+  }
+
+  private syncControlState(container: HTMLElement, canvas: any): void {
+    const record = this.controlGroups.get(container);
+    if (!record) return;
+    const nodeId = selectedNodeId(canvas);
+    record.button.classList.toggle("is-disabled", !nodeId);
+    record.button.setAttribute("aria-disabled", String(!nodeId));
+    record.button.classList.toggle(
+      "is-active",
+      Boolean(this.activePanel && this.activePanel.canvas === canvas)
+    );
+    // Keep an open panel pointed at the current single selection.
+    const active = this.activePanel;
+    if (active && active.canvas === canvas && nodeId && active.nodeId !== nodeId) {
+      if (nodeFromData(canvas, nodeId)) {
+        active.nodeId = nodeId;
+        this.renderStylePanel();
+      }
+    }
+  }
+
+  private showStylePanel(canvas: any, nodeId: string): void {
+    this.dismissPanel();
+    if (!nodeFromData(canvas, nodeId)) {
+      new Notice("目标节点已不存在，样式面板已关闭。");
       return;
     }
 
-    popupEl.classList.remove("bc-node-popup-dismissed", "bc-node-style-view");
-    popupEl.classList.add("bc-node-popup-menu");
-    popupEl.replaceChildren();
-
-    addButton(popupEl, "节点样式", "bc-node-toolbar-button", () => {
-      const rect = popupEl.getBoundingClientRect();
-      this.showStylePanel(canvas, nodeId, "toolbar", { x: rect.left, y: rect.top }, popupEl);
-    }, "palette");
-  }
-
-  private showStylePanel(
-    canvas: any,
-    nodeId: string,
-    source: PanelSource,
-    anchor: { x: number; y: number },
-    popupEl?: HTMLElement
-  ): void {
-    this.dismissPanel(false);
-
-    let surface: HTMLElement;
-    let originalInlineStyle: ActivePanel["originalInlineStyle"];
-    if (popupEl) {
-      surface = popupEl;
-      originalInlineStyle = {
-        position: surface.style.position,
-        left: surface.style.left,
-        top: surface.style.top,
-        width: surface.style.width,
-        transform: surface.style.transform
-      };
-      surface.classList.add("bc-node-popup-menu", "bc-node-style-view");
-      surface.classList.remove("bc-node-popup-dismissed");
-      surface.style.transform = "none";
-      this.positionPopover(surface, anchor);
-    } else {
-      surface = document.createElement("div");
-      surface.className = "bc-node-style-popover";
-      document.body.appendChild(surface);
-      this.positionPopover(surface, anchor);
-    }
+    const surface = document.createElement("aside");
+    surface.className = "bc-node-style-panel";
+    surface.setAttribute("role", "dialog");
+    surface.setAttribute("aria-label", "节点样式");
+    document.body.appendChild(surface);
 
     const active: ActivePanel = {
       canvas,
       nodeId,
-      source,
       surface,
-      ...(popupEl ? { popupEl } : {}),
-      anchor,
-      ...(originalInlineStyle ? { originalInlineStyle } : {}),
       outsideHandler: () => undefined,
-      keyHandler: () => undefined
+      keyHandler: () => undefined,
+      resizeHandler: () => this.positionPanel()
     };
     active.outsideHandler = event => {
-      if (!surface.contains(event.target as Node)) this.dismissPanel(source === "toolbar");
+      if (surface.contains(event.target as Node)) return;
+      // A click on another Canvas node retargets the panel; anywhere else
+      // dismisses it.
+      const target = event.target;
+      if (target instanceof Element && target.closest(".canvas-node")) return;
+      this.dismissPanel();
     };
     active.keyHandler = event => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
-      this.dismissPanel(source === "toolbar");
+      this.dismissPanel();
     };
     this.activePanel = active;
     document.addEventListener("pointerdown", active.outsideHandler, true);
     document.addEventListener("keydown", active.keyHandler, true);
+    window.addEventListener("resize", active.resizeHandler);
     this.renderStylePanel();
   }
 
-  /**
-   * Place the panel inside the visible Canvas area. A `position: fixed` box is
-   * resolved against its nearest containing block, and inside Canvas that is the
-   * `contain: strict` canvas wrapper rather than the viewport, so the anchor has
-   * to be converted into that box before it can be applied. Clamping against the
-   * wrapper also keeps the panel inside the area the wrapper does not clip.
-   */
-  private positionPopover(surface: HTMLElement, anchor: { x: number; y: number }): void {
+  /** Docks the panel just left of the Canvas control stack. */
+  private positionPanel(): void {
+    const active = this.activePanel;
+    if (!active) return;
+    const controls = this.controlsForCanvas(active.canvas);
+    const surface = active.surface;
     const margin = 12;
-    const containerEl = surface.offsetParent instanceof HTMLElement ? surface.offsetParent : document.documentElement;
-    const container = containerEl.getBoundingClientRect();
-    const containerStyle = getComputedStyle(containerEl);
-    const inset = (property: "borderLeftWidth" | "borderRightWidth" | "borderTopWidth" | "borderBottomWidth"): number =>
-      Number.parseFloat(containerStyle[property]) || 0;
-    const origin = {
-      left: container.left + inset("borderLeftWidth"),
-      top: container.top + inset("borderTopWidth")
-    };
-    const bounds = {
-      left: Math.max(margin, origin.left + margin),
-      top: Math.max(margin, origin.top + margin),
-      right: Math.min(window.innerWidth - margin, container.right - inset("borderRightWidth") - margin),
-      bottom: Math.min(window.innerHeight - margin, container.bottom - inset("borderBottomWidth") - margin)
-    };
-
-    const availableWidth = Math.max(220, bounds.right - bounds.left);
-    const availableHeight = Math.max(160, bounds.bottom - bounds.top);
-    const width = Math.min(332, availableWidth);
+    surface.style.maxHeight = Math.max(240, window.innerHeight - margin * 2) + "px";
+    const width = Math.min(316, Math.max(240, window.innerWidth - margin * 2));
     surface.style.width = width + "px";
-    surface.style.maxHeight = availableHeight + "px";
 
-    const height = Math.min(surface.getBoundingClientRect().height, availableHeight);
-    const left = Math.min(Math.max(anchor.x, bounds.left), Math.max(bounds.left, bounds.left + availableWidth - width));
-    const top = Math.min(Math.max(anchor.y, bounds.top), Math.max(bounds.top, bounds.top + availableHeight - height));
-    surface.style.left = Math.round(left - origin.left) + "px";
-    surface.style.top = Math.round(top - origin.top) + "px";
+    const anchor = controls?.getBoundingClientRect();
+    const panelHeight = Math.min(surface.getBoundingClientRect().height, window.innerHeight - margin * 2);
+    const top = anchor
+      ? Math.min(Math.max(margin, anchor.top), Math.max(margin, window.innerHeight - panelHeight - margin))
+      : margin;
+    const left = anchor
+      ? Math.max(margin, anchor.left - width - 10)
+      : window.innerWidth - width - margin;
+    surface.style.top = Math.round(top) + "px";
+    surface.style.left = Math.round(left) + "px";
   }
 
-  private dismissPanel(restoreToolbar: boolean): void {
+  private controlsForCanvas(canvas: any): HTMLElement | null {
+    const workspace = this.plugin.app.workspace as any;
+    for (const leaf of workspace?.getLeavesOfType?.("canvas") ?? []) {
+      if (leaf?.view?.canvas !== canvas) continue;
+      const container = leaf.view.containerEl;
+      if (!(container instanceof HTMLElement)) return null;
+      return container.querySelector<HTMLElement>(".canvas-controls");
+    }
+    return null;
+  }
+
+  private dismissPanel(): void {
     const active = this.activePanel;
     if (!active) return;
     document.removeEventListener("pointerdown", active.outsideHandler, true);
     document.removeEventListener("keydown", active.keyHandler, true);
+    window.removeEventListener("resize", active.resizeHandler);
+    active.surface.remove();
     this.activePanel = null;
-
-    if (active.popupEl && active.surface === active.popupEl) {
-      if (active.originalInlineStyle) {
-        active.popupEl.style.position = active.originalInlineStyle.position;
-        active.popupEl.style.left = active.originalInlineStyle.left;
-        active.popupEl.style.top = active.originalInlineStyle.top;
-        active.popupEl.style.width = active.originalInlineStyle.width;
-        active.popupEl.style.transform = active.originalInlineStyle.transform;
-      }
-      if (active.source === "toolbar" && !restoreToolbar) {
-        active.popupEl.replaceChildren();
-        active.popupEl.classList.remove("bc-node-style-view");
-        active.popupEl.classList.add("bc-node-popup-dismissed");
-      } else {
-        this.renderPopupToolbar(active.canvas, active.canvas.menu);
-      }
-    } else {
-      active.surface.remove();
-      if (active.popupEl) this.renderPopupToolbar(active.canvas, active.canvas.menu);
+    for (const [container] of this.controlGroups) {
+      const canvas = (this.plugin.app.workspace as any)?.getLeavesOfType?.("canvas")
+        ?.find((leaf: any) => leaf?.view?.containerEl === container)?.view?.canvas;
+      if (canvas) this.syncControlState(container, canvas);
     }
   }
 
-  private openNativeContextMenu(canvas: any, nodeId: string, point: { x: number; y: number }): void {
-    const element = nodeElement(canvas, nodeId);
-    if (!element) {
-      new Notice("目标节点已不存在，无法打开菜单。");
-      return;
-    }
-    if (this.activePanel) this.dismissPanel(false);
-    const event = new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      button: 2,
-      clientX: point.x,
-      clientY: point.y
-    });
-    element.dispatchEvent(event);
-  }
-
-  private applyStyle(patch: NodeVisualStylePatch, focusKey: string): void {
+  private applyStyle(patch: NodeVisualStylePatch, focusKey?: string): void {
     const active = this.activePanel;
     if (!active) return;
     const { canvas, nodeId } = active;
@@ -440,7 +366,7 @@ export default class NodeMenuUnifier {
     const result = applyNodeVisualStyle(current, [nodeId], patch);
     if (result.updated === 0) {
       new Notice("目标节点已不存在，未应用样式。");
-      this.dismissPanel(false);
+      this.dismissPanel();
       return;
     }
 
@@ -462,7 +388,7 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const node = nodeFromData(active.canvas, active.nodeId);
     if (!node) {
-      this.dismissPanel(false);
+      this.dismissPanel();
       new Notice("目标节点已不存在，样式面板已关闭。");
       return;
     }
@@ -470,26 +396,14 @@ export default class NodeMenuUnifier {
     const currentStyle = styleOf(node);
     const surface = active.surface;
     surface.replaceChildren();
-    if (active.surface === active.popupEl) {
-      surface.classList.add("bc-node-popup-menu", "bc-node-style-view");
-      surface.classList.remove("bc-node-popup-dismissed");
-    } else {
-      surface.classList.add("bc-node-style-popover");
-    }
 
     const header = document.createElement("div");
     header.className = "bc-node-style-header";
-    addButton(header, "返回", "bc-node-style-back", () => {
-      const source = active.source;
-      const canvas = active.canvas;
-      const nodeId = active.nodeId;
-      const anchor = active.anchor;
-      this.dismissPanel(source === "toolbar");
-      if (source === "context") this.openNativeContextMenu(canvas, nodeId, anchor);
-    }, "arrow-left");
     const heading = document.createElement("strong");
+    heading.className = "bc-node-style-title";
     heading.textContent = "节点样式";
     header.appendChild(heading);
+    addButton(header, "关闭", "bc-node-style-close", () => this.dismissPanel(), "x");
     surface.appendChild(header);
 
     const body = document.createElement("div");
@@ -506,6 +420,37 @@ export default class NodeMenuUnifier {
       body.appendChild(section);
       return section;
     };
+
+    // Presets come first: one click applies colour, shape, border and alignment.
+    const presetSection = addSection("预设");
+    const presets = document.createElement("div");
+    presets.className = "bc-node-style-presets";
+    presetSection.appendChild(presets);
+    for (const preset of NODE_STYLE_PRESET_LIST) {
+      const selected =
+        currentStyle.color.toLowerCase() === preset.style.color.toLowerCase() &&
+        currentStyle.shape === preset.style.shape &&
+        currentStyle.border === preset.style.border &&
+        currentStyle.align === preset.style.align;
+      const button = addButton(presets, "", "bc-node-style-preset" + (selected ? " is-selected" : ""), () => {
+        this.applyStyle({ ...preset.style }, "preset-" + preset.id);
+      });
+      button.dataset.styleOption = "preset-" + preset.id;
+      button.title = preset.label + "预设";
+      button.setAttribute("aria-label", preset.label + "预设");
+      button.setAttribute("aria-pressed", String(selected));
+
+      const preview = document.createElement("span");
+      preview.className = "bc-node-style-preset-preview shape-" + preset.style.shape +
+        " border-" + preset.style.border + " align-" + preset.style.align;
+      preview.style.setProperty("--bc-preset-color", preset.style.color);
+      preview.setAttribute("aria-hidden", "true");
+      const sample = document.createElement("span");
+      sample.className = "bc-node-style-preset-sample";
+      sample.textContent = "Aa";
+      preview.appendChild(sample);
+      button.appendChild(preview);
+    }
 
     const colorSection = addSection("颜色");
     const colors = document.createElement("div");
@@ -554,17 +499,11 @@ export default class NodeMenuUnifier {
     for (const border of NODE_STYLE_BORDERS) {
       const selected = currentStyle.border === border.id ||
         (border.id === "invisible" && currentStyle.border === "none");
-      const button = addButton(borders, "", "bc-node-style-choice" + (selected ? " is-selected" : ""), () => {
+      const button = addButton(borders, border.label, "bc-node-style-choice" + (selected ? " is-selected" : ""), () => {
         this.applyStyle({ border: border.id }, "border-" + border.id);
-      });
+      }, border.icon);
       button.dataset.styleOption = "border-" + border.id;
-      button.title = border.label;
-      button.setAttribute("aria-label", border.label);
       button.setAttribute("aria-pressed", String(selected));
-      const sample = document.createElement("span");
-      sample.className = "bc-node-border-preview border-" + border.id;
-      sample.setAttribute("aria-hidden", "true");
-      button.appendChild(sample);
     }
 
     const alignSection = addSection("文本对齐");
@@ -580,43 +519,7 @@ export default class NodeMenuUnifier {
       button.setAttribute("aria-pressed", String(selected));
     }
 
-    const presetSection = addSection("预设");
-    const presets = document.createElement("div");
-    presets.className = "bc-node-style-presets";
-    presetSection.appendChild(presets);
-    const presetNames: Record<string, string> = { flow: "流程", focus: "聚焦", warning: "警告" };
-    for (const id of Object.keys(NODE_STYLE_PRESETS)) {
-      const preset = NODE_STYLE_PRESETS[id];
-      const name = presetNames[id] ?? id;
-      const button = addButton(presets, "", "bc-node-style-preset", () => {
-        this.applyStyle({ color: preset.color, shape: preset.shape, border: preset.border, align: preset.align }, "preset-" + id);
-      });
-      button.dataset.styleOption = "preset-" + id;
-      // The preview already shows colour, shape, border and alignment; the
-      // preset name stays a tooltip and accessible label only.
-      button.setAttribute("aria-label", name + "节点样式预设");
-      button.title = name + "预设";
-
-      const preview = document.createElement("span");
-      preview.className = "bc-node-style-preset-preview shape-" + preset.shape + " border-" + preset.border;
-      preview.style.backgroundColor = preset.color;
-      preview.setAttribute("aria-hidden", "true");
-      const sample = document.createElement("span");
-      sample.className = "bc-node-style-preset-sample";
-      sample.textContent = "Aa";
-      sample.style.textAlign = preset.align;
-      preview.appendChild(sample);
-      button.appendChild(preview);
-
-      button.setAttribute("aria-pressed", String(
-        currentStyle.color.toLowerCase() === preset.color.toLowerCase() &&
-        currentStyle.shape === preset.shape &&
-        currentStyle.border === preset.border &&
-        currentStyle.align === preset.align
-      ));
-    }
-
-    this.positionPopover(surface, active.anchor);
+    this.positionPanel();
     if (focusKey) {
       const selector = '[data-style-option="' + focusKey + '"]';
       surface.querySelector<HTMLElement>(selector)?.focus();
