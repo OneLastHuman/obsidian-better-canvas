@@ -15,12 +15,26 @@ export type NodeVisualStylePatch = {
 };
 
 export const NODE_STYLE_COLORS = [
-  { id: "lavender", label: "Lavender", value: "#a78bfa" },
-  { id: "blue", label: "Blue", value: "#60a5fa" },
+  { id: "red", label: "Red", value: "#ef4444" },
+  { id: "orange", label: "Orange", value: "#f97316" },
   { id: "amber", label: "Amber", value: "#fbbf24" },
-  { id: "green", label: "Green", value: "#34d399" },
-  { id: "rose", label: "Rose", value: "#fb7185" },
-  { id: "slate", label: "Slate", value: "#94a3b8" }
+  { id: "yellow", label: "Yellow", value: "#eab308" },
+  { id: "lime", label: "Lime", value: "#84cc16" },
+  { id: "green", label: "Green", value: "#22c55e" },
+  { id: "emerald", label: "Emerald", value: "#10b981" },
+  { id: "teal", label: "Teal", value: "#14b8a6" },
+  { id: "cyan", label: "Cyan", value: "#06b6d4" },
+  { id: "sky", label: "Sky", value: "#0ea5e9" },
+  { id: "blue", label: "Blue", value: "#3b82f6" },
+  { id: "indigo", label: "Indigo", value: "#6366f1" },
+  { id: "violet", label: "Violet", value: "#8b5cf6" },
+  { id: "purple", label: "Purple", value: "#a855f7" },
+  { id: "fuchsia", label: "Fuchsia", value: "#d946ef" },
+  { id: "pink", label: "Pink", value: "#ec4899" },
+  { id: "rose", label: "Rose", value: "#f43f5e" },
+  { id: "brown", label: "Brown", value: "#a16207" },
+  { id: "slate", label: "Slate", value: "#94a3b8" },
+  { id: "gray", label: "Gray", value: "#6b7280" }
 ] as const;
 
 export const NODE_STYLE_SHAPES = [
