@@ -45,7 +45,7 @@ import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirectio
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
-import { applyDefaultNodeTextAlignment } from "./node-defaults";
+import { applyDefaultNodePreferences } from "./node-defaults";
 import { isCanvasReadOnly } from "./canvas-command-guards";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
@@ -402,11 +402,12 @@ export default class BetterCanvasFeatures {
     const currentNode = readCanvasData(canvas).nodes.find(item => item.id === nodeId);
     if (!currentNode) return;
 
-    const updated = applyDefaultNodeTextAlignment(currentNode, this.settings().defaultNodeTextAlign);
+    const updated = applyDefaultNodePreferences(currentNode, this.settings().defaultNodeTextAlign);
     if (updated === currentNode) return;
     if (patchNode(canvas, nodeId, {
-      bcTextAlign: updated.bcTextAlign,
-      styleAttributes: updated.styleAttributes
+      ...(typeof updated.bcTextAlign === "string" ? { bcTextAlign: updated.bcTextAlign } : {}),
+      ...(updated.styleAttributes !== undefined ? { styleAttributes: updated.styleAttributes } : {}),
+      ...(typeof updated.bcAutoResize === "boolean" ? { bcAutoResize: updated.bcAutoResize } : {})
     })) {
       this.decorate(canvas);
     }
