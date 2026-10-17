@@ -96,7 +96,10 @@ function addButton(
           "M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 1.5-3.3 1.8 1.8 0 0 1 1.4-3h1.4A3.5 3.5 0 0 0 21 11.2 8.5 8.5 0 0 0 12 3Z",
           "M7.5 10h.01", "M10 6.5h.01", "M15 7.5h.01", "M17 10.5h.01"
         ],
-        "arrow-left": ["m12 19-7-7 7-7", "M19 12H5"]
+        "arrow-left": ["m12 19-7-7 7-7", "M19 12H5"],
+        "align-left": ["M15 12H3", "M17 18H3", "M21 6H3"],
+        "align-center": ["M17 12H7", "M19 18H5", "M21 6H3"],
+        "align-right": ["M21 12H9", "M21 18H7", "M21 6H3"]
       };
       for (const d of paths[icon] ?? []) {
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -536,13 +539,12 @@ export default class NodeMenuUnifier {
       button.title = shape.label;
       button.setAttribute("aria-label", shape.label);
       button.setAttribute("aria-pressed", String(selected));
+      // The preview alone identifies the option; the name stays a tooltip and
+      // accessible label instead of printed text under the preview.
       const preview = document.createElement("span");
       preview.className = "bc-node-shape-preview shape-" + shape.id;
+      preview.setAttribute("aria-hidden", "true");
       button.appendChild(preview);
-      const label = document.createElement("span");
-      label.className = "bc-node-style-option-label";
-      label.textContent = shape.label;
-      button.appendChild(label);
     }
 
     const borderSection = addSection("边框");
@@ -561,11 +563,8 @@ export default class NodeMenuUnifier {
       button.setAttribute("aria-pressed", String(selected));
       const sample = document.createElement("span");
       sample.className = "bc-node-border-preview border-" + border.id;
+      sample.setAttribute("aria-hidden", "true");
       button.appendChild(sample);
-      const label = document.createElement("span");
-      label.className = "bc-node-style-option-label";
-      label.textContent = border.label;
-      button.appendChild(label);
     }
 
     const alignSection = addSection("文本对齐");
@@ -576,7 +575,7 @@ export default class NodeMenuUnifier {
       const selected = currentStyle.align === align.id;
       const button = addButton(alignments, align.label, "bc-node-style-choice" + (selected ? " is-selected" : ""), () => {
         this.applyStyle({ align: align.id }, "align-" + align.id);
-      });
+      }, align.icon);
       button.dataset.styleOption = "align-" + align.id;
       button.setAttribute("aria-pressed", String(selected));
     }
@@ -585,7 +584,7 @@ export default class NodeMenuUnifier {
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
     presetSection.appendChild(presets);
-    const presetNames: Record<string, string> = { flow: "Flow", focus: "Focus", warning: "Warning / Risk" };
+    const presetNames: Record<string, string> = { flow: "流程", focus: "聚焦", warning: "警告" };
     for (const id of Object.keys(NODE_STYLE_PRESETS)) {
       const preset = NODE_STYLE_PRESETS[id];
       const name = presetNames[id] ?? id;
@@ -593,8 +592,10 @@ export default class NodeMenuUnifier {
         this.applyStyle({ color: preset.color, shape: preset.shape, border: preset.border, align: preset.align }, "preset-" + id);
       });
       button.dataset.styleOption = "preset-" + id;
-      button.setAttribute("aria-label", name + " 节点样式预设");
-      button.title = name;
+      // The preview already shows colour, shape, border and alignment; the
+      // preset name stays a tooltip and accessible label only.
+      button.setAttribute("aria-label", name + "节点样式预设");
+      button.title = name + "预设";
 
       const preview = document.createElement("span");
       preview.className = "bc-node-style-preset-preview shape-" + preset.shape + " border-" + preset.border;
@@ -606,11 +607,6 @@ export default class NodeMenuUnifier {
       sample.style.textAlign = preset.align;
       preview.appendChild(sample);
       button.appendChild(preview);
-
-      const label = document.createElement("span");
-      label.className = "bc-node-style-preset-label";
-      label.textContent = name;
-      button.appendChild(label);
 
       button.setAttribute("aria-pressed", String(
         currentStyle.color.toLowerCase() === preset.color.toLowerCase() &&
