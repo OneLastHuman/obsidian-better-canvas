@@ -3,7 +3,7 @@ import type { CanvasNodeData } from "./canvas";
 export type NodeTextAlignment = "left" | "center" | "right";
 
 export function normalizeDefaultNodeTextAlignment(value: unknown): NodeTextAlignment {
-  return value === "center" || value === "right" || value === "left" ? value : "left";
+  return value === "center" || value === "right" || value === "left" ? value : "center";
 }
 
 /**
@@ -35,4 +35,19 @@ export function applyDefaultNodeTextAlignment(
     bcTextAlign: alignment,
     styleAttributes: { ...attributes, textAlign: alignment }
   };
+}
+
+/**
+ * Set defaults for a newly created text card. Explicit per-node choices remain
+ * authoritative; auto-resize is enabled only when no preference is stored.
+ */
+export function applyDefaultNodePreferences(
+  node: CanvasNodeData,
+  preferredAlignment: unknown
+): CanvasNodeData {
+  if (node.type !== "text") return node;
+
+  const aligned = applyDefaultNodeTextAlignment(node, preferredAlignment);
+  if (typeof node.bcAutoResize === "boolean") return aligned;
+  return { ...aligned, bcAutoResize: true };
 }
