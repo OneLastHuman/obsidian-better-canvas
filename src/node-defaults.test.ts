@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasNodeData } from "./canvas";
-import { applyDefaultNodeTextAlignment, normalizeDefaultNodeTextAlignment } from "./node-defaults";
+import { applyDefaultNodePreferences, applyDefaultNodeTextAlignment, normalizeDefaultNodeTextAlignment } from "./node-defaults";
 
 function textNode(overrides: Record<string, unknown> = {}): CanvasNodeData {
   return {
@@ -50,8 +50,30 @@ describe("default text alignment for new Canvas nodes", () => {
     expect(applyDefaultNodeTextAlignment(node, "left")).toBe(node);
   });
 
+  it("centers new text cards and enables content-driven sizing by default", () => {
+    const node = textNode();
+    expect(applyDefaultNodePreferences(node, undefined)).toMatchObject({
+      bcTextAlign: "center",
+      bcAutoResize: true,
+      styleAttributes: { textAlign: "center" }
+    });
+  });
+
+  it("preserves an explicit auto-resize preference", () => {
+    const node = textNode({ bcAutoResize: false });
+    expect(applyDefaultNodePreferences(node, undefined)).toMatchObject({
+      bcTextAlign: "center",
+      bcAutoResize: false
+    });
+  });
+
+  it("does not add auto-resize metadata to non-text nodes", () => {
+    const node = textNode({ type: "file", file: "notes/example.md" });
+    expect(applyDefaultNodePreferences(node, undefined)).toBe(node);
+  });
+
   it("normalizes unsupported setting values to left alignment", () => {
-    expect(normalizeDefaultNodeTextAlignment("justify")).toBe("left");
-    expect(normalizeDefaultNodeTextAlignment(undefined)).toBe("left");
+    expect(normalizeDefaultNodeTextAlignment("justify")).toBe("center");
+    expect(normalizeDefaultNodeTextAlignment(undefined)).toBe("center");
   });
 });
