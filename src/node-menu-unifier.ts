@@ -75,8 +75,37 @@ function addButton(
   const button = document.createElement("button");
   button.type = "button";
   button.className = className;
-  if (icon) setIcon(button, icon);
-  else button.textContent = label;
+  if (icon) {
+    setIcon(button, icon);
+    // Keep icon-only Canvas popup controls visible if the host renderer fails
+    // to inject Obsidian's SVG for this popup surface.
+    if (!button.querySelector("svg")) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("width", "16");
+      svg.setAttribute("height", "16");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "1.8");
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+      const paths: Record<string, string[]> = {
+        palette: [
+          "M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 1.5-3.3 1.8 1.8 0 0 1 1.4-3h1.4A3.5 3.5 0 0 0 21 11.2 8.5 8.5 0 0 0 12 3Z",
+          "M7.5 10h.01", "M10 6.5h.01", "M15 7.5h.01", "M17 10.5h.01"
+        ],
+        "arrow-left": ["m12 19-7-7 7-7", "M19 12H5"]
+      };
+      for (const d of paths[icon] ?? []) {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        svg.appendChild(path);
+      }
+      button.appendChild(svg);
+    }
+  } else button.textContent = label;
   button.setAttribute("aria-label", label);
   button.setAttribute("title", label);
   button.addEventListener("click", event => {
