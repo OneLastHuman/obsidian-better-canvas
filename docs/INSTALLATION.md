@@ -22,13 +22,13 @@ Releases 也会提供三个独立文件，可按下方的手动安装方式使�
 
 将以下文件放入 `<Vault>/.obsidian/plugins/obsidian-better-canvas/`：
 
-- [main.js（生产构建）](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/main.js)
-- [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/manifest.json)
-- [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/styles.css)
+- [main.js（生产构建）](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/main.js)
+- [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/manifest.json)
+- [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/styles.css)
 
 然后在 **设置 → 社区插件** 中重新加载列表并启用插件。
 
-成功的 `main` 分支 Build workflow 会将生产构建的 `main.js` 自动提交到仓库根目录。Pull Request 构建只负责验证和打包，不会写回安装产物。手动下载 `main.js` 即代表选择当前主分支的构建，不等同于固定的正式版本。
+成功的 `main` 分支 Build workflow 会将生产构建的 `main.js` 更新到仓库根目录，并将 `main.js`、`manifest.json` 和 `styles.css` 同步到 [`release/`](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 目录。Pull Request 构建只负责验证和打包，不会写回安装产物。`release/` 提供主分支最新成功构建，不等同于固定的正式版本；正式版请使用 GitHub Releases。
 
 ## 方式三：安装尚未正式发布的 CI 构建
 

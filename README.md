@@ -75,11 +75,11 @@ Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思�
 
 将以下三个文件放入 `<Vault>/.obsidian/plugins/obsidian-better-canvas/`：
 
-- [main.js](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/main.js)
-- [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/manifest.json)
-- [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/styles.css)
+- [main.js](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/main.js)
+- [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/manifest.json)
+- [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/styles.css)
 
-之后重新加载插件列表并启用插件。仓库的 `main.js` 由成功的 main 分支生产构建更新；也可以从 **Actions → Build** 下载近期构建工件（工件保留 14 天）。
+之后重新加载插件列表并启用插件。仓库的 [`release/` 目录](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 由成功的 `main` 分支 Build workflow 自动同步，提供最新通过 CI 构建的三个安装文件；它代表主分支最新构建，不一定是正式版。正式版请优先使用上面的 GitHub Releases。也可以从 **Actions → Build** 下载近期构建工件（工件保留 14 天）。
 
 ### 方式三：从源码构建
 
