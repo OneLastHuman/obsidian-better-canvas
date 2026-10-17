@@ -20,26 +20,26 @@ export type NodeVisualStylePatch = {
  * or icons, so no option name is printed inside the panel.
  */
 export const NODE_STYLE_COLORS = [
-  { id: "red", label: "红色", value: "#ef4444" },
-  { id: "orange", label: "橙色", value: "#f97316" },
-  { id: "amber", label: "琥珀色", value: "#fbbf24" },
-  { id: "yellow", label: "黄色", value: "#eab308" },
-  { id: "lime", label: "青柠色", value: "#84cc16" },
-  { id: "green", label: "绿色", value: "#22c55e" },
-  { id: "emerald", label: "翠绿色", value: "#10b981" },
-  { id: "teal", label: "蓝绿色", value: "#14b8a6" },
-  { id: "cyan", label: "青色", value: "#06b6d4" },
-  { id: "sky", label: "天蓝色", value: "#0ea5e9" },
-  { id: "blue", label: "蓝色", value: "#3b82f6" },
-  { id: "indigo", label: "靛蓝色", value: "#6366f1" },
-  { id: "violet", label: "紫罗兰色", value: "#8b5cf6" },
-  { id: "purple", label: "紫色", value: "#a855f7" },
-  { id: "fuchsia", label: "洋红色", value: "#d946ef" },
-  { id: "pink", label: "粉色", value: "#ec4899" },
-  { id: "rose", label: "玫红色", value: "#f43f5e" },
-  { id: "brown", label: "棕色", value: "#a16207" },
-  { id: "slate", label: "石板灰", value: "#94a3b8" },
-  { id: "gray", label: "灰色", value: "#6b7280" }
+  { id: "red", label: "红色", value: "#e8798f" },
+  { id: "orange", label: "橙色", value: "#f59e72" },
+  { id: "amber", label: "琥珀色", value: "#e8b75a" },
+  { id: "yellow", label: "黄色", value: "#d4c75b" },
+  { id: "lime", label: "青柠色", value: "#a3be6c" },
+  { id: "green", label: "绿色", value: "#78b58c" },
+  { id: "emerald", label: "翠绿色", value: "#65b9a7" },
+  { id: "teal", label: "蓝绿色", value: "#62b8bd" },
+  { id: "cyan", label: "青色", value: "#66bdd1" },
+  { id: "sky", label: "天蓝色", value: "#72b4e8" },
+  { id: "blue", label: "蓝色", value: "#719cf4" },
+  { id: "indigo", label: "靛蓝色", value: "#8a92ed" },
+  { id: "violet", label: "紫罗兰色", value: "#a58bea" },
+  { id: "purple", label: "紫色", value: "#b28ad7" },
+  { id: "fuchsia", label: "洋红色", value: "#d18bd0" },
+  { id: "pink", label: "粉色", value: "#e58eb4" },
+  { id: "rose", label: "玫红色", value: "#dc8298" },
+  { id: "brown", label: "棕色", value: "#b08968" },
+  { id: "slate", label: "石板灰", value: "#8b9bb4" },
+  { id: "gray", label: "灰色", value: "#89919d" }
 ] as const;
 
 export const NODE_STYLE_SHAPES = [
@@ -68,9 +68,9 @@ export const NODE_STYLE_ALIGNMENTS = [
 ] as const;
 
 export const NODE_STYLE_PRESETS: Record<string, NodeVisualStyle> = {
-  flow: { color: "#34d399", shape: "pill", border: "solid", align: "center" },
-  focus: { color: "#a78bfa", shape: "default", border: "solid", align: "left" },
-  warning: { color: "#fbbf24", shape: "default", border: "dashed", align: "left" }
+  flow: { color: "#65b9a7", shape: "pill", border: "solid", align: "center" },
+  focus: { color: "#a58bea", shape: "default", border: "solid", align: "left" },
+  warning: { color: "#e8b75a", shape: "default", border: "dashed", align: "left" }
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -132,10 +132,10 @@ export function applyNodeVisualStyle(
   return { data: { ...data, nodes }, updated };
 }
 
-/** The documented reset baseline: Slate, rounded rectangle, solid border, left aligned. */
+/** Reset baseline: muted slate, rounded rectangle, solid border, centered text. */
 export const DEFAULT_NODE_VISUAL_STYLE: NodeVisualStyle = {
-  color: "#94a3b8",
+  color: "#64748b",
   shape: "default",
   border: "solid",
-  align: "left"
+  align: "center"
 };
