@@ -330,16 +330,22 @@ export function selectAllCanvasEdges(canvas: any): number {
   return selected;
 }
 
-export function resizeNodeToText(canvas: any, nodeId: string): boolean {
+export function resizeNodeToText(
+  canvas: any,
+  nodeId: string,
+  minimums: { width: number; height: number } = { width: 220, height: 100 }
+): boolean {
   const data = readCanvasData(canvas);
   const node = data.nodes.find(item => item.id === nodeId);
   if (!node || node.type !== "text" || typeof node.text !== "string") return false;
 
+  const minWidth = Number.isFinite(minimums.width) ? minimums.width : 220;
+  const minHeight = Number.isFinite(minimums.height) ? minimums.height : 100;
   const lines = node.text.split("\n");
   const longest = Math.max(1, ...lines.map(line => line.length));
-  const width = Math.max(220, Math.min(720, Math.round(longest * 7.2 + 52)));
+  const width = Math.max(minWidth, Math.min(720, Math.round(longest * 7.2 + 52)));
   const wrappedLines = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / Math.max(1, (width - 40) / 7.2))), 0);
-  const height = Math.max(100, Math.min(1000, Math.round(wrappedLines * 24 + 44)));
+  const height = Math.max(minHeight, Math.min(1000, Math.round(wrappedLines * 24 + 44)));
   if (Math.abs(node.width - width) < 1 && Math.abs(node.height - height) < 1) return true;
   const nodes = data.nodes.map(item => item.id === nodeId ? { ...item, width, height } : item);
   canvas.importData({ ...data, nodes, edges: data.edges });
