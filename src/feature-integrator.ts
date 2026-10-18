@@ -288,6 +288,7 @@ export default class BetterCanvasFeatures {
   private boundContainers = new WeakSet<HTMLElement>();
   private boundRouteContainers = new WeakSet<HTMLElement>();
   private resizeObservers = new WeakSet<HTMLElement>();
+  private autoResizingNodeIds = new Set<string>();
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private metadataIndexer: CanvasMetadataIndexer | null = null;
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
@@ -318,6 +319,9 @@ export default class BetterCanvasFeatures {
     });
     this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-created", (canvas: any, node: any) => {
       this.applyDefaultTextAlignmentToNewNode(canvas, node);
+    }));
+    this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-resized", (canvas: any, node: any) => {
+      this.handleNodeResized(canvas, node);
     }));
     this.advancedCanvasEventBridge = new AdvancedCanvasEventBridge(this.p.app, this.p);
     this.advancedCanvasEventBridge.start();
@@ -411,6 +415,19 @@ export default class BetterCanvasFeatures {
     })) {
       this.decorate(canvas);
     }
+  }
+
+  private handleNodeResized(canvas: any, node: any): void {
+    if (!canvas || isCanvasReadOnly(canvas)) return;
+    const nodeId = typeof node?.id === "string" ? node.id : node?.getData?.()?.id;
+    if (typeof nodeId !== "string") return;
+    if (this.autoResizingNodeIds.has(nodeId)) {
+      this.autoResizingNodeIds.delete(nodeId);
+      return;
+    }
+    const currentNode = readCanvasData(canvas).nodes.find(item => item.id === nodeId);
+    if (!currentNode || (currentNode as any).bcAutoResize !== true) return;
+    patchNode(canvas, nodeId, { bcAutoResize: false });
   }
 
   async probeProviderCapabilities(profileId: string): Promise<ModelCapabilityReport> {
@@ -1064,6 +1081,7 @@ export default class BetterCanvasFeatures {
   private resizeNode(): void {
     const selection = this.selected();
     if (!selection) return;
+    this.autoResizingNodeIds.add(selection.node.id);
     new Notice(resizeNodeToText(selection.canvas, selection.node.id) ? "已调整节点尺寸。" : "仅支持文本节点。");
   }
 
@@ -1072,7 +1090,10 @@ export default class BetterCanvasFeatures {
     if (!selection) return;
     const enabled = (selection.node as any).bcAutoResize !== true;
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
-    if (enabled) resizeNodeToText(selection.canvas, selection.node.id);
+    if (enabled) {
+      this.autoResizingNodeIds.add(selection.node.id);
+      resizeNodeToText(selection.canvas, selection.node.id);
+    }
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
   }
 
@@ -1150,15 +1171,30 @@ export default class BetterCanvasFeatures {
     if (!(container instanceof HTMLElement) || this.resizeObservers.has(container)) return;
     this.resizeObservers.add(container);
     let pending = false;
-    const observer = new MutationObserver(() => {
+    let hasContentChange = false;
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (mutation.type === "childList" || mutation.type === "characterData") {
+          hasContentChange = true;
+          break;
+        }
+      }
       if (pending) return;
       pending = true;
       window.setTimeout(() => {
         pending = false;
+        const shouldResizeText = hasContentChange;
+        hasContentChange = false;
         const data = readCanvasData(canvas);
-        for (const node of data.nodes) {
-          if (node.type === "text" && (node as any).bcAutoResize === true) {
-            resizeNodeToText(canvas, node.id);
+        if (shouldResizeText) {
+          for (const node of data.nodes) {
+            if (node.type === "text" && (node as any).bcAutoResize === true) {
+              const internal = canvas?.nodes?.get?.(node.id);
+              const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+              if (element?.classList?.contains("is-dragging")) continue;
+              this.autoResizingNodeIds.add(node.id);
+              resizeNodeToText(canvas, node.id);
+            }
           }
         }
         this.applyZoomBreakpoints(canvas);
