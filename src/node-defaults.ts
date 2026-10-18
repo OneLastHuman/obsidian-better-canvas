@@ -2,6 +2,38 @@ import type { CanvasNodeData } from "./canvas";
 
 export type NodeTextAlignment = "left" | "center" | "right";
 
+export const DEFAULT_NODE_WIDTH = 280;
+export const DEFAULT_NODE_HEIGHT = 140;
+export const MIN_NODE_WIDTH = 120;
+export const MAX_NODE_WIDTH = 1200;
+export const MIN_NODE_HEIGHT = 40;
+export const MAX_NODE_HEIGHT = 1000;
+
+/** Clamp a configured default node width into the settings range. */
+export function normalizeDefaultNodeWidth(value: unknown): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return DEFAULT_NODE_WIDTH;
+  return Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, number));
+}
+
+/** Clamp a configured default node height into the settings range. */
+export function normalizeDefaultNodeHeight(value: unknown): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return DEFAULT_NODE_HEIGHT;
+  return Math.min(MAX_NODE_HEIGHT, Math.max(MIN_NODE_HEIGHT, number));
+}
+
+/** Read the configured default text-node size with safe fallbacks. */
+export function configuredDefaultNodeSize(settings: unknown): { width: number; height: number } {
+  const record = settings !== null && typeof settings === "object"
+    ? settings as Record<string, unknown>
+    : {};
+  return {
+    width: normalizeDefaultNodeWidth(record.defaultNodeWidth),
+    height: normalizeDefaultNodeHeight(record.defaultNodeHeight)
+  };
+}
+
 export function normalizeDefaultNodeTextAlignment(value: unknown): NodeTextAlignment {
   return value === "center" || value === "right" || value === "left" ? value : "center";
 }

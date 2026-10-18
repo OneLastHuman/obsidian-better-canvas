@@ -14,6 +14,7 @@ import { decorateCanvas } from "./enhancements";
 import { getNodeAIContextMenuActions } from "./node-ai-context-menu";
 import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
+import { configuredDefaultNodeSize, DEFAULT_NODE_HEIGHT, DEFAULT_NODE_WIDTH } from "./node-defaults";
 import type { ModelCapabilityReport } from "./model-capabilities";
 import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
 import { AIUsageModal } from "./ai-usage-modal";
@@ -55,6 +56,8 @@ interface BetterCanvasSettings {
   gapX: number;
   gapY: number;
   defaultNodeTextAlign: "left" | "center" | "right";
+  defaultNodeWidth: number;
+  defaultNodeHeight: number;
   attachmentFolder: string;
   templates: NodeTemplate[];
   mindMapShortcutChildTabEnabled: boolean;
@@ -83,6 +86,8 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   gapX: 100,
   gapY: 44,
   defaultNodeTextAlign: "center",
+  defaultNodeWidth: DEFAULT_NODE_WIDTH,
+  defaultNodeHeight: DEFAULT_NODE_HEIGHT,
   attachmentFolder: "Better Canvas/Generated Images",
   templates: [],
   mindMapShortcutChildTabEnabled: true,
@@ -586,11 +591,16 @@ export default class BetterCanvasPlugin extends Plugin {
     if (candidates[0]) this.selectNode(canvas, candidates[0].node.id);
   }
 
+  private configuredDefaultSize(): { width: number; height: number } {
+    return configuredDefaultNodeSize(this.settings);
+  }
+
   private createChildNode(): void {
     const selected = this.selectedOrNotice();
     if (!selected) return;
     const { canvas, node } = selected;
-    const child = makeTextNode("", node.x + node.width + this.settings.gapX, node.y, { width: node.width, height: node.height });
+    const size = this.configuredDefaultSize();
+    const child = makeTextNode("", node.x + node.width + this.settings.gapX, node.y, size);
     insertCanvasNode(canvas, child, node.id);
     window.setTimeout(() => {
       const internal = canvas.nodes?.get?.(child.id);
@@ -616,7 +626,7 @@ export default class BetterCanvasPlugin extends Plugin {
       .map(edge => data.nodes.find(item => item.id === edge.toNode))
       .filter((item): item is CanvasNodeData => Boolean(item));
     const y = siblings.reduce((bottom, sibling) => Math.max(bottom, sibling.y + sibling.height), node.y + node.height) + 36;
-    const sibling = makeTextNode("", node.x, y, { width: node.width, height: node.height });
+    const sibling = makeTextNode("", node.x, y, this.configuredDefaultSize());
     insertCanvasNode(canvas, sibling, incoming.fromNode);
     window.setTimeout(() => {
       const internal = canvas.nodes?.get?.(sibling.id);
@@ -632,7 +642,7 @@ export default class BetterCanvasPlugin extends Plugin {
     const selected = this.selectedOrNotice();
     if (!selected) return;
     const { canvas, node } = selected;
-    const floating = makeTextNode("", node.x + node.width + this.settings.gapX, node.y + node.height + 40, { width: node.width, height: node.height });
+    const floating = makeTextNode("", node.x + node.width + this.settings.gapX, node.y + node.height + 40, this.configuredDefaultSize());
     insertCanvasNode(canvas, floating);
     window.setTimeout(() => {
       const internal = canvas.nodes?.get?.(floating.id);
@@ -670,7 +680,10 @@ export default class BetterCanvasPlugin extends Plugin {
       return;
     }
     headings.forEach((heading, index) => {
-      const child = makeTextNode(heading.heading.trim(), node.x + node.width + this.settings.gapX, node.y + (index - (headings.length - 1) / 2) * 170);
+      const child = makeTextNode(heading.heading.trim(),
+        node.x + node.width + this.settings.gapX,
+        node.y + (index - (headings.length - 1) / 2) * 170,
+        this.configuredDefaultSize());
       insertCanvasNode(canvas, child, node.id);
     });
     new Notice(`已从“${file.basename}”创建 ${headings.length} 个标题节点。`);

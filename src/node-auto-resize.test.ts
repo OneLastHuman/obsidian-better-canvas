@@ -41,6 +41,7 @@ vi.mock("obsidian", () => ({
 }));
 
 import BetterCanvasFeatures from "./feature-integrator";
+import { resizeNodeToText } from "./enhancements";
 import type { CanvasData } from "./canvas";
 
 function createMockPlugin() {
@@ -188,5 +189,53 @@ describe("Node auto-resize manual drag-resize override", () => {
     expect(canvas.saved).toBe(initialSaveCount);
     const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
     expect(updatedNode.bcAutoResize).toBe(false);
+  });
+});
+
+describe("auto-resize respects configured default node size", () => {
+  it("never shrinks an auto-resized node below the configured defaults", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: "hello", bcAutoResize: true } as any
+      ],
+      edges: []
+    });
+
+    resizeNodeToText(canvas, "node-1", { width: 250, height: 140 });
+
+    const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
+    expect(updatedNode.width).toBe(250);
+    expect(updatedNode.height).toBe(140);
+  });
+
+  it("grows an auto-resized node past the configured defaults when text needs room", () => {
+    const longText = "a very long single line of text that clearly exceeds the configured default width";
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: longText, bcAutoResize: true } as any
+      ],
+      edges: []
+    });
+
+    resizeNodeToText(canvas, "node-1", { width: 250, height: 140 });
+
+    const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
+    expect(updatedNode.width).toBeGreaterThan(250);
+    expect(updatedNode.height).toBeGreaterThanOrEqual(140);
+  });
+
+  it("falls back to the previous minimums when no configured size is passed", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: "hello" } as any
+      ],
+      edges: []
+    });
+
+    resizeNodeToText(canvas, "node-1");
+
+    const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
+    expect(updatedNode.width).toBe(220);
+    expect(updatedNode.height).toBe(100);
   });
 });
