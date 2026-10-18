@@ -26,9 +26,9 @@ Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思�
 
 ## 界面预览
 
-以下截图在真实 Obsidian 桌面版中运行本插件的生产构建后直接截取，不是示意图。示例内容来自合成测试 Vault，不含真实笔记、凭据或 API Key；AI 截图的回答来自本地 mock 服务，未调用真实模型。采集环境与复现步骤见 [截图说明](docs/screenshots/README.md)。实际界面会因 Obsidian 版本、主题及服务配置而异。
+以下截图来自真实 Obsidian 桌面版运行插件生产构建后的界面。示例内容来自合成测试 Vault，未包含真实笔记或凭据；AI 回答由本地 mock 服务生成，未调用真实模型。采集环境见 [截图说明](docs/screenshots/README.md)。实际界面会因 Obsidian 版本、主题和服务配置而异。
 
-**Canvas 增强：** 样式入口是 Canvas 右侧原生控件栈中的调色板按钮（与缩放、撤销按钮同组），选中单个节点后点击即可在控件左侧展开样式面板；右键节点仍打开 Obsidian 原生节点菜单，原生操作与 Better Canvas AI 操作全部保留。样式面板依次提供组合预设、颜色、形状、边框和文本对齐：预设以缩略卡片直接展示颜色、形状、边框与对齐的组合效果，形状用可视图元、边框和对齐用图标按钮，选项名称仅作为悬停提示和读屏标签。点击任一选项后立即应用并写回 Canvas 节点数据，无需额外确认；面板会自动跟随当前单选节点。点击面板外部或按 Esc 可关闭面板。节点卡片使用节点颜色的低对比填充与描边，并默认居中、随内容自适应尺寸（可用“切换所选节点自动调整尺寸”命令按节点开关）。
+**Canvas 增强：** 通过样式面板调整节点颜色、形状、边框、文本对齐和组合预设。选中单个节点后，点击 Canvas 右侧控件栈中的调色板按钮打开面板。详细说明见 [功能指南](docs/FEATURE_GUIDE.md#节点样式面板与默认尺寸)。
 
 <p align="center">
   <img src="docs/screenshots/canvas-enhancements.png" alt="迁移前的界面截图：Canvas 中带颜色、形状、边框的节点与带标签连线，悬停节点时显示 AI、Img、卡片、模型按钮" width="100%" />
@@ -49,7 +49,7 @@ Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思�
   </tr>
 </table>
 
-**导出：** “导出 Canvas 全内容 PNG”按所有节点边界渲染整张画布，不含界面控件，文件写入 Vault 后可在 Obsidian 中直接打开。
+**导出：** 支持导出 Canvas 的 PNG 和 SVG，可选择当前视口、全画布或选中节点。
 
 <p align="center">
   <img src="docs/screenshots/export.png" alt="Better Canvas 导出的整张 Canvas PNG，在 Obsidian 中打开后的静态图像结果" width="100%" />
@@ -96,14 +96,12 @@ npm run build
 
 ## 快速配置
 
-- **Canvas 与思维导图：** 安装并启用插件即可使用，不需要 API Key。在 Better Canvas 设置的「画布与布局」中，可设置“新建文本节点默认对齐”（左对齐、居中、右对齐）；默认保持左对齐，已有明确文字对齐样式的节点不会被覆盖。同一页还可设置“默认节点宽度/高度”（宽度 120–1200、高度 40–1000），决定新建文本节点的初始尺寸；插件创建的空白文本节点（子节点、同级节点、游离节点、方向键创建、标题拆分等）都会使用该尺寸，自动调整尺寸的节点也不会小于该值。
-- **AI 与模型：** 文本生成可选择大模型 API、OpenCode ACP 或 Codex CLI；图片服务商、API Key、图片模型和保存目录独立配置。API 后端支持多个服务商配置。
-- **连接与索引：** 在插件设置中配置远程 MCP endpoint、本地服务、Canvas 元数据与内容来源。
+- **Canvas 与思维导图：** 安装并启用插件即可使用，无需 API Key。可在“画布与布局”设置中调整新建文本节点的默认对齐和尺寸。
+- **AI 与模型：** 文本生成可使用配置的模型 API、OpenCode ACP 或 Codex CLI。图片生成有独立的服务商、模型和保存目录设置。
+- **连接与索引：** 可在设置中配置 MCP endpoint、本地服务及 Canvas 内容来源。
 - **本地 OpenCode / Codex：** 需要在桌面端预先安装并登录对应 CLI。
 
-数值设置输入超出允许范围时会显示范围提示并标记为无效；该值不会保存，修正输入后才会应用。
-
-配置步骤、安全说明与本地 AI 后端说明见 [AI 与 MCP 配置指南](docs/AI_SETUP.md)。完整能力清单见 [功能指南](docs/FEATURE_GUIDE.md)，详细安装方式见 [安装与构建指南](docs/INSTALLATION.md)。
+详细配置与使用说明见 [AI 与 MCP 配置指南](docs/AI_SETUP.md) 和 [功能指南](docs/FEATURE_GUIDE.md)，安装方法见 [安装与构建指南](docs/INSTALLATION.md)。
 
 ## 常用快捷键
 
