@@ -12,6 +12,7 @@ import {
   NODE_STYLE_ALIGNMENTS,
   NODE_STYLE_BORDERS,
   NODE_STYLE_COLORS,
+  NODE_STYLE_PRESET_LIST,
   NODE_STYLE_PRESETS,
   NODE_STYLE_SHAPES
 } from "./node-visual-style";
@@ -25,7 +26,11 @@ class FakeElement {
   readonly tagName: string;
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
-  readonly style: Record<string, string> = {};
+  readonly style: Record<string, unknown> = {
+    setProperty: (name: string, value: string): void => {
+      this.style[name] = value;
+    }
+  };
   private readonly attributes = new Map<string, string>();
   private ownText = "";
   className = "";
@@ -107,8 +112,8 @@ class FakeElement {
 }
 
 type PanelHarness = {
-  showStylePanel: (canvas: unknown, nodeId: string, source: "context", anchor: { x: number; y: number }) => void;
-  dismissPanel: (restoreToolbar: boolean) => void;
+  showStylePanel: (canvas: unknown, nodeId: string) => void;
+  dismissPanel: () => void;
   activePanel: { surface: FakeElement } | null;
 };
 
@@ -133,7 +138,12 @@ function installFakeDom(): void {
   };
   const globals = globalThis as Record<string, unknown>;
   globals.document = documentStub;
-  globals.window = { innerWidth: 1280, innerHeight: 800 };
+  globals.window = {
+    innerWidth: 1280,
+    innerHeight: 800,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined
+  };
   globals.HTMLElement = FakeElement;
   globals.getComputedStyle = () => ({
     borderLeftWidth: "0px",
@@ -143,19 +153,22 @@ function installFakeDom(): void {
   });
 }
 
-function renderStylePanel(): FakeElement {
+function renderStylePanel(nodePatch: Record<string, unknown> = {}): FakeElement {
   const unifier = new NodeMenuUnifier({ app: {} } as never);
   const harness = unifier as unknown as PanelHarness;
   const canvas = {
     getData: () => ({
-      nodes: [{ id: "n1", type: "text", x: 0, y: 0, width: 280, height: 140, text: "节点", color: "#3b82f6" }],
+      nodes: [{
+        id: "n1", type: "text", x: 0, y: 0, width: 280, height: 140, text: "节点", color: "#3b82f6",
+        ...nodePatch
+      }],
       edges: []
     })
   };
-  harness.showStylePanel(canvas, "n1", "context", { x: 0, y: 0 });
+  harness.showStylePanel(canvas, "n1");
   const surface = harness.activePanel?.surface;
   expect(surface).toBeDefined();
-  harness.dismissPanel(false);
+  harness.dismissPanel();
   return surface as FakeElement;
 }
 
@@ -200,18 +213,22 @@ describe("node style panel rendering", () => {
     }
   });
 
-  it("keeps option names out of the visible panel text", () => {
+  it("keeps individual option names out of the visible panel text", () => {
     const surface = renderStylePanel();
 
     expect(descendants(surface).some(element => element.className.includes("bc-node-style-option-label"))).toBe(false);
-    expect(descendants(surface).some(element => element.className.includes("bc-node-style-preset-label"))).toBe(false);
 
-    // The only latin text left is the decorative "Aa" alignment sample inside
-    // the preset previews.
-    expect(surface.textContent.replace(/Aa/g, "")).not.toMatch(/[A-Za-z]/);
+    // Presets are the deliberate exception: their names are the only text
+    // besides the section titles and the "Aa" sample inside each preview.
+    const text = surface.textContent;
+    expect(text).toContain("预设");
+    expect(text).not.toContain("菱形");
+    expect(text).not.toContain("实线");
+    expect(text).not.toContain("左对齐");
+    expect(text.replace(/Aa/g, "")).not.toMatch(/[A-Za-z]/);
   });
 
-  it("shows shapes and borders as previews only", () => {
+  it("shows shapes as previews only", () => {
     const surface = renderStylePanel();
 
     for (const shape of NODE_STYLE_SHAPES) {
@@ -220,17 +237,17 @@ describe("node style panel rendering", () => {
       expect(button.children).toHaveLength(1);
       expect(button.children[0].className).toBe("bc-node-shape-preview shape-" + shape.id);
     }
+  });
+
+  it("uses icons for borders and text alignment instead of text labels", () => {
+    const surface = renderStylePanel();
 
     for (const border of NODE_STYLE_BORDERS) {
       const button = optionButton(surface, "border-" + border.id);
       expect(button.textContent).toBe("");
       expect(button.children).toHaveLength(1);
-      expect(button.children[0].className).toBe("bc-node-border-preview border-" + border.id);
+      expect(button.children[0].tagName).toBe("svg");
     }
-  });
-
-  it("uses icons for text alignment instead of text labels", () => {
-    const surface = renderStylePanel();
 
     for (const align of NODE_STYLE_ALIGNMENTS) {
       const button = optionButton(surface, "align-" + align.id);
@@ -240,14 +257,59 @@ describe("node style panel rendering", () => {
     }
   });
 
-  it("drops the preset name from the preset button", () => {
+  it("omits the reset footer", () => {
+    const surface = renderStylePanel();
+    expect(descendants(surface).some(element => element.className === "bc-node-style-footer")).toBe(false);
+    expect(surface.textContent).not.toContain("恢复默认");
+  });
+
+  it("previews each preset with its own colour, shape, border and alignment", () => {
     const surface = renderStylePanel();
 
-    for (const id of Object.keys(NODE_STYLE_PRESETS)) {
-      const button = optionButton(surface, "preset-" + id);
+    for (const preset of NODE_STYLE_PRESET_LIST) {
+      const button = optionButton(surface, "preset-" + preset.id);
+      expect(button.getAttribute("aria-label")).toBe(preset.label + "预设");
+      // The tile is the whole preview: no printed name competes with it.
       expect(button.children).toHaveLength(1);
-      expect(button.children[0].className).toContain("bc-node-style-preset-preview");
+
+      const preview = button.children[0];
+      expect(preview.className).toBe(
+        "bc-node-style-preset-preview shape-" + preset.style.shape +
+        " border-" + preset.style.border + " align-" + preset.style.align
+      );
+      expect(preview.style["--bc-preset-color"]).toBe(preset.style.color);
+      expect(preview.children[0].className).toBe("bc-node-style-preset-sample");
       expect(button.textContent).toBe("Aa");
     }
+  });
+
+  it("marks the preset that matches the current node style", () => {
+    const flowPreset = NODE_STYLE_PRESETS.flow;
+    const surface = renderStylePanel({
+      color: flowPreset.color,
+      bcShape: flowPreset.shape,
+      bcBorderStyle: flowPreset.border,
+      bcTextAlign: flowPreset.align
+    });
+
+    const flow = optionButton(surface, "preset-flow");
+    expect(flow.getAttribute("aria-pressed")).toBe("true");
+    expect(flow.className).toContain("is-selected");
+    expect(optionButton(surface, "preset-warning").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("offers the expanded preset set before the manual controls", () => {
+    const surface = renderStylePanel();
+
+    expect(NODE_STYLE_PRESET_LIST.length).toBeGreaterThanOrEqual(6);
+    const sections = descendants(surface)
+      .filter(element => element.className === "bc-node-style-section");
+    expect(sections[0].textContent).toContain("预设");
+  });
+
+  it("does not expose an auto-resize switch", () => {
+    const surface = renderStylePanel();
+    expect(surface.textContent).not.toContain("自适应");
+    expect(surface.textContent).not.toContain("自动调整");
   });
 });
