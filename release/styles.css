@@ -17,27 +17,262 @@
   gap: 0.5rem;
 }
 
-/* Better Canvas persisted node/edge enhancements */
-.canvas-node[data-bc-shape="pill"] {
-  border-radius: 999px !important;
+/* Better Canvas persisted node/edge enhancements.
+
+   Shapes and border styles target .canvas-node-container: Obsidian paints the
+   card (background, border, radius, shadow) on the container and .canvas-node
+   is only the positioning anchor, so styling the anchor leaves the visible
+   card untouched. */
+.canvas-node[data-bc-shape] {
+  /* Fully transparent mask, used when a shape defines no outline ring. */
+  --bc-ring-off: linear-gradient(transparent, transparent);
 }
-.canvas-node[data-bc-shape="diamond"] {
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+
+/* Modern card treatment: a soft tint of the node colour inside a low-contrast
+   border, instead of a saturated outline around a plain white card. Better
+   Canvas decorates every Canvas node, so this is the default look; a node
+   without a colour keeps the neutral surface. */
+.canvas-node[data-bc-shape] .canvas-node-container {
+  border-color: color-mix(in oklab, var(--canvas-color, var(--text-muted)) 30%, var(--background-modifier-border));
+  background-color: color-mix(in oklab, var(--canvas-color, var(--text-muted)) 9%, var(--background-primary));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 5%),
+    0 8px 22px -14px rgb(0 0 0 / 22%);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
-.canvas-node[data-bc-shape="parallelogram"] {
-  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
+.canvas-node[data-bc-shape]:not(.is-themed) .canvas-node-container {
+  border-color: var(--background-modifier-border);
+  background-color: var(--background-primary);
 }
-.canvas-node[data-bc-shape="hexagon"] {
-  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+.canvas-node[data-bc-shape] .canvas-node-content {
+  /* The container already carries the tint; avoid stacking a second layer. */
+  background-color: transparent;
 }
-.canvas-node[data-bc-border="dashed"] {
+.canvas-node[data-bc-shape].is-focused .canvas-node-container,
+.canvas-node[data-bc-shape].is-selected .canvas-node-container,
+.canvas-node[data-bc-shape].is-editing .canvas-node-container {
+  border-color: color-mix(in oklab, var(--color-accent) 65%, var(--background-modifier-border));
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--color-accent) 16%, transparent),
+    0 10px 26px -14px rgb(0 0 0 / 26%);
+}
+.canvas-node[data-bc-shape="default"] .canvas-node-container {
+  border-radius: 10px;
+}
+.canvas-node[data-bc-shape="square"] .canvas-node-container {
+  border-radius: 0;
+}
+.canvas-node[data-bc-shape="pill"] .canvas-node-container,
+.canvas-node[data-bc-shape="terminal"] .canvas-node-container {
+  border-radius: 999px;
+}
+.canvas-node[data-bc-shape="circle"] .canvas-node-container,
+.canvas-node[data-bc-shape="ellipse"] .canvas-node-container,
+.canvas-node[data-bc-shape="reference"] .canvas-node-container {
+  border-radius: 50%;
+}
+.canvas-node[data-bc-shape="database"] .canvas-node-container {
+  border-radius: 50% / 12%;
+}
+.canvas-node[data-bc-shape="predefined-process"] .canvas-node-container {
+  border-left-width: 4px !important;
+  border-left-style: double !important;
+  border-right-width: 4px !important;
+  border-right-style: double !important;
+}
+.canvas-node[data-bc-border="dashed"] .canvas-node-container {
   border-style: dashed !important;
 }
-.canvas-node[data-bc-border="dotted"] {
+.canvas-node[data-bc-border="dotted"] .canvas-node-container {
   border-style: dotted !important;
 }
-.canvas-node[data-bc-border="double"] {
+.canvas-node[data-bc-border="double"] .canvas-node-container {
   border-style: double !important;
+}
+.canvas-node[data-bc-border="invisible"] .canvas-node-container,
+.canvas-node[data-bc-border="none"] .canvas-node-container {
+  border-color: transparent !important;
+}
+/* A borderless card keeps the resting lift and the accent selection ring, so
+   removing the border does not make it look pasted flat or unselected. */
+.canvas-node[data-bc-border="invisible"] .canvas-node-container,
+.canvas-node[data-bc-border="none"] .canvas-node-container {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 8px 22px -14px rgb(0 0 0 / 22%);
+}
+.canvas-node[data-bc-border="invisible"].is-focused .canvas-node-container,
+.canvas-node[data-bc-border="invisible"].is-selected .canvas-node-container,
+.canvas-node[data-bc-border="invisible"].is-editing .canvas-node-container,
+.canvas-node[data-bc-border="none"].is-focused .canvas-node-container,
+.canvas-node[data-bc-border="none"].is-selected .canvas-node-container,
+.canvas-node[data-bc-border="none"].is-editing .canvas-node-container {
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--color-accent) 16%, transparent),
+    0 10px 26px -14px rgb(0 0 0 / 26%);
+}
+
+/* Polygon shapes. A rectangular border cannot follow a clip-path outline; it is
+   cut into stubs, so the container border is hidden and the outline is stroked
+   by the ::after ring below. */
+.canvas-node[data-bc-shape="diamond"] .canvas-node-container,
+.canvas-node[data-bc-shape="decision"] .canvas-node-container,
+.canvas-node[data-bc-shape="parallelogram"] .canvas-node-container,
+.canvas-node[data-bc-shape="input-output"] .canvas-node-container,
+.canvas-node[data-bc-shape="hexagon"] .canvas-node-container,
+.canvas-node[data-bc-shape="pentagon"] .canvas-node-container,
+.canvas-node[data-bc-shape="octagon"] .canvas-node-container,
+.canvas-node[data-bc-shape="triangle"] .canvas-node-container,
+.canvas-node[data-bc-shape="trapezoid"] .canvas-node-container,
+.canvas-node[data-bc-shape="chevron"] .canvas-node-container,
+.canvas-node[data-bc-shape="cloud"] .canvas-node-container,
+.canvas-node[data-bc-shape="document"] .canvas-node-container {
+  border-radius: 0;
+  border-color: transparent !important;
+  /* Shared with the ring masks and the panel previews below. */
+  clip-path: var(--bc-shape-outline);
+}
+
+/* Shape constants shared by canvas nodes and the style panel previews: the
+   outline clip and one white stroke mask per border style. The mask keeps only
+   the outline and the ring background paints it, so the border follows the
+   shape while dashed/dotted/double stay available. stroke-width 2 with
+   non-scaling-stroke keeps the visible border at 1px on every edge. */
+:is(
+  .canvas-node[data-bc-shape="diamond"],
+  .canvas-node[data-bc-shape="decision"],
+  .bc-node-shape-preview.shape-diamond,
+  .bc-node-style-preset-preview.shape-diamond
+) {
+  --bc-shape-outline: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,50 50,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,50 50,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,50 50,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+:is(
+  .canvas-node[data-bc-shape="parallelogram"],
+  .canvas-node[data-bc-shape="input-output"]
+) {
+  --bc-shape-outline: polygon(14% 0, 100% 0, 86% 100%, 0 100%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='14,0 100,0 86,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='14,0 100,0 86,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='14,0 100,0 86,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+:is(
+  .canvas-node[data-bc-shape="hexagon"],
+  .bc-node-shape-preview.shape-hexagon,
+  .bc-node-style-preset-preview.shape-hexagon
+) {
+  --bc-shape-outline: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='25,0 75,0 100,50 75,100 25,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='25,0 75,0 100,50 75,100 25,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='25,0 75,0 100,50 75,100 25,100 0,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="pentagon"] {
+  --bc-shape-outline: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,38 82,100 18,100 0,38' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,38 82,100 18,100 0,38' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,38 82,100 18,100 0,38' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="octagon"] {
+  --bc-shape-outline: polygon(28% 0, 72% 0, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0 72%, 0 28%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='28,0 72,0 100,28 100,72 72,100 28,100 0,72 0,28' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='28,0 72,0 100,28 100,72 72,100 28,100 0,72 0,28' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='28,0 72,0 100,28 100,72 72,100 28,100 0,72 0,28' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="triangle"] {
+  --bc-shape-outline: polygon(50% 0, 100% 100%, 0 100%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='50,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="trapezoid"] {
+  --bc-shape-outline: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='20,0 80,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='20,0 80,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='20,0 80,0 100,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="chevron"] {
+  --bc-shape-outline: polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%, 22% 50%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 78,0 100,50 78,100 0,100 22,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 78,0 100,50 78,100 0,100 22,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 78,0 100,50 78,100 0,100 22,50' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.canvas-node[data-bc-shape="cloud"] {
+  --bc-shape-outline: polygon(22% 18%, 28% 5%, 44% 8%, 55% 2%, 69% 13%, 84% 11%, 94% 27%, 90% 43%, 100% 55%, 88% 72%, 84% 87%, 66% 91%, 53% 100%, 38% 91%, 22% 94%, 12% 78%, 0 70%, 7% 51%, 2% 35%, 12% 20%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='22,18 28,5 44,8 55,2 69,13 84,11 94,27 90,43 100,55 88,72 84,87 66,91 53,100 38,91 22,94 12,78 0,70 7,51 2,35 12,20' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='22,18 28,5 44,8 55,2 69,13 84,11 94,27 90,43 100,55 88,72 84,87 66,91 53,100 38,91 22,94 12,78 0,70 7,51 2,35 12,20' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='22,18 28,5 44,8 55,2 69,13 84,11 94,27 90,43 100,55 88,72 84,87 66,91 53,100 38,91 22,94 12,78 0,70 7,51 2,35 12,20' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+:is(
+  .canvas-node[data-bc-shape="document"],
+  .bc-node-shape-preview.shape-document,
+  .bc-node-style-preset-preview.shape-document
+) {
+  --bc-shape-outline: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 100,0 100,88 88,94 74,88 60,94 46,88 32,94 16,88 0,94' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 100,0 100,88 88,94 74,88 60,94 46,88 32,94 16,88 0,94' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,0 100,0 100,88 88,94 74,88 60,94 46,88 32,94 16,88 0,94' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* Outline ring: paints the border along the outline of polygon shapes. The
+   stroke is centred on the outline, so the ring keeps a 1px border inside the
+   clip path and never grows the card. */
+.canvas-node[data-bc-shape="diamond"]::after,
+.canvas-node[data-bc-shape="decision"]::after,
+.canvas-node[data-bc-shape="parallelogram"]::after,
+.canvas-node[data-bc-shape="input-output"]::after,
+.canvas-node[data-bc-shape="hexagon"]::after,
+.canvas-node[data-bc-shape="pentagon"]::after,
+.canvas-node[data-bc-shape="octagon"]::after,
+.canvas-node[data-bc-shape="triangle"]::after,
+.canvas-node[data-bc-shape="trapezoid"]::after,
+.canvas-node[data-bc-shape="chevron"]::after,
+.canvas-node[data-bc-shape="cloud"]::after,
+.canvas-node[data-bc-shape="document"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--canvas-color);
+  -webkit-mask-image: var(--bc-ring-solid, var(--bc-ring-off));
+  mask-image: var(--bc-ring-solid, var(--bc-ring-off));
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.canvas-node[data-bc-border="dashed"]::after {
+  -webkit-mask-image: var(--bc-ring-dashed, var(--bc-ring-off));
+  mask-image: var(--bc-ring-dashed, var(--bc-ring-off));
+}
+.canvas-node[data-bc-border="dotted"]::after {
+  -webkit-mask-image: var(--bc-ring-dotted, var(--bc-ring-off));
+  mask-image: var(--bc-ring-dotted, var(--bc-ring-off));
+}
+.canvas-node[data-bc-border="double"]::after {
+  -webkit-mask-image: var(--bc-ring-solid, var(--bc-ring-off)), var(--bc-ring-solid, var(--bc-ring-off));
+  mask-image: var(--bc-ring-solid, var(--bc-ring-off)), var(--bc-ring-solid, var(--bc-ring-off));
+  -webkit-mask-size: 100% 100%, calc(100% - 6px) calc(100% - 6px);
+  mask-size: 100% 100%, calc(100% - 6px) calc(100% - 6px);
+  -webkit-mask-position: 0 0, 3px 3px;
+  mask-position: 0 0, 3px 3px;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-repeat: no-repeat, no-repeat;
+}
+.canvas-node[data-bc-border="invisible"]::after,
+.canvas-node[data-bc-border="none"]::after {
+  display: none;
+}
+.canvas-node[data-bc-shape].is-themed::after {
+  background-color: color-mix(in oklch, var(--canvas-color) 70%, transparent);
+}
+.canvas-node[data-bc-shape].is-selected::after,
+.canvas-node[data-bc-shape].is-focused::after,
+.canvas-node[data-bc-shape].is-dummy::after {
+  background-color: var(--color-accent);
+}
+.canvas-node[data-bc-shape].is-themed.is-selected::after,
+.canvas-node[data-bc-shape].is-themed.is-focused::after {
+  background-color: var(--canvas-color);
 }
 .canvas-node.bc-focus-dimmed {
   opacity: 0.12 !important;
@@ -60,28 +295,6 @@
 }
 .better-canvas-node-embed > :last-child {
   margin-bottom: 0;
-}
-
-.canvas-node[data-bc-shape="ellipse"] {
-  border-radius: 50% !important;
-}
-.canvas-node[data-bc-shape="pentagon"] {
-  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
-}
-.canvas-node[data-bc-shape="octagon"] {
-  clip-path: polygon(28% 0%, 72% 0%, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0% 72%, 0% 28%);
-}
-.canvas-node[data-bc-shape="triangle"] {
-  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
-}
-.canvas-node[data-bc-shape="trapezoid"] {
-  clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
-}
-.canvas-node[data-bc-shape="chevron"] {
-  clip-path: polygon(0% 0%, 78% 0%, 100% 50%, 78% 100%, 0% 100%, 22% 50%);
-}
-.canvas-node[data-bc-shape="cloud"] {
-  clip-path: polygon(22% 18%, 28% 5%, 44% 8%, 55% 2%, 69% 13%, 84% 11%, 94% 27%, 90% 43%, 100% 55%, 88% 72%, 84% 87%, 66% 91%, 53% 100%, 38% 91%, 22% 94%, 12% 78%, 0% 70%, 7% 51%, 2% 35%, 12% 20%);
 }
 
 /* Better Canvas read-only mode keeps the canvas background available for panning/zooming. */
@@ -162,21 +375,6 @@
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
 }
 
-/* Shapes defined by the Advanced JSON Canvas styleAttributes schema. */
-.canvas-node[data-bc-shape="circle"] {
-  border-radius: 50% !important;
-}
-.canvas-node[data-bc-shape="predefined-process"] {
-  border-left: 4px double var(--background-modifier-border) !important;
-  border-right: 4px double var(--background-modifier-border) !important;
-}
-.canvas-node[data-bc-shape="document"] {
-  clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%);
-}
-.canvas-node[data-bc-shape="database"] {
-  border-radius: 50% / 12% !important;
-}
-
 /* Selectable text extraction for pinned PDF pages. */
 .bc-pdf-text-selection {
   margin-top: 0.45rem;
@@ -249,21 +447,6 @@
   background: rgba(45, 125, 255, 0.32);
 }
 
-/* Common Advanced Canvas flowchart aliases; canonical JSON shapes are stored
-   separately in styleAttributes so exported files remain interoperable. */
-.canvas-node[data-bc-shape="terminal"] {
-  border-radius: 999px !important;
-}
-.canvas-node[data-bc-shape="decision"] {
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-}
-.canvas-node[data-bc-shape="input-output"] {
-  clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
-}
-.canvas-node[data-bc-shape="reference"] {
-  border-radius: 50% !important;
-}
-
 /* Canvas link/backlink explorer */
 .bc-link-explorer-modal {
   width: min(900px, 90vw);
@@ -291,11 +474,6 @@
   color: var(--text-muted);
   overflow-wrap: anywhere;
   white-space: normal;
-}
-
-.canvas-node[data-bc-border="invisible"] {
-  border-color: transparent !important;
-  box-shadow: none !important;
 }
 
 .bc-html-preview-toolbar {
@@ -606,164 +784,315 @@
 }
 
 
-/* Unified Canvas node menu. */
-.bc-node-popup-menu {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  width: max-content !important;
-  min-width: 0 !important;
-  padding: 0.35rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  background: var(--background-primary);
-  box-shadow: var(--shadow-s);
+/* Node style entry in the native Canvas control stack. The markup mirrors
+   Obsidian's `.canvas-control-group` / `.canvas-control-item` so the button
+   inherits the native size, radius and hover treatment; only the state colours
+   below are ours. */
+.bc-node-style-control-item {
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
 }
-.bc-node-popup-menu .bc-node-toolbar-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  min-width: 32px;
-  min-height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
+.bc-node-style-control-item:hover {
+  background-color: var(--interactive-hover);
   color: var(--text-normal);
-  white-space: nowrap;
-  font-size: var(--font-ui-small);
 }
-.bc-node-popup-menu .bc-node-toolbar-button svg {
-  width: 16px;
-  height: 16px;
+.bc-node-style-control-item.is-active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
 }
-.bc-node-popup-menu .bc-node-toolbar-button:hover,
-.bc-node-style-popover button:hover,
-.bc-node-popup-menu.bc-node-style-view button:hover {
-  background: var(--background-modifier-hover);
+.bc-node-style-control-item.is-active:hover {
+  background-color: var(--interactive-accent-hover);
 }
-.bc-node-popup-menu .bc-node-toolbar-button:focus-visible,
-.bc-node-style-popover button:focus-visible,
-.bc-node-popup-menu.bc-node-style-view button:focus-visible {
+.bc-node-style-control-item.is-disabled {
+  opacity: 0.45;
+}
+.bc-node-style-control-item:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }
-.bc-node-popup-dismissed { display: none !important; }
-.bc-node-popup-menu.bc-node-style-view {
-  position: fixed !important;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  width: min(332px, calc(100vw - 24px)) !important;
-  max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
-  padding: 0;
-  overflow: hidden;
-  color: var(--text-normal);
-}
-.bc-node-style-popover {
+
+/* Docked inspector. It is positioned next to the control stack and never
+   replaces the native node context menu. */
+.bc-node-style-panel {
   position: fixed;
   z-index: var(--layer-menu, 1000);
   display: flex;
   flex-direction: column;
-  width: min(332px, calc(100vw - 24px));
-  max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
+  border-radius: 14px;
   background: var(--background-primary);
   color: var(--text-normal);
-  box-shadow: var(--shadow-l);
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 18%),
+    0 2px 8px rgb(0 0 0 / 8%);
   font-size: var(--font-ui-small);
+}
+/* The host's base `button` rule fixes a 30px input height; the panel's tiles
+   size themselves, so the height and padding are reset here. */
+.bc-node-style-panel button {
+  height: auto;
+  min-height: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
 }
 .bc-node-style-header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0.5rem;
-  min-height: 42px;
-  padding: 0.5rem 0.65rem;
+  min-height: 44px;
+  padding: 0.5rem 0.55rem 0.5rem 0.85rem;
   border-bottom: 1px solid var(--background-modifier-border);
 }
-.bc-node-style-header strong { flex: 1; text-align: center; font-weight: var(--font-semibold); }
-.bc-node-style-header button,
-.bc-node-style-popover button,
-.bc-node-popup-menu.bc-node-style-view button { cursor: pointer; color: var(--text-normal); font: inherit; }
-.bc-node-style-back {
+.bc-node-style-title {
+  flex: 1;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  letter-spacing: -0.01em;
+}
+.bc-node-style-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
   padding: 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
 }
-.bc-node-style-back svg {
+.bc-node-style-close:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.bc-node-style-close svg {
   width: 16px;
   height: 16px;
 }
 .bc-node-style-scroll {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: 0.2rem;
   min-height: 0;
-  padding: 0.25rem 0.65rem;
+  padding: 0.2rem 0.85rem 0.6rem;
   overflow: auto;
+  overscroll-behavior: contain;
 }
-.bc-node-style-section { padding: 0.45rem 0; border-bottom: 1px solid var(--background-modifier-border); }
-.bc-node-style-section:last-child { border-bottom: 0; }
+.bc-node-style-section {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.bc-node-style-section:last-child {
+  border-bottom: 0;
+}
 .bc-node-style-section-title {
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.55rem;
   color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  font-size: 0.72rem;
   font-weight: var(--font-semibold);
+  letter-spacing: 0.02em;
 }
-.bc-node-style-colors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
+.bc-node-style-panel button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+/* Presets: the panel's primary affordance. Each tile previews the colour,
+   shape, border and alignment it applies. */
+.bc-node-style-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.bc-node-style-preset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.bc-node-style-preset:hover {
+  background: var(--background-modifier-hover);
+  transform: translateY(-1px);
+}
+.bc-node-style-preset[aria-pressed="true"] {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+/* Each tile is a miniature card: the whole tile area shows the style, so the
+   shape, border, alignment and colour read at a glance without a name. */
+.bc-node-style-preset-preview {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 3.1rem;
+  padding: 0 0.5rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--bc-preset-color, var(--text-muted)) 55%, var(--background-modifier-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bc-preset-color, var(--text-muted)) 22%, var(--background-primary));
+}
+.bc-node-style-preset-preview.shape-square { border-radius: 0; }
+.bc-node-style-preset-preview.shape-pill { border-radius: 999px; }
+.bc-node-style-preset-preview.shape-circle {
+  width: 2.3rem;
+  height: 2.3rem;
+  align-self: center;
+  margin: 0 auto;
+  padding: 0;
+  border-radius: 50%;
+}
+.bc-node-style-preset-preview.shape-database { border-radius: 50% / 18%; }
+/* Polygon preset previews reuse the shared outline and ring constants; the
+   ring is painted in the preset colour. */
+.bc-node-style-preset-preview.shape-diamond,
+.bc-node-style-preset-preview.shape-hexagon,
+.bc-node-style-preset-preview.shape-document {
+  border: 0;
+  border-radius: 0;
+  clip-path: var(--bc-shape-outline);
+}
+.bc-node-style-preset-preview.shape-diamond::after,
+.bc-node-style-preset-preview.shape-hexagon::after,
+.bc-node-style-preset-preview.shape-document::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--bc-preset-color, var(--text-muted));
+  -webkit-mask-image: var(--bc-ring-solid);
+  mask-image: var(--bc-ring-solid);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.bc-node-style-preset-preview.border-dashed { border-style: dashed; }
+.bc-node-style-preset-preview.border-dotted { border-style: dotted; }
+.bc-node-style-preset-preview.border-double { border-style: double; }
+.bc-node-style-preset-preview.border-invisible { border-color: transparent; }
+.bc-node-style-preset-preview.align-center { justify-content: center; }
+.bc-node-style-preset-preview.align-right { justify-content: flex-end; }
+.bc-node-style-preset-sample {
+  color: color-mix(in srgb, var(--bc-preset-color, var(--text-normal)) 60%, var(--text-normal));
+  font-size: 0.75rem;
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Colour row: 20 swatches, two rows of ten. */
+.bc-node-style-colors {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 0.3rem;
+}
 .bc-node-style-color {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  justify-content: center;
   min-width: 0;
-  padding: 0.35rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
-  text-align: left;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+.bc-node-style-color:hover {
+  transform: scale(1.12);
+}
+.bc-node-style-color.is-selected {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--interactive-accent);
 }
 .bc-node-style-swatch {
-  flex: 0 0 1rem;
-  width: 1rem;
-  height: 1rem;
-  border: 1px solid var(--background-modifier-border);
+  display: block;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%);
 }
-.bc-node-style-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-ui-smaller); }
-.bc-node-style-shapes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.3rem; }
-.bc-node-style-choice {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+
+/* Shape and border previews. */
+.bc-node-style-shapes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
-  min-width: 0;
-  min-height: 52px;
-  padding: 0.3rem 0.15rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
+}
+/* Segmented rows (border and alignment): one recessed track with a raised
+   active segment, the same treatment as the prototype's inspector. */
+.bc-node-style-borders,
+.bc-node-style-alignments {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
   background: var(--background-secondary);
 }
-.bc-node-style-choice.is-selected,
-.bc-node-style-color.is-selected,
-.bc-node-style-preset[aria-pressed="true"] {
+.bc-node-style-borders .bc-node-style-choice,
+.bc-node-style-alignments .bc-node-style-choice {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.bc-node-style-borders .bc-node-style-choice:hover,
+.bc-node-style-alignments .bc-node-style-choice:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+.bc-node-style-borders .bc-node-style-choice.is-selected,
+.bc-node-style-alignments .bc-node-style-choice.is-selected {
+  color: var(--text-normal);
+  background: var(--background-primary);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+}
+.bc-node-style-borders svg,
+.bc-node-style-alignments svg {
+  width: 17px;
+  height: 17px;
+}
+.bc-node-style-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--background-secondary);
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.bc-node-style-choice:hover {
+  background: var(--background-modifier-hover);
+  transform: translateY(-1px);
+}
+.bc-node-style-choice.is-selected {
   border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
   box-shadow: inset 0 0 0 1px var(--interactive-accent);
 }
 .bc-node-shape-preview {
   display: block;
+  position: relative;
   width: 2rem;
   height: 1.25rem;
   border: 1.5px solid var(--text-muted);
@@ -772,81 +1101,42 @@
 }
 .bc-node-shape-preview.shape-square { border-radius: 0; }
 .bc-node-shape-preview.shape-pill { border-radius: 999px; }
-.bc-node-shape-preview.shape-diamond { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .bc-node-shape-preview.shape-circle { width: 1.4rem; height: 1.4rem; border-radius: 50%; }
-.bc-node-shape-preview.shape-hexagon { border-radius: 0; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
-.bc-node-shape-preview.shape-document { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% 88%, 88% 94%, 74% 88%, 60% 94%, 46% 88%, 32% 94%, 16% 88%, 0 94%); }
 .bc-node-shape-preview.shape-database { border-radius: 50% / 18%; }
-.bc-node-style-borders { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.25rem; }
-.bc-node-border-preview {
-  display: block;
-  width: 1.8rem;
-  height: 0.85rem;
-  border: 2px solid var(--text-muted);
-  border-radius: 2px;
+.bc-node-shape-preview.shape-diamond,
+.bc-node-shape-preview.shape-hexagon,
+.bc-node-shape-preview.shape-document {
+  border: 0;
+  border-radius: 0;
+  background: var(--background-primary);
+  clip-path: var(--bc-shape-outline);
 }
-.bc-node-border-preview.border-dashed { border-style: dashed; }
-.bc-node-border-preview.border-dotted { border-style: dotted; }
-.bc-node-border-preview.border-double { border-style: double; }
-.bc-node-border-preview.border-invisible { border-color: transparent; }
-.bc-node-style-alignments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
-.bc-node-style-alignments button {
-  min-height: 30px;
-  padding: 0.3rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
+.bc-node-shape-preview.shape-diamond::after,
+.bc-node-shape-preview.shape-hexagon::after,
+.bc-node-shape-preview.shape-document::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--text-muted);
+  -webkit-mask-image: var(--bc-ring-solid);
+  mask-image: var(--bc-ring-solid);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
-.bc-node-style-alignments button.is-selected { border-color: var(--interactive-accent); }
-.bc-node-style-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.35rem; }
-.bc-node-style-preset {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  min-width: 0;
-  min-height: 66px;
-  padding: 0.4rem 0.25rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
+
+@media (prefers-reduced-motion: reduce) {
+  .bc-node-style-color,
+  .bc-node-style-choice,
+  .bc-node-style-preset,
+  .bc-node-style-control-item {
+    transition: none;
+  }
+  .bc-node-style-color:hover,
+  .bc-node-style-choice:hover,
+  .bc-node-style-preset:hover {
+    transform: none;
+  }
 }
-.bc-node-style-preset-preview {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  width: 3rem;
-  max-width: 100%;
-  height: 1.35rem;
-  padding: 0 0.25rem;
-  overflow: hidden;
-  border: 1.5px solid var(--text-normal);
-  border-radius: 4px;
-}
-.bc-node-style-preset-preview.shape-square { border-radius: 0; }
-.bc-node-style-preset-preview.shape-pill { border-radius: 999px; }
-.bc-node-style-preset-preview.shape-diamond { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.bc-node-style-preset-preview.border-dashed { border-style: dashed; }
-.bc-node-style-preset-preview.border-dotted { border-style: dotted; }
-.bc-node-style-preset-preview.border-double { border-style: double; }
-.bc-node-style-preset-preview.border-invisible { border-color: transparent; }
-.bc-node-style-preset-sample {
-  width: 100%;
-  color: #111827;
-  font-size: 0.65rem;
-  line-height: 1;
-  white-space: nowrap;
-}
-.bc-node-style-preset-label {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-ui-smaller);
-  line-height: 1.1;
-}
-/* Only the plain rectangle alias lacks a rule above; the other panel shapes
-   reuse the Advanced JSON Canvas styleAttributes definitions. */
-.canvas-node[data-bc-shape="square"] { border-radius: 0 !important; clip-path: none !important; }
