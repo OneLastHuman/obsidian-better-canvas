@@ -479,6 +479,11 @@ export default class BetterCanvasFeatures {
     await this.p.saveSettings();
   }
 
+  applySettings(): void {
+    this.refresh();
+    if (this.settings().canvasMetadataEnabled) this.refreshMetadataCache();
+  }
+
   refreshMetadataCache(): void {
     this.metadataIndexer?.refreshAll();
   }
