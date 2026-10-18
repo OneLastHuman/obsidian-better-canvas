@@ -578,6 +578,26 @@
 .bc-settings-nav-button.is-active .bc-settings-nav-icon { color: var(--interactive-accent); }
 .bc-settings-nav-label { font-size: var(--font-ui-small); }
 .bc-settings-main { min-width: 0; }
+.bc-settings-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+.bc-settings-save-status {
+  color: var(--text-muted);
+  font-size: var(--font-smaller);
+}
+.bc-settings-save-status.is-dirty {
+  color: var(--text-accent);
+}
 .bc-settings-page-header {
   margin: 0 0 15px;
   padding: 1px 0 11px;
