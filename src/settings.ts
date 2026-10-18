@@ -202,7 +202,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       await this.features.save();
     }, { description: "新建文本节点的初始宽度；自动调整尺寸的节点不会小于该值。" });
 
-    this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, 80, 1000, async number => {
+    this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, 40, 1000, async number => {
       settings.defaultNodeHeight = number;
       await this.features.save();
     }, { description: "新建文本节点的初始高度；自动调整尺寸的节点不会小于该值。" });
