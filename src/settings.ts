@@ -644,6 +644,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
             try {
               const result = await this.features.probeProviderCapabilities(String(profile.id));
               new Notice("能力探测完成：文本 " + statusLabel(result.text.status) + "；图片输入 " + statusLabel(result.imageInput.status));
+              this.draftSettings = this.cloneSettings(this.features.settings());
+              this.hasUnsavedChanges = false;
               this.display();
             } catch (error) {
               button.setDisabled(false);
