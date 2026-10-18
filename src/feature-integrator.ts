@@ -45,7 +45,7 @@ import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirectio
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
-import { applyDefaultNodePreferences } from "./node-defaults";
+import { applyDefaultNodePreferences, configuredDefaultNodeSize, normalizeDefaultNodeHeight, normalizeDefaultNodeWidth } from "./node-defaults";
 import { isCanvasReadOnly } from "./canvas-command-guards";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
@@ -525,8 +525,8 @@ export default class BetterCanvasFeatures {
     if (!Array.isArray(s.customColors)) s.customColors = ["#d14d41", "#438c7a", "#5c6bc0"];
     if (typeof s.youtubeLanguage !== "string") s.youtubeLanguage = "en";
     if (!Number.isFinite(s.gridSize) || s.gridSize < 1 || s.gridSize > 500) s.gridSize = 20;
-    if (!Number.isFinite(s.defaultNodeWidth) || s.defaultNodeWidth < 120 || s.defaultNodeWidth > 1200) s.defaultNodeWidth = 280;
-    if (!Number.isFinite(s.defaultNodeHeight) || s.defaultNodeHeight < 80 || s.defaultNodeHeight > 1000) s.defaultNodeHeight = 140;
+    s.defaultNodeWidth = normalizeDefaultNodeWidth(s.defaultNodeWidth);
+    s.defaultNodeHeight = normalizeDefaultNodeHeight(s.defaultNodeHeight);
     if (typeof s.mcpEndpoint !== "string") s.mcpEndpoint = "";
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
     if (s.mcpTransport !== "stdio" && s.mcpTransport !== "sse" && s.mcpTransport !== "http") s.mcpTransport = "http";
@@ -970,10 +970,8 @@ export default class BetterCanvasFeatures {
   }
 
   private makeConfiguredTextNode(text: string, x: number, y: number, height?: number): CanvasNodeData {
-    const settings = this.settings();
-    const width = Number(settings.defaultNodeWidth) || 280;
-    const defaultHeight = Number(settings.defaultNodeHeight) || 140;
-    return makeTextNode(text, x, y, { width, height: height ?? defaultHeight });
+    const size = configuredDefaultNodeSize(this.settings());
+    return makeTextNode(text, x, y, { width: size.width, height: height ?? size.height });
   }
   private setZoomBreakpoint(): void {
     const selected = this.selected();
@@ -1082,7 +1080,8 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     this.autoResizingNodeIds.add(selection.node.id);
-    new Notice(resizeNodeToText(selection.canvas, selection.node.id) ? "已调整节点尺寸。" : "仅支持文本节点。");
+    const resized = resizeNodeToText(selection.canvas, selection.node.id, configuredDefaultNodeSize(this.settings()));
+    new Notice(resized ? "已调整节点尺寸。" : "仅支持文本节点。");
   }
 
   private toggleAutoResize(): void {
@@ -1092,7 +1091,7 @@ export default class BetterCanvasFeatures {
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) {
       this.autoResizingNodeIds.add(selection.node.id);
-      resizeNodeToText(selection.canvas, selection.node.id);
+      resizeNodeToText(selection.canvas, selection.node.id, configuredDefaultNodeSize(this.settings()));
     }
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
   }
@@ -1154,7 +1153,7 @@ export default class BetterCanvasFeatures {
         : direction === "right" ? node.x + node.width + gap : node.x;
       const y = direction === "up" ? node.y - node.height - gap
         : direction === "down" ? node.y + node.height + gap : node.y;
-      const created = makeTextNode("", x, y, { width: node.width, height: node.height });
+      const created = makeTextNode("", x, y, configuredDefaultNodeSize(this.settings()));
       insertCanvasNode(canvas, created, event.shiftKey ? node.id : undefined);
       window.setTimeout(() => {
         const internal = canvas.nodes?.get?.(created.id);
@@ -1185,6 +1184,7 @@ export default class BetterCanvasFeatures {
         pending = false;
         const shouldResizeText = hasContentChange;
         hasContentChange = false;
+        const defaultSize = configuredDefaultNodeSize(this.settings());
         const data = readCanvasData(canvas);
         if (shouldResizeText) {
           for (const node of data.nodes) {
@@ -1193,7 +1193,7 @@ export default class BetterCanvasFeatures {
               const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
               if (element?.classList?.contains("is-dragging")) continue;
               this.autoResizingNodeIds.add(node.id);
-              resizeNodeToText(canvas, node.id);
+              resizeNodeToText(canvas, node.id, defaultSize);
             }
           }
         }
@@ -2961,7 +2961,7 @@ export default class BetterCanvasFeatures {
         : [];
       if (!questions.length) throw new Error("AI 没有返回有效的问题列表。");
       for (let i = 0; i < questions.length; i++) {
-        const defaultHeight = Number(this.settings().defaultNodeHeight) || 140;
+        const defaultHeight = normalizeDefaultNodeHeight(this.settings().defaultNodeHeight);
         const node = this.makeConfiguredTextNode("研究问题：" + questions[i],
           selected.node.x + selected.node.width + 100, selected.node.y + i * (defaultHeight + 20));
         insertCanvasNode(selected.canvas, node, selected.node.id);
