@@ -9,7 +9,7 @@ import {
 } from "./provider-params";
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
 import { validateNumericRangeInput } from "./numeric-range-validation";
-import { normalizeDefaultNodeTextAlignment } from "./node-defaults";
+import { MAX_NODE_HEIGHT, MAX_NODE_WIDTH, MIN_NODE_HEIGHT, MIN_NODE_WIDTH, normalizeDefaultNodeTextAlignment } from "./node-defaults";
 
 type SettingSection = {
   id: string;
@@ -197,12 +197,12 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       await this.features.save();
     });
 
-    this.addNumericRangeSetting(page, "默认节点宽度", settings.defaultNodeWidth ?? 280, 120, 1200, async number => {
+    this.addNumericRangeSetting(page, "默认节点宽度", settings.defaultNodeWidth ?? 280, MIN_NODE_WIDTH, MAX_NODE_WIDTH, async number => {
       settings.defaultNodeWidth = number;
       await this.features.save();
     }, { description: "新建文本节点的初始宽度；自动调整尺寸的节点不会小于该值。" });
 
-    this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, 40, 1000, async number => {
+    this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT, async number => {
       settings.defaultNodeHeight = number;
       await this.features.save();
     }, { description: "新建文本节点的初始高度；自动调整尺寸的节点不会小于该值。" });

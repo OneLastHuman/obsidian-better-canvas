@@ -88,7 +88,9 @@ describe("default text alignment for new Canvas nodes", () => {
 describe("default node size settings", () => {
   it("keeps configured widths within the settings range", () => {
     expect(normalizeDefaultNodeWidth(400)).toBe(400);
-    expect(normalizeDefaultNodeWidth(50)).toBe(120);
+    expect(normalizeDefaultNodeWidth(50)).toBe(50);
+    expect(normalizeDefaultNodeWidth(20)).toBe(20);
+    expect(normalizeDefaultNodeWidth(19)).toBe(20);
     expect(normalizeDefaultNodeWidth(9999)).toBe(1200);
     expect(normalizeDefaultNodeWidth(undefined)).toBe(280);
     expect(normalizeDefaultNodeWidth("abc")).toBe(280);
@@ -96,7 +98,9 @@ describe("default node size settings", () => {
 
   it("keeps configured heights within the settings range", () => {
     expect(normalizeDefaultNodeHeight(220)).toBe(220);
-    expect(normalizeDefaultNodeHeight(10)).toBe(40);
+    expect(normalizeDefaultNodeHeight(20)).toBe(20);
+    expect(normalizeDefaultNodeHeight(19)).toBe(20);
+    expect(normalizeDefaultNodeHeight(10)).toBe(20);
     expect(normalizeDefaultNodeHeight(9999)).toBe(1000);
     expect(normalizeDefaultNodeHeight(undefined)).toBe(140);
     expect(normalizeDefaultNodeHeight("abc")).toBe(140);
@@ -108,7 +112,7 @@ describe("default node size settings", () => {
     expect(configuredDefaultNodeSize({})).toEqual({ width: 280, height: 140 });
     expect(configuredDefaultNodeSize(null)).toEqual({ width: 280, height: 140 });
     expect(configuredDefaultNodeSize(undefined)).toEqual({ width: 280, height: 140 });
-    expect(configuredDefaultNodeSize({ defaultNodeWidth: 40, defaultNodeHeight: 5 }))
-      .toEqual({ width: 120, height: 40 });
+    expect(configuredDefaultNodeSize({ defaultNodeWidth: 10, defaultNodeHeight: 5 }))
+      .toEqual({ width: 20, height: 20 });
   });
 });
