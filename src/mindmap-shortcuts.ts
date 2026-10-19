@@ -30,3 +30,22 @@ export function isMindMapShortcutEnabled(
   const value = settings?.[key];
   return typeof value === "boolean" ? value : true;
 }
+
+export type MindMapEditingCreationShortcut = Extract<MindMapShortcut, "childTab" | "siblingEnter">;
+
+/**
+ * Maps Shift+Tab and Shift+Enter while a Canvas node is being edited.
+ * Other modifiers are left to the host editor and other plugins.
+ */
+export function getMindMapEditingCreationShortcut(event: {
+  key: string;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+}): MindMapEditingCreationShortcut | null {
+  if (!event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return null;
+  if (event.key === "Tab") return "childTab";
+  if (event.key === "Enter") return "siblingEnter";
+  return null;
+}

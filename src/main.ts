@@ -8,7 +8,7 @@ import {
   TFile
 } from "obsidian";
 import BetterCanvasFeatures from "./feature-integrator";
-import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
+import { getMindMapEditingCreationShortcut, isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
 import { decorateCanvas } from "./enhancements";
 import { getNodeAIContextMenuActions } from "./node-ai-context-menu";
@@ -541,6 +541,22 @@ export default class BetterCanvasPlugin extends Plugin {
     const container = view.containerEl as HTMLElement;
     if (this.boundContainers.has(container)) return;
     this.boundContainers.add(container);
+
+    // Capture editing shortcuts before Obsidian's Canvas editor handles the key event.
+    this.registerDomEvent(container, "keydown", (event: KeyboardEvent) => {
+      const canvas = this.getCanvas();
+      if (!canvas || canvas.wrapperEl?.classList?.contains("bc-readonly")) return;
+      const target = event.target as HTMLElement | null;
+      if (!target || !(target.isContentEditable || target.closest("input, textarea, select, [contenteditable='true'], .cm-editor"))) return;
+      const selectedInternal = canvas.selection?.values?.().next?.().value;
+      if (!selectedInternal?.isEditing) return;
+      const shortcut = getMindMapEditingCreationShortcut(event);
+      if (!shortcut || !isMindMapShortcutEnabled(this.settings, shortcut)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (shortcut === "childTab") this.createChildNode();
+      else this.createSiblingNode();
+    }, true);
 
     this.registerDomEvent(container, "keydown", (event: KeyboardEvent) => {
       const canvas = this.getCanvas();
