@@ -74,6 +74,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     const previousSettings = this.cloneSettings(liveSettings);
     const nextSettings = this.cloneSettings(this.currentSettings());
     nextSettings.autoResizeTest = normalizeAutoResizeTestSettings(nextSettings.autoResizeTest);
+    const autoResizeTestChanged =
+      JSON.stringify(previousSettings.autoResizeTest ?? null) !== JSON.stringify(nextSettings.autoResizeTest ?? null);
 
     try {
       for (const key of Object.keys(liveSettings)) {
@@ -97,8 +99,12 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     this.hasUnsavedChanges = false;
 
     let applyError: unknown = null;
+    let resizedNodeCount: number | null = null;
     try {
       this.features.applySettings();
+      if (autoResizeTestChanged) {
+        resizedNodeCount = this.features.applyAutoResizeTestSettingsToOpenCanvases();
+      }
     } catch (error) {
       applyError = error;
     }
@@ -106,6 +112,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
 
     if (applyError) {
       new Notice("设置已保存，但部分更改未能立即应用：" + (applyError instanceof Error ? applyError.message : String(applyError)), 8000);
+    } else if (resizedNodeCount !== null) {
+      new Notice("设置已保存；test 参数已应用到 " + resizedNodeCount + " 个自动尺寸文本节点。");
     } else {
       new Notice("设置已保存并立即生效。");
     }
@@ -380,7 +388,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
 
     new Setting(page)
       .setName("实验性自动尺寸参数")
-      .setDesc("这些数值会直接参与实际 Canvas 文字节点的尺寸计算。修改后先点击侧栏“保存设置”，再用“重新计算当前画布”实测；确定最终参数后，再将其固定到产品默认值。");
+      .setDesc("这些数值会直接参与实际 Canvas 文字节点的尺寸计算。修改后先点击侧栏“保存设置”，再用“重新计算已打开画布”实测；确定最终参数后，再将其固定到产品默认值。");
 
     const addNumber = (
       key: keyof AutoResizeTestSettings,
@@ -415,16 +423,17 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     addNumber("heightPadding", "高度附加值（px）", 0, 1000, "在估算正文行高之外保留的额外高度。", { integer: true });
 
     new Setting(page)
-      .setName("重算当前画布的自动尺寸节点")
-      .setDesc("对当前打开的 Canvas 中已启用自动尺寸、且有正文的文字节点重新计算。空白节点和已关闭自动尺寸的节点不会修改。请先保存上面的参数。")
+      .setName("重算已打开画布的自动尺寸节点")
+      .setDesc("对已打开的 Canvas 中启用自动尺寸且有正文的文字节点重新计算。空白节点、只读画布和已关闭自动尺寸的节点不会修改。保存 test 参数后会自动重算；也可再次手动执行。")
       .addButton(button => button
-        .setButtonText("重新计算当前画布")
+        .setButtonText("重新计算已打开画布")
         .onClick(() => {
           if (this.hasUnsavedChanges) {
             new Notice("请先保存 test 参数，再重新计算当前画布。");
             return;
           }
-          this.features.applyAutoResizeTestSettingsToActiveCanvas();
+          const count = this.features.applyAutoResizeTestSettingsToOpenCanvases();
+          new Notice("已重新计算 " + count + " 个自动尺寸文本节点。");
         }));
 
     new Setting(page)
