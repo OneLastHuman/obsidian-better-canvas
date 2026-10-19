@@ -31,7 +31,11 @@ function clampNumber(
   max: number,
   integer = false
 ): number {
-  const number = value === null || value === "" ? Number.NaN : Number(value);
+  const number = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim()
+      ? Number(value)
+      : Number.NaN;
   if (!Number.isFinite(number)) return fallback;
   const clamped = Math.min(max, Math.max(min, number));
   return integer ? Math.round(clamped) : Math.round(clamped * 10) / 10;
