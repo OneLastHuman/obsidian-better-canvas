@@ -247,6 +247,24 @@ describe("auto-resize uses dedicated experimental settings", () => {
     expect(updatedNode.height).toBe(68);
   });
 
+  it("does not leave a resize-in-progress marker when dimensions already match", () => {
+    const { plugin } = createMockPlugin();
+    const features = new BetterCanvasFeatures(plugin);
+    features.init();
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "node-1", type: "text", x: 0, y: 0, width: 88, height: 68, text: "hello", bcAutoResize: true } as any
+      ],
+      edges: []
+    });
+
+    const resized = (features as any).resizeNodeWithTestSettings(canvas, "node-1", testSettings);
+
+    expect(resized).toBe(true);
+    expect((features as any).autoResizingNodeIds.has("node-1")).toBe(false);
+    expect(canvas.saved).toBe(0);
+  });
+
   it("leaves empty new nodes at their configured initial size", () => {
     const canvas = makeCanvas({
       nodes: [
