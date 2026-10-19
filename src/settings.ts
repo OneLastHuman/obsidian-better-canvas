@@ -429,7 +429,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .setButtonText("重新计算已打开画布")
         .onClick(() => {
           if (this.hasUnsavedChanges) {
-            new Notice("请先保存 test 参数，再重新计算当前画布。");
+            new Notice("请先保存 test 参数，再重新计算已打开画布。");
             return;
           }
           const count = this.features.applyAutoResizeTestSettingsToOpenCanvases();
