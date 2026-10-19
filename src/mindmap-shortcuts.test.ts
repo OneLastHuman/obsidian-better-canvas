@@ -26,13 +26,20 @@ describe("MindMap shortcut settings", () => {
 describe("MindMap editing creation shortcuts", () => {
   const keyEvent = (
     key: string,
-    modifiers: Partial<{ shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean }> = {}
+    modifiers: Partial<{
+      shiftKey: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      altKey: boolean;
+      isComposing: boolean;
+    }> = {}
   ) => ({
     key,
     shiftKey: true,
     ctrlKey: false,
     metaKey: false,
     altKey: false,
+    isComposing: false,
     ...modifiers
   });
 
@@ -48,5 +55,7 @@ describe("MindMap editing creation shortcuts", () => {
     expect(getMindMapEditingCreationShortcut(keyEvent("Tab", { ctrlKey: true }))).toBeNull();
     expect(getMindMapEditingCreationShortcut(keyEvent("Enter", { metaKey: true }))).toBeNull();
     expect(getMindMapEditingCreationShortcut(keyEvent("Tab", { altKey: true }))).toBeNull();
+    expect(getMindMapEditingCreationShortcut(keyEvent("Enter", { isComposing: true }))).toBeNull();
+    expect(getMindMapEditingCreationShortcut(keyEvent("Tab", { isComposing: true }))).toBeNull();
   });
 });
