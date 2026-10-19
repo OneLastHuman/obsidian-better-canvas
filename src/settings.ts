@@ -32,16 +32,85 @@ function temperatureRangeDescription(protocol: ProviderRequestProtocol): string 
 }
 
 export default class BetterCanvasSettingsTab extends PluginSettingTab {
-  private plugin: any;
+  private draftSettings: any = null;
+  private hasUnsavedChanges = false;
+  private saveButton: HTMLButtonElement | null = null;
+  private saveStatus: HTMLElement | null = null;
   private activeSection = "canvas";
   private openAIAccordion: "text" | "image" | null = null;
 
   constructor(app: App, plugin: any, private features: any) {
     super(app, plugin);
-    this.plugin = plugin;
+  }
+
+  private cloneSettings(settings: any): any {
+    return JSON.parse(JSON.stringify(settings ?? {}));
+  }
+
+  private currentSettings(): any {
+    if (!this.draftSettings) this.draftSettings = this.cloneSettings(this.features.settings());
+    return this.draftSettings;
+  }
+
+  private markDirty(): Promise<void> {
+    this.hasUnsavedChanges = true;
+    this.updateSaveStatus();
+    return Promise.resolve();
+  }
+
+  private updateSaveStatus(): void {
+    if (this.saveButton) this.saveButton.disabled = !this.hasUnsavedChanges;
+    if (this.saveStatus) {
+      this.saveStatus.setText(this.hasUnsavedChanges ? "有未保存的更改" : "没有待保存的更改");
+      this.saveStatus.toggleClass("is-dirty", this.hasUnsavedChanges);
+    }
+  }
+
+  private async saveDraftSettings(): Promise<void> {
+    if (!this.hasUnsavedChanges) return;
+
+    const liveSettings = this.features.settings() as Record<string, unknown>;
+    const previousSettings = this.cloneSettings(liveSettings);
+    const nextSettings = this.cloneSettings(this.currentSettings());
+
+    try {
+      for (const key of Object.keys(liveSettings)) {
+        if (!(key in nextSettings)) delete liveSettings[key];
+      }
+      Object.assign(liveSettings, nextSettings);
+      await this.features.save();
+    } catch (error) {
+      for (const key of Object.keys(liveSettings)) {
+        if (!(key in previousSettings)) delete liveSettings[key];
+      }
+      Object.assign(liveSettings, previousSettings);
+      this.draftSettings = nextSettings;
+      this.hasUnsavedChanges = true;
+      this.updateSaveStatus();
+      new Notice("保存设置失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+      return;
+    }
+
+    this.draftSettings = this.cloneSettings(liveSettings);
+    this.hasUnsavedChanges = false;
+
+    let applyError: unknown = null;
+    try {
+      this.features.applySettings();
+    } catch (error) {
+      applyError = error;
+    }
+    this.display();
+
+    if (applyError) {
+      new Notice("设置已保存，但部分更改未能立即应用：" + (applyError instanceof Error ? applyError.message : String(applyError)), 8000);
+    } else {
+      new Notice("设置已保存并立即生效。");
+    }
   }
 
   display(): void {
+    this.draftSettings ??= this.cloneSettings(this.features.settings());
     const root = this.containerEl;
     root.empty();
     root.addClass("bc-settings-root");
@@ -58,6 +127,16 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       { id: "export", icon: "⇧", title: "导出", description: "格式、清晰度、背景与范围" }
     ];
     const nav = sidebar.createDiv({ cls: "bc-settings-nav", attr: { "aria-label": "设置分类" } });
+    const actions = sidebar.createDiv({ cls: "bc-settings-actions" });
+    const saveButton = actions.createEl("button", { text: "保存设置", cls: "mod-cta" });
+    saveButton.type = "button";
+    saveButton.addEventListener("click", () => { void this.saveDraftSettings(); });
+    this.saveButton = saveButton;
+    this.saveStatus = actions.createEl("span", {
+      cls: "bc-settings-save-status",
+      attr: { role: "status", "aria-live": "polite" }
+    });
+    this.updateSaveStatus();
     const pagesHost = shell.createDiv({ cls: "bc-settings-main" });
     const pages = new Map<string, HTMLElement>();
     const navButtons = new Map<string, HTMLButtonElement>();
@@ -104,7 +183,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
 
   private async saveProvider(profile: any, settings: any): Promise<void> {
     this.syncLegacyProvider(profile, settings);
-    await this.features.save();
+    await this.markDirty();
   }
 
   private addNumericRangeSetting(
@@ -168,7 +247,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
   }
 
   private renderCanvasSettings(page: HTMLElement): void {
-    const settings = this.features.settings() as any;
+    const settings = this.currentSettings() as any;
 
     new Setting(page).setName("自动布局方向")
       .addDropdown(dropdown => dropdown
@@ -176,35 +255,35 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .addOption("RL", "从右到左")
         .addOption("TB", "从上到下")
         .addOption("BT", "从下到上")
-        .setValue(String(this.plugin.settings.direction || "LR"))
+        .setValue(String(this.currentSettings().direction || "LR"))
         .onChange(async value => {
-          this.plugin.settings.direction = value as any;
-          await this.features.save();
+          this.currentSettings().direction = value as any;
+          await this.markDirty();
         }));
 
-    this.addNumericRangeSetting(page, "水平间距", this.plugin.settings.gapX ?? 100, 0, 1000, async number => {
-      this.plugin.settings.gapX = number;
-      await this.features.save();
+    this.addNumericRangeSetting(page, "水平间距", this.currentSettings().gapX ?? 100, 0, 1000, async number => {
+      this.currentSettings().gapX = number;
+      await this.markDirty();
     });
 
-    this.addNumericRangeSetting(page, "垂直间距", this.plugin.settings.gapY ?? 44, 0, 1000, async number => {
-      this.plugin.settings.gapY = number;
-      await this.features.save();
+    this.addNumericRangeSetting(page, "垂直间距", this.currentSettings().gapY ?? 44, 0, 1000, async number => {
+      this.currentSettings().gapY = number;
+      await this.markDirty();
     });
 
     this.addNumericRangeSetting(page, "网格大小", settings.gridSize ?? 20, 1, 500, async number => {
       settings.gridSize = number;
-      await this.features.save();
+      await this.markDirty();
     });
 
     this.addNumericRangeSetting(page, "默认节点宽度", settings.defaultNodeWidth ?? 280, MIN_NODE_WIDTH, MAX_NODE_WIDTH, async number => {
       settings.defaultNodeWidth = number;
-      await this.features.save();
+      await this.markDirty();
     }, { description: "新建文本节点的初始宽度；自动调整尺寸的节点不会小于该值。" });
 
     this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT, async number => {
       settings.defaultNodeHeight = number;
-      await this.features.save();
+      await this.markDirty();
     }, { description: "新建文本节点的初始高度；自动调整尺寸的节点不会小于该值。" });
 
     new Setting(page).setName("新建文本节点默认对齐")
@@ -213,59 +292,59 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .addOption("left", "左对齐")
         .addOption("center", "居中")
         .addOption("right", "右对齐")
-        .setValue(normalizeDefaultNodeTextAlignment(this.plugin.settings.defaultNodeTextAlign))
+        .setValue(normalizeDefaultNodeTextAlignment(this.currentSettings().defaultNodeTextAlign))
         .onChange(async value => {
-          this.plugin.settings.defaultNodeTextAlign = normalizeDefaultNodeTextAlignment(value);
-          await this.features.save();
+          this.currentSettings().defaultNodeTextAlign = normalizeDefaultNodeTextAlignment(value);
+          await this.markDirty();
         }));
 
     new Setting(page).setName("Tab 创建子节点")
       .setDesc("关闭后，Tab 不会被 Better Canvas 拦截，可继续使用 Obsidian 或其他插件的快捷键。")
       .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.mindMapShortcutChildTabEnabled !== false)
+        .setValue(this.currentSettings().mindMapShortcutChildTabEnabled !== false)
         .onChange(async value => {
-          this.plugin.settings.mindMapShortcutChildTabEnabled = value;
-          await this.features.save();
+          this.currentSettings().mindMapShortcutChildTabEnabled = value;
+          await this.markDirty();
         }));
 
     new Setting(page).setName("Enter 创建同级节点")
       .setDesc("关闭后，Enter 不会被 Better Canvas 用于创建同级节点。")
       .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.mindMapShortcutSiblingEnterEnabled !== false)
+        .setValue(this.currentSettings().mindMapShortcutSiblingEnterEnabled !== false)
         .onChange(async value => {
-          this.plugin.settings.mindMapShortcutSiblingEnterEnabled = value;
-          await this.features.save();
+          this.currentSettings().mindMapShortcutSiblingEnterEnabled = value;
+          await this.markDirty();
         }));
 
     new Setting(page).setName("Alt + 方向键导航节点")
       .setDesc("关闭后，Alt + 方向键不会触发 Better Canvas 的相邻节点导航。")
       .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.mindMapShortcutAltArrowNavigationEnabled !== false)
+        .setValue(this.currentSettings().mindMapShortcutAltArrowNavigationEnabled !== false)
         .onChange(async value => {
-          this.plugin.settings.mindMapShortcutAltArrowNavigationEnabled = value;
-          await this.features.save();
+          this.currentSettings().mindMapShortcutAltArrowNavigationEnabled = value;
+          await this.markDirty();
         }));
 
     new Setting(page).setName("Ctrl/Cmd + 方向键创建方向节点")
       .setDesc("关闭后，Ctrl/Cmd + 方向键及其 Shift 变体不会被 Better Canvas 拦截。")
       .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.mindMapShortcutDirectionalCreationEnabled !== false)
+        .setValue(this.currentSettings().mindMapShortcutDirectionalCreationEnabled !== false)
         .onChange(async value => {
-          this.plugin.settings.mindMapShortcutDirectionalCreationEnabled = value;
-          await this.features.save();
+          this.currentSettings().mindMapShortcutDirectionalCreationEnabled = value;
+          await this.markDirty();
         }));
 
     new Setting(page).setName("自动创建文件节点连线")
       .setDesc("读取 Markdown frontmatter 中的关联文件。")
       .addToggle(toggle => toggle.setValue(Boolean(settings.autoFileNodeEdgesEnabled)).onChange(async value => {
         settings.autoFileNodeEdgesEnabled = value;
-        await this.features.save();
+        await this.markDirty();
       }));
 
     new Setting(page).setName("关联字段名")
       .addText(text => text.setPlaceholder("canvas-edges").setValue(String(settings.autoEdgesFrontmatterKey || "canvas-edges")).onChange(async value => {
         settings.autoEdgesFrontmatterKey = value.trim() || "canvas-edges";
-        await this.features.save();
+        await this.markDirty();
       }));
 
     new Setting(page).setName("只读时禁用右键菜单")
@@ -274,8 +353,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .setValue(settings.readOnlyDisableNodeMenusEnabled !== false)
         .onChange(async value => {
           settings.readOnlyDisableNodeMenusEnabled = value;
-          await this.features.save();
-          this.features.refreshReadonly();
+          await this.markDirty();
         }));
 
     new Setting(page).setName("只读时锁定平移和缩放")
@@ -284,8 +362,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .setValue(settings.readOnlyLockPanZoomEnabled === true)
         .onChange(async value => {
           settings.readOnlyLockPanZoomEnabled = value;
-          await this.features.save();
-          this.features.refreshReadonly();
+          await this.markDirty();
         }));
     this.renderTemplateSettings(page);
 
@@ -293,15 +370,15 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
 
   private renderTemplateSettings(page: HTMLElement): void {
     new Setting(page).setName("节点模板")
-      .setDesc("已保存 " + ((this.plugin.settings.templates || []).length) + " 个模板。")
+      .setDesc("当前设置中有 " + ((this.currentSettings().templates || []).length) + " 个模板。")
       .addButton(button => button.setButtonText("清空模板").setWarning().onClick(async () => {
-        if (!(this.plugin.settings.templates || []).length) {
+        if (!(this.currentSettings().templates || []).length) {
           new Notice("没有可清空的模板。");
           return;
         }
         if (!window.confirm("删除所有已保存的节点模板？此操作无法撤销。")) return;
-        this.plugin.settings.templates = [];
-        await this.features.save();
+        this.currentSettings().templates = [];
+        await this.markDirty();
         this.display();
       }));
   }
@@ -319,7 +396,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
   }
 
   private renderAISettings(page: HTMLElement): void {
-    const settings = this.features.settings() as any;
+    const settings = this.currentSettings() as any;
     const textAccordion = this.createAIAccordion(page, "text", "文本生成");
     const imageAccordion = this.createAIAccordion(page, "image", "图片生成");
     const textBody = textAccordion.body;
@@ -345,7 +422,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .onChange(async value => {
           settings.backend = value === "opencode-acp" || value === "codex-cli" ? value : "api";
           this.openAIAccordion = "text";
-          await this.features.save();
+          await this.markDirty();
           this.display();
         }));
 
@@ -385,7 +462,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         activate.addEventListener("click", async () => {
           settings.activeProviderId = profile.id;
           this.syncLegacyProvider(profile, settings);
-          await this.features.save();
+          await this.markDirty();
           this.display();
         });
       }
@@ -407,7 +484,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         if (!result.confirmed) return;
         settings.activeProviderId = result.activeProviderId;
         if (result.activeProfile) this.syncLegacyProvider(result.activeProfile, settings);
-        await this.features.save();
+        await this.markDirty();
         this.display();
       });
 
@@ -553,6 +630,10 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .addButton(button => button
           .setButtonText("探测文本 / 图片输入")
           .onClick(async () => {
+            if (this.hasUnsavedChanges) {
+              new Notice("请先保存设置，再探测模型能力。");
+              return;
+            }
             if (!effectiveModel.trim()) {
               new Notice("请先为此服务商配置文本模型。");
               return;
@@ -563,6 +644,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
             try {
               const result = await this.features.probeProviderCapabilities(String(profile.id));
               new Notice("能力探测完成：文本 " + statusLabel(result.text.status) + "；图片输入 " + statusLabel(result.imageInput.status));
+              this.draftSettings = this.cloneSettings(this.features.settings());
+              this.hasUnsavedChanges = false;
               this.display();
             } catch (error) {
               button.setDisabled(false);
@@ -592,7 +675,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       settings.providerProfiles.push(profile);
       settings.activeProviderId = profile.id;
       this.syncLegacyProvider(profile, settings);
-      await this.features.save();
+      await this.markDirty();
       this.display();
     });
 
@@ -601,14 +684,14 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .setDesc("留空时使用系统 PATH 中的 opencode。")
         .addText(text => text.setPlaceholder("opencode").setValue(String(settings.opencodeBinaryPath || "opencode")).onChange(async value => {
           settings.opencodeBinaryPath = value.trim() || "opencode";
-          await this.features.save();
+          await this.markDirty();
         }));
     } else if (settings.backend === "codex-cli") {
       new Setting(textBody).setName("Codex CLI 可执行文件")
         .setDesc("留空时使用系统 PATH 中的 codex。")
         .addText(text => text.setPlaceholder("codex 或绝对路径").setValue(String(settings.codexBinaryPath || "")).onChange(async value => {
           settings.codexBinaryPath = value.trim();
-          await this.features.save();
+          await this.markDirty();
         }));
     }
 
@@ -620,7 +703,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         text.setValue(String(settings.systemPrompt || "You are a precise assistant. Preserve uncertainty."));
         text.onChange(async value => {
           settings.systemPrompt = value;
-          await this.features.save();
+          await this.markDirty();
         });
       });
 
@@ -639,13 +722,13 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           const profile = promptProfiles.find(item => item.id === id);
           if (!profile) {
             settings.activeSystemPromptProfile = "";
-            await this.features.save();
+            await this.markDirty();
             return;
           }
           settings.activeSystemPromptProfile = profile.id;
           settings.systemPrompt = profile.prompt;
           profileNameInput = profile.name;
-          await this.features.save();
+          await this.markDirty();
           this.display();
         });
       });
@@ -672,8 +755,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
               profile.name.toLocaleLowerCase() === profileNameInput.trim().toLocaleLowerCase()
             );
             settings.activeSystemPromptProfile = saved?.id ?? "";
-            await this.features.save();
-            new Notice(saved ? "已保存命名提示词：" + saved.name : "已保存命名提示词。");
+            await this.markDirty();
+            new Notice(saved ? "已暂存命名提示词：" + saved.name : "已暂存命名提示词。");
             this.display();
           } catch (error) {
             new Notice(error instanceof Error ? error.message : String(error), 6000);
@@ -699,8 +782,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
             selected.id
           );
           settings.activeSystemPromptProfile = "";
-          await this.features.save();
-          new Notice("已删除命名提示词：" + selected.name);
+          await this.markDirty();
+          new Notice("已暂存删除的命名提示词：" + selected.name);
           this.display();
         }));
 
@@ -712,7 +795,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .setValue(settings.flashcardOutputMode === "spaced-repetition" ? "spaced-repetition" : "canvas")
         .onChange(async value => {
           settings.flashcardOutputMode = value === "spaced-repetition" ? "spaced-repetition" : "canvas";
-          await this.features.save();
+          await this.markDirty();
           this.display();
         }));
 
@@ -723,7 +806,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           .setValue(String(settings.spacedRepetitionFolder || "Better Canvas/Flashcards"))
           .onChange(async value => {
             settings.spacedRepetitionFolder = value.trim() || "Better Canvas/Flashcards";
-            await this.features.save();
+            await this.markDirty();
           }));
       new Setting(textBody).setName("复习卡组标签")
         .setDesc("输入主题路径，例如 science/biology；最终标签为 #flashcards/science/biology。")
@@ -731,7 +814,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           .setValue(String(settings.spacedRepetitionDeck || "better-canvas"))
           .onChange(async value => {
             settings.spacedRepetitionDeck = value.trim() || "better-canvas";
-            await this.features.save();
+            await this.markDirty();
           }));
     }
 
@@ -750,47 +833,46 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           }
           settings.imageProtocol = value === "gemini" ? "gemini" : "openai";
           this.openAIAccordion = "image";
-          await this.features.save();
+          await this.markDirty();
           this.display();
         }));
     new Setting(imageBody).setName("API Base URL")
       .addText(text => text.setPlaceholder(settings.imageProtocol === "gemini" ? "https://generativelanguage.googleapis.com/v1beta" : "https://api.openai.com/v1")
         .setValue(String(settings.imageBaseUrl || ""))
-        .onChange(async value => { settings.imageBaseUrl = value.trim(); await this.features.save(); }));
+        .onChange(async value => { settings.imageBaseUrl = value.trim(); await this.markDirty(); }));
     new Setting(imageBody).setName("API Key")
       .addText(text => {
         text.inputEl.type = "password";
         text.setPlaceholder("可留空").setValue(String(settings.imageApiKey || "")).onChange(async value => {
           settings.imageApiKey = value.trim();
-          await this.features.save();
+          await this.markDirty();
         });
       });
     new Setting(imageBody).setName("图片模型")
       .addText(text => text.setPlaceholder("例如：gpt-image-1 或 gemini-2.5-flash-image")
         .setValue(String(settings.imageModel || "gpt-image-1"))
-        .onChange(async value => { settings.imageModel = value.trim(); await this.features.save(); }));
+        .onChange(async value => { settings.imageModel = value.trim(); await this.markDirty(); }));
     new Setting(imageBody).setName("保存位置")
       .addText(text => text.setPlaceholder("Better Canvas/Generated Images")
         .setValue(String(settings.attachmentFolder || "Better Canvas/Generated Images"))
-        .onChange(async value => { settings.attachmentFolder = value.trim() || "Better Canvas/Generated Images"; await this.features.save(); }));
+        .onChange(async value => { settings.attachmentFolder = value.trim() || "Better Canvas/Generated Images"; await this.markDirty(); }));
 
   }
 
   private renderIntegrationSettings(page: HTMLElement): void {
-    const settings = this.features.settings() as any;
+    const settings = this.currentSettings() as any;
 
     new Setting(page).setName("Canvas 元数据与反向链接")
       .setDesc("将 Canvas 中的链接同步到 Obsidian 索引。")
       .addToggle(toggle => toggle.setValue(Boolean(settings.canvasMetadataEnabled)).onChange(async value => {
         settings.canvasMetadataEnabled = value;
-        await this.features.save();
-        if (value) this.features.refreshMetadataCache();
+        await this.markDirty();
       }));
 
     new Setting(page).setName("YouTube 字幕语言")
       .addText(text => text.setPlaceholder("zh-Hans").setValue(String(settings.youtubeLanguage || "en")).onChange(async value => {
         settings.youtubeLanguage = value.trim() || "en";
-        await this.features.save();
+        await this.markDirty();
       }));
 
     new Setting(page).setName("MCP 连接方式")
@@ -801,7 +883,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         .setValue(settings.mcpTransport === "stdio" || settings.mcpTransport === "sse" ? settings.mcpTransport : "http")
         .onChange(async value => {
           settings.mcpTransport = value === "stdio" || value === "sse" ? value : "http";
-          await this.features.save();
+          await this.markDirty();
           this.display();
         }));
 
@@ -814,14 +896,14 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           text.setValue(String(settings.mcpStdioConfig || '{"command":"","args":[],"env":{},"cwd":""}'));
           text.onChange(async value => {
             settings.mcpStdioConfig = value;
-            await this.features.save();
+            await this.markDirty();
           });
         });
     } else {
       new Setting(page).setName("服务地址")
         .addText(text => text.setPlaceholder("https://server.example/mcp").setValue(String(settings.mcpEndpoint || "")).onChange(async value => {
           settings.mcpEndpoint = value.trim();
-          await this.features.save();
+          await this.markDirty();
         }));
 
       new Setting(page).setName("Bearer Token")
@@ -829,19 +911,19 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
           text.inputEl.type = "password";
           text.setValue(String(settings.mcpApiKey || "")).onChange(async value => {
             settings.mcpApiKey = value.trim();
-            await this.features.save();
+            await this.markDirty();
           });
         });
     }
   }
 
   private renderAppearanceSettings(page: HTMLElement): void {
-    const settings = this.features.settings() as any;
+    const settings = this.currentSettings() as any;
     new Setting(page).setName("自定义节点颜色")
       .setDesc("用逗号分隔 HEX 颜色，例如 #d14d41, #438c7a。")
       .addText(text => text.setPlaceholder("#d14d41, #438c7a, #5c6bc0").setValue((settings.customColors as string[]).join(", ")).onChange(async value => {
         settings.customColors = value.split(",").map((item: string) => item.trim()).filter(Boolean).slice(0, 12);
-        await this.features.save();
+        await this.markDirty();
       }));
     new Setting(page).setName("自定义节点 CSS")
       .setDesc("为节点添加自定义 class 后，可在这里设置对应样式。")
@@ -849,18 +931,18 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         text.inputEl.rows = 5;
         text.inputEl.style.width = "100%";
         text.setValue(String(settings.customCss || ""));
-        text.onChange(async value => { settings.customCss = value; await this.features.save(); this.features.applyUserCss(); });
+        text.onChange(async value => { settings.customCss = value; await this.markDirty(); });
       });
   }
 
   private renderExportSettings(page: HTMLElement): void {
-    const settings = this.features.settings() as any;
+    const settings = this.currentSettings() as any;
     const intro = page.createDiv({ cls: "bc-settings-inline-heading" });
     intro.createEl("p", { text: "导出格式与范围通过 Canvas 导出命令选择。此处配置图像清晰度和背景。" });
     new Setting(page).setName("PNG / SVG 导出清晰度")
       .addDropdown(dropdown => {
         for (const ratio of [1, 1.5, 2, 3, 4]) dropdown.addOption(String(ratio), String(ratio) + "×");
-        dropdown.setValue(String(Number(settings.exportPixelRatio) || 2)).onChange(async value => { settings.exportPixelRatio = Number(value); await this.features.save(); });
+        dropdown.setValue(String(Number(settings.exportPixelRatio) || 2)).onChange(async value => { settings.exportPixelRatio = Number(value); await this.markDirty(); });
       });
     new Setting(page).setName("导出背景颜色")
       .setDesc("留空可保留透明背景。")
@@ -868,7 +950,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         const candidate = value.trim();
         if (candidate) { const probe = document.createElement("span"); probe.style.backgroundColor = candidate; if (!probe.style.backgroundColor) return; }
         settings.exportBackgroundColor = candidate;
-        await this.features.save();
+        await this.markDirty();
       }));
   }
 
