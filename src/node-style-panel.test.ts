@@ -132,6 +132,42 @@ class FakeElement {
   }
 }
 
+const originalGlobals = {
+  document: (globalThis as Record<string, unknown>).document,
+  window: (globalThis as Record<string, unknown>).window,
+  HTMLElement: (globalThis as Record<string, unknown>).HTMLElement,
+  getComputedStyle: (globalThis as Record<string, unknown>).getComputedStyle
+};
+
+let body: FakeElement;
+
+function installFakeDom(): void {
+  body = new FakeElement("body");
+  const documentStub = {
+    body,
+    documentElement: new FakeElement("html"),
+    createElement: (tagName: string) => new FakeElement(tagName),
+    createElementNS: (_namespace: string, tagName: string) => new FakeElement(tagName),
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined
+  };
+  const globals = globalThis as Record<string, unknown>;
+  globals.document = documentStub;
+  globals.window = {
+    innerWidth: 1280,
+    innerHeight: 800,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined
+  };
+  globals.HTMLElement = FakeElement;
+  globals.getComputedStyle = () => ({
+    borderLeftWidth: "0px",
+    borderRightWidth: "0px",
+    borderTopWidth: "0px",
+    borderBottomWidth: "0px"
+  });
+}
+
 type PanelHarness = {
   showStylePanel: (canvas: unknown, nodeIds: string | string[]) => void;
   dismissPanel: () => void;
