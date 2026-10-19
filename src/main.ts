@@ -8,7 +8,8 @@ import {
   TFile
 } from "obsidian";
 import BetterCanvasFeatures from "./feature-integrator";
-import { isMindMapShortcutEnabled } from "./mindmap-shortcuts";
+import { getMindMapEditingCreationShortcut, isMindMapShortcutEnabled } from "./mindmap-shortcuts";
+import { EditingIframeShortcutRegistry } from "./canvas-editing-shortcuts";
 import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
 import { decorateCanvas } from "./enhancements";
 import { getNodeAIContextMenuActions } from "./node-ai-context-menu";
@@ -296,6 +297,9 @@ class PresentationModal extends Modal {
 export default class BetterCanvasPlugin extends Plugin {
   declare settings: BetterCanvasSettings;
   private boundContainers = new WeakSet<HTMLElement>();
+  private readonly editingIframeShortcuts = new EditingIframeShortcutRegistry(
+    event => this.handleMindMapEditingShortcut(event)
+  );
   private features: BetterCanvasFeatures;
   private nodeMenuUnifier: NodeMenuUnifier;
 
@@ -323,6 +327,7 @@ export default class BetterCanvasPlugin extends Plugin {
     this.features.init();
     this.nodeMenuUnifier = new NodeMenuUnifier(this);
     this.nodeMenuUnifier.start();
+    this.register(() => this.editingIframeShortcuts.dispose());
     this.registerEvent(this.app.workspace.on("layout-change", () => this.bindCanvasKeyboard()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bindCanvasKeyboard()));
     this.app.workspace.onLayoutReady(() => this.bindCanvasKeyboard());
@@ -542,6 +547,23 @@ export default class BetterCanvasPlugin extends Plugin {
     if (this.boundContainers.has(container)) return;
     this.boundContainers.add(container);
 
+    // Capture editing shortcuts before editors that render in the canvas document.
+    this.registerDomEvent(container, "keydown", (event: KeyboardEvent) => {
+      this.handleMindMapEditingShortcut(event);
+    }, true);
+
+    // Canvas text editing runs in a same-origin iframe, whose key events never
+    // reach this container. Bind the same handler to each editing document.
+    const editingIframeObserver = new MutationObserver(() => this.editingIframeShortcuts.sync(container));
+    editingIframeObserver.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+    this.register(() => editingIframeObserver.disconnect());
+    this.editingIframeShortcuts.sync(container);
+
     this.registerDomEvent(container, "keydown", (event: KeyboardEvent) => {
       const canvas = this.getCanvas();
       if (!canvas) return;
@@ -566,6 +588,21 @@ export default class BetterCanvasPlugin extends Plugin {
         this.createSiblingNode();
       }
     });
+  }
+
+  private handleMindMapEditingShortcut(event: KeyboardEvent): void {
+    const canvas = this.getCanvas();
+    if (!canvas || canvas.wrapperEl?.classList?.contains("bc-readonly")) return;
+    const target = event.target as HTMLElement | null;
+    if (!target || !(target.isContentEditable || target.closest("input, textarea, select, [contenteditable='true'], .cm-editor"))) return;
+    const selectedInternal = canvas.selection?.values?.().next?.().value;
+    if (!selectedInternal?.isEditing) return;
+    const shortcut = getMindMapEditingCreationShortcut(event);
+    if (!shortcut || !isMindMapShortcutEnabled(this.settings, shortcut)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (shortcut === "childTab") this.createChildNode();
+    else this.createSiblingNode();
   }
 
   private navigateSelection(canvas: any, key: string): void {

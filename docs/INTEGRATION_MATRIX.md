@@ -17,7 +17,7 @@ This matrix records Better Canvas implementation and parity gaps against the cur
 | AI-generated mind map | Implemented, basic | Structured JSON response becomes connected nodes; malformed model output may be rejected |
 | Independent flashcard nodes | Implemented | Generated content is model-dependent and still needs review |
 | Per-edge colors | Implemented, extension metadata | Canvas JSON stores the style; exact display can vary by renderer |
-| Shortcut behavior settings | Implemented, basic | Settings expose independent toggles for Tab child creation, Enter sibling creation, Alt+arrow navigation, and Ctrl/Cmd+arrow directional creation. Existing user configurations default to the former enabled behavior; conflict behavior with third-party hotkey plugins still needs desktop verification |
+| Shortcut behavior settings | Implemented, basic | Settings independently toggle Tab child creation (including Shift+Tab while editing), Enter sibling creation (including Shift+Enter while editing), Alt+arrow navigation, and Ctrl/Cmd+Shift+arrow directional creation. Existing user configurations keep the previous enabled defaults; conflicts with third-party hotkey plugins still need desktop verification |
 
 ## Advanced Canvas
 
@@ -110,7 +110,7 @@ The items below are gaps identified by comparing the current Better Canvas sourc
 
 | Feature | Status | Notes |
 |---|---|---|
-| Configurable MindMap shortcut controls | Implemented, basic | Settings independently enable/disable Tab child creation, Enter sibling creation, Alt+arrow navigation and Ctrl/Cmd+arrow directional creation. Inline DOM shortcuts still need conflict testing with user hotkeys and themes |
+| Configurable MindMap shortcut controls | Implemented, basic | Settings independently enable/disable Tab child creation (including Shift+Tab while editing), Enter sibling creation (including Shift+Enter while editing), Alt+arrow navigation and Ctrl/Cmd+Shift+arrow directional creation. Inline DOM shortcuts still need conflict testing with user hotkeys and themes |
 | Optimal layout for arbitrary graphs | Partial | LR/RL/TB/BT tree layout works for basic trees. Multi-parent graphs, cycles, shared descendants and dense non-tree structures may not produce an optimal or stable mind-map layout |
 
 ### Obsidian AI Canvas parity gaps

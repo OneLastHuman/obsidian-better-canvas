@@ -140,7 +140,8 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 
 ### 插件命令与键盘操作
 - 每个命令都在正确的 view/selection 状态下执行；
-- 编辑文本时 Tab/Enter/方向键不应被插件错误拦截；
+- 编辑文本时，不应拦截 Tab、Enter 和方向键的默认行为；仅按功能说明拦截 Shift + Tab 与 Shift + Enter 创建节点；
+- Canvas 卡片编辑在 Obsidian 1.14+ 运行于同源 iframe；验证编辑态快捷键时，键盘事件必须在 iframe 的 `contentDocument` 上触发，不能只验证父文档的 `view.containerEl`；
 - 只读模式阻止修改，但不意外阻断设计上允许的画布平移/缩放；
 - 插件重载或重复的 workspace 事件不应重复绑定监听器或触发重复操作。
 
