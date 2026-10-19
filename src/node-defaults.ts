@@ -4,9 +4,9 @@ export type NodeTextAlignment = "left" | "center" | "right";
 
 export const DEFAULT_NODE_WIDTH = 280;
 export const DEFAULT_NODE_HEIGHT = 140;
-export const MIN_NODE_WIDTH = 120;
+export const MIN_NODE_WIDTH = 20;
 export const MAX_NODE_WIDTH = 1200;
-export const MIN_NODE_HEIGHT = 40;
+export const MIN_NODE_HEIGHT = 20;
 export const MAX_NODE_HEIGHT = 1000;
 
 /** Clamp a configured default node width into the settings range. */
