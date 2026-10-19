@@ -127,8 +127,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       { id: "export", icon: "⇧", title: "导出", description: "格式、清晰度、背景与范围" }
     ];
     const nav = sidebar.createDiv({ cls: "bc-settings-nav", attr: { "aria-label": "设置分类" } });
-    const pagesHost = shell.createDiv({ cls: "bc-settings-main" });
-    const actions = pagesHost.createDiv({ cls: "bc-settings-actions" });
+    const actions = sidebar.createDiv({ cls: "bc-settings-actions" });
     const saveButton = actions.createEl("button", { text: "保存设置", cls: "mod-cta" });
     saveButton.type = "button";
     saveButton.addEventListener("click", () => { void this.saveDraftSettings(); });
@@ -138,6 +137,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       attr: { role: "status", "aria-live": "polite" }
     });
     this.updateSaveStatus();
+    const pagesHost = shell.createDiv({ cls: "bc-settings-main" });
     const pages = new Map<string, HTMLElement>();
     const navButtons = new Map<string, HTMLButtonElement>();
     for (const section of sections) {
