@@ -7,6 +7,8 @@ vi.mock("obsidian", () => ({
   setIcon: vi.fn()
 }));
 
+vi.mock("./enhancements", () => ({ decorateCanvas: vi.fn() }));
+
 import NodeMenuUnifier from "./node-menu-unifier";
 import {
   NODE_STYLE_ALIGNMENTS,
@@ -102,7 +104,26 @@ class FakeElement {
     return { width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
   }
 
-  addEventListener(): void {}
+  private readonly listeners = new Map<string, EventListener[]>();
+
+  addEventListener(type: string, listener: EventListener): void {
+    const handlers = this.listeners.get(type) ?? [];
+    handlers.push(listener);
+    this.listeners.set(type, handlers);
+  }
+
+  removeEventListener(type: string, listener: EventListener): void {
+    this.listeners.set(type, (this.listeners.get(type) ?? []).filter(handler => handler !== listener));
+  }
+
+  click(): void {
+    const event = {
+      preventDefault: () => undefined,
+      stopPropagation: () => undefined
+    } as unknown as MouseEvent;
+    for (const listener of this.listeners.get("click") ?? []) listener.call(this, event);
+  }
+
   remove(): void {}
   focus(): void {}
 
@@ -110,12 +131,6 @@ class FakeElement {
     return this.className.split(/\s+/).filter(Boolean);
   }
 }
-
-type PanelHarness = {
-  showStylePanel: (canvas: unknown, nodeId: string) => void;
-  dismissPanel: () => void;
-  activePanel: { surface: FakeElement } | null;
-};
 
 const originalGlobals = {
   document: (globalThis as Record<string, unknown>).document,
@@ -153,23 +168,72 @@ function installFakeDom(): void {
   });
 }
 
-function renderStylePanel(nodePatch: Record<string, unknown> = {}): FakeElement {
+type PanelHarness = {
+  showStylePanel: (canvas: unknown, nodeIds: string | string[]) => void;
+  dismissPanel: () => void;
+  activePanel: { surface: FakeElement } | null;
+};
+
+type TestCanvasData = {
+  nodes: Array<Record<string, any>>;
+  edges: Array<Record<string, any>>;
+};
+
+function createStylePanel(
+  nodePatches: Array<Record<string, unknown>> = [{}],
+  selectedCount = nodePatches.length
+): {
+  surface: FakeElement;
+  canvas: {
+    importData: ReturnType<typeof vi.fn>;
+    requestSave: ReturnType<typeof vi.fn>;
+    requestFrame: ReturnType<typeof vi.fn>;
+  };
+  getData: () => TestCanvasData;
+  close: () => void;
+} {
   const unifier = new NodeMenuUnifier({ app: {} } as never);
   const harness = unifier as unknown as PanelHarness;
-  const canvas = {
-    getData: () => ({
-      nodes: [{
-        id: "n1", type: "text", x: 0, y: 0, width: 280, height: 140, text: "节点", color: "#3b82f6",
-        ...nodePatch
-      }],
-      edges: []
-    })
+  let data: TestCanvasData = {
+    nodes: nodePatches.map((patch, index) => ({
+      id: "n" + (index + 1),
+      type: "text",
+      x: index * 400,
+      y: 0,
+      width: 280,
+      height: 140,
+      text: "节点 " + (index + 1),
+      color: "#3b82f6",
+      ...patch
+    })),
+    edges: []
   };
-  harness.showStylePanel(canvas, "n1");
+  const canvas = {
+    getData: () => data,
+    importData: vi.fn((next: TestCanvasData) => {
+      data = next;
+    }),
+    requestSave: vi.fn(),
+    requestFrame: vi.fn(),
+    nodes: new Map(data.nodes.map(node => [node.id, node]))
+  };
+  const nodeIds = data.nodes.slice(0, selectedCount).map(node => String(node.id));
+  harness.showStylePanel(canvas, nodeIds);
   const surface = harness.activePanel?.surface;
   expect(surface).toBeDefined();
-  harness.dismissPanel();
-  return surface as FakeElement;
+  return {
+    surface: surface as FakeElement,
+    canvas,
+    getData: () => data,
+    close: () => harness.dismissPanel()
+  };
+}
+
+function renderStylePanel(nodePatch: Record<string, unknown> = {}, additionalNodePatches: Array<Record<string, unknown>> = []): FakeElement {
+  const panel = createStylePanel([nodePatch, ...additionalNodePatches]);
+  const surface = panel.surface;
+  panel.close();
+  return surface;
 }
 
 function descendants(root: FakeElement): FakeElement[] {
@@ -305,6 +369,61 @@ describe("node style panel rendering", () => {
     const sections = descendants(surface)
       .filter(element => element.className === "bc-node-style-section");
     expect(sections[0].textContent).toContain("预设");
+  });
+
+  it("shows mixed values for properties that differ across selected nodes", () => {
+    const surface = renderStylePanel(
+      {
+        color: "#e8798f",
+        bcShape: "default",
+        bcBorderStyle: "solid",
+        bcTextAlign: "left"
+      },
+      [{
+        color: "#719cf4",
+        bcShape: "diamond",
+        bcBorderStyle: "dashed",
+        bcTextAlign: "right"
+      }]
+    );
+
+    expect(surface.textContent).toContain("2 个节点 · 部分样式不同");
+    expect(optionButton(surface, "color-red").getAttribute("aria-pressed")).toBe("mixed");
+    expect(optionButton(surface, "color-blue").getAttribute("aria-pressed")).toBe("mixed");
+    expect(optionButton(surface, "color-green").getAttribute("aria-pressed")).toBe("false");
+    expect(optionButton(surface, "shape-default").getAttribute("aria-pressed")).toBe("mixed");
+    expect(optionButton(surface, "shape-diamond").getAttribute("aria-pressed")).toBe("mixed");
+    expect(optionButton(surface, "border-solid").getAttribute("aria-pressed")).toBe("mixed");
+    expect(optionButton(surface, "align-left").getAttribute("aria-pressed")).toBe("mixed");
+    expect(optionButton(surface, "preset-flow").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("applies a selected preset to every targeted node and leaves unselected nodes unchanged", () => {
+    const panel = createStylePanel(
+      [
+        { color: "#e8798f", text: "First node" },
+        { color: "#719cf4", text: "Second node" },
+        { color: "#d4c75b", text: "Unselected node" }
+      ],
+      2
+    );
+
+    optionButton(panel.surface, "preset-flow").click();
+
+    const nodes = panel.getData().nodes;
+    expect(panel.canvas.importData).toHaveBeenCalledTimes(1);
+    expect(panel.canvas.requestSave).toHaveBeenCalledTimes(1);
+    expect(nodes[0]).toMatchObject({
+      id: "n1", text: "First node", color: "#65b9a7",
+      bcShape: "pill", bcBorderStyle: "solid", bcTextAlign: "center"
+    });
+    expect(nodes[1]).toMatchObject({
+      id: "n2", text: "Second node", color: "#65b9a7",
+      bcShape: "pill", bcBorderStyle: "solid", bcTextAlign: "center"
+    });
+    expect(nodes[2]).toMatchObject({ id: "n3", text: "Unselected node", color: "#d4c75b" });
+    expect(nodes[2].bcShape).toBeUndefined();
+    panel.close();
   });
 
   it("does not expose an auto-resize switch", () => {

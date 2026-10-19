@@ -49,6 +49,20 @@ describe("applyNodeVisualStyle", () => {
     expect((result.data.nodes[0].styleAttributes as Record<string, unknown>).custom).toBe("keep");
   });
 
+  it("applies one style to multiple nodes and leaves other nodes unchanged", () => {
+    const result = applyNodeVisualStyle(fixture, ["node-1", "node-2"], { shape: "pill" });
+
+    expect(result.updated).toBe(2);
+    expect(result.data.nodes[0]).toMatchObject({
+      id: "node-1", text: "Keep this content", x: 10, y: 20, width: 280, height: 120, bcShape: "pill"
+    });
+    expect(result.data.nodes[1]).toMatchObject({
+      id: "node-2", text: "Untouched", x: 400, y: 20, bcShape: "pill"
+    });
+    expect(result.data.edges).toEqual(fixture.edges);
+    expect(result.data.metadata).toEqual(fixture.metadata);
+  });
+
   it("does not report or rewrite missing targets", () => {
     const result = applyNodeVisualStyle(fixture, ["missing"], { shape: "pill" });
     expect(result.updated).toBe(0);
