@@ -876,6 +876,15 @@
   font-weight: var(--font-semibold);
   letter-spacing: -0.01em;
 }
+.bc-node-style-selection-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+.bc-node-style-panel button.is-mixed {
+  outline: 1px dashed var(--interactive-accent);
+  outline-offset: -3px;
+}
 .bc-node-style-close {
   display: inline-flex;
   align-items: center;

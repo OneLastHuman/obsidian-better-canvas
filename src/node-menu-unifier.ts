@@ -31,18 +31,19 @@ type ControlGroup = {
 
 type ActivePanel = {
   canvas: any;
-  nodeId: string;
+  nodeIds: string[];
   surface: HTMLElement;
   outsideHandler: (event: PointerEvent) => void;
   keyHandler: (event: KeyboardEvent) => void;
   resizeHandler: () => void;
 };
 
-function selectedNodeId(canvas: any): string | null {
+function selectedNodeIds(canvas: any): string[] | null {
   const selected = Array.from(canvas?.selection?.values?.() ?? []) as any[];
-  if (selected.length !== 1) return null;
-  const id = selected[0]?.id ?? selected[0]?.getData?.()?.id;
-  return typeof id === "string" && canvas?.nodes?.has?.(id) ? id : null;
+  if (selected.length === 0) return null;
+  const ids = selected.map(item => item?.id ?? item?.getData?.()?.id);
+  if (ids.some(id => typeof id !== "string" || !canvas?.nodes?.has?.(id))) return null;
+  return [...new Set(ids as string[])].sort();
 }
 
 function nodeFromData(canvas: any, nodeId: string): CanvasNodeData | undefined {
@@ -53,14 +54,41 @@ function styleOf(node: CanvasNodeData): { color: string; shape: string; border: 
   const styleAttributes = node.styleAttributes && typeof node.styleAttributes === "object"
     ? node.styleAttributes as Record<string, unknown>
     : {};
+  const border = resolveCanvasNodeBorder(node as CanvasNodeStyleSource);
   return {
-    color: typeof node.color === "string" ? node.color : "",
+    color: typeof node.color === "string" ? node.color.toLowerCase() : "",
     shape: resolveCanvasNodeShape(node as CanvasNodeStyleSource),
-    border: resolveCanvasNodeBorder(node as CanvasNodeStyleSource),
+    border: border === "none" ? "invisible" : border,
     align: typeof node.bcTextAlign === "string"
       ? node.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left"
   };
+}
+
+type StyleOptionState = "true" | "false" | "mixed";
+type NodeStyleSnapshot = ReturnType<typeof styleOf>;
+
+function optionState(matchCount: number, total: number): StyleOptionState {
+  if (matchCount === total) return "true";
+  return matchCount > 0 ? "mixed" : "false";
+}
+
+function stateForStyles(
+  styles: readonly NodeStyleSnapshot[],
+  matches: (style: NodeStyleSnapshot) => boolean
+): StyleOptionState {
+  return optionState(styles.filter(matches).length, styles.length);
+}
+
+function optionClass(baseClass: string, state: StyleOptionState): string {
+  return baseClass + (state === "true" ? " is-selected" : state === "mixed" ? " is-mixed" : "");
+}
+
+function matchesPreset(style: NodeStyleSnapshot, preset: (typeof NODE_STYLE_PRESET_LIST)[number]): boolean {
+  return style.color === preset.style.color.toLowerCase() &&
+    style.shape === preset.style.shape &&
+    style.border === preset.style.border &&
+    style.align === preset.style.align;
 }
 
 /**
@@ -208,16 +236,16 @@ export default class NodeMenuUnifier {
     const open = (event: Event): void => {
       event.preventDefault();
       event.stopPropagation();
-      const nodeId = selectedNodeId(canvas);
-      if (!nodeId) {
-        new Notice("请先选择一个节点，再打开节点样式。");
+      const nodeIds = selectedNodeIds(canvas);
+      if (!nodeIds) {
+        new Notice("请先选择一个或多个节点（不能包含连线），再打开节点样式。");
         return;
       }
       if (this.activePanel?.canvas === canvas) {
         this.dismissPanel();
         return;
       }
-      this.showStylePanel(canvas, nodeId);
+      this.showStylePanel(canvas, nodeIds);
     };
     const keydown = (event: KeyboardEvent): void => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -245,26 +273,43 @@ export default class NodeMenuUnifier {
   private syncControlState(container: HTMLElement, canvas: any): void {
     const record = this.controlGroups.get(container);
     if (!record) return;
-    const nodeId = selectedNodeId(canvas);
-    record.button.classList.toggle("is-disabled", !nodeId);
-    record.button.setAttribute("aria-disabled", String(!nodeId));
+    const nodeIds = selectedNodeIds(canvas);
+    record.button.classList.toggle("is-disabled", !nodeIds);
+    record.button.setAttribute("aria-disabled", String(!nodeIds));
     record.button.classList.toggle(
       "is-active",
       Boolean(this.activePanel && this.activePanel.canvas === canvas)
     );
-    // Keep an open panel pointed at the current single selection.
+
     const active = this.activePanel;
-    if (active && active.canvas === canvas && nodeId && active.nodeId !== nodeId) {
-      if (nodeFromData(canvas, nodeId)) {
-        active.nodeId = nodeId;
-        this.renderStylePanel();
-      }
+    if (!active || active.canvas !== canvas) return;
+    const selectedItems = Array.from(canvas?.selection?.values?.() ?? []) as any[];
+    // Keep the last target when the user clears the selection. A non-empty
+    // edge or mixed selection cannot be styled as nodes, so close the panel.
+    if (selectedItems.length === 0) return;
+    if (!nodeIds) {
+      this.dismissPanel();
+      return;
+    }
+    const currentData = readCanvasData(canvas);
+    const currentIds = new Set(currentData.nodes.map(node => node.id));
+    if (nodeIds.some(id => !currentIds.has(id))) {
+      this.dismissPanel();
+      new Notice("部分选中节点已不存在，样式面板已关闭。");
+      return;
+    }
+    if (nodeIds.join("\u0000") !== active.nodeIds.join("\u0000")) {
+      active.nodeIds = nodeIds;
+      this.renderStylePanel();
     }
   }
 
-  private showStylePanel(canvas: any, nodeId: string): void {
+  private showStylePanel(canvas: any, nodeIds: readonly string[]): void {
     this.dismissPanel();
-    if (!nodeFromData(canvas, nodeId)) {
+    const targetIds = [...new Set(nodeIds)].sort();
+    const currentData = readCanvasData(canvas);
+    const availableIds = new Set(currentData.nodes.map(node => node.id));
+    if (targetIds.length === 0 || targetIds.some(id => !availableIds.has(id))) {
       new Notice("目标节点已不存在，样式面板已关闭。");
       return;
     }
@@ -277,7 +322,7 @@ export default class NodeMenuUnifier {
 
     const active: ActivePanel = {
       canvas,
-      nodeId,
+      nodeIds: targetIds,
       surface,
       outsideHandler: () => undefined,
       keyHandler: () => undefined,
@@ -356,17 +401,23 @@ export default class NodeMenuUnifier {
   private applyStyle(patch: NodeVisualStylePatch, focusKey?: string): void {
     const active = this.activePanel;
     if (!active) return;
-    const { canvas, nodeId } = active;
+    const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
       new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
       return;
     }
 
     const current = readCanvasData(canvas);
-    const result = applyNodeVisualStyle(current, [nodeId], patch);
-    if (result.updated === 0) {
-      new Notice("目标节点已不存在，未应用样式。");
+    const currentIds = new Set(current.nodes.map(node => node.id));
+    if (nodeIds.some(id => !currentIds.has(id))) {
+      new Notice("部分选中节点已不存在，未应用样式。");
       this.dismissPanel();
+      return;
+    }
+
+    const result = applyNodeVisualStyle(current, nodeIds, patch);
+    if (result.updated !== nodeIds.length) {
+      new Notice("无法更新全部选中节点，未应用样式。");
       return;
     }
 
@@ -386,14 +437,16 @@ export default class NodeMenuUnifier {
   private renderStylePanel(focusKey?: string): void {
     const active = this.activePanel;
     if (!active) return;
-    const node = nodeFromData(active.canvas, active.nodeId);
-    if (!node) {
+    const data = readCanvasData(active.canvas);
+    const nodes = active.nodeIds.map(id => data.nodes.find(node => node.id === id));
+    if (nodes.some(node => !node)) {
       this.dismissPanel();
       new Notice("目标节点已不存在，样式面板已关闭。");
       return;
     }
-
-    const currentStyle = styleOf(node);
+    const nodeStyles = nodes.map(node => styleOf(node as CanvasNodeData));
+    const hasMixedStyles = (["color", "shape", "border", "align"] as const)
+      .some(key => new Set(nodeStyles.map(style => style[key])).size > 1);
     const surface = active.surface;
     surface.replaceChildren();
 
@@ -403,6 +456,12 @@ export default class NodeMenuUnifier {
     heading.className = "bc-node-style-title";
     heading.textContent = "节点样式";
     header.appendChild(heading);
+    if (active.nodeIds.length > 1) {
+      const count = document.createElement("span");
+      count.className = "bc-node-style-selection-count";
+      count.textContent = active.nodeIds.length + " 个节点" + (hasMixedStyles ? " · 部分样式不同" : "");
+      header.appendChild(count);
+    }
     addButton(header, "关闭", "bc-node-style-close", () => this.dismissPanel(), "x");
     surface.appendChild(header);
 
@@ -421,24 +480,22 @@ export default class NodeMenuUnifier {
       return section;
     };
 
-    // Presets come first: one click applies colour, shape, border and alignment.
     const presetSection = addSection("预设");
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
     presetSection.appendChild(presets);
     for (const preset of NODE_STYLE_PRESET_LIST) {
-      const selected =
-        currentStyle.color.toLowerCase() === preset.style.color.toLowerCase() &&
-        currentStyle.shape === preset.style.shape &&
-        currentStyle.border === preset.style.border &&
-        currentStyle.align === preset.style.align;
-      const button = addButton(presets, "", "bc-node-style-preset" + (selected ? " is-selected" : ""), () => {
-        this.applyStyle({ ...preset.style }, "preset-" + preset.id);
-      });
+      const state = stateForStyles(nodeStyles, style => matchesPreset(style, preset));
+      const button = addButton(
+        presets,
+        "",
+        optionClass("bc-node-style-preset", state),
+        () => this.applyStyle({ ...preset.style }, "preset-" + preset.id)
+      );
       button.dataset.styleOption = "preset-" + preset.id;
       button.title = preset.label + "预设";
       button.setAttribute("aria-label", preset.label + "预设");
-      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-pressed", state);
 
       const preview = document.createElement("span");
       preview.className = "bc-node-style-preset-preview shape-" + preset.style.shape +
@@ -457,14 +514,17 @@ export default class NodeMenuUnifier {
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
     for (const color of NODE_STYLE_COLORS) {
-      const selected = currentStyle.color.toLowerCase() === color.value.toLowerCase();
-      const button = addButton(colors, "", "bc-node-style-color" + (selected ? " is-selected" : ""), () => {
-        this.applyStyle({ color: color.value }, "color-" + color.id);
-      });
+      const state = stateForStyles(nodeStyles, style => style.color === color.value.toLowerCase());
+      const button = addButton(
+        colors,
+        "",
+        optionClass("bc-node-style-color", state),
+        () => this.applyStyle({ color: color.value }, "color-" + color.id)
+      );
       button.dataset.styleOption = "color-" + color.id;
       button.title = color.label;
       button.setAttribute("aria-label", color.label);
-      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-pressed", state);
       const swatch = document.createElement("span");
       swatch.className = "bc-node-style-swatch";
       swatch.style.backgroundColor = color.value;
@@ -476,14 +536,17 @@ export default class NodeMenuUnifier {
     shapes.className = "bc-node-style-shapes";
     shapeSection.appendChild(shapes);
     for (const shape of NODE_STYLE_SHAPES) {
-      const selected = currentStyle.shape === shape.id;
-      const button = addButton(shapes, "", "bc-node-style-choice" + (selected ? " is-selected" : ""), () => {
-        this.applyStyle({ shape: shape.id }, "shape-" + shape.id);
-      });
+      const state = stateForStyles(nodeStyles, style => style.shape === shape.id);
+      const button = addButton(
+        shapes,
+        "",
+        optionClass("bc-node-style-choice", state),
+        () => this.applyStyle({ shape: shape.id }, "shape-" + shape.id)
+      );
       button.dataset.styleOption = "shape-" + shape.id;
       button.title = shape.label;
       button.setAttribute("aria-label", shape.label);
-      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-pressed", state);
       // The preview alone identifies the option; the name stays a tooltip and
       // accessible label instead of printed text under the preview.
       const preview = document.createElement("span");
@@ -497,13 +560,16 @@ export default class NodeMenuUnifier {
     borders.className = "bc-node-style-borders";
     borderSection.appendChild(borders);
     for (const border of NODE_STYLE_BORDERS) {
-      const selected = currentStyle.border === border.id ||
-        (border.id === "invisible" && currentStyle.border === "none");
-      const button = addButton(borders, border.label, "bc-node-style-choice" + (selected ? " is-selected" : ""), () => {
-        this.applyStyle({ border: border.id }, "border-" + border.id);
-      }, border.icon);
+      const state = stateForStyles(nodeStyles, style => style.border === border.id);
+      const button = addButton(
+        borders,
+        border.label,
+        optionClass("bc-node-style-choice", state),
+        () => this.applyStyle({ border: border.id }, "border-" + border.id),
+        border.icon
+      );
       button.dataset.styleOption = "border-" + border.id;
-      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-pressed", state);
     }
 
     const alignSection = addSection("文本对齐");
@@ -511,12 +577,16 @@ export default class NodeMenuUnifier {
     alignments.className = "bc-node-style-alignments";
     alignSection.appendChild(alignments);
     for (const align of NODE_STYLE_ALIGNMENTS) {
-      const selected = currentStyle.align === align.id;
-      const button = addButton(alignments, align.label, "bc-node-style-choice" + (selected ? " is-selected" : ""), () => {
-        this.applyStyle({ align: align.id }, "align-" + align.id);
-      }, align.icon);
+      const state = stateForStyles(nodeStyles, style => style.align === align.id);
+      const button = addButton(
+        alignments,
+        align.label,
+        optionClass("bc-node-style-choice", state),
+        () => this.applyStyle({ align: align.id }, "align-" + align.id),
+        align.icon
+      );
       button.dataset.styleOption = "align-" + align.id;
-      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-pressed", state);
     }
 
     this.positionPanel();
@@ -525,4 +595,5 @@ export default class NodeMenuUnifier {
       surface.querySelector<HTMLElement>(selector)?.focus();
     }
   }
+
 }
