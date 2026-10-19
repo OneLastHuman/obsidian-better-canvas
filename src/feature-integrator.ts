@@ -46,7 +46,7 @@ import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arran
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 import { applyDefaultNodePreferences, configuredDefaultNodeSize, normalizeDefaultNodeHeight, normalizeDefaultNodeWidth } from "./node-defaults";
-import { normalizeAutoResizeTestSettings, type AutoResizeTestSettings } from "./node-auto-resize";
+import { calculateTextNodeDimensions, normalizeAutoResizeTestSettings, type AutoResizeTestSettings } from "./node-auto-resize";
 import { isCanvasReadOnly } from "./canvas-command-guards";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
@@ -1088,11 +1088,24 @@ export default class BetterCanvasFeatures {
     return normalizeAutoResizeTestSettings(this.settings().autoResizeTest);
   }
 
+  private resizeNodeWithTestSettings(
+    canvas: any,
+    nodeId: string,
+    settings: AutoResizeTestSettings = this.autoResizeTestSettings()
+  ): boolean {
+    const node = readCanvasData(canvas).nodes.find(item => item.id === nodeId);
+    if (!node || node.type !== "text" || typeof node.text !== "string" || !node.text.trim()) return false;
+
+    const target = calculateTextNodeDimensions(node.text, settings);
+    const sizeWillChange = Math.abs(node.width - target.width) >= 1 || Math.abs(node.height - target.height) >= 1;
+    if (sizeWillChange) this.autoResizingNodeIds.add(nodeId);
+    return resizeNodeToText(canvas, nodeId, settings);
+  }
+
   private resizeNode(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.autoResizingNodeIds.add(selection.node.id);
-    const resized = resizeNodeToText(selection.canvas, selection.node.id, this.autoResizeTestSettings());
+    const resized = this.resizeNodeWithTestSettings(selection.canvas, selection.node.id, this.autoResizeTestSettings());
     new Notice(resized ? "已调整节点尺寸。" : "仅支持有内容的文本节点。");
   }
 
@@ -1102,8 +1115,7 @@ export default class BetterCanvasFeatures {
     const enabled = (selection.node as any).bcAutoResize !== true;
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) {
-      this.autoResizingNodeIds.add(selection.node.id);
-      resizeNodeToText(selection.canvas, selection.node.id, this.autoResizeTestSettings());
+      this.resizeNodeWithTestSettings(selection.canvas, selection.node.id, this.autoResizeTestSettings());
     }
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
   }
@@ -1124,8 +1136,7 @@ export default class BetterCanvasFeatures {
       const nodes = readCanvasData(canvas).nodes;
       for (const node of nodes) {
         if (node.type !== "text" || (node as any).bcAutoResize !== true || !node.text?.trim()) continue;
-        this.autoResizingNodeIds.add(node.id);
-        if (resizeNodeToText(canvas, node.id, settings)) processed++;
+        if (this.resizeNodeWithTestSettings(canvas, node.id, settings)) processed++;
       }
     }
     return processed;
@@ -1227,8 +1238,7 @@ export default class BetterCanvasFeatures {
               const internal = canvas?.nodes?.get?.(node.id);
               const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
               if (element?.classList?.contains("is-dragging")) continue;
-              this.autoResizingNodeIds.add(node.id);
-              resizeNodeToText(canvas, node.id, autoResizeSettings);
+              this.resizeNodeWithTestSettings(canvas, node.id, autoResizeSettings);
             }
           }
         }
