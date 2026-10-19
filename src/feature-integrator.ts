@@ -46,6 +46,7 @@ import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arran
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 import { applyDefaultNodePreferences, configuredDefaultNodeSize, normalizeDefaultNodeHeight, normalizeDefaultNodeWidth } from "./node-defaults";
+import { normalizeAutoResizeTestSettings, type AutoResizeTestSettings } from "./node-auto-resize";
 import { isCanvasReadOnly } from "./canvas-command-guards";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
@@ -101,6 +102,7 @@ interface FeatureSettings {
   gridSize: number;
   defaultNodeWidth: number;
   defaultNodeHeight: number;
+  autoResizeTest: AutoResizeTestSettings;
   mcpEndpoint: string;
   mcpApiKey: string;
   mcpTransport: "http" | "sse" | "stdio";
@@ -532,6 +534,7 @@ export default class BetterCanvasFeatures {
     if (!Number.isFinite(s.gridSize) || s.gridSize < 1 || s.gridSize > 500) s.gridSize = 20;
     s.defaultNodeWidth = normalizeDefaultNodeWidth(s.defaultNodeWidth);
     s.defaultNodeHeight = normalizeDefaultNodeHeight(s.defaultNodeHeight);
+    s.autoResizeTest = normalizeAutoResizeTestSettings(s.autoResizeTest);
     if (typeof s.mcpEndpoint !== "string") s.mcpEndpoint = "";
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
     if (s.mcpTransport !== "stdio" && s.mcpTransport !== "sse" && s.mcpTransport !== "http") s.mcpTransport = "http";
@@ -1081,12 +1084,16 @@ export default class BetterCanvasFeatures {
       new Notice(count ? "已设置 " + count + " 条连线的箭头样式。" : "请先选择一条或多条连线。");
     }, "default");
   }
+  private autoResizeTestSettings(): AutoResizeTestSettings {
+    return normalizeAutoResizeTestSettings(this.settings().autoResizeTest);
+  }
+
   private resizeNode(): void {
     const selection = this.selected();
     if (!selection) return;
     this.autoResizingNodeIds.add(selection.node.id);
-    const resized = resizeNodeToText(selection.canvas, selection.node.id, configuredDefaultNodeSize(this.settings()));
-    new Notice(resized ? "已调整节点尺寸。" : "仅支持文本节点。");
+    const resized = resizeNodeToText(selection.canvas, selection.node.id, this.autoResizeTestSettings());
+    new Notice(resized ? "已调整节点尺寸。" : "仅支持有内容的文本节点。");
   }
 
   private toggleAutoResize(): void {
@@ -1096,9 +1103,32 @@ export default class BetterCanvasFeatures {
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) {
       this.autoResizingNodeIds.add(selection.node.id);
-      resizeNodeToText(selection.canvas, selection.node.id, configuredDefaultNodeSize(this.settings()));
+      resizeNodeToText(selection.canvas, selection.node.id, this.autoResizeTestSettings());
     }
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
+  }
+
+  /** Recalculate currently auto-resizing text nodes with the persisted experimental parameters. */
+  applyAutoResizeTestSettingsToActiveCanvas(): void {
+    const canvas = this.canvas();
+    if (!canvas) {
+      new Notice("请先打开一个 Canvas。");
+      return;
+    }
+    if (isCanvasReadOnly(canvas)) {
+      new Notice("当前 Canvas 处于只读模式，无法重算节点尺寸。");
+      return;
+    }
+
+    const settings = this.autoResizeTestSettings();
+    const nodes = readCanvasData(canvas).nodes;
+    let processed = 0;
+    for (const node of nodes) {
+      if (node.type !== "text" || (node as any).bcAutoResize !== true || !node.text?.trim()) continue;
+      this.autoResizingNodeIds.add(node.id);
+      if (resizeNodeToText(canvas, node.id, settings)) processed++;
+    }
+    new Notice("已使用 test 参数重新计算 " + processed + " 个自动尺寸文本节点。");
   }
 
   private bindCanvasRouteRefresh(view: any): void {
@@ -1189,7 +1219,7 @@ export default class BetterCanvasFeatures {
         pending = false;
         const shouldResizeText = hasContentChange;
         hasContentChange = false;
-        const defaultSize = configuredDefaultNodeSize(this.settings());
+        const autoResizeSettings = this.autoResizeTestSettings();
         const data = readCanvasData(canvas);
         if (shouldResizeText) {
           for (const node of data.nodes) {
@@ -1198,7 +1228,7 @@ export default class BetterCanvasFeatures {
               const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
               if (element?.classList?.contains("is-dragging")) continue;
               this.autoResizingNodeIds.add(node.id);
-              resizeNodeToText(canvas, node.id, defaultSize);
+              resizeNodeToText(canvas, node.id, autoResizeSettings);
             }
           }
         }
