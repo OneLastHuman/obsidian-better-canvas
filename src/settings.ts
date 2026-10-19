@@ -10,6 +10,7 @@ import {
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
 import { validateNumericRangeInput } from "./numeric-range-validation";
 import { MAX_NODE_HEIGHT, MAX_NODE_WIDTH, MIN_NODE_HEIGHT, MIN_NODE_WIDTH, normalizeDefaultNodeTextAlignment } from "./node-defaults";
+import { DEFAULT_AUTO_RESIZE_TEST_SETTINGS, normalizeAutoResizeTestSettings, type AutoResizeTestSettings } from "./node-auto-resize";
 
 type SettingSection = {
   id: string;
@@ -72,6 +73,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     const liveSettings = this.features.settings() as Record<string, unknown>;
     const previousSettings = this.cloneSettings(liveSettings);
     const nextSettings = this.cloneSettings(this.currentSettings());
+    nextSettings.autoResizeTest = normalizeAutoResizeTestSettings(nextSettings.autoResizeTest);
 
     try {
       for (const key of Object.keys(liveSettings)) {
@@ -124,7 +126,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       { id: "appearance", icon: "◐", title: "样式与外观", description: "节点颜色与自定义 CSS" },
       { id: "ai", icon: "✳", title: "AI 与模型", description: "文本生成与图片生成" },
       { id: "integrations", icon: "↔", title: "连接与索引", description: "MCP、元数据、反向链接与内容来源" },
-      { id: "export", icon: "⇧", title: "导出", description: "格式、清晰度、背景与范围" }
+      { id: "export", icon: "⇧", title: "导出", description: "格式、清晰度、背景与范围" },
+      { id: "test", icon: "⚗", title: "test", description: "实验性文字节点尺寸参数，供真实画布测量" }
     ];
     const nav = sidebar.createDiv({ cls: "bc-settings-nav", attr: { "aria-label": "设置分类" } });
     const actions = sidebar.createDiv({ cls: "bc-settings-actions" });
@@ -171,6 +174,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     this.renderAISettings(pages.get("ai")!);
     this.renderIntegrationSettings(pages.get("integrations")!);
     this.renderExportSettings(pages.get("export")!);
+    this.renderTestSettings(pages.get("test")!);
     updateView();
   }
 
@@ -279,12 +283,12 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     this.addNumericRangeSetting(page, "默认节点宽度", settings.defaultNodeWidth ?? 280, MIN_NODE_WIDTH, MAX_NODE_WIDTH, async number => {
       settings.defaultNodeWidth = number;
       await this.markDirty();
-    }, { description: "新建文本节点的初始宽度；自动调整尺寸的节点不会小于该值。" });
+    }, { description: "只决定空白新建节点的初始宽度；内容节点的自动尺寸下限在 test 设置中单独调节。" });
 
     this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT, async number => {
       settings.defaultNodeHeight = number;
       await this.markDirty();
-    }, { description: "新建文本节点的初始高度；自动调整尺寸的节点不会小于该值。" });
+    }, { description: "只决定空白新建节点的初始高度；内容节点的自动尺寸下限在 test 设置中单独调节。" });
 
     new Setting(page).setName("新建文本节点默认对齐")
       .setDesc("选择新建文本节点的默认文字对齐方式。已有节点中明确保存的文字对齐样式不会被覆盖。")
@@ -366,6 +370,73 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         }));
     this.renderTemplateSettings(page);
 
+  }
+
+
+  private renderTestSettings(page: HTMLElement): void {
+    const settings = this.currentSettings() as any;
+    settings.autoResizeTest = normalizeAutoResizeTestSettings(settings.autoResizeTest);
+    const values = settings.autoResizeTest as AutoResizeTestSettings;
+
+    new Setting(page)
+      .setName("实验性自动尺寸参数")
+      .setDesc("这些数值会直接参与实际 Canvas 文字节点的尺寸计算。修改后先点击侧栏“保存设置”，再用“重新计算当前画布”实测；确定最终参数后，再将其固定到产品默认值。");
+
+    const addNumber = (
+      key: keyof AutoResizeTestSettings,
+      name: string,
+      min: number,
+      max: number,
+      description: string,
+      options: { step?: string; integer?: boolean } = {}
+    ): void => {
+      this.addNumericRangeSetting(
+        page,
+        name,
+        values[key],
+        min,
+        max,
+        async value => {
+          values[key] = value;
+          await this.markDirty();
+        },
+        { description, step: options.step, integer: options.integer ?? true }
+      );
+    };
+
+    addNumber("minWidth", "最小宽度（px）", 20, 1200, "短文本允许缩到的最小宽度。", { integer: true });
+    addNumber("minHeight", "最小高度（px）", 20, 2000, "短文本允许缩到的最小高度。", { integer: true });
+    addNumber("maxWidth", "最大宽度（px）", 20, 1200, "宽度上限；超过后按换行规则增加高度。", { integer: true });
+    addNumber("maxHeight", "最大高度（px）", 20, 2000, "高度上限，用于实测长文本的最大节点高度。", { integer: true });
+    addNumber("charWidthFactor", "单字符估算宽度系数", 0.1, 50, "用于按最长单行字符数估算宽度，也用于估算每行可容纳的字符数。", { step: "0.1", integer: false });
+    addNumber("widthPadding", "宽度附加值（px）", 0, 1000, "在最长单行文本估算宽度上额外增加的像素。", { integer: true });
+    addNumber("wrapWidthPadding", "换行计算内缩值（px）", 0, 1000, "从节点宽度中扣除后，再估算每行可容纳多少字符。", { integer: true });
+    addNumber("lineHeight", "估算单行高度（px）", 1, 500, "每增加一行文字，预计增加的高度。", { step: "0.1", integer: false });
+    addNumber("heightPadding", "高度附加值（px）", 0, 1000, "在估算正文行高之外保留的额外高度。", { integer: true });
+
+    new Setting(page)
+      .setName("重算当前画布的自动尺寸节点")
+      .setDesc("对当前打开的 Canvas 中已启用自动尺寸、且有正文的文字节点重新计算。空白节点和已关闭自动尺寸的节点不会修改。请先保存上面的参数。")
+      .addButton(button => button
+        .setButtonText("重新计算当前画布")
+        .onClick(() => {
+          if (this.hasUnsavedChanges) {
+            new Notice("请先保存 test 参数，再重新计算当前画布。");
+            return;
+          }
+          this.features.applyAutoResizeTestSettingsToActiveCanvas();
+        }));
+
+    new Setting(page)
+      .setName("恢复基线参数")
+      .setDesc("恢复当前实验参数的代码基线：最小宽高 20 px、最大宽度 720 px、最大高度 1000 px，以及当前字符／行高估算系数。恢复后仍需点击“保存设置”。")
+      .addButton(button => button
+        .setButtonText("恢复基线值")
+        .onClick(async () => {
+          settings.autoResizeTest = { ...DEFAULT_AUTO_RESIZE_TEST_SETTINGS };
+          await this.markDirty();
+          this.display();
+        }));
   }
 
   private renderTemplateSettings(page: HTMLElement): void {
