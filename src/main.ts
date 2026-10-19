@@ -15,6 +15,7 @@ import { getNodeAIContextMenuActions } from "./node-ai-context-menu";
 import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import { configuredDefaultNodeSize, DEFAULT_NODE_HEIGHT, DEFAULT_NODE_WIDTH } from "./node-defaults";
+import { DEFAULT_AUTO_RESIZE_TEST_SETTINGS, type AutoResizeTestSettings } from "./node-auto-resize";
 import type { ModelCapabilityReport } from "./model-capabilities";
 import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
 import { AIUsageModal } from "./ai-usage-modal";
@@ -58,6 +59,7 @@ interface BetterCanvasSettings {
   defaultNodeTextAlign: "left" | "center" | "right";
   defaultNodeWidth: number;
   defaultNodeHeight: number;
+  autoResizeTest: AutoResizeTestSettings;
   attachmentFolder: string;
   templates: NodeTemplate[];
   mindMapShortcutChildTabEnabled: boolean;
@@ -88,6 +90,7 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   defaultNodeTextAlign: "center",
   defaultNodeWidth: DEFAULT_NODE_WIDTH,
   defaultNodeHeight: DEFAULT_NODE_HEIGHT,
+  autoResizeTest: { ...DEFAULT_AUTO_RESIZE_TEST_SETTINGS },
   attachmentFolder: "Better Canvas/Generated Images",
   templates: [],
   mindMapShortcutChildTabEnabled: true,
