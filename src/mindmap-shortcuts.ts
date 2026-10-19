@@ -43,7 +43,9 @@ export function getMindMapEditingCreationShortcut(event: {
   ctrlKey: boolean;
   metaKey: boolean;
   altKey: boolean;
+  isComposing?: boolean;
 }): MindMapEditingCreationShortcut | null {
+  if (event.isComposing) return null;
   if (!event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return null;
   if (event.key === "Tab") return "childTab";
   if (event.key === "Enter") return "siblingEnter";
