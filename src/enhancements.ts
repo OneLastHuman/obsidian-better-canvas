@@ -1,4 +1,5 @@
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
+import { calculateTextNodeDimensions, DEFAULT_AUTO_RESIZE_TEST_SETTINGS, normalizeAutoResizeTestSettings } from "./node-auto-resize";
 
 export type NodeShape = "default" | "pill" | "diamond" | "parallelogram" | "hexagon";
 export type BorderStyle = "solid" | "dashed" | "dotted" | "double" | "invisible";
@@ -333,19 +334,14 @@ export function selectAllCanvasEdges(canvas: any): number {
 export function resizeNodeToText(
   canvas: any,
   nodeId: string,
-  minimums: { width: number; height: number } = { width: 220, height: 100 }
+  rawSettings: unknown = DEFAULT_AUTO_RESIZE_TEST_SETTINGS
 ): boolean {
   const data = readCanvasData(canvas);
   const node = data.nodes.find(item => item.id === nodeId);
-  if (!node || node.type !== "text" || typeof node.text !== "string") return false;
+  if (!node || node.type !== "text" || typeof node.text !== "string" || !node.text.trim()) return false;
 
-  const minWidth = Number.isFinite(minimums.width) ? minimums.width : 220;
-  const minHeight = Number.isFinite(minimums.height) ? minimums.height : 100;
-  const lines = node.text.split("\n");
-  const longest = Math.max(1, ...lines.map(line => line.length));
-  const width = Math.max(minWidth, Math.min(720, Math.round(longest * 7.2 + 52)));
-  const wrappedLines = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / Math.max(1, (width - 40) / 7.2))), 0);
-  const height = Math.max(minHeight, Math.min(1000, Math.round(wrappedLines * 24 + 44)));
+  const settings = normalizeAutoResizeTestSettings(rawSettings);
+  const { width, height } = calculateTextNodeDimensions(node.text, settings);
   if (Math.abs(node.width - width) < 1 && Math.abs(node.height - height) < 1) return true;
   const nodes = data.nodes.map(item => item.id === nodeId ? { ...item, width, height } : item);
   canvas.importData({ ...data, nodes, edges: data.edges });
