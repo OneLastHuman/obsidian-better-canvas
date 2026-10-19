@@ -578,6 +578,23 @@
 .bc-settings-nav-button.is-active .bc-settings-nav-icon { color: var(--interactive-accent); }
 .bc-settings-nav-label { font-size: var(--font-ui-small); }
 .bc-settings-main { min-width: 0; }
+.bc-settings-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.bc-settings-actions button { width: 100%; }
+.bc-settings-save-status {
+  color: var(--text-muted);
+  font-size: var(--font-smaller);
+}
+.bc-settings-save-status.is-dirty {
+  color: var(--text-accent);
+}
 .bc-settings-page-header {
   margin: 0 0 15px;
   padding: 1px 0 11px;
@@ -708,6 +725,13 @@
     padding-bottom: 3px;
   }
   .bc-settings-nav-button { flex: 0 0 auto; width: auto; }
+  .bc-settings-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+  }
+  .bc-settings-actions button { width: auto; }
   .bc-settings-provider-header { align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) {
