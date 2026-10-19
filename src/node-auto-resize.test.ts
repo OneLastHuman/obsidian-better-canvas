@@ -192,50 +192,72 @@ describe("Node auto-resize manual drag-resize override", () => {
   });
 });
 
-describe("auto-resize respects configured default node size", () => {
-  it("never shrinks an auto-resized node below the configured defaults", () => {
+describe("auto-resize uses dedicated experimental settings", () => {
+  const testSettings = {
+    minWidth: 20,
+    minHeight: 20,
+    maxWidth: 720,
+    maxHeight: 1000,
+    charWidthFactor: 7.2,
+    widthPadding: 52,
+    wrapWidthPadding: 40,
+    lineHeight: 24,
+    heightPadding: 44
+  };
+
+  it("does not use new-node default dimensions as the minimum size", () => {
     const canvas = makeCanvas({
       nodes: [
         { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: "hello", bcAutoResize: true } as any
       ],
       edges: []
     });
-
-    resizeNodeToText(canvas, "node-1", { width: 250, height: 140 });
-
+    resizeNodeToText(canvas, "node-1", testSettings);
     const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
-    expect(updatedNode.width).toBe(250);
-    expect(updatedNode.height).toBe(140);
+    expect(updatedNode.width).toBe(88);
+    expect(updatedNode.height).toBe(68);
+    expect(canvas.saved).toBe(1);
+    expect(canvas.frames).toBe(1);
   });
 
-  it("grows an auto-resized node past the configured defaults when text needs room", () => {
-    const longText = "a very long single line of text that clearly exceeds the configured default width";
+  it("grows long content up to the configured width limit", () => {
+    const longText = "a very long single line of text that clearly exceeds the configured default width ".repeat(2);
     const canvas = makeCanvas({
       nodes: [
         { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: longText, bcAutoResize: true } as any
       ],
       edges: []
     });
-
-    resizeNodeToText(canvas, "node-1", { width: 250, height: 140 });
-
+    resizeNodeToText(canvas, "node-1", testSettings);
     const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
-    expect(updatedNode.width).toBeGreaterThan(250);
-    expect(updatedNode.height).toBeGreaterThanOrEqual(140);
+    expect(updatedNode.width).toBe(720);
+    expect(updatedNode.height).toBe(92);
   });
 
-  it("falls back to the previous minimums when no configured size is passed", () => {
+  it("uses the experimental baseline when no settings are passed", () => {
     const canvas = makeCanvas({
       nodes: [
         { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: "hello" } as any
       ],
       edges: []
     });
-
     resizeNodeToText(canvas, "node-1");
-
     const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
-    expect(updatedNode.width).toBe(220);
-    expect(updatedNode.height).toBe(100);
+    expect(updatedNode.width).toBe(88);
+    expect(updatedNode.height).toBe(68);
+  });
+
+  it("leaves empty new nodes at their configured initial size", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "node-1", type: "text", x: 0, y: 0, width: 280, height: 140, text: "", bcAutoResize: true } as any
+      ],
+      edges: []
+    });
+    expect(resizeNodeToText(canvas, "node-1", testSettings)).toBe(false);
+    const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
+    expect(updatedNode.width).toBe(280);
+    expect(updatedNode.height).toBe(140);
+    expect(canvas.saved).toBe(0);
   });
 });
