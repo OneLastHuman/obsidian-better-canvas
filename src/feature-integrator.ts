@@ -1108,27 +1108,27 @@ export default class BetterCanvasFeatures {
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
   }
 
-  /** Recalculate currently auto-resizing text nodes with the persisted experimental parameters. */
-  applyAutoResizeTestSettingsToActiveCanvas(): void {
-    const canvas = this.canvas();
-    if (!canvas) {
-      new Notice("请先打开一个 Canvas。");
-      return;
-    }
-    if (isCanvasReadOnly(canvas)) {
-      new Notice("当前 Canvas 处于只读模式，无法重算节点尺寸。");
-      return;
-    }
+  /** Recalculate auto-resizing text nodes in open Canvas leaves using the persisted test parameters. */
+  applyAutoResizeTestSettingsToOpenCanvases(): number {
+    const leaves = this.p.app.workspace.getLeavesOfType?.("canvas") ?? [];
+    const canvases = leaves
+      .map((leaf: any) => leaf?.view?.canvas)
+      .filter((canvas: any) => Boolean(canvas));
+    const activeCanvas = this.canvas();
+    if (activeCanvas && !canvases.includes(activeCanvas)) canvases.unshift(activeCanvas);
 
     const settings = this.autoResizeTestSettings();
-    const nodes = readCanvasData(canvas).nodes;
     let processed = 0;
-    for (const node of nodes) {
-      if (node.type !== "text" || (node as any).bcAutoResize !== true || !node.text?.trim()) continue;
-      this.autoResizingNodeIds.add(node.id);
-      if (resizeNodeToText(canvas, node.id, settings)) processed++;
+    for (const canvas of canvases) {
+      if (isCanvasReadOnly(canvas)) continue;
+      const nodes = readCanvasData(canvas).nodes;
+      for (const node of nodes) {
+        if (node.type !== "text" || (node as any).bcAutoResize !== true || !node.text?.trim()) continue;
+        this.autoResizingNodeIds.add(node.id);
+        if (resizeNodeToText(canvas, node.id, settings)) processed++;
+      }
     }
-    new Notice("已使用 test 参数重新计算 " + processed + " 个自动尺寸文本节点。");
+    return processed;
   }
 
   private bindCanvasRouteRefresh(view: any): void {
