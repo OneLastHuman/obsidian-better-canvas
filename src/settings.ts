@@ -299,7 +299,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         }));
 
     new Setting(page).setName("Tab 创建子节点")
-      .setDesc("关闭后，Tab 不会被 Better Canvas 拦截，可继续使用 Obsidian 或其他插件的快捷键。")
+      .setDesc("关闭后，Tab 和编辑卡片时的 Shift + Tab 都不会触发子节点创建。")
       .addToggle(toggle => toggle
         .setValue(this.currentSettings().mindMapShortcutChildTabEnabled !== false)
         .onChange(async value => {
@@ -308,7 +308,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         }));
 
     new Setting(page).setName("Enter 创建同级节点")
-      .setDesc("关闭后，Enter 不会被 Better Canvas 用于创建同级节点。")
+      .setDesc("关闭后，Enter 和编辑卡片时的 Shift + Enter 都不会触发同级节点创建。")
       .addToggle(toggle => toggle
         .setValue(this.currentSettings().mindMapShortcutSiblingEnterEnabled !== false)
         .onChange(async value => {
