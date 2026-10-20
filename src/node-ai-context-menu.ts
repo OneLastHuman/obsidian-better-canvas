@@ -1,4 +1,4 @@
-export type NodeAIContextActionId = "ask" | "image" | "flashcards" | "model" | "regenerate";
+export type NodeAIContextActionId = "ask" | "image" | "flashcards" | "regenerate";
 
 export interface NodeAIContextMenuAction {
   id: NodeAIContextActionId;
@@ -9,8 +9,7 @@ export interface NodeAIContextMenuAction {
 const BASE_ACTIONS: NodeAIContextMenuAction[] = [
   { id: "ask", title: "问 AI", icon: "sparkles" },
   { id: "image", title: "生成图片", icon: "image" },
-  { id: "flashcards", title: "闪卡", icon: "graduation-cap" },
-  { id: "model", title: "模型", icon: "bot" }
+  { id: "flashcards", title: "闪卡", icon: "graduation-cap" }
 ];
 
 const REGENERATE_ACTION: NodeAIContextMenuAction = {
