@@ -1,0 +1,110 @@
+/*
+ * Excalidraw-inspired Canvas theme — prototype
+ * Opt-in CSS snippet. Copy this file to .obsidian/snippets/ and enable it in Obsidian.
+ * Design intent: sketch-like content, calm UI, strong ink, restrained pastel fills.
+ * CSS cannot reproduce Excalidraw's Rough.js geometry; this prototype uses typography,
+ * line rhythm and shape styling without pretending CSS borders are genuinely hand-drawn.
+ */
+
+:root {
+  --bc-sketch-ink: #1e1e1e;
+  --bc-sketch-paper: #fffdf8;
+  --bc-sketch-muted: #737373;
+  --bc-sketch-grid: rgb(30 30 30 / 8%);
+  --bc-sketch-line: #55514b;
+  --bc-sketch-yellow: #fff3bf;
+  --bc-sketch-blue: #dbeafe;
+  --bc-sketch-green: #d9f99d;
+  --bc-sketch-pink: #fce7f3;
+  --bc-sketch-purple: #e9d5ff;
+  --bc-sketch-orange: #fed7aa;
+}
+
+/* Paper-like canvas: subtle dots, never competing with content. */
+.canvas-wrapper {
+  background-color: var(--bc-sketch-paper);
+  background-image: radial-gradient(var(--bc-sketch-grid) 0.8px, transparent 0.8px);
+  background-size: 20px 20px;
+}
+
+/* The editor UI remains in the host application's normal font.
+   Only content inside cards receives the sketch-inspired font stack. */
+.canvas-node[data-bc-shape] .canvas-node-content,
+.canvas-node[data-bc-shape] .canvas-node-content * {
+  font-family: "Excalifont", "Comic Shanns", "Comic Sans MS", "Chalkboard", sans-serif;
+  color: var(--bc-sketch-ink);
+  line-height: 1.48;
+}
+
+/* Paper cards: clear ink outline, almost no elevation, no glossy gradients. */
+.canvas-node[data-bc-shape] .canvas-node-container {
+  border: 1.5px solid var(--bc-sketch-ink);
+  border-radius: 10px;
+  background: var(--bc-sketch-paper);
+  box-shadow: 2px 3px 0 rgb(30 30 30 / 10%);
+  transition: box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.canvas-node[data-bc-shape] .canvas-node-content {
+  background: transparent;
+}
+
+/* Existing Canvas color values become low-saturation paper fills. */
+.canvas-node[data-bc-shape].is-themed .canvas-node-container {
+  background: color-mix(in srgb, var(--canvas-color, var(--bc-sketch-paper)) 24%, var(--bc-sketch-paper));
+  border-color: var(--bc-sketch-ink);
+}
+
+/* Explicit style classes make the prototype palette repeatable.
+   Apply these as custom classes only if your current Better Canvas build exposes them. */
+.canvas-node.bc-sketch-yellow .canvas-node-container { background: var(--bc-sketch-yellow); }
+.canvas-node.bc-sketch-blue .canvas-node-container { background: var(--bc-sketch-blue); }
+.canvas-node.bc-sketch-green .canvas-node-container { background: var(--bc-sketch-green); }
+.canvas-node.bc-sketch-pink .canvas-node-container { background: var(--bc-sketch-pink); }
+.canvas-node.bc-sketch-purple .canvas-node-container { background: var(--bc-sketch-purple); }
+.canvas-node.bc-sketch-orange .canvas-node-container { background: var(--bc-sketch-orange); }
+
+/* Selected state is an unmistakable ink-and-accent ring, not a heavy glow. */
+.canvas-node[data-bc-shape].is-selected .canvas-node-container,
+.canvas-node[data-bc-shape].is-focused .canvas-node-container,
+.canvas-node[data-bc-shape].is-editing .canvas-node-container {
+  border-color: var(--bc-sketch-ink);
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 24%), 2px 3px 0 rgb(30 30 30 / 10%);
+}
+
+/* Edges: hand-drawn feel is suggested with restrained stroke weight and dashes.
+   SVG path styling is limited to the known Canvas edge layer. */
+.canvas-edges path {
+  stroke: var(--bc-sketch-line);
+  stroke-width: 1.7px;
+}
+
+.canvas-edges path[marker-end],
+.canvas-edges path[marker-start] {
+  stroke: var(--bc-sketch-ink);
+}
+
+/* Keep Obsidian's own dark theme readable; don't force a white sheet there. */
+.theme-dark .canvas-wrapper {
+  background-color: var(--background-primary);
+  background-image: radial-gradient(rgb(255 255 255 / 9%) 0.8px, transparent 0.8px);
+}
+.theme-dark .canvas-node[data-bc-shape] .canvas-node-container {
+  background: color-mix(in srgb, var(--background-secondary) 88%, #f5e8c9 12%);
+  border-color: #d6d3d1;
+  box-shadow: 2px 3px 0 rgb(0 0 0 / 22%);
+}
+.theme-dark .canvas-node[data-bc-shape] .canvas-node-content,
+.theme-dark .canvas-node[data-bc-shape] .canvas-node-content * {
+  color: var(--text-normal);
+}
+.theme-dark .canvas-edges path {
+  stroke: #c7c2b8;
+}
+
+/* Motion accessibility: the theme adds no movement when reduced motion is preferred. */
+@media (prefers-reduced-motion: reduce) {
+  .canvas-node[data-bc-shape] .canvas-node-container {
+    transition: none;
+  }
+}
