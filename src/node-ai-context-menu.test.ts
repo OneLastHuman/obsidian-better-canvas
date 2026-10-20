@@ -8,11 +8,10 @@ describe("getNodeAIContextMenuActions", () => {
     expect(actions.map(action => action.id)).toEqual([
       "ask",
       "image",
-      "flashcards",
-      "model"
+      "flashcards"
     ]);
     expect(actions.some(action => action.id === "regenerate")).toBe(false);
-    expect(actions.map(action => action.title)).toEqual(["问 AI", "生成图片", "闪卡", "模型"]);
+    expect(actions.map(action => action.title)).toEqual(["问 AI", "生成图片", "生成闪卡"]);
   });
 
   it("offers regeneration only for generated AI nodes", () => {
@@ -22,7 +21,6 @@ describe("getNodeAIContextMenuActions", () => {
       "ask",
       "image",
       "flashcards",
-      "model",
       "regenerate"
     ]);
     expect(actions.find(action => action.id === "regenerate")?.title)
