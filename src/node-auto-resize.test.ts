@@ -212,7 +212,7 @@ describe("fixed content-aware auto-resize", () => {
     expect(updatedNode.styleAttributes.textAlign).toBe("center");
   });
 
-  it("clears a stale preview sizer after resizing", () => {
+  it("sets the preview sizer to the current text height", () => {
     const canvas = makeCanvas({
       nodes: [
         { id: "node-1", type: "text", x: 0, y: 0, width: 220, height: 100, text: "字".repeat(29), bcAutoResize: true } as any
@@ -229,7 +229,7 @@ describe("fixed content-aware auto-resize", () => {
     };
 
     expect(resizeNodeToText(canvas, "node-1", measure)).toBe(true);
-    expect(sizer.style.minHeight).toBe("0px");
+    expect(sizer.style.minHeight).toBe("48px");
     expect(sizer.style.height).toBe("auto");
     expect(preview.scrollTop).toBe(0);
   });
@@ -336,7 +336,7 @@ describe("fixed content-aware auto-resize", () => {
 
     expect(resizeNodeToText(canvas, "node-1", measure)).toBe(true);
     expect(canvas.saved).toBe(0);
-    expect(sizer.style.minHeight).toBe("0px");
+    expect(sizer.style.minHeight).toBe("24px");
     expect(preview.scrollTop).toBe(0);
   });
 });
