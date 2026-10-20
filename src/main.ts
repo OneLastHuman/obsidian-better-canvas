@@ -12,7 +12,7 @@ import { getMindMapEditingCreationShortcut, isMindMapShortcutEnabled } from "./m
 import { EditingIframeShortcutRegistry } from "./canvas-editing-shortcuts";
 import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
 import { decorateCanvas } from "./enhancements";
-import { getNodeAIContextMenuActions } from "./node-ai-context-menu";
+import { addNodeAIContextMenuItems } from "./node-ai-context-menu";
 import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import { configuredDefaultNodeSize, DEFAULT_NODE_HEIGHT, DEFAULT_NODE_WIDTH } from "./node-defaults";
@@ -415,26 +415,22 @@ export default class BetterCanvasPlugin extends Plugin {
       const record = canvas ? readCanvasData(canvas).nodes.find(item => item.id === nodeId) : undefined;
       const isGeneratedAI = Boolean((record as any)?.bcGenerated);
 
-      for (const action of getNodeAIContextMenuActions(isGeneratedAI)) {
-        menu.addItem((item: any) => {
-          item.setTitle(action.title).setIcon(action.icon).onClick(() => {
-            switch (action.id) {
-              case "ask":
-                this.features.askSelectedNode(nodeId);
-                break;
-              case "image":
-                this.features.generateImageFromSelection(nodeId);
-                break;
-              case "flashcards":
-                this.features.generateFlashcardsFromSelection(nodeId);
-                break;
-              case "regenerate":
-                this.features.regenerateNode(nodeId);
-                break;
-            }
-          });
-        });
-      }
+      addNodeAIContextMenuItems(menu, isGeneratedAI, actionId => {
+        switch (actionId) {
+          case "ask":
+            this.features.askSelectedNode(nodeId);
+            break;
+          case "image":
+            this.features.generateImageFromSelection(nodeId);
+            break;
+          case "flashcards":
+            this.features.generateFlashcardsFromSelection(nodeId);
+            break;
+          case "regenerate":
+            this.features.regenerateNode(nodeId);
+            break;
+        }
+      });
 
       menu.addItem((item: any) => item.setTitle("整理").setIcon("git-branch").onClick(() => {
         this.selectNode(this.getCanvas(), nodeId);
