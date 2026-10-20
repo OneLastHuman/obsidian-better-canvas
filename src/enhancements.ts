@@ -1,4 +1,10 @@
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
+import {
+  calculateTextNodeLayout,
+  createCanvasTextMeasurer,
+  estimateTextWidth,
+  type TextMeasure
+} from "./node-auto-resize";
 
 export type NodeShape = "default" | "pill" | "diamond" | "parallelogram" | "hexagon";
 export type BorderStyle = "solid" | "dashed" | "dotted" | "double" | "invisible";
@@ -330,28 +336,62 @@ export function selectAllCanvasEdges(canvas: any): number {
   return selected;
 }
 
+function textMeasureForNode(canvas: any, nodeId: string): TextMeasure {
+  const internal = canvas?.nodes?.get?.(nodeId);
+  const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+  const preview = element?.querySelector?.(".markdown-preview-view") as HTMLElement | null;
+  let family = "";
+  if (preview && typeof getComputedStyle === "function") {
+    try {
+      family = getComputedStyle(preview).fontFamily;
+    } catch {
+      // Fall back to the Canvas font stack when the host style is unavailable.
+    }
+  }
+  const font = `16px ${family || '"Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif'}`;
+  return createCanvasTextMeasurer(font) ?? estimateTextWidth;
+}
+
+/**
+ * Fit a text node to its content with the fixed product layout and select the
+ * alignment that matches the result: one line is centered, wrapped text is
+ * left-aligned. Empty text keeps the node at its current size.
+ */
 export function resizeNodeToText(
   canvas: any,
   nodeId: string,
-  minimums: { width: number; height: number } = { width: 220, height: 100 }
+  measure?: TextMeasure
 ): boolean {
   const data = readCanvasData(canvas);
   const node = data.nodes.find(item => item.id === nodeId);
   if (!node || node.type !== "text" || typeof node.text !== "string") return false;
 
-  const minWidth = Number.isFinite(minimums.width) ? minimums.width : 220;
-  const minHeight = Number.isFinite(minimums.height) ? minimums.height : 100;
-  const lines = node.text.split("\n");
-  const longest = Math.max(1, ...lines.map(line => line.length));
-  const width = Math.max(minWidth, Math.min(720, Math.round(longest * 7.2 + 52)));
-  const wrappedLines = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / Math.max(1, (width - 40) / 7.2))), 0);
-  const height = Math.max(minHeight, Math.min(1000, Math.round(wrappedLines * 24 + 44)));
-  if (Math.abs(node.width - width) < 1 && Math.abs(node.height - height) < 1) return true;
-  const nodes = data.nodes.map(item => item.id === nodeId ? { ...item, width, height } : item);
-  canvas.importData({ ...data, nodes, edges: data.edges });
-  canvas.requestSave?.();
-  canvas.requestFrame?.();
-  return true;
+  const layout = calculateTextNodeLayout(node.text, measure ?? textMeasureForNode(canvas, nodeId));
+  if (!layout) return false;
+
+  const currentAttributes = node.styleAttributes &&
+    typeof node.styleAttributes === "object" &&
+    !Array.isArray(node.styleAttributes)
+    ? node.styleAttributes as Record<string, unknown>
+    : {};
+  const styleAttributes = { ...currentAttributes, textAlign: layout.alignment };
+  const currentAlignment = typeof (node as any).bcTextAlign === "string"
+    ? (node as any).bcTextAlign
+    : currentAttributes.textAlign;
+
+  if (Math.abs(node.width - layout.width) < 1 &&
+      Math.abs(node.height - layout.height) < 1 &&
+      currentAlignment === layout.alignment &&
+      currentAttributes.textAlign === layout.alignment) {
+    return true;
+  }
+
+  return patchNode(canvas, nodeId, {
+    width: layout.width,
+    height: layout.height,
+    bcTextAlign: layout.alignment,
+    styleAttributes
+  });
 }
 
 export type RoutePoint = { x: number; y: number };
