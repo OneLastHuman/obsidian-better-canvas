@@ -192,50 +192,118 @@ describe("Node auto-resize manual drag-resize override", () => {
   });
 });
 
-describe("auto-resize respects configured default node size", () => {
-  it("never shrinks an auto-resized node below the configured defaults", () => {
+describe("fixed content-aware auto-resize", () => {
+  const measure = (text: string): number => Array.from(text).length * 16;
+
+  it("uses the 80 × 44 minimum and centers one line", () => {
     const canvas = makeCanvas({
       nodes: [
-        { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: "hello", bcAutoResize: true } as any
+        { id: "node-1", type: "text", x: 0, y: 0, width: 220, height: 100, text: "字", bcAutoResize: true } as any
       ],
       edges: []
     });
 
-    resizeNodeToText(canvas, "node-1", { width: 250, height: 140 });
+    expect(resizeNodeToText(canvas, "node-1", measure)).toBe(true);
 
     const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
-    expect(updatedNode.width).toBe(250);
-    expect(updatedNode.height).toBe(140);
+    expect(updatedNode.width).toBe(80);
+    expect(updatedNode.height).toBe(44);
+    expect(updatedNode.bcTextAlign).toBe("center");
+    expect(updatedNode.styleAttributes.textAlign).toBe("center");
   });
 
-  it("grows an auto-resized node past the configured defaults when text needs room", () => {
-    const longText = "a very long single line of text that clearly exceeds the configured default width";
+  it("keeps 24 characters centered on one line and wraps 25 characters left-aligned", () => {
     const canvas = makeCanvas({
       nodes: [
-        { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: longText, bcAutoResize: true } as any
+        { id: "node-24", type: "text", x: 0, y: 0, width: 100, height: 100, text: "字".repeat(24), bcAutoResize: true } as any,
+        { id: "node-25", type: "text", x: 0, y: 0, width: 100, height: 100, text: "字".repeat(25), bcAutoResize: true } as any
       ],
       edges: []
     });
 
-    resizeNodeToText(canvas, "node-1", { width: 250, height: 140 });
+    resizeNodeToText(canvas, "node-24", measure);
+    resizeNodeToText(canvas, "node-25", measure);
 
-    const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
-    expect(updatedNode.width).toBeGreaterThan(250);
-    expect(updatedNode.height).toBeGreaterThanOrEqual(140);
+    const node24 = canvas.data.nodes.find((n: any) => n.id === "node-24");
+    const node25 = canvas.data.nodes.find((n: any) => n.id === "node-25");
+    expect(node24).toMatchObject({ width: 432, height: 44, bcTextAlign: "center" });
+    expect(node25).toMatchObject({ width: 440, height: 68, bcTextAlign: "left" });
   });
 
-  it("falls back to the previous minimums when no configured size is passed", () => {
+  it("caps very long text at 440 × 560 and preserves style metadata", () => {
     const canvas = makeCanvas({
       nodes: [
-        { id: "node-1", type: "text", x: 0, y: 0, width: 250, height: 140, text: "hello" } as any
+        {
+          id: "node-1",
+          type: "text",
+          x: 0,
+          y: 0,
+          width: 220,
+          height: 100,
+          text: "字".repeat(600),
+          bcAutoResize: true,
+          bcShape: "diamond",
+          customFlag: true,
+          styleAttributes: { border: "dashed", custom: "keep" }
+        } as any
       ],
       edges: []
     });
 
-    resizeNodeToText(canvas, "node-1");
+    resizeNodeToText(canvas, "node-1", measure);
 
     const updatedNode = canvas.data.nodes.find((n: any) => n.id === "node-1");
-    expect(updatedNode.width).toBe(220);
-    expect(updatedNode.height).toBe(100);
+    expect(updatedNode.width).toBe(440);
+    expect(updatedNode.height).toBe(560);
+    expect(updatedNode.bcTextAlign).toBe("left");
+    expect(updatedNode.bcShape).toBe("diamond");
+    expect(updatedNode.customFlag).toBe(true);
+    expect(updatedNode.styleAttributes).toEqual({
+      border: "dashed",
+      custom: "keep",
+      textAlign: "left"
+    });
+  });
+
+  it("leaves blank text and non-text nodes untouched", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "blank", type: "text", x: 0, y: 0, width: 250, height: 60, text: "   ", bcAutoResize: true } as any,
+        { id: "file", type: "file", x: 0, y: 0, width: 300, height: 200, file: "note.md" } as any
+      ],
+      edges: []
+    });
+
+    expect(resizeNodeToText(canvas, "blank", measure)).toBe(false);
+    expect(resizeNodeToText(canvas, "file", measure)).toBe(false);
+    expect(resizeNodeToText(canvas, "missing", measure)).toBe(false);
+
+    const blank = canvas.data.nodes.find((n: any) => n.id === "blank");
+    expect(blank.width).toBe(250);
+    expect(blank.height).toBe(60);
+    expect(blank.bcTextAlign).toBeUndefined();
+  });
+
+  it("does not write again when the node already has the final layout", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        {
+          id: "node-1",
+          type: "text",
+          x: 0,
+          y: 0,
+          width: 80,
+          height: 44,
+          text: "字",
+          bcAutoResize: true,
+          bcTextAlign: "center",
+          styleAttributes: { textAlign: "center" }
+        } as any
+      ],
+      edges: []
+    });
+
+    expect(resizeNodeToText(canvas, "node-1", measure)).toBe(true);
+    expect(canvas.saved).toBe(0);
   });
 });
