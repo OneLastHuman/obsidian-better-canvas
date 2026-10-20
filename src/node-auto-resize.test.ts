@@ -212,6 +212,28 @@ describe("fixed content-aware auto-resize", () => {
     expect(updatedNode.styleAttributes.textAlign).toBe("center");
   });
 
+  it("clears a stale preview sizer after resizing", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "node-1", type: "text", x: 0, y: 0, width: 220, height: 100, text: "字".repeat(29), bcAutoResize: true } as any
+      ],
+      edges: []
+    });
+    const sizer = { style: { minHeight: "71px", height: "71px" } };
+    const preview: any = {
+      scrollTop: 12,
+      querySelector: (selector: string) => selector === ".markdown-preview-sizer" ? sizer : null
+    };
+    (canvas.nodes.get("node-1") as any).nodeEl = {
+      querySelector: (selector: string) => selector === ".markdown-preview-view" ? preview : null
+    };
+
+    expect(resizeNodeToText(canvas, "node-1", measure)).toBe(true);
+    expect(sizer.style.minHeight).toBe("0px");
+    expect(sizer.style.height).toBe("auto");
+    expect(preview.scrollTop).toBe(0);
+  });
+
   it("keeps 24 characters centered on one line and wraps 25 characters left-aligned", () => {
     const canvas = makeCanvas({
       nodes: [
@@ -303,7 +325,18 @@ describe("fixed content-aware auto-resize", () => {
       edges: []
     });
 
+    const sizer = { style: { minHeight: "71px", height: "71px" } };
+    const preview: any = {
+      scrollTop: 12,
+      querySelector: (selector: string) => selector === ".markdown-preview-sizer" ? sizer : null
+    };
+    (canvas.nodes.get("node-1") as any).nodeEl = {
+      querySelector: (selector: string) => selector === ".markdown-preview-view" ? preview : null
+    };
+
     expect(resizeNodeToText(canvas, "node-1", measure)).toBe(true);
     expect(canvas.saved).toBe(0);
+    expect(sizer.style.minHeight).toBe("0px");
+    expect(preview.scrollTop).toBe(0);
   });
 });
