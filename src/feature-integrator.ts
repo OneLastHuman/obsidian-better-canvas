@@ -756,7 +756,6 @@ export default class BetterCanvasFeatures {
       const actions: Array<[string, string, () => void]> = [
         ["复制链接", "link", () => void this.copyNodeLink()],
         ["翻转连线", "git-compare", () => this.flipEdges()],
-        ["专注", "focus", () => this.focus()],
         ["置顶", "layers", () => this.reorder(true)],
         ["置底", "layers-2", () => this.reorder(false)],
         ["重生成", "rotate-cw", () => void this.regenerate()]
