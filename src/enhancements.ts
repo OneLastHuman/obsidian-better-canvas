@@ -1,5 +1,6 @@
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
 import {
+  AUTO_RESIZE_LAYOUT,
   calculateTextNodeLayout,
   createCanvasTextMeasurer,
   estimateTextWidth,
@@ -340,17 +341,19 @@ export function selectAllCanvasEdges(canvas: any): number {
  * Obsidian's markdown preview keeps an inline `min-height` on its sizer from
  * the previous content layout. After the node becomes wider, the text can wrap
  * into fewer lines while that stale sizer height remains, which produces a
- * scrollbar and visible empty space at the bottom. Reset the sizer and scroll
- * position so the preview reflows to the new card size.
+ * scrollbar and visible empty space at the bottom. Replacing it with zero also
+ * lets the flex sizer become shorter than its text, so the preview centers a
+ * too-small block and pushes the text downward. Set the sizer to the current
+ * text height instead, then clear the scroll position so padding stays even.
  */
-function refreshTextNodePreview(canvas: any, nodeId: string): void {
+function refreshTextNodePreview(canvas: any, nodeId: string, contentHeight: number): void {
   const internal = canvas?.nodes?.get?.(nodeId);
   const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
   const preview = element?.querySelector?.(".markdown-preview-view") as HTMLElement | null;
   if (!preview) return;
   const sizer = preview.querySelector?.(".markdown-preview-sizer") as HTMLElement | null;
   if (sizer) {
-    sizer.style.minHeight = "0px";
+    sizer.style.minHeight = `${Math.max(0, Math.round(contentHeight))}px`;
     sizer.style.height = "auto";
   }
   preview.scrollTop = 0;
@@ -399,11 +402,13 @@ export function resizeNodeToText(
     ? (node as any).bcTextAlign
     : currentAttributes.textAlign;
 
+  const contentHeight = layout.lines * AUTO_RESIZE_LAYOUT.lineHeight;
+
   if (Math.abs(node.width - layout.width) < 1 &&
       Math.abs(node.height - layout.height) < 1 &&
       currentAlignment === layout.alignment &&
       currentAttributes.textAlign === layout.alignment) {
-    refreshTextNodePreview(canvas, nodeId);
+    refreshTextNodePreview(canvas, nodeId, contentHeight);
     return true;
   }
 
@@ -413,7 +418,7 @@ export function resizeNodeToText(
     bcTextAlign: layout.alignment,
     styleAttributes
   });
-  if (patched) refreshTextNodePreview(canvas, nodeId);
+  if (patched) refreshTextNodePreview(canvas, nodeId, contentHeight);
   return patched;
 }
 
