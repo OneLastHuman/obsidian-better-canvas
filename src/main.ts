@@ -428,9 +428,6 @@ export default class BetterCanvasPlugin extends Plugin {
               case "flashcards":
                 this.features.generateFlashcardsFromSelection(nodeId);
                 break;
-              case "model":
-                this.features.chooseModelForNode(nodeId);
-                break;
               case "regenerate":
                 this.features.regenerateNode(nodeId);
                 break;
