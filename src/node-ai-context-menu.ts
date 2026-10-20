@@ -9,7 +9,7 @@ export interface NodeAIContextMenuAction {
 const BASE_ACTIONS: NodeAIContextMenuAction[] = [
   { id: "ask", title: "问 AI", icon: "sparkles" },
   { id: "image", title: "生成图片", icon: "image" },
-  { id: "flashcards", title: "闪卡", icon: "graduation-cap" }
+  { id: "flashcards", title: "生成闪卡", icon: "graduation-cap" }
 ];
 
 const REGENERATE_ACTION: NodeAIContextMenuAction = {
