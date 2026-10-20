@@ -279,15 +279,15 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     this.addNumericRangeSetting(page, "默认节点宽度", settings.defaultNodeWidth ?? 280, MIN_NODE_WIDTH, MAX_NODE_WIDTH, async number => {
       settings.defaultNodeWidth = number;
       await this.markDirty();
-    }, { description: "新建文本节点的初始宽度；自动调整尺寸的节点不会小于该值。" });
+    }, { description: "仅用于新建空白文本节点；自动调整尺寸使用固定的 80–440 宽度范围。" });
 
     this.addNumericRangeSetting(page, "默认节点高度", settings.defaultNodeHeight ?? 140, MIN_NODE_HEIGHT, MAX_NODE_HEIGHT, async number => {
       settings.defaultNodeHeight = number;
       await this.markDirty();
-    }, { description: "新建文本节点的初始高度；自动调整尺寸的节点不会小于该值。" });
+    }, { description: "仅用于新建空白文本节点；自动调整尺寸使用固定的 44–560 高度范围。" });
 
     new Setting(page).setName("新建文本节点默认对齐")
-      .setDesc("选择新建文本节点的默认文字对齐方式。已有节点中明确保存的文字对齐样式不会被覆盖。")
+      .setDesc("选择新建文本节点的默认文字对齐方式。启用自动调整尺寸的节点会按单行居中、多行左对齐自动写入；关闭自动调整的已有节点保留原对齐。")
       .addDropdown(dropdown => dropdown
         .addOption("left", "左对齐")
         .addOption("center", "居中")

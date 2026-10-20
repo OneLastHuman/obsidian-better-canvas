@@ -1085,8 +1085,9 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     this.autoResizingNodeIds.add(selection.node.id);
-    const resized = resizeNodeToText(selection.canvas, selection.node.id, configuredDefaultNodeSize(this.settings()));
-    new Notice(resized ? "已调整节点尺寸。" : "仅支持文本节点。");
+    const resized = resizeNodeToText(selection.canvas, selection.node.id);
+    if (resized) this.decorate(selection.canvas);
+    new Notice(resized ? "已调整节点尺寸。" : "仅支持非空文本节点。");
   }
 
   private toggleAutoResize(): void {
@@ -1096,7 +1097,7 @@ export default class BetterCanvasFeatures {
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) {
       this.autoResizingNodeIds.add(selection.node.id);
-      resizeNodeToText(selection.canvas, selection.node.id, configuredDefaultNodeSize(this.settings()));
+      if (resizeNodeToText(selection.canvas, selection.node.id)) this.decorate(selection.canvas);
     }
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
   }
@@ -1189,8 +1190,8 @@ export default class BetterCanvasFeatures {
         pending = false;
         const shouldResizeText = hasContentChange;
         hasContentChange = false;
-        const defaultSize = configuredDefaultNodeSize(this.settings());
         const data = readCanvasData(canvas);
+        let resizedAny = false;
         if (shouldResizeText) {
           for (const node of data.nodes) {
             if (node.type === "text" && (node as any).bcAutoResize === true) {
@@ -1198,12 +1199,13 @@ export default class BetterCanvasFeatures {
               const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
               if (element?.classList?.contains("is-dragging")) continue;
               this.autoResizingNodeIds.add(node.id);
-              resizeNodeToText(canvas, node.id, defaultSize);
+              if (resizeNodeToText(canvas, node.id)) resizedAny = true;
             }
           }
         }
         this.applyZoomBreakpoints(canvas);
-        syncHtmlPreviews(canvas, data);
+        if (resizedAny) this.decorate(canvas);
+        else syncHtmlPreviews(canvas, data);
       }, 220);
     });
     observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "transform", "class"] });
