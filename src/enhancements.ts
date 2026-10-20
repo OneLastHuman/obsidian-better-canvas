@@ -336,6 +336,26 @@ export function selectAllCanvasEdges(canvas: any): number {
   return selected;
 }
 
+/**
+ * Obsidian's markdown preview keeps an inline `min-height` on its sizer from
+ * the previous content layout. After the node becomes wider, the text can wrap
+ * into fewer lines while that stale sizer height remains, which produces a
+ * scrollbar and visible empty space at the bottom. Reset the sizer and scroll
+ * position so the preview reflows to the new card size.
+ */
+function refreshTextNodePreview(canvas: any, nodeId: string): void {
+  const internal = canvas?.nodes?.get?.(nodeId);
+  const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+  const preview = element?.querySelector?.(".markdown-preview-view") as HTMLElement | null;
+  if (!preview) return;
+  const sizer = preview.querySelector?.(".markdown-preview-sizer") as HTMLElement | null;
+  if (sizer) {
+    sizer.style.minHeight = "0px";
+    sizer.style.height = "auto";
+  }
+  preview.scrollTop = 0;
+}
+
 function textMeasureForNode(canvas: any, nodeId: string): TextMeasure {
   const internal = canvas?.nodes?.get?.(nodeId);
   const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
@@ -383,15 +403,18 @@ export function resizeNodeToText(
       Math.abs(node.height - layout.height) < 1 &&
       currentAlignment === layout.alignment &&
       currentAttributes.textAlign === layout.alignment) {
+    refreshTextNodePreview(canvas, nodeId);
     return true;
   }
 
-  return patchNode(canvas, nodeId, {
+  const patched = patchNode(canvas, nodeId, {
     width: layout.width,
     height: layout.height,
     bcTextAlign: layout.alignment,
     styleAttributes
   });
+  if (patched) refreshTextNodePreview(canvas, nodeId);
+  return patched;
 }
 
 export type RoutePoint = { x: number; y: number };
