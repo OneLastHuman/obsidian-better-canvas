@@ -757,8 +757,7 @@ export default class BetterCanvasFeatures {
         ["复制链接", "link", () => void this.copyNodeLink()],
         ["翻转连线", "git-compare", () => this.flipEdges()],
         ["置顶", "layers", () => this.reorder(true)],
-        ["置底", "layers-2", () => this.reorder(false)],
-        ["重生成", "rotate-cw", () => void this.regenerate()]
+        ["置底", "layers-2", () => this.reorder(false)]
       ];
       for (const action of actions) {
         menu.addItem((item: any) => item.setTitle(action[0]).setIcon(action[1]).onClick(() => {
