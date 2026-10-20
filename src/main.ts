@@ -415,7 +415,7 @@ export default class BetterCanvasPlugin extends Plugin {
       const record = canvas ? readCanvasData(canvas).nodes.find(item => item.id === nodeId) : undefined;
       const isGeneratedAI = Boolean((record as any)?.bcGenerated);
 
-      menu.addSeparator?.();
+      // Obsidian already inserts a separator before plugin-contributed node actions.
       for (const action of getNodeAIContextMenuActions(isGeneratedAI)) {
         menu.addItem((item: any) => {
           item.setTitle(action.title).setIcon(action.icon).onClick(() => {
