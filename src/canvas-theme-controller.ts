@@ -2,6 +2,22 @@ import { Modal, Notice, setIcon, type App, type Plugin } from "obsidian";
 import { readCanvasData } from "./canvas";
 import { decorateCanvasTheme, resolveCanvasTheme, setCanvasTheme, type CanvasThemeId } from "./canvas-theme";
 
+/**
+ * Mirrors Obsidian's native control markup (a `div.canvas-control-item`) rather
+ * than a `<button>`, so the entry inherits the same 32px box, 8px padding and
+ * muted icon colour as the neighbouring Canvas controls.
+ */
+export function createThemeControl(): HTMLElement {
+  const control = document.createElement("div");
+  control.className = "canvas-control-item bc-theme-control-button";
+  control.setAttribute("role", "button");
+  control.setAttribute("tabindex", "0");
+  control.setAttribute("aria-haspopup", "dialog");
+  control.setAttribute("data-tooltip-position", "left");
+  setIcon(control, "wallpaper");
+  return control;
+}
+
 const EDITOR_STYLE_ID = "bc-scrapbook-editor";
 const EDITOR_CSS = `
 body { color-scheme: light; --background-primary: #fff8e8; --background-secondary: #f2e7d2;
@@ -144,22 +160,23 @@ export default class CanvasThemeController {
       if (!group) {
         group = document.createElement("div");
         group.className = "canvas-control-group mod-raised bc-theme-control";
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "canvas-control-item bc-theme-control-button";
-        setIcon(button, "panels-top-left");
-        button.addEventListener("click", event => {
+        const control = createThemeControl();
+        const activate = (event: Event): void => {
           event.preventDefault();
           event.stopPropagation();
           this.open(canvas);
+        };
+        control.addEventListener("click", activate);
+        control.addEventListener("keydown", (event: KeyboardEvent) => {
+          if (event.repeat || (event.key !== "Enter" && event.key !== " ")) return;
+          activate(event);
         });
-        group.appendChild(button);
+        group.appendChild(control);
         stack.insertBefore(group, stack.firstChild);
         this.controls.set(canvas, group);
       }
-      const button = group.firstElementChild as HTMLElement;
-      button.setAttribute("aria-label", "画布主题 · " + (theme === "scrapbook" ? "拼贴手账" : "默认"));
-      button.setAttribute("data-tooltip-position", "left");
+      const control = group.firstElementChild as HTMLElement;
+      control.setAttribute("aria-label", "画布主题 · " + (theme === "scrapbook" ? "拼贴手账" : "默认"));
     }
     for (const [canvas, group] of this.controls) {
       if (live.has(canvas)) continue;
