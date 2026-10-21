@@ -1,11 +1,40 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("obsidian", () => ({ Modal: class {}, Notice: class {}, setIcon: () => undefined }));
-import CanvasThemeController from "./canvas-theme-controller";
+const { setIcon } = vi.hoisted(() => ({ setIcon: vi.fn() }));
+vi.mock("obsidian", () => ({ Modal: class {}, Notice: class {}, setIcon }));
+import CanvasThemeController, { createThemeControl } from "./canvas-theme-controller";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
 describe("Canvas theme lifecycle", () => {
+  it("builds the entry as a native 32px control, not a button", () => {
+    let created: any;
+    vi.stubGlobal("document", {
+      createElement: (tagName: string) => {
+        const attributes = new Map<string, string>();
+        created = {
+          tagName: tagName.toLowerCase(),
+          className: "",
+          setAttribute(name: string, value: string) { attributes.set(name, value); },
+          getAttribute(name: string) { return attributes.get(name) ?? null; }
+        };
+        return created;
+      }
+    });
+
+    const control = createThemeControl();
+
+    expect(created.tagName).toBe("div");
+    expect(control.className).toBe("canvas-control-item bc-theme-control-button");
+    expect(control.getAttribute("role")).toBe("button");
+    expect(control.getAttribute("tabindex")).toBe("0");
+    expect(control.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(setIcon).toHaveBeenCalledWith(control, "wallpaper");
+  });
+
   it("cleans a decorated canvas and editor even when native controls are unavailable", () => {
     const frames: Array<() => void> = [];
     vi.stubGlobal("window", { requestAnimationFrame: (fn: () => void) => { frames.push(fn); return frames.length; }, cancelAnimationFrame: () => undefined });
