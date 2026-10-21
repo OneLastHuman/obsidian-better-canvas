@@ -3,6 +3,7 @@ import type { Plugin } from "obsidian";
 import { readCanvasData, type CanvasNodeData } from "./canvas";
 import { decorateCanvas } from "./enhancements";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { applyScrapbookPreset, decorateCanvasTheme, recordCanvasStyleHistory, resolveCanvasTheme, scrapbookPreset, SCRAPBOOK_PRESETS, SCRAPBOOK_COLORS } from "./canvas-theme";
 import {
   applyNodeVisualStyle,
   NODE_STYLE_ALIGNMENTS,
@@ -161,6 +162,7 @@ export default class NodeMenuUnifier {
   private readonly plugin: Plugin;
   private readonly controlGroups = new Map<HTMLElement, ControlGroup>();
   private activePanel: ActivePanel | null = null;
+  private panelRefreshFrame: number | null = null;
 
   constructor(plugin: Plugin) {
     this.plugin = plugin;
@@ -170,12 +172,22 @@ export default class NodeMenuUnifier {
     const workspace = this.plugin.app.workspace as any;
     this.plugin.registerEvent(workspace.on("layout-change", () => this.scanCanvases()));
     this.plugin.registerEvent(workspace.on("active-leaf-change", () => this.scanCanvases()));
+    this.plugin.registerEvent(workspace.on("better-canvas:theme-changed", () => this.renderStylePanel()));
+    this.plugin.registerEvent(workspace.on("advanced-canvas:data-loaded:after", (canvas: any) => {
+      if (this.activePanel?.canvas !== canvas || this.panelRefreshFrame !== null) return;
+      this.panelRefreshFrame = window.requestAnimationFrame(() => {
+        this.panelRefreshFrame = null;
+        this.renderStylePanel();
+      });
+    }));
     workspace.onLayoutReady(() => this.scanCanvases());
     this.plugin.register(() => this.stop());
     this.scanCanvases();
   }
 
   stop(): void {
+    if (this.panelRefreshFrame !== null) window.cancelAnimationFrame(this.panelRefreshFrame);
+    this.panelRefreshFrame = null;
     this.dismissPanel();
     for (const record of this.controlGroups.values()) {
       record.cleanup();
@@ -434,6 +446,29 @@ export default class NodeMenuUnifier {
     this.renderStylePanel(focusKey);
   }
 
+  private applyPaper(preset: string): void {
+    const active = this.activePanel;
+    if (!active) return;
+    const { canvas, nodeIds } = active;
+    if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    if (nodeIds.some(id => !data.nodes.some(node => node.id === id))) {
+      this.dismissPanel();
+      return;
+    }
+    recordCanvasStyleHistory(canvas, data);
+    canvas.importData(applyScrapbookPreset(data, nodeIds, preset));
+    canvas.requestSave?.(false);
+    recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+    canvas.requestFrame?.();
+    decorateCanvas(canvas);
+    decorateCanvasTheme(canvas);
+    this.renderStylePanel("paper-" + preset);
+  }
+
   private renderStylePanel(focusKey?: string): void {
     const active = this.activePanel;
     if (!active) return;
@@ -480,6 +515,33 @@ export default class NodeMenuUnifier {
       return section;
     };
 
+    const isScrapbook = resolveCanvasTheme(data) === "scrapbook";
+    surface.dataset.bcTheme = isScrapbook ? "scrapbook" : "default";
+    if (isScrapbook) {
+      const papers = document.createElement("div");
+      papers.className = "bc-paper-presets";
+      addSection("拼贴手账 · 纸片").appendChild(papers);
+      for (const preset of SCRAPBOOK_PRESETS) {
+        const applicable = nodes.filter(node => node?.type !== "group");
+        const state = applicable.length ? optionState(
+          applicable.filter(node => scrapbookPreset(node?.bcScrapbookPreset) === preset.id).length,
+          applicable.length
+        ) : "false";
+        const button = addButton(papers, "", optionClass("bc-paper-preset", state), () => this.applyPaper(preset.id));
+        button.dataset.styleOption = "paper-" + preset.id;
+        button.setAttribute("aria-label", preset.label);
+        button.setAttribute("title", preset.label);
+        button.setAttribute("aria-pressed", state);
+        button.disabled = applicable.length === 0;
+        const preview = document.createElement("span");
+        preview.className = "bc-paper-preview";
+        preview.dataset.bcPaper = preset.id;
+        preview.textContent = preset.sample;
+        preview.setAttribute("aria-hidden", "true");
+        button.appendChild(preview);
+      }
+    }
+    if (!isScrapbook) {
     const presetSection = addSection("预设");
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
@@ -508,12 +570,13 @@ export default class NodeMenuUnifier {
       preview.appendChild(sample);
       button.appendChild(preview);
     }
+    }
 
     const colorSection = addSection("颜色");
     const colors = document.createElement("div");
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
-    for (const color of NODE_STYLE_COLORS) {
+    for (const color of isScrapbook ? SCRAPBOOK_COLORS : NODE_STYLE_COLORS) {
       const state = stateForStyles(nodeStyles, style => style.color === color.value.toLowerCase());
       const button = addButton(
         colors,
