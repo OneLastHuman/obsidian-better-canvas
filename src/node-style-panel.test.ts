@@ -37,6 +37,7 @@ class FakeElement {
   private ownText = "";
   className = "";
   type = "";
+  disabled = false;
   offsetParent: FakeElement | null = null;
 
   constructor(tagName: string) {
@@ -117,6 +118,7 @@ class FakeElement {
   }
 
   click(): void {
+    if (this.disabled) return;
     const event = {
       preventDefault: () => undefined,
       stopPropagation: () => undefined
@@ -265,6 +267,27 @@ afterEach(() => {
 });
 
 describe("node style panel rendering", () => {
+  it("opens without a selection", () => {
+    const panel = createStylePanel([{}], 0);
+
+    expect(panel.surface.textContent).toContain("未选择节点");
+    expect(descendants(panel.surface).some(element => element.className === "bc-node-style-empty")).toBe(false);
+    panel.close();
+  });
+
+  it("disables style options until a node is selected", () => {
+    const panel = createStylePanel([{}], 0);
+    const options = buttons(panel.surface).filter(button => button.dataset.styleOption);
+
+    expect(options.length).toBeGreaterThan(0);
+    for (const option of options) expect(option.disabled).toBe(true);
+    expect(optionButton(panel.surface, "preset-flow").getAttribute("aria-pressed")).toBe("false");
+
+    optionButton(panel.surface, "preset-flow").click();
+    expect(panel.canvas.importData).not.toHaveBeenCalled();
+    panel.close();
+  });
+
   it("shows scrapbook treatments and applies them to the full selection preserving explicit styles", () => {
     const panel = createStylePanel([{ bcShape: "diamond" }, {}], 2, "scrapbook");
     const tape = optionButton(panel.surface, "paper-tape");

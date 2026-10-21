@@ -70,6 +70,7 @@ type StyleOptionState = "true" | "false" | "mixed";
 type NodeStyleSnapshot = ReturnType<typeof styleOf>;
 
 function optionState(matchCount: number, total: number): StyleOptionState {
+  if (total === 0) return "false";
   if (matchCount === total) return "true";
   return matchCount > 0 ? "mixed" : "false";
 }
@@ -248,8 +249,12 @@ export default class NodeMenuUnifier {
     const open = (event: Event): void => {
       event.preventDefault();
       event.stopPropagation();
+      const selected = Array.from(canvas?.selection?.values?.() ?? []) as unknown[];
       const nodeIds = selectedNodeIds(canvas);
-      if (!nodeIds) {
+      // An empty Canvas selection opens the panel in its empty state. A
+      // selection made only of edges (or a mixed selection) still cannot be
+      // styled as nodes.
+      if (selected.length > 0 && !nodeIds) {
         new Notice("请先选择一个或多个节点（不能包含连线），再打开节点样式。");
         return;
       }
@@ -257,7 +262,8 @@ export default class NodeMenuUnifier {
         this.dismissPanel();
         return;
       }
-      this.showStylePanel(canvas, nodeIds);
+      this.showStylePanel(canvas, nodeIds ?? []);
+      this.syncControlState(container, canvas);
     };
     const keydown = (event: KeyboardEvent): void => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -286,8 +292,6 @@ export default class NodeMenuUnifier {
     const record = this.controlGroups.get(container);
     if (!record) return;
     const nodeIds = selectedNodeIds(canvas);
-    record.button.classList.toggle("is-disabled", !nodeIds);
-    record.button.setAttribute("aria-disabled", String(!nodeIds));
     record.button.classList.toggle(
       "is-active",
       Boolean(this.activePanel && this.activePanel.canvas === canvas)
@@ -321,7 +325,7 @@ export default class NodeMenuUnifier {
     const targetIds = [...new Set(nodeIds)].sort();
     const currentData = readCanvasData(canvas);
     const availableIds = new Set(currentData.nodes.map(node => node.id));
-    if (targetIds.length === 0 || targetIds.some(id => !availableIds.has(id))) {
+    if (targetIds.some(id => !availableIds.has(id))) {
       new Notice("目标节点已不存在，样式面板已关闭。");
       return;
     }
@@ -342,10 +346,11 @@ export default class NodeMenuUnifier {
     };
     active.outsideHandler = event => {
       if (surface.contains(event.target as Node)) return;
-      // A click on another Canvas node retargets the panel; anywhere else
-      // dismisses it.
+      // A click on another Canvas node retargets the panel; the style control
+      // toggles it; anywhere else dismisses it.
       const target = event.target;
-      if (target instanceof Element && target.closest(".canvas-node")) return;
+      if (target instanceof Element &&
+        (target.closest(".canvas-node") || target.closest(".bc-node-style-control-group"))) return;
       this.dismissPanel();
     };
     active.keyHandler = event => {
@@ -480,6 +485,7 @@ export default class NodeMenuUnifier {
       return;
     }
     const nodeStyles = nodes.map(node => styleOf(node as CanvasNodeData));
+    const hasSelection = nodeStyles.length > 0;
     const hasMixedStyles = (["color", "shape", "border", "align"] as const)
       .some(key => new Set(nodeStyles.map(style => style[key])).size > 1);
     const surface = active.surface;
@@ -491,7 +497,12 @@ export default class NodeMenuUnifier {
     heading.className = "bc-node-style-title";
     heading.textContent = "节点样式";
     header.appendChild(heading);
-    if (active.nodeIds.length > 1) {
+    if (!hasSelection) {
+      const count = document.createElement("span");
+      count.className = "bc-node-style-selection-count";
+      count.textContent = "未选择节点";
+      header.appendChild(count);
+    } else if (active.nodeIds.length > 1) {
       const count = document.createElement("span");
       count.className = "bc-node-style-selection-count";
       count.textContent = active.nodeIds.length + " 个节点" + (hasMixedStyles ? " · 部分样式不同" : "");
@@ -532,7 +543,7 @@ export default class NodeMenuUnifier {
         button.setAttribute("aria-label", preset.label);
         button.setAttribute("title", preset.label);
         button.setAttribute("aria-pressed", state);
-        button.disabled = applicable.length === 0;
+        button.disabled = !hasSelection || applicable.length === 0;
         const preview = document.createElement("span");
         preview.className = "bc-paper-preview";
         preview.dataset.bcPaper = preset.id;
@@ -558,6 +569,7 @@ export default class NodeMenuUnifier {
       button.title = preset.label + "预设";
       button.setAttribute("aria-label", preset.label + "预设");
       button.setAttribute("aria-pressed", state);
+      button.disabled = !hasSelection;
 
       const preview = document.createElement("span");
       preview.className = "bc-node-style-preset-preview shape-" + preset.style.shape +
@@ -588,6 +600,7 @@ export default class NodeMenuUnifier {
       button.title = color.label;
       button.setAttribute("aria-label", color.label);
       button.setAttribute("aria-pressed", state);
+      button.disabled = !hasSelection;
       const swatch = document.createElement("span");
       swatch.className = "bc-node-style-swatch";
       swatch.style.backgroundColor = color.value;
@@ -610,6 +623,7 @@ export default class NodeMenuUnifier {
       button.title = shape.label;
       button.setAttribute("aria-label", shape.label);
       button.setAttribute("aria-pressed", state);
+      button.disabled = !hasSelection;
       // The preview alone identifies the option; the name stays a tooltip and
       // accessible label instead of printed text under the preview.
       const preview = document.createElement("span");
@@ -633,6 +647,7 @@ export default class NodeMenuUnifier {
       );
       button.dataset.styleOption = "border-" + border.id;
       button.setAttribute("aria-pressed", state);
+      button.disabled = !hasSelection;
     }
 
     const alignSection = addSection("文本对齐");
@@ -650,6 +665,7 @@ export default class NodeMenuUnifier {
       );
       button.dataset.styleOption = "align-" + align.id;
       button.setAttribute("aria-pressed", state);
+      button.disabled = !hasSelection;
     }
 
     this.positionPanel();
