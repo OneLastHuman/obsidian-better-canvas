@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    { "id": "collection", "type": "group", "x": 20, "y": 40, "width": 1120, "height": 710, "label": "OCTOBER COLLECTION  /  十月的日常收藏" },
+    { "id": "intro", "type": "text", "x": 80, "y": 100, "width": 320, "height": 210, "text": "# 把日子，贴成一页\n\n一段散步、一束光，\n还有突然冒出来的好主意。\n\n**收集微小，但值得记住的事。**", "bcScrapbookPreset": "tape", "bcTextAlign": "left", "bcAutoResize": false },
+    { "id": "notes", "type": "text", "x": 470, "y": 100, "width": 280, "height": 210, "text": "### 周末的小计划\n\n- [ ] 去街角买一束花\n- [ ] 找一家安静的咖啡馆\n- [ ] 把沿途的颜色记下来\n\n不赶时间，慢慢走。", "bcScrapbookPreset": "lined", "bcTextAlign": "left", "bcAutoResize": false },
+    { "id": "tag", "type": "text", "x": 830, "y": 110, "width": 240, "height": 80, "text": "值得收藏的小事", "bcScrapbookPreset": "label", "bcTextAlign": "center", "bcAutoResize": false },
+    { "id": "quote", "type": "text", "x": 830, "y": 280, "width": 240, "height": 180, "text": "### 留住这一刻\n\n> 灵感往往藏在\n> 没有安排的时间里。\n\n今天，也留一点空白。", "bcScrapbookPreset": "torn", "bcTextAlign": "left", "bcAutoResize": false },
+    { "id": "photo", "type": "file", "file": "Better Canvas 主题体验/scrapbook-postcard.svg", "x": 80, "y": 400, "width": 320, "height": 260, "bcScrapbookPreset": "photo" },
+    { "id": "idea", "type": "text", "x": 480, "y": 420, "width": 280, "height": 185, "text": "### 下一页的灵感\n\n把想法放在一起，\n用一条线连起它们。\n\n**画布有结构，也有温度。**", "bcScrapbookPreset": "tape", "bcTextAlign": "left", "bcAutoResize": false },
+    { "id": "footer", "type": "text", "x": 830, "y": 570, "width": 240, "height": 88, "text": "慢一点，也没关系。\nLittle things, kept.", "bcScrapbookPreset": "label", "bcTextAlign": "center", "bcAutoResize": false }
+  ],
+  "edges": [
+    { "id": "e1", "fromNode": "intro", "fromSide": "right", "toNode": "notes", "toSide": "left", "toEnd": "arrow" },
+    { "id": "e2", "fromNode": "notes", "fromSide": "right", "toNode": "tag", "toSide": "left", "toEnd": "arrow" },
+    { "id": "e3", "fromNode": "intro", "fromSide": "bottom", "toNode": "photo", "toSide": "top", "toEnd": "arrow", "label": "沿途的风景" },
+    { "id": "e4", "fromNode": "notes", "fromSide": "bottom", "toNode": "idea", "toSide": "top", "toEnd": "arrow", "label": "慢慢生长", "bcPathStyle": "dashed" },
+    { "id": "e5", "fromNode": "idea", "fromSide": "right", "toNode": "quote", "toSide": "left", "toEnd": "arrow" },
+    { "id": "e6", "fromNode": "quote", "fromSide": "bottom", "toNode": "footer", "toSide": "top", "toEnd": "arrow" }
+  ]
+}

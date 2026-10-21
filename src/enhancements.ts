@@ -1,4 +1,5 @@
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
+import { decorateCanvasTheme } from "./canvas-theme";
 import {
   AUTO_RESIZE_LAYOUT,
   calculateTextNodeLayout,
@@ -686,6 +687,7 @@ function syncCustomStyleDataAttributes(element: Element | null | undefined, styl
 }
 
 export function decorateCanvas(canvas: any): void {
+  decorateCanvasTheme(canvas);
   let data = readCanvasData(canvas);
 
   // Edges flagged as floating are re-docked to the side facing the opposite

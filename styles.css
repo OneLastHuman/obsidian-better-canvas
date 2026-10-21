@@ -1173,3 +1173,293 @@
     transform: none;
   }
 }
+
+/* Scrapbook: warm stationery, natural ink and small, tactile paper details.
+   Everything is scoped to a Canvas. The host chrome keeps its own theme. */
+.canvas-wrapper[data-bc-theme="scrapbook"] {
+  color-scheme: light;
+  --background-primary: #fff8e8;
+  --background-secondary: #f2e7d2;
+  --background-modifier-border: #d1c1a7;
+  --background-modifier-hover: #e9ddc8;
+  --text-normal: #43372f;
+  --text-muted: #7a6a59;
+  --text-faint: #91816e;
+  --text-accent: #956247;
+  --color-accent: #a16d50;
+  --interactive-accent: #a16d50;
+  --canvas-dot-pattern: #b7a68a;
+  --canvas-color: #8d745e;
+  --canvas-background: #e9dfcb;
+  --code-background: #eaddc6;
+  --code-normal: #614b3e;
+  --text-selection: #e2c99c;
+  --bc-paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23796243' opacity='.075' filter='url(%23n)' d='M0 0h160v160H0z'/%3E%3C/svg%3E");
+  background-color: var(--canvas-background);
+  background-image: var(--bc-paper-grain), radial-gradient(ellipse at 35% 30%, #f4eddf 0%, #e9dfcb 75%);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-background {
+  opacity: 0.32;
+  background: transparent;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-background circle { fill: #a18a68; }
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper] {
+  --bc-paper-fill: #f4dfaa;
+  --bc-paper-ink: #43372f;
+  --bc-tape: #b4b995;
+  color: var(--bc-paper-ink);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="lined"] { --bc-paper-fill: #fcf7ec; }
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"] { --bc-paper-fill: #ecd0c3; }
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="photo"] { --bc-paper-fill: #fffaf1; }
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="label"] { --bc-paper-fill: #d5dfc7; }
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper] .canvas-node-container {
+  color: var(--bc-paper-ink);
+  background-color: var(--bc-paper-fill);
+  background-image: var(--bc-paper-grain);
+  border-color: #a48b694f;
+  box-shadow: 0 1px 1px #6a503425, 1px 4px 6px -3px #6a50344a, 3px 14px 24px -14px #6a503452;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper].is-themed .canvas-node-container {
+  background-color: color-mix(in oklab, var(--canvas-color) 22%, var(--bc-paper-fill));
+  border-color: color-mix(in oklab, var(--canvas-color) 40%, #b7a78b);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper][data-bc-shape="default"] .canvas-node-container {
+  border-radius: 3px 6px 4px 3px;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper] :is(.canvas-node-content, .markdown-preview-view) {
+  background-color: transparent;
+  color: var(--bc-paper-ink);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper] :is(h1, h2, h3, h4, h5, h6) {
+  color: #584534;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  letter-spacing: 0.025em;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper] blockquote {
+  border-inline-start-color: #b7a17e;
+  color: #75604d;
+}
+/* Tape sits on the anchor, outside the paper; pointer events stay with Canvas.
+   Only rectangular cards receive the ornaments, leaving shape outlines intact. */
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="tape"]:is([data-bc-shape="default"], [data-bc-shape="square"])::before,
+.bc-paper-preview[data-bc-paper="tape"]::before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  width: min(92px, 42%);
+  height: 26px;
+  left: 50%;
+  top: -13px;
+  transform: translateX(-50%) rotate(-4deg);
+  background: repeating-linear-gradient(115deg, #ffffff20 0 3px, transparent 3px 7px), #b1b78fbf;
+  border-inline: 1px dashed #8b946b70;
+  box-shadow: 0 1px 2px #715e3120;
+  clip-path: polygon(1% 0, 98% 2%, 100% 14%, 98% 29%, 100% 43%, 98% 61%, 100% 79%, 98% 100%, 0 97%, 2% 83%, 0 67%, 2% 50%, 0 33%, 2% 17%);
+  pointer-events: none;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="lined"] .canvas-node-container,
+.bc-paper-preview[data-bc-paper="lined"] {
+  background-image: linear-gradient(90deg, transparent 0 27px, #c7827540 27px 28px, transparent 28px), repeating-linear-gradient(0deg, transparent 0 23px, #8d9fa52b 23px 24px);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"][data-bc-paper-border="theme"]:is([data-bc-shape="default"], [data-bc-shape="square"]) .canvas-node-container,
+.bc-paper-preview[data-bc-paper="torn"] {
+  border-radius: 0;
+  clip-path: polygon(0 1%, 7% 0, 14% 1%, 21% 0, 28% 1%, 35% 0, 42% 1%, 49% 0, 56% 1%, 63% 0, 70% 1%, 77% 0, 84% 1%, 91% 0, 100% 1%, 100% 98%, 94% 100%, 87% 98%, 80% 100%, 73% 98%, 66% 100%, 59% 98%, 52% 100%, 45% 98%, 38% 100%, 31% 98%, 24% 100%, 17% 98%, 10% 100%, 3% 98%, 0 100%);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"] {
+  filter: drop-shadow(1px 3px 2px #72583a25);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"][data-bc-paper-border="theme"]:is([data-bc-shape="default"], [data-bc-shape="square"]) .canvas-node-container {
+  border-color: transparent;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"]:is([data-bc-shape="default"], [data-bc-shape="square"]):is(.is-selected, .is-focused, .is-editing)::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid #a16d50;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="photo"]:is([data-bc-shape="default"], [data-bc-shape="square"]) .canvas-node-container {
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 8px #fffdf5, inset 0 -17px 0 8px #fffdf5, 1px 4px 5px #6a503430;
+  background-image: linear-gradient(#d5d8c81f, #b2bb9f1a);
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="photo"] .canvas-node-content.image-embed {
+  /* Keep the frame clear without changing the node's interaction geometry. */
+  box-sizing: border-box;
+  padding: 8px 8px 22px;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="photo"] .canvas-node-content.image-embed img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="photo"] .canvas-node-label {
+  background: #fffaf1;
+  color: #8a7258;
+  font-size: 11px;
+  border-radius: 2px;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="label"]:is([data-bc-shape="default"], [data-bc-shape="square"])::before,
+.bc-paper-preview[data-bc-paper="label"]::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border: 1px solid #8c9a7b;
+  border-radius: 50%;
+  background: #e9dfcb;
+  box-shadow: 0 0 0 3px #f7f6e788;
+  transform: translateY(-50%);
+  z-index: 3;
+  pointer-events: none;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="group"] .canvas-node-container {
+  background: #f8f2e521;
+  border: 1.5px dashed #b39b7b;
+  box-shadow: none;
+  border-radius: 7px;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="group"][data-bc-paper-border="explicit"][data-bc-border="solid"] .canvas-node-container { border-style: solid; }
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="group"] .canvas-group-label {
+  color: #6c5743;
+  background: #e4d3b4;
+  border: 1px solid #bdab8c80;
+  border-radius: 2px;
+  padding: 5px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper]:is(.is-selected, .is-focused, .is-editing) .canvas-node-container {
+  outline: 2px solid #a16d50;
+  outline-offset: 4px;
+  box-shadow: 0 2px 4px #6a503430, 3px 12px 24px -10px #6a503445;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-edges {
+  --canvas-color: #94755b;
+  color: #94755b;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-edges path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-path-label {
+  color: #735840;
+  background: #f6edda;
+  border: 1px solid #cbb799;
+  border-radius: 3px;
+  box-shadow: 0 2px 3px #72583a12;
+  font-size: 12px;
+  padding: 3px 9px;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-control-group,
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-card-menu {
+  color: #68533e;
+  background: #faf5e9;
+  border-color: #cdbb9f;
+  box-shadow: 0 2px 6px #72583a18;
+}
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-control-item:hover { background: #e9ddc8; }
+.bc-theme-control-button { padding: 0; box-shadow: none; border-radius: 0; background: transparent; color: inherit; }
+.canvas-wrapper[data-bc-theme="scrapbook"] button.bc-theme-control-button { background: transparent; color: #68533e; }
+.bc-node-style-panel[data-bc-theme="scrapbook"] {
+  color-scheme: light;
+  --background-primary: #fffaf0;
+  --background-secondary: #f0e7d6;
+  --background-modifier-border: #d5c6ad;
+  --background-modifier-hover: #e9ddc8;
+  --text-normal: #51412f;
+  --text-muted: #867057;
+  --text-faint: #9a8870;
+  --color-accent: #a16d50;
+  --interactive-accent: #a16d50;
+  --text-on-accent: #fffaf0;
+}
+
+/* The same paper treatments are used for the live cards and their swatches. */
+.bc-paper-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.bc-paper-preset {
+  height: 80px;
+  min-width: 0;
+  padding: 15px 8px 10px;
+  background: #eae1d0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.bc-paper-preset:hover { background: #e0d4bf; }
+.bc-paper-preset.is-selected { border-color: #a16d50; box-shadow: 0 0 0 1px #a16d50; }
+.bc-paper-preset.is-mixed { border: 1px dashed #a16d50; }
+.bc-paper-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 48px;
+  width: 100%;
+  background: #f4dfaa;
+  color: #584534;
+  border: 1px solid #a48b694f;
+  border-radius: 2px;
+  box-shadow: 1px 3px 5px #71563525;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-family: "Palatino Linotype", "SimSun", serif;
+}
+.bc-paper-preview[data-bc-paper="tape"]::before { height: 13px; top: -6px; width: 38px; }
+.bc-paper-preview[data-bc-paper="lined"] { background-color: #fcf7ec; }
+.bc-paper-preview[data-bc-paper="torn"] { background-color: #ecd0c3; }
+.bc-paper-preview[data-bc-paper="photo"] {
+  background: #d7ddce;
+  border: 5px solid #fffaf1;
+  border-bottom-width: 12px;
+}
+.bc-paper-preview[data-bc-paper="label"] { background: #d5dfc7; padding-left: 10px; }
+.bc-paper-preview[data-bc-paper="label"]::before { left: 5px; width: 4px; height: 4px; box-shadow: none; }
+
+/* Theme picker: a small board, rather than a colour chip, previews the theme. */
+.modal.bc-theme-modal { width: min(640px, 92vw); }
+.bc-theme-intro { color: var(--text-muted); margin: 2px 0 22px; }
+.bc-theme-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+button.bc-theme-choice {
+  display: block;
+  height: auto;
+  padding: 7px 7px 16px;
+  text-align: left;
+  white-space: normal;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-primary);
+  box-shadow: none;
+}
+button.bc-theme-choice[aria-pressed="true"] { border-color: var(--interactive-accent); box-shadow: 0 0 0 1px var(--interactive-accent); }
+button.bc-theme-choice:hover { border-color: var(--text-muted); }
+.bc-theme-mini-board {
+  height: 165px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #e9dfcb;
+  background-image: radial-gradient(#a18a6830 0.7px, transparent 0.7px);
+  background-size: 11px 11px;
+}
+.bc-theme-mini-caption { position: absolute; top: 14px; left: 16px; color: #84715a; font: italic 13px Georgia, serif; }
+.bc-theme-mini-board svg { position: absolute; inset: 15px 0 0; width: 100%; height: 140px; fill: none; stroke: #94755b; stroke-width: 1.4; }
+.bc-theme-mini-board .bc-paper-preview { position: absolute; width: 76px; height: 46px; font-size: 11px; }
+.bc-theme-mini-board .bc-mini-tape { left: 20px; top: 58px; transform: rotate(-5deg); }
+.bc-theme-mini-board .bc-mini-lined { right: 23px; top: 88px; transform: rotate(4deg); }
+.bc-theme-mini-board .bc-mini-label { right: 22px; top: 42px; width: 65px; height: 28px; transform: rotate(-3deg); }
+.bc-theme-mini-board[data-bc-theme="default"] { background-color: var(--background-secondary); }
+.bc-theme-mini-board[data-bc-theme="default"] .bc-paper-preview { background: var(--background-primary); color: var(--text-normal); border: 1px solid var(--background-modifier-border); border-radius: 5px; transform: none; }
+.bc-theme-mini-board[data-bc-theme="default"] .bc-paper-preview::before { display: none; }
+.bc-theme-mini-board[data-bc-theme="default"] .bc-theme-mini-caption { color: var(--text-muted); }
+.bc-theme-choice-label { display: flex; align-items: center; justify-content: space-between; margin: 14px 9px 5px; }
+.bc-theme-current { font-size: 11px; color: var(--text-accent); }
+.bc-theme-choice-detail { color: var(--text-muted); font-size: 12px; margin: 0 9px; }
+.bc-theme-footnote { color: var(--text-muted); font-size: 12px; line-height: 1.7; margin: 20px 0 0; }
+@media (max-width: 480px) { .bc-theme-choices { grid-template-columns: 1fr; } }

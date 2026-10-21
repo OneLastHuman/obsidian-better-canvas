@@ -181,7 +181,8 @@ type TestCanvasData = {
 
 function createStylePanel(
   nodePatches: Array<Record<string, unknown>> = [{}],
-  selectedCount = nodePatches.length
+  selectedCount = nodePatches.length,
+  theme?: string
 ): {
   surface: FakeElement;
   canvas: {
@@ -195,6 +196,7 @@ function createStylePanel(
   const unifier = new NodeMenuUnifier({ app: {} } as never);
   const harness = unifier as unknown as PanelHarness;
   let data: TestCanvasData = {
+    ...(theme ? { bcTheme: theme } : {}),
     nodes: nodePatches.map((patch, index) => ({
       id: "n" + (index + 1),
       type: "text",
@@ -263,6 +265,24 @@ afterEach(() => {
 });
 
 describe("node style panel rendering", () => {
+  it("shows scrapbook treatments and applies them to the full selection preserving explicit styles", () => {
+    const panel = createStylePanel([{ bcShape: "diamond" }, {}], 2, "scrapbook");
+    const tape = optionButton(panel.surface, "paper-tape");
+    expect(tape.getAttribute("aria-label")).toContain("胶带便签");
+    optionButton(panel.surface, "paper-lined").click();
+    expect(panel.getData().nodes.map(node => node.bcScrapbookPreset)).toEqual(["lined", "lined"]);
+    expect(panel.getData().nodes[0].bcShape).toBe("diamond");
+    expect(panel.getData().nodes[0].color).toBe("#3b82f6");
+    panel.close();
+  });
+
+  it("rejects paper changes on a read-only canvas", () => {
+    const panel = createStylePanel([{}], 1, "scrapbook");
+    (panel.canvas as any).readonly = true;
+    optionButton(panel.surface, "paper-photo").click();
+    expect(panel.getData().nodes[0].bcScrapbookPreset).toBeUndefined();
+    panel.close();
+  });
   it("renders every option instead of printing its name", () => {
     const surface = renderStylePanel();
 
