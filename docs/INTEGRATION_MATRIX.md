@@ -74,7 +74,7 @@ This matrix records Better Canvas implementation and parity gaps against the cur
 
 | Feature | Status | Notes |
 |---|---|---|
-| Ask AI from a selected node | Implemented, command/menu/card toolbar | Adds a progressively updated response node connected to the source; hover toolbar exposes Ask AI, image generation, flashcards and per-node model selection, with regenerate on generated cards |
+| Ask AI from a selected node | Implemented, command/node menu | Adds a progressively updated response node connected to the source. Both ordinary and model-specific questions use a compact composer with single-line context, model label, draft-preserving text starters, an accessible round send button, and an outer bottom-right resize handle. On 2026-10-23, Windows / Obsidian 1.14.4 checks in an independent preview Vault covered light/dark appearance, 390px viewport emulation, native resizing, blank/IME/duplicate-submit guards, Enter/Escape, local backend labels and model-override forwarding. Generation was intercepted during these checks; no live-provider or actual-mobile compatibility claim is made |
 | Stop in-flight generation | Implemented, transport-dependent | Uses AbortController for streaming fetch; a fallback non-streaming request may not be cancellable |
 | Regenerate response | Implemented | Requires Better Canvas generation metadata on the response node |
 | Per-node provider / model overrides | Implemented | Stores provider and model identifiers on the node |
