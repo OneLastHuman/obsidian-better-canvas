@@ -1466,3 +1466,361 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .bc-theme-choice-detail { color: var(--text-muted); font-size: 12px; margin: 0 9px; }
 .bc-theme-footnote { color: var(--text-muted); font-size: 12px; line-height: 1.7; margin: 20px 0 0; }
 @media (max-width: 480px) { .bc-theme-choices { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------------------------ */
+/* Sketch theme: whiteboard paper, ink outlines, handwriting, six presets. */
+.canvas-wrapper[data-bc-theme="sketch"] {
+  color-scheme: light;
+  --bc-sketch-paper: #fffefb;
+  --bc-sketch-ink: #262520;
+  --bc-sketch-muted: #696b65;
+  --bc-sketch-accent: #6554c0;
+  --bc-sketch-font: "BC Sketch Hand", "Segoe Print", cursive;
+  --background-primary: #fffefb;
+  --background-secondary: #f4f3ee;
+  --background-modifier-border: #d9d8cf;
+  --background-modifier-hover: #ecebe4;
+  --text-normal: #262520;
+  --text-muted: #696b65;
+  --text-faint: #888982;
+  --text-accent: #6554c0;
+  --color-accent: #6554c0;
+  --interactive-accent: #6554c0;
+  --canvas-dot-pattern: #d8d7cf;
+  --canvas-color: #73736c;
+  --canvas-background: #fffefb;
+  --code-background: #f1f0ea;
+  --code-normal: #45443e;
+  --text-selection: #ddd6ff;
+  background-color: var(--bc-sketch-paper);
+}
+.theme-dark .canvas-wrapper[data-bc-theme="sketch"] {
+  color-scheme: dark;
+  --bc-sketch-paper: #202126;
+  --bc-sketch-ink: #ecebe4;
+  --bc-sketch-muted: #aaa9b0;
+  --bc-sketch-accent: #b5a7ff;
+  --background-primary: #202126;
+  --background-secondary: #292a30;
+  --background-modifier-border: #41424a;
+  --background-modifier-hover: #33343b;
+  --text-normal: #ecebe4;
+  --text-muted: #aaa9b0;
+  --text-faint: #8f9098;
+  --text-accent: #b5a7ff;
+  --color-accent: #b5a7ff;
+  --interactive-accent: #b5a7ff;
+  --canvas-dot-pattern: #4b4c55;
+  --canvas-color: #c9c8d0;
+  --canvas-background: #202126;
+  --code-background: #292a30;
+  --code-normal: #d6d5dc;
+  --text-selection: #463d78;
+  background-color: var(--bc-sketch-paper);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-background {
+  opacity: 0.7;
+  background: transparent;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node .canvas-node-container {
+  color: var(--bc-sketch-ink);
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node-container {
+  position: relative;
+  overflow: visible;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .bc-sketch-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: var(--bc-sketch-ink);
+  pointer-events: none;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node-content {
+  position: relative;
+  z-index: 1;
+  color: var(--bc-sketch-ink);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node-container :is(
+  .markdown-preview-view,
+  .markdown-source-view,
+  .markdown-rendered,
+  .cm-editor,
+  .cm-content,
+  .markdown-embed,
+  p,
+  li,
+  h1, h2, h3, h4, h5, h6
+) {
+  color: var(--bc-sketch-ink);
+  font-family: var(--bc-sketch-font) !important;
+  font-weight: 600;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node-content :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 600;
+  line-height: 1.3;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="heading"] .canvas-node-content {
+  font-size: 30px !important;
+  line-height: 1.35 !important;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="concept"] .canvas-node-content,
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="action"] .canvas-node-content,
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="risk"] .canvas-node-content {
+  font-size: 24px !important;
+  line-height: 1.4 !important;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="decision"] .canvas-node-content {
+  font-size: 22px !important;
+  line-height: 1.35 !important;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="annotation"] .canvas-node-content {
+  font-size: 20px !important;
+  line-height: 1.55 !important;
+  color: var(--bc-sketch-muted);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="annotation"] .canvas-node-content :is(p, li) {
+  color: var(--bc-sketch-muted);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="heading"] .canvas-node-content,
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="annotation"] .canvas-node-content {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="concept"] .canvas-node-content {
+  box-sizing: border-box;
+  padding: 16px 34px;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="decision"] .canvas-node-content {
+  box-sizing: border-box;
+  padding: 24px 38px;
+}
+/* Hit the content height, not the wrapper, for vertically balanced cards. */
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node-content .markdown-preview-sizer {
+  min-height: auto;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch] .canvas-node-label {
+  font-family: var(--bc-sketch-font);
+  font-weight: 600;
+  color: var(--bc-sketch-muted);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node.is-selected .canvas-node-container,
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node.is-focused .canvas-node-container,
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node.is-editing .canvas-node-container {
+  outline: 1.5px dashed var(--bc-sketch-accent);
+  outline-offset: 7px;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch="free"] .canvas-node-container {
+  border-color: color-mix(in srgb, var(--bc-sketch-ink) 25%, transparent) !important;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="annotation"] .canvas-node-container,
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="heading"] .canvas-node-container {
+  border-color: transparent !important;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch="free"] .canvas-node-container {
+  border-style: solid;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch="free"] .canvas-node-container {
+  box-shadow: none !important;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset] .canvas-node-label {
+  display: none;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-group-label {
+  color: var(--bc-sketch-muted);
+  background: transparent;
+  border: 0;
+  font-family: var(--bc-sketch-font);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-edges {
+  --canvas-color: var(--bc-sketch-ink);
+  color: var(--bc-sketch-ink);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-edges path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: url(#bc-sketch-wobble);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-path-label {
+  color: var(--bc-sketch-muted);
+  background: var(--bc-sketch-paper);
+  border: 1px dashed color-mix(in srgb, var(--bc-sketch-muted) 45%, transparent);
+  border-radius: 4px;
+  font-family: var(--bc-sketch-font);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 8px;
+}
+.canvas-wrapper[data-bc-theme="sketch"] :is(.canvas-control-group, .canvas-card-menu) {
+  color: var(--bc-sketch-ink);
+  background: var(--bc-sketch-paper);
+  border-color: color-mix(in srgb, var(--bc-sketch-ink) 18%, transparent);
+  box-shadow: 0 2px 8px #00000010;
+}
+.canvas-wrapper[data-bc-theme="sketch"] .canvas-control-item:hover {
+  background: var(--background-modifier-hover);
+}
+.canvas-wrapper[data-bc-theme="sketch"] .bc-theme-control-button {
+  background: transparent;
+  color: var(--bc-sketch-ink);
+}
+.bc-node-style-panel[data-bc-theme="sketch"] {
+  --bc-sketch-ink: #262520;
+  --bc-sketch-muted: #696b65;
+  --bc-sketch-font: "BC Sketch Hand", "Segoe Print", cursive;
+}
+.theme-dark .bc-node-style-panel[data-bc-theme="sketch"] {
+  --bc-sketch-ink: #ecebe4;
+  --bc-sketch-muted: #aaa9b0;
+}
+.bc-sketch-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+.bc-sketch-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  text-align: left;
+}
+.bc-sketch-preset:hover {
+  background: var(--background-modifier-hover);
+}
+.bc-sketch-preset[aria-pressed="true"] {
+  border-color: var(--interactive-accent);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.bc-sketch-preset-preview {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 2.8rem;
+  padding: 0 0.45rem;
+  overflow: hidden;
+  color: var(--bc-sketch-preset-color, var(--text-muted));
+  border: 1.7px solid currentColor;
+  border-radius: 7px;
+  font: 15px var(--bc-sketch-font);
+  font-weight: 600;
+  line-height: 1.1;
+  transform: rotate(-0.45deg);
+  white-space: nowrap;
+}
+.bc-sketch-preset-preview.shape-square { border-radius: 2px; }
+.bc-sketch-preset-preview.shape-ellipse,
+.bc-sketch-preset-preview.shape-circle { border-radius: 50%; }
+.bc-sketch-preset-preview.shape-pill { border-radius: 999px; }
+.bc-sketch-preset-preview.shape-diamond {
+  border: 0;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  background: color-mix(in srgb, currentColor 22%, var(--background-primary));
+}
+.bc-sketch-preset-preview.shape-diamond.fill-solid {
+  background: color-mix(in srgb, currentColor 34%, var(--background-primary));
+}
+.bc-sketch-preset-preview.border-invisible { border-color: transparent; }
+.bc-sketch-preset-preview.border-dashed { border-style: dashed; }
+.bc-sketch-preset-preview.fill-solid { background: color-mix(in srgb, currentColor 24%, var(--background-primary)); }
+.bc-sketch-preset-preview.fill-hachure {
+  background: repeating-linear-gradient(-48deg, color-mix(in srgb, currentColor 60%, transparent) 0 1px, transparent 1px 6px);
+}
+.bc-sketch-preset-preview.fill-cross-hatch {
+  background:
+    repeating-linear-gradient(48deg, color-mix(in srgb, currentColor 42%, transparent) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(-48deg, color-mix(in srgb, currentColor 42%, transparent) 0 1px, transparent 1px 6px);
+}
+.bc-sketch-preset-preview.align-left { justify-content: flex-start; }
+.bc-sketch-preset-preview.align-right { justify-content: flex-end; }
+.bc-sketch-preset-name {
+  color: var(--text-normal);
+  font-size: 0.72rem;
+  font-weight: var(--font-semibold);
+  line-height: 1.25;
+}
+.bc-sketch-fills {
+  display: flex;
+  gap: 0.35rem;
+}
+.bc-sketch-fill {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  padding: 0.35rem 0.2rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.66rem;
+}
+.bc-sketch-fill[aria-pressed="true"] {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+.bc-sketch-fill-swatch {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--bc-sketch-ink);
+  border-radius: 3px;
+}
+.bc-sketch-fill-swatch.fill-none { background: transparent; border-style: dashed; }
+.bc-sketch-fill-swatch.fill-solid { background: color-mix(in srgb, var(--text-accent) 34%, transparent); }
+.bc-sketch-fill-swatch.fill-hachure {
+  background: repeating-linear-gradient(-48deg, var(--bc-sketch-ink) 0 1px, transparent 1px 4px);
+}
+.bc-sketch-fill-swatch.fill-cross-hatch {
+  background:
+    repeating-linear-gradient(48deg, var(--bc-sketch-ink) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-48deg, var(--bc-sketch-ink) 0 1px, transparent 1px 5px);
+}
+.bc-theme-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bc-theme-mini-board[data-bc-theme="sketch"] {
+  background-color: #fffefb;
+  background-image: radial-gradient(#d8d7cf 0.7px, transparent 0.7px);
+}
+.bc-theme-mini-board[data-bc-theme="sketch"] svg { stroke: #262520; }
+.bc-theme-mini-board[data-bc-theme="sketch"] .bc-theme-mini-caption {
+  color: #696b65;
+  font-family: "BC Sketch Hand", "Segoe Print", cursive;
+  font-style: normal;
+  font-weight: 600;
+}
+.bc-theme-mini-board[data-bc-theme="sketch"] .bc-sketch-mini {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #262520;
+  border: 1.5px solid #262520;
+  border-radius: 5px;
+  background: repeating-linear-gradient(-48deg, #719cf466 0 1px, transparent 1px 5px);
+  font: 13px "BC Sketch Hand", "Segoe Print", cursive;
+  font-weight: 600;
+  transform: rotate(-1deg);
+}
+.bc-theme-mini-board[data-bc-theme="sketch"] .bc-mini-concept { left: 18px; top: 65px; width: 80px; height: 48px; border-radius: 50%; }
+.bc-theme-mini-board[data-bc-theme="sketch"] .bc-mini-action { right: 18px; top: 46px; width: 78px; height: 40px; background: repeating-linear-gradient(-48deg, #78b58c66 0 1px, transparent 1px 5px); transform: rotate(1deg); }
+.bc-theme-mini-board[data-bc-theme="sketch"] .bc-mini-risk { right: 30px; top: 99px; width: 74px; height: 36px; border-style: dashed; border-color: #e8798f; background: repeating-linear-gradient(48deg, #e8798f55 0 1px, transparent 1px 5px), repeating-linear-gradient(-48deg, #e8798f55 0 1px, transparent 1px 5px); transform: rotate(-2deg); }
+@media (max-width: 640px) { .bc-theme-choices { grid-template-columns: 1fr; } }

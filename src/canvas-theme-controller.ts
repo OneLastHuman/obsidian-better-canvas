@@ -1,5 +1,7 @@
 import { Modal, Notice, setIcon, type App, type Plugin } from "obsidian";
 import { readCanvasData } from "./canvas";
+import { clearSketchCanvas } from "./sketch-renderer";
+import { SKETCH_FONT_CSS } from "./sketch-font";
 import { decorateCanvasTheme, resolveCanvasTheme, setCanvasTheme, type CanvasThemeId } from "./canvas-theme";
 
 /**
@@ -19,6 +21,8 @@ export function createThemeControl(): HTMLElement {
 }
 
 const EDITOR_STYLE_ID = "bc-scrapbook-editor";
+const SKETCH_EDITOR_STYLE_ID = "bc-sketch-editor";
+const FONT_STYLE_ID = "bc-sketch-font";
 const EDITOR_CSS = `
 body { color-scheme: light; --background-primary: #fff8e8; --background-secondary: #f2e7d2;
   --text-normal: #43372f; --text-muted: #766758; --text-faint: #8c7b68;
@@ -27,6 +31,20 @@ body { color-scheme: light; --background-primary: #fff8e8; --background-secondar
   --text-selection: #e2c99c; color: #43372f; background: transparent; }
 .markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #43372f; }
 `;
+
+function sketchEditorCss(): string {
+  return SKETCH_FONT_CSS + `
+body { color-scheme: light; --background-primary: #fffefb; --background-secondary: #f4f3ee;
+  --text-normal: #262520; --text-muted: #696b65; --text-faint: #8a8b84;
+  --text-accent: #6554c0; --text-accent-hover: #4f3fa5; --color-accent: #6554c0;
+  --code-background: #f1f0ea; --code-normal: #45443e; --background-modifier-border: #d9d8cf;
+  --text-selection: #ddd6ff; color: #262520; background: transparent;
+  font-family: "BC Sketch Hand", "Segoe Print", cursive; font-weight: 600; }
+.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #262520; }
+.markdown-preview-view, .markdown-source-view, .cm-content, .inline-title {
+  font-family: "BC Sketch Hand", "Segoe Print", cursive; font-weight: 600; }
+`;
+}
 
 class CanvasThemeModal extends Modal {
   constructor(app: App, private readonly canvas: any, private readonly changed: () => void) {
@@ -41,7 +59,8 @@ class CanvasThemeModal extends Modal {
     const current = resolveCanvasTheme(readCanvasData(this.canvas));
     const themes: Array<{ id: CanvasThemeId; title: string; detail: string }> = [
       { id: "default", title: "默认", detail: "跟随 Obsidian · 清晰简洁" },
-      { id: "scrapbook", title: "拼贴手账", detail: "暖纸 · 胶带 · 收藏灵感" }
+      { id: "scrapbook", title: "拼贴手账", detail: "暖纸 · 胶带 · 收藏灵感" },
+      { id: "sketch", title: "手绘白板", detail: "白纸 · 手绘线 · 功能预设" }
     ];
     for (const theme of themes) {
       const button = choices.createEl("button", { cls: "bc-theme-choice" });
@@ -51,17 +70,31 @@ class CanvasThemeModal extends Modal {
       const board = button.createDiv({ cls: "bc-theme-mini-board" });
       board.dataset.bcTheme = theme.id;
       board.setAttribute("aria-hidden", "true");
-      board.createSpan({ cls: "bc-theme-mini-caption", text: theme.id === "scrapbook" ? "little things, kept." : "A space to think." });
+      board.createSpan({
+        cls: "bc-theme-mini-caption",
+        text: theme.id === "scrapbook" ? "little things, kept."
+          : theme.id === "sketch" ? "think in ink."
+            : "A space to think."
+      });
       // createElementNS is necessary for SVG in Obsidian's HTML helpers.
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 240 140");
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", "M82 67 C125 60 100 104 152 100 M145 94 L153 100 L146 106");
+      path.setAttribute("d", theme.id === "sketch"
+        ? "M74 72 C116 64 101 106 157 99 M149 93 L158 99 L150 106"
+        : "M82 67 C125 60 100 104 152 100 M145 94 L153 100 L146 106");
       svg.appendChild(path);
       board.appendChild(svg);
-      for (const [kind, text] of [["tape", "灵感"], ["lined", "记录"], ["label", "收藏"]]) {
-        const paper = board.createSpan({ cls: "bc-paper-preview bc-mini-" + kind, text });
-        paper.dataset.bcPaper = kind;
+      if (theme.id === "sketch") {
+        for (const [kind, text] of [["concept", "想法"], ["action", "下一步"], ["risk", "待确认"]]) {
+          const sample = board.createSpan({ cls: "bc-sketch-mini bc-mini-" + kind, text });
+          sample.dataset.bcSketchPreview = kind;
+        }
+      } else {
+        for (const [kind, text] of [["tape", "灵感"], ["lined", "记录"], ["label", "收藏"]]) {
+          const paper = board.createSpan({ cls: "bc-paper-preview bc-mini-" + kind, text });
+          paper.dataset.bcPaper = kind;
+        }
       }
       const label = button.createDiv({ cls: "bc-theme-choice-label" });
       label.createEl("strong", { text: theme.title });
@@ -77,7 +110,7 @@ class CanvasThemeModal extends Modal {
         this.close();
       });
     }
-    this.contentEl.createEl("p", { cls: "bc-theme-footnote", text: "主题随画布保存。选中卡片后，在「节点样式」中挑选纸片预设。" });
+    this.contentEl.createEl("p", { cls: "bc-theme-footnote", text: "主题随画布保存。手绘白板可在「节点样式」中组合六种功能预设。" });
   }
 
   onClose(): void {
@@ -96,6 +129,7 @@ export default class CanvasThemeController {
   constructor(private readonly plugin: Plugin) {}
 
   start(): void {
+    this.ensureFont();
     const workspace = this.plugin.app.workspace as any;
     for (const name of ["layout-change", "active-leaf-change", "advanced-canvas:data-loaded:after",
       "advanced-canvas:node-added", "advanced-canvas:node-changed", "advanced-canvas:node-editing-state-changed",
@@ -129,6 +163,18 @@ export default class CanvasThemeController {
     this.modal.open();
   }
 
+  /** The font is embedded in main.js; inject it once for Canvas and editor iframes. */
+  private ensureFont(): void {
+    if (!SKETCH_FONT_CSS) return;
+    const head = (globalThis as any).document?.head;
+    if (!head || typeof document === "undefined") return;
+    if (document.getElementById(FONT_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = FONT_STYLE_ID;
+    style.textContent = SKETCH_FONT_CSS;
+    head.appendChild(style);
+  }
+
   private schedule(): void {
     if (this.stopped || this.pendingFrame !== null) return;
     this.pendingFrame = window.requestAnimationFrame(() => {
@@ -148,7 +194,7 @@ export default class CanvasThemeController {
       this.decoratedCanvases.add(canvas);
       decorateCanvasTheme(canvas);
       const theme = resolveCanvasTheme(readCanvasData(canvas));
-      this.syncEditors(canvas, theme === "scrapbook");
+      this.syncEditors(canvas, theme);
       const stack = view.containerEl?.querySelector(".canvas-controls");
       if (!stack) continue;
       let group = this.controls.get(canvas);
@@ -176,7 +222,8 @@ export default class CanvasThemeController {
         this.controls.set(canvas, group);
       }
       const control = group.firstElementChild as HTMLElement;
-      control.setAttribute("aria-label", "画布主题 · " + (theme === "scrapbook" ? "拼贴手账" : "默认"));
+      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : "默认";
+      control.setAttribute("aria-label", "画布主题 · " + themeName);
     }
     for (const [canvas, group] of this.controls) {
       if (live.has(canvas)) continue;
@@ -190,17 +237,28 @@ export default class CanvasThemeController {
     }
   }
 
-  private syncEditors(canvas: any, enabled: boolean): void {
+  private syncEditors(canvas: any, theme: CanvasThemeId): void {
     for (const iframe of canvas.wrapperEl?.querySelectorAll("iframe.canvas-node-iframe, .markdown-embed iframe.embed-iframe.is-controlled") ?? []) {
       try {
         const doc = (iframe as HTMLIFrameElement).contentDocument;
         if (!doc?.head) continue;
-        const previous = doc.getElementById(EDITOR_STYLE_ID);
-        if (!enabled) { previous?.remove(); continue; }
-        if (previous) continue;
+        const scrapbook = doc.getElementById(EDITOR_STYLE_ID);
+        const sketch = doc.getElementById(SKETCH_EDITOR_STYLE_ID);
+        if (theme === "default") {
+          scrapbook?.remove();
+          sketch?.remove();
+          continue;
+        }
+        const styleId = theme === "scrapbook" ? EDITOR_STYLE_ID : SKETCH_EDITOR_STYLE_ID;
+        if (doc.getElementById(styleId)) {
+          (theme === "scrapbook" ? sketch : scrapbook)?.remove();
+          continue;
+        }
+        scrapbook?.remove();
+        sketch?.remove();
         const style = doc.createElement("style");
-        style.id = EDITOR_STYLE_ID;
-        style.textContent = EDITOR_CSS;
+        style.id = styleId;
+        style.textContent = theme === "scrapbook" ? EDITOR_CSS : sketchEditorCss();
         doc.head.appendChild(style);
       } catch { /* Remote embeds are not editing surfaces. */ }
     }
@@ -218,10 +276,11 @@ export default class CanvasThemeController {
 
   private clearDecoration(canvas: any): void {
     if (canvas.wrapperEl?.dataset) delete canvas.wrapperEl.dataset.bcTheme;
+    clearSketchCanvas(canvas);
     for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-paper]") ?? []) {
       delete el.dataset.bcPaper;
       delete el.dataset.bcPaperBorder;
     }
-    this.syncEditors(canvas, false);
+    this.syncEditors(canvas, "default");
   }
 }

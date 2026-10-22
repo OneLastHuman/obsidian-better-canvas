@@ -15,6 +15,11 @@ describe("Canvas themes", () => {
     expect(resolveCanvasTheme({ ...sample, bcTheme: "scrapbook" })).toBe("scrapbook");
   });
 
+  it("resolves the hand-drawn theme without treating unknown values as themes", () => {
+    expect(resolveCanvasTheme({ ...sample, bcTheme: "sketch" })).toBe("sketch");
+    expect(withCanvasTheme(sample, "sketch").bcTheme).toBe("sketch");
+  });
+
   it("switches a whole board without rewriting cards, edges or extensions", () => {
     const next = withCanvasTheme(sample, "scrapbook");
     expect(next.bcTheme).toBe("scrapbook");
@@ -85,5 +90,19 @@ describe("Canvas themes", () => {
     expect(wrapperEl.dataset.bcTheme).toBeUndefined();
     expect(nodeEl.dataset.bcPaper).toBeUndefined();
     expect(nodeEl.dataset.bcPaperBorder).toBeUndefined();
+  });
+
+  it("marks a sketch board and clears the marker when another snapshot is loaded", () => {
+    let data = { ...sample, bcTheme: "sketch" } as CanvasData;
+    const wrapperEl = {
+      dataset: {} as Record<string, string>,
+      querySelectorAll: () => [] as any[]
+    };
+    const canvas = { getData: () => data, wrapperEl, nodes: new Map() };
+    decorateCanvasTheme(canvas);
+    expect(wrapperEl.dataset.bcTheme).toBe("sketch");
+    data = sample;
+    decorateCanvasTheme(canvas);
+    expect(wrapperEl.dataset.bcTheme).toBeUndefined();
   });
 });

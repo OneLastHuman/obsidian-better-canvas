@@ -26,6 +26,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "html-to-image": "^1.11.13"
+    "html-to-image": "^1.11.13",
+    "roughjs": "^4.6.6"
   }
 }

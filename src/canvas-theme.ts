@@ -1,6 +1,7 @@
 import { readCanvasData, type CanvasData } from "./canvas";
+import { clearSketchCanvas, decorateSketchCanvas } from "./sketch-renderer";
 
-export type CanvasThemeId = "default" | "scrapbook";
+export type CanvasThemeId = "default" | "scrapbook" | "sketch";
 
 export const SCRAPBOOK_PRESETS = [
   { id: "tape", label: "胶带便签", sample: "拾起灵感", color: "#f4dfaa" },
@@ -24,7 +25,9 @@ export const SCRAPBOOK_COLORS = [
 ] as const;
 
 export function resolveCanvasTheme(data: Partial<CanvasData>): CanvasThemeId {
-  return data.bcTheme === "scrapbook" ? "scrapbook" : "default";
+  if (data.bcTheme === "scrapbook") return "scrapbook";
+  if (data.bcTheme === "sketch") return "sketch";
+  return "default";
 }
 
 export function withCanvasTheme(data: CanvasData, theme: CanvasThemeId): CanvasData {
@@ -70,9 +73,11 @@ export function decorateCanvasTheme(canvas: any): void {
   const theme = resolveCanvasTheme(data);
   const wrapper = canvas?.wrapperEl;
   if (wrapper?.dataset) {
-    if (theme === "scrapbook") wrapper.dataset.bcTheme = theme;
+    if (theme !== "default") wrapper.dataset.bcTheme = theme;
     else delete wrapper.dataset.bcTheme;
   }
+  if (theme === "sketch") decorateSketchCanvas(canvas);
+  else clearSketchCanvas(canvas);
   for (const item of data.nodes) {
     const node = canvas?.nodes?.get?.(item.id);
     const el = node?.nodeEl ?? node?.containerEl ?? node?.el;
