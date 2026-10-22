@@ -4,34 +4,9 @@ export type NodeTextAlignment = "left" | "center" | "right";
 
 export const DEFAULT_NODE_WIDTH = 280;
 export const DEFAULT_NODE_HEIGHT = 140;
-export const MIN_NODE_WIDTH = 20;
-export const MAX_NODE_WIDTH = 1200;
-export const MIN_NODE_HEIGHT = 20;
-export const MAX_NODE_HEIGHT = 1000;
-
-/** Clamp a configured default node width into the settings range. */
-export function normalizeDefaultNodeWidth(value: unknown): number {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return DEFAULT_NODE_WIDTH;
-  return Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, number));
-}
-
-/** Clamp a configured default node height into the settings range. */
-export function normalizeDefaultNodeHeight(value: unknown): number {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return DEFAULT_NODE_HEIGHT;
-  return Math.min(MAX_NODE_HEIGHT, Math.max(MIN_NODE_HEIGHT, number));
-}
-
-/** Read the configured default text-node size with safe fallbacks. */
-export function configuredDefaultNodeSize(settings: unknown): { width: number; height: number } {
-  const record = settings !== null && typeof settings === "object"
-    ? settings as Record<string, unknown>
-    : {};
-  return {
-    width: normalizeDefaultNodeWidth(record.defaultNodeWidth),
-    height: normalizeDefaultNodeHeight(record.defaultNodeHeight)
-  };
+/** Fixed creation size; existing cards and content-driven sizing keep their own geometry. */
+export function defaultNodeSize(): { width: number; height: number } {
+  return { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT };
 }
 
 export function normalizeDefaultNodeTextAlignment(value: unknown): NodeTextAlignment {
@@ -40,7 +15,7 @@ export function normalizeDefaultNodeTextAlignment(value: unknown): NodeTextAlign
 
 /**
  * Apply the configured default to a new text node only when that node has no
- * explicit text alignment of its own. Existing node/template styles and other
+ * explicit text alignment of its own. Existing node styles and other
  * node types must remain untouched.
  */
 export function applyDefaultNodeTextAlignment(

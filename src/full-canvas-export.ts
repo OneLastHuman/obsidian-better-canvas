@@ -6,6 +6,8 @@ import { renderSketchNodeSvg, SKETCH_EDGE_FILTER_ID } from "./sketch-renderer";
 import { resolveSketchStyle } from "./sketch-style";
 import { resolveSoftNotesStyle } from "./soft-notes-style";
 import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
+import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { roundedMapInsets, roundedMapPath, ROUNDED_MAP_INK, ROUNDED_MAP_PAPER, ROUNDED_MAP_STROKE } from "./rounded-map-style";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -141,7 +143,7 @@ function arrowMarker(id: string, style: string, color: string): string {
     '" stroke-width="' + strokeWidth + '" stroke-linejoin="round" stroke-linecap="round"/></marker>';
 }
 
-function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, index: number, sketch = false): string {
+function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, index: number, sketch = false, rounded = false, margin = 48): string {
   const from = nodes.get(edge.fromNode);
   const to = nodes.get(edge.toNode);
   if (!from || !to) return "";
@@ -162,8 +164,9 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
   const endVisible = !noArrows && (toEnd
     ? toEnd !== "none" && toEnd !== "null"
     : true);
-  const color = edgeColor(edge);
-  const lineWidth = Math.max(0.5, Math.min(10, number(attrs.strokeWidth ?? attrs.lineWidth ?? (edge as any).bcWidth, 2)));
+  const color = rounded && !edge.color && !edge.bcColor && !attrs.strokeColor && !attrs.color
+    ? ROUNDED_MAP_INK : edgeColor(rounded && !edge.color && edge.bcColor ? { ...edge, color: edge.bcColor } : edge);
+  const lineWidth = Math.max(0.5, Math.min(10, number(attrs.strokeWidth ?? attrs.lineWidth ?? (edge as any).bcWidth, rounded ? 3 : 2)));
   const markers: string[] = [];
   const markerAttrs: string[] = [];
   if (startVisible && arrowStyle !== "none") {
@@ -196,14 +199,41 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
           : []
       )
     : [start, end];
-  const d = routePoints.map((point, pointIndex) =>
+  let d = routePoints.map((point, pointIndex) =>
     (pointIndex === 0 ? "M " : "L ") + point.x.toFixed(2) + " " + point.y.toFixed(2)
   ).join(" ");
+  let labelPoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+  if (rounded && !routeMethod) {
+    const fromSide = String(edge.fromSide || sides[0]), toSide = String(edge.toSide || sides[1]);
+    const distance = fromSide === toSide ? Math.max(0, Math.min(80, margin * .8))
+      : Math.min(140, Math.max(40, Math.hypot(end.x - start.x, end.y - start.y) / 3));
+    const control = (point: { x: number; y: number }, side: string) => ({
+      x: point.x + (side === "left" ? -distance : side === "right" ? distance : 0),
+      y: point.y + (side === "top" ? -distance : side === "bottom" ? distance : 0)
+    });
+    const c1 = control(start, fromSide), c2 = control(end, toSide);
+    d = `M ${start.x} ${start.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${end.x} ${end.y}`;
+    labelPoint = { x: (start.x + 3 * c1.x + 3 * c2.x + end.x) / 8, y: (start.y + 3 * c1.y + 3 * c2.y + end.y) / 8 };
+  } else if (rounded && routePoints.length > 2) {
+    const lengths = routePoints.slice(1).map((p, i) => Math.hypot(p.x - routePoints[i].x, p.y - routePoints[i].y));
+    let remaining = lengths.reduce((sum, length) => sum + length, 0) / 2;
+    for (let i = 0; i < lengths.length; i++) {
+      if (remaining <= lengths[i]) {
+        const t = lengths[i] ? remaining / lengths[i] : 0;
+        labelPoint = { x: routePoints[i].x + (routePoints[i + 1].x - routePoints[i].x) * t,
+          y: routePoints[i].y + (routePoints[i + 1].y - routePoints[i].y) * t };
+        break;
+      }
+      remaining -= lengths[i];
+    }
+  }
+  const label = rounded && typeof edge.label === "string" && edge.label.trim()
+    ? `<text x="${labelPoint.x}" y="${labelPoint.y}" dy=".35em" text-anchor="middle" font-size="14" font-family="sans-serif" fill="${xml(color)}" stroke="${ROUNDED_MAP_PAPER}" stroke-width="6" stroke-linejoin="round" paint-order="stroke fill">${xml(edge.label.slice(0, 512).replace(/\r?\n/g, " "))}</text>` : "";
   return (markers.length ? "<defs>" + markers.join("") + "</defs>" : "") +
     '<path id="bc-edge-' + index + '" d="' + xml(d) + '" fill="none" stroke="' + xml(color) +
     '" stroke-width="' + lineWidth + '" stroke-linecap="round"' +
     (sketch ? ' filter="url(#' + SKETCH_EDGE_FILTER_ID + ')"' : "") +
-    (dash ? ' stroke-dasharray="' + dash + '"' : "") + markerAttrs.join("") + "/>";
+    (dash ? ' stroke-dasharray="' + dash + '"' : "") + markerAttrs.join("") + "/>" + label;
 }
 
 function polygonPoints(x: number, y: number, w: number, h: number, sides: number, rotate = -Math.PI / 2): string {
@@ -397,9 +427,46 @@ function renderSoftNotesExportNode(node: CanvasNodeData, index: number): string 
     wrapNodeText(contentNode, clipId, false, true) + "</g>";
 }
 
-function renderNode(node: CanvasNodeData, index: number, sketch = false, soft = false): string {
+function renderRoundedMapExportNode(node: CanvasNodeData, index: number): string | null {
+  if (node.type === "group") return null;
+  const shape = resolveCanvasNodeShape(node as CanvasNodeStyleSource);
+  const path = roundedMapPath(shape, node.width, node.height);
+  if (!path) return null;
+  const { x, y, width, height } = node;
+  const inset = roundedMapInsets(shape, width, height);
+  const clipId = "bc-clip-" + index;
+  const attrs = (node.styleAttributes ?? {}) as Record<string, unknown>;
+  const border = resolveCanvasNodeBorder(node as CanvasNodeStyleSource);
+  const stroke = border === "none" || border === "invisible" ? "none" : ROUNDED_MAP_INK;
+  const dash = border === "dashed" ? ' stroke-dasharray="10 6"' : border === "dotted" ? ' stroke-dasharray="1 8"' : "";
+  const rawFill = nodeColor(node);
+  const fill = rawFill === "none" ? "#c8dff3" : rawFill;
+  const outline = `<path d="${path}" fill="${fill}" stroke="${stroke}" stroke-width="${ROUNDED_MAP_STROKE}" stroke-linecap="round" stroke-linejoin="round"${dash}/>`;
+  const inner = border === "double"
+    ? `<g transform="translate(6 6) scale(${Math.max(.1, (width - 12) / width)} ${Math.max(.1, (height - 12) / height)})">${outline.replace(`fill="${fill}"`, 'fill="none"')}</g>` : "";
+  const clip = `<clipPath id="${clipId}"><path d="${path}" transform="translate(${x} ${y})"/></clipPath>`;
+  const textNode = {
+    ...node, x: x + inset.x - 12, y: y + inset.y - 18,
+    width: Math.max(1, width - inset.x - inset.right + 24),
+    height: Math.max(1, height - inset.y - inset.bottom + 26),
+    styleAttributes: { ...attrs, fontSize: attrs.fontSize ?? 18, textColor: attrs.textColor ?? ROUNDED_MAP_INK,
+      fontFamily: attrs.fontFamily ?? "Avenir Next, PingFang SC, Microsoft YaHei, sans-serif",
+      textAlign: node.bcTextAlign ?? attrs.textAlign ?? "left" }
+  };
+  const image = typeof node.bcExportImageDataUrl === "string" && node.bcExportImageDataUrl.startsWith("data:image/") && node.type === "file"
+    ? `<image x="${x + inset.x}" y="${y + inset.y}" width="${Math.max(1, width - inset.x - inset.right)}" height="${Math.max(1, height - inset.y - inset.bottom)}" href="${xml(node.bcExportImageDataUrl)}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>`
+    : "";
+  return clip + `<g class="bc-full-node bc-full-rounded-node"><g transform="translate(${x} ${y})">${outline}${inner}</g>` +
+    (image || wrapNodeText(textNode, clipId)) + "</g>";
+}
+
+function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded = false, soft = false): string {
   if (soft && node.type === "text") return renderSoftNotesExportNode(node, index);
   if (sketch) return renderSketchExportNode(node, index);
+  if (rounded) {
+    const result = renderRoundedMapExportNode(node, index);
+    if (result) return result;
+  }
   const x = number(node.x), y = number(node.y);
   const width = Math.max(1, number(node.width, 280)), height = Math.max(1, number(node.height, 140));
   const attrs = (node as any).styleAttributes ?? {};
@@ -442,6 +509,8 @@ function renderNode(node: CanvasNodeData, index: number, sketch = false, soft = 
     geometry = polygon([[0.2, 0], [0.8, 0], [1, 1], [0, 1]]);
   } else if (shape === "chevron") {
     geometry = polygon([[0, 0], [0.78, 0], [1, 0.5], [0.78, 1], [0, 1], [0.22, 0.5]]);
+  } else if (shape === "right-arrow") {
+    geometry = polygon([[0, .2], [.68, .2], [.68, 0], [1, .5], [.68, 1], [.68, .8], [0, .8]]);
   } else if (shape === "cloud") {
     geometry = polygon([
       [0.22, 0.18], [0.28, 0.05], [0.44, 0.08], [0.55, 0.02], [0.69, 0.13],
@@ -559,6 +628,7 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
 
   const sketch = data.bcTheme === "sketch";
   const soft = data.bcTheme === "soft-notes";
+  const rounded = data.bcTheme === "rounded-map";
   const sketchFilter = '<filter id="' + SKETCH_EDGE_FILTER_ID + '" x="-8%" y="-20%" width="116%" height="140%">' +
     '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="7" result="noise"/>' +
     '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.75" xChannelSelector="R" yChannelSelector="G"/>' +
@@ -572,10 +642,10 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
       ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#fcfcf8"/>'
     : sketch
       ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#fffefb"/>'
-      : "";
+      : rounded ? `<rect width="${width}" height="${height}" fill="${ROUNDED_MAP_PAPER}"/>` : "";
   const nodeMap = new Map(translatedNodes.map(node => [node.id, node]));
-  const edgeMarkup = translatedEdges.map((edge, index) => renderEdge(edge, nodeMap, index, sketch)).join("");
-  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index, sketch, soft)).join("");
+  const edgeMarkup = translatedEdges.map((edge, index) => renderEdge(edge, nodeMap, index, sketch, rounded, margin)).join("");
+  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index, sketch, rounded, soft)).join("");
 
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height +
     '" viewBox="0 0 ' + width + " " + height + '">' +

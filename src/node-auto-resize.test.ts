@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("obsidian", () => ({
   App: class App {},
+  Plugin: class Plugin {},
   Component: class Component { register() {} addChild() {} registerEvent() {} },
   ItemView: class ItemView {},
   Modal: class Modal {
@@ -41,6 +42,7 @@ vi.mock("obsidian", () => ({
 }));
 
 import BetterCanvasFeatures from "./feature-integrator";
+import BetterCanvasPlugin from "./main";
 import { resizeNodeToText } from "./enhancements";
 import type { CanvasData } from "./canvas";
 
@@ -125,6 +127,61 @@ function makeCanvas(data: CanvasData): any {
   syncNodes();
   return canvas;
 }
+
+describe("retired settings and features", () => {
+  it("keeps old data inert and uses fixed creation sizes even with legacy dimensions", () => {
+    const { plugin } = createMockPlugin();
+    const legacy = {
+      defaultNodeWidth: 900,
+      defaultNodeHeight: 800,
+      templates: [{ name: "Old", text: "Keep me" }],
+      customColors: ["#123456"],
+      customCss: "body { color: red; }",
+      youtubeLanguage: "en"
+    };
+    Object.assign(plugin.settings, legacy);
+    const features = new BetterCanvasFeatures(plugin);
+    features.init();
+    expect((features as any).makeDefaultTextNode("", 10, 20)).toMatchObject({
+      x: 10, y: 20, width: 280, height: 140
+    });
+    expect(plugin.settings).toMatchObject(legacy);
+    // No Canvas is open. Refresh must not inject the retired global styles.
+    expect(() => (features as any).refresh()).not.toThrow();
+    const ids = plugin.addCommand.mock.calls.map(([command]) => command.id);
+    expect(ids).not.toContain("bc-ingest-youtube");
+    expect(ids).toContain("bc-ingest-web");
+    expect(ids).toContain("bc-gemini-youtube-video");
+  });
+
+  it("removes template commands while retaining creation and theme-independent style commands", () => {
+    const plugin = new (BetterCanvasPlugin as any)();
+    plugin.addCommand = vi.fn();
+    plugin.registerCommands();
+    const ids = plugin.addCommand.mock.calls.map(([command]: any[]) => command.id);
+    expect(ids).not.toContain("save-node-template");
+    expect(ids).not.toContain("insert-node-template");
+    expect(ids).toContain("create-child-node");
+    expect(ids).toContain("apply-css-style-preset");
+  });
+
+  it("creates a blank child with fixed dimensions without resizing its existing parent", () => {
+    const plugin = new (BetterCanvasPlugin as any)();
+    plugin.settings = { defaultNodeWidth: 900, defaultNodeHeight: 800, gapX: 100 };
+    const parent = { id: "parent", type: "text", text: "Existing", x: 0, y: 0, width: 350, height: 210 };
+    const canvas = makeCanvas({ nodes: [parent as any], edges: [] });
+    plugin.selectedOrNotice = () => ({ canvas, node: parent });
+    vi.stubGlobal("window", { setTimeout: vi.fn() });
+    try {
+      plugin.createChildNode();
+      expect(canvas.data.nodes.find((node: any) => node.id === "parent")).toEqual(parent);
+      expect(canvas.data.nodes.find((node: any) => node.id !== "parent")).toMatchObject({ width: 280, height: 140 });
+      expect(canvas.data.edges).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe("Node auto-resize manual drag-resize override", () => {
   it("clears bcAutoResize when a node is manually resized via the corner handle", () => {

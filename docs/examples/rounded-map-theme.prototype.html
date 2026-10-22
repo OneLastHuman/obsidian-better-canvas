@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>形与线 · Better Canvas 主题提案</title>
+  <!-- PROTOTYPE: Three rounded-node themes, switchable via ?variant=A|B|C.
+       Standalone visual study only; no Obsidian APIs, remote assets or persistence.
+       Run: python3 -m http.server 4177 --bind 127.0.0.1 --directory docs/examples -->
+  <style>
+    :root {
+      --ui-paper: #faf9f6;
+      --ui-ink: #252924;
+      --ui-muted: #70766e;
+      --ui-line: #dedfd7;
+      --ui-accent: #315d47;
+      --ui-font: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ui-ink); background: var(--ui-paper); font: 14px var(--ui-font); }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; color: inherit; }
+    button:focus-visible, summary:focus-visible, select:focus-visible { outline: 3px solid #5186c9; outline-offset: 4px; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .topbar { height: 69px; display: flex; align-items: center; gap: 13px; padding: 0 28px; border-bottom: 1px solid var(--ui-line); }
+    .brand-mark { position: relative; width: 29px; height: 29px; border: 3px solid var(--ui-ink); border-radius: 10px; background: #dfed94; }
+    .brand-mark::after { content: ""; position: absolute; right: -7px; bottom: -4px; width: 11px; height: 11px; background: #faf9f6; border: 2px solid var(--ui-ink); border-radius: 4px; }
+    .brand { font-size: 16px; font-weight: 650; letter-spacing: -.5px; }
+    .divider { height: 18px; width: 1px; background: var(--ui-line); margin: 0 6px; }
+    .topbar .context { color: var(--ui-muted); font-size: 12px; }
+    .prototype-label { margin-left: auto; color: var(--ui-muted); font-size: 10px; letter-spacing: 1.5px; }
+    .layout { display: grid; grid-template-columns: 269px minmax(0, 1fr); min-height: calc(100vh - 69px); }
+    .sidebar { padding: 28px 23px 26px; border-right: 1px solid var(--ui-line); }
+    .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 2px; color: var(--ui-muted); text-transform: uppercase; }
+    h1 { margin: 11px 0 10px; font-size: 28px; font-weight: 650; letter-spacing: -1.5px; }
+    .intro { color: var(--ui-muted); font-size: 12px; line-height: 1.9; margin: 0 0 23px; }
+    .variants { display: grid; gap: 9px; }
+    .variant-choice { position: relative; display: grid; grid-template-columns: 51px 1fr; gap: 13px; align-items: center; width: 100%; padding: 14px 12px; border: 1px solid var(--ui-line); border-radius: 13px; text-align: left; background: transparent; }
+    .variant-choice[aria-pressed=true] { border-color: var(--ui-ink); box-shadow: inset 0 0 0 1px var(--ui-ink); background: #fff; }
+    .variant-choice strong { display: block; font-size: 13px; font-weight: 650; margin-bottom: 4px; }
+    .variant-choice small { display: block; font-size: 10px; color: var(--ui-muted); }
+    .mini-node { height: 36px; border: 3px solid #34372f; border-radius: 12px; background: #f2d97c; position: relative; }
+    .mini-node::after { content: ""; position: absolute; left: 12px; right: 12px; top: 14px; border-top: 2px solid currentColor; opacity: .65; }
+    .variant-choice[data-variant=B] .mini-node { background: #eef4e9; border-color: #557754; border-radius: 10px; color: #557754; }
+    .variant-choice[data-variant=C] .mini-node { background: #b7d9ff; border-radius: 11px; box-shadow: 3px 3px 0 #34372f; }
+    .direction-copy { margin-top: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--ui-line); }
+    .direction-copy h2 { font-size: 12px; margin: 0 0 8px; }
+    .direction-copy p { font-size: 12px; line-height: 1.9; color: var(--ui-muted); margin: 0; }
+    .tuning { margin-top: 20px; }
+    .tuning summary { font-size: 12px; font-weight: 600; cursor: pointer; }
+    .control { margin-top: 18px; }
+    .control label { display: flex; justify-content: space-between; gap: 8px; color: var(--ui-muted); font-size: 11px; margin-bottom: 9px; }
+    output { color: var(--ui-ink); font-variant-numeric: tabular-nums; }
+    input[type=range] { width: 100%; accent-color: var(--ui-accent); margin: 0; }
+    select { width: 100%; border: 1px solid var(--ui-line); background: transparent; border-radius: 7px; padding: 8px; color: var(--ui-ink); font-size: 12px; }
+    .reset { padding: 0; border: 0; background: none; margin-top: 20px; color: var(--ui-muted); font-size: 11px; text-decoration: underline; text-underline-offset: 4px; }
+    .sidebar-foot { color: var(--ui-muted); font-size: 10px; line-height: 1.8; margin-top: 26px; }
+    .main { min-width: 0; display: flex; flex-direction: column; }
+    .canvas-heading { min-height: 89px; display: flex; align-items: center; gap: 20px; padding: 19px 29px; border-bottom: 1px solid var(--ui-line); background: #fffefa; }
+    .canvas-heading h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; letter-spacing: -.4px; }
+    .canvas-heading p { margin: 0; font-size: 11px; color: var(--ui-muted); }
+    .scene-tabs { margin-left: auto; display: flex; gap: 3px; padding: 4px; border: 1px solid var(--ui-line); border-radius: 10px; flex-shrink: 0; }
+    .scene-tabs button { font-size: 11px; border: 0; background: transparent; border-radius: 6px; padding: 8px 13px; }
+    .scene-tabs button[aria-pressed=true] { color: #fff; background: #313a32; }
+    .canvas {
+      --paper: #f8f7f0; --dot: #d6d6c7; --ink: #34372f; --muted: #6c7162; --line: #c2c5b7;
+      --node-radius: 27px; --node-stroke: 3.5px; --edge-stroke: 3px; --selection: #4579cd;
+      --yellow-fill: #f3dc83; --yellow-ink: #34372f;
+      --blue-fill: #c8dff3; --blue-ink: #34372f;
+      --green-fill: #d9e7b5; --green-ink: #34372f;
+      --pink-fill: #f1c9b8; --pink-ink: #34372f;
+      --root-fill: #f3dc83; --root-ink: #34372f; --shadow: 0px;
+      position: relative; flex: 1; min-height: 620px; color: var(--ink); background-color: var(--paper); overflow: hidden;
+      background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 22px 22px;
+      transition: background-color .2s;
+    }
+    .canvas[data-theme=B] {
+      --paper: #f7faf6; --dot: #dde5d8; --ink: #2e4636; --muted: #697c6d; --line: #b4c8b5;
+      --yellow-fill: #fbf3da; --yellow-ink: #96752b;
+      --blue-fill: #f0f6fc; --blue-ink: #507da5;
+      --green-fill: #eef4e9; --green-ink: #557754;
+      --pink-fill: #fcf0ec; --pink-ink: #b37159;
+      --root-fill: #365b43; --root-ink: #fff; --selection: #486baf;
+      background-image: none;
+    }
+    .canvas[data-theme=C] {
+      --paper: #f4f3ee; --dot: #e3e2d8; --ink: #292e2c; --muted: #666e67; --line: #c4c9bc;
+      --yellow-fill: #f5d964; --yellow-ink: #292e2c;
+      --blue-fill: #b7d9ff; --blue-ink: #292e2c;
+      --green-fill: #d9ee91; --green-ink: #292e2c;
+      --pink-fill: #ffbc98; --pink-ink: #292e2c;
+      --root-fill: #d9ee91; --root-ink: #292e2c; --shadow: 5px;
+      background-image: linear-gradient(var(--dot) 1px, transparent 1px), linear-gradient(90deg, var(--dot) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .canvas[data-dark=true] {
+      --paper: #252b2a; --dot: #3b4240; --ink: #e2e6d9; --muted: #b3bdb3; --line: #576159;
+      --yellow-fill: #665c32; --yellow-ink: #efe1ac;
+      --blue-fill: #344c5d; --blue-ink: #c3d9e9;
+      --green-fill: #43543b; --green-ink: #d7e5b8;
+      --pink-fill: #61483d; --pink-ink: #e7c3af;
+      --root-fill: #d9dc9f; --root-ink: #252b2a; --selection: #9cc2ff;
+    }
+    .canvas[data-theme=B][data-dark=true] { --root-fill: #bfd1a9; --root-ink: #24372a; }
+    .canvas-label { position: absolute; left: 29px; top: 25px; font-size: 10px; letter-spacing: 1.6px; color: var(--muted); }
+    .appearance { position: absolute; right: 25px; top: 18px; border: 1px solid var(--line); background: var(--paper); color: var(--muted); font-size: 11px; border-radius: 8px; padding: 8px 11px; }
+    .board { position: absolute; top: 69px; left: 19px; right: 19px; bottom: 135px; }
+    .world { position: absolute; width: 1040px; height: 500px; transform-origin: 0 0; }
+    .edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .edge-line { stroke-width: var(--edge-stroke); stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    .edge-label { font: 12px var(--ui-font); fill: var(--muted); stroke: var(--paper); stroke-width: 7px; stroke-linejoin: round; paint-order: stroke fill; text-anchor: middle; }
+    .map-node {
+      --fill: var(--blue-fill); --node-ink: var(--blue-ink);
+      position: absolute; border: var(--node-stroke) solid var(--ink); border-radius: var(--node-radius);
+      color: var(--ink); background: var(--fill); padding: 14px 18px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+      text-align: left; box-shadow: var(--shadow) var(--shadow) 0 var(--ink); line-height: 1.45;
+      transition: background-color .16s, border-radius .16s, box-shadow .16s; user-select: none;
+    }
+    .map-node[data-color=yellow] { --fill: var(--yellow-fill); --node-ink: var(--yellow-ink); }
+    .map-node[data-color=green] { --fill: var(--green-fill); --node-ink: var(--green-ink); }
+    .map-node[data-color=pink] { --fill: var(--pink-fill); --node-ink: var(--pink-ink); }
+    .map-node strong { display: block; font-size: 19px; font-weight: 650; letter-spacing: -.45px; }
+    .map-node .node-description { font-size: 12px; margin-top: 7px; opacity: .76; white-space: pre-line; }
+    .map-node .node-kicker { display: block; font-size: 10px; font-weight: 550; letter-spacing: 1px; margin-bottom: 7px; opacity: .74; }
+    .map-node.root { background: var(--root-fill); color: var(--root-ink); }
+    .map-node.root strong { font-size: 24px; font-weight: 700; letter-spacing: -1px; }
+    .map-node.leaf { background: var(--paper); padding: 11px 16px; }
+    .map-node.leaf strong { font-size: 15px; font-weight: 550; }
+    .map-node.leaf .node-description { font-size: 11px; margin-top: 4px; }
+    .map-node.selected::before { content: ""; position: absolute; inset: -9px; border: 1.5px solid var(--selection); border-radius: calc(var(--node-radius) + 7px); pointer-events: none; }
+    .node-port { position: absolute; width: 9px; height: 9px; border: 2px solid var(--selection); border-radius: 50%; background: var(--paper); opacity: 0; pointer-events: none; }
+    .selected .node-port { opacity: 1; }
+    .node-port.left { left: -7px; top: calc(50% - 4px); }
+    .node-port.right { right: -7px; top: calc(50% - 4px); }
+    .node-port.top { top: -7px; left: calc(50% - 4px); }
+    .node-port.bottom { bottom: -7px; left: calc(50% - 4px); }
+    [data-theme=B] .map-node { border-color: var(--node-ink); color: var(--node-ink); align-items: center; text-align: center; padding: 13px; }
+    [data-theme=B] .map-node.root { color: var(--root-ink); border-color: var(--root-fill); }
+    [data-theme=B] .map-node .node-kicker { display: none; }
+    [data-theme=B] .map-node.leaf { border-width: max(2px, calc(var(--node-stroke) - 1px)); border-radius: max(12px, calc(var(--node-radius) - 5px)); }
+    [data-theme=C] .map-node:not(.leaf) { padding-left: 22px; padding-top: 41px; }
+    [data-theme=C] .map-node .node-kicker { position: absolute; top: 13px; left: 20px; opacity: 1; margin: 0; font-size: 10px; }
+    [data-theme=C] .map-node .node-kicker::before { content: ""; display: inline-block; height: 7px; width: 7px; background: currentColor; margin-right: 6px; border-radius: 2px; }
+    [data-theme=C] .map-node.root strong { font-size: 22px; }
+    .canvas-footnote { position: absolute; bottom: 104px; left: 28px; right: 28px; display: flex; align-items: center; justify-content: space-between; gap: 15px; color: var(--muted); font-size: 10px; }
+    .palette { display: flex; gap: 5px; align-items: center; }
+    .palette span { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line); }
+    .palette span:nth-child(1) { background: var(--yellow-fill); }
+    .palette span:nth-child(2) { background: var(--blue-fill); }
+    .palette span:nth-child(3) { background: var(--green-fill); }
+    .palette span:nth-child(4) { background: var(--pink-fill); }
+    .switcher { position: fixed; z-index: 5; bottom: 26px; left: calc(50% + 134.5px); transform: translateX(-50%); display: flex; align-items: center; background: #29342e; color: #fffdf5; padding: 6px; border: 1px solid #48514a; border-radius: 13px; box-shadow: 0 7px 22px #252a2415; white-space: nowrap; }
+    .switcher button { width: 37px; height: 34px; border: 0; border-radius: 8px; background: #ffffff0d; color: inherit; font-size: 18px; }
+    .switcher button:hover { background: #ffffff25; }
+    #current-variant { min-width: 180px; padding: 0 14px; text-align: center; font-size: 12px; letter-spacing: .4px; }
+    #current-variant small { font-size: 10px; opacity: .55; margin-left: 10px; }
+    .specimen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 25px; padding: 23px 29px; border-top: 1px solid var(--ui-line); background: #fffefa; }
+    .specimen .spec-label { color: var(--ui-muted); font-size: 10px; letter-spacing: .6px; margin-bottom: 9px; }
+    .specimen strong { display: block; font-size: 13px; font-weight: 550; line-height: 1.6; }
+    .specimen p { color: var(--ui-muted); font-size: 11px; line-height: 1.7; margin: 4px 0 0; }
+    .specimen .swatch-line { display: flex; align-items: center; gap: 8px; }
+    .swatch-line i { display: block; width: 22px; height: 14px; border: 3px solid #34372f; border-radius: 6px; }
+    .selection-value { color: var(--ui-accent); }
+    .canvas.reveal .world { animation: arrive .32s ease-out; }
+    @keyframes arrive { from { opacity: .2; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+    @media (min-width: 1500px) { .canvas { min-height: 710px; } .sidebar { padding-top: 36px; } }
+    @media (max-width: 1080px) {
+      .layout { grid-template-columns: 225px minmax(0, 1fr); }
+      .sidebar { padding: 24px 16px; }
+      .variant-choice { padding: 13px 10px; gap: 10px; grid-template-columns: 42px 1fr; }
+      .canvas-heading { padding: 18px 21px; }
+      .canvas-heading h2 { font-size: 14px; }
+      .scene-tabs button { padding: 8px 10px; }
+      .specimen { gap: 17px; padding: 20px; }
+      .switcher { left: calc(50% + 112.5px); }
+    }
+    @media (max-width: 800px) {
+      .topbar { height: 59px; padding: 0 18px; gap: 10px; }
+      .prototype-label { font-size: 9px; letter-spacing: 1px; }
+      .topbar .context, .topbar .divider { display: none; }
+      .layout { display: flex; flex-direction: column; }
+      .sidebar { border-right: 0; border-bottom: 1px solid var(--ui-line); padding: 21px 18px 17px; }
+      h1 { font-size: 25px; margin: 5px 0 15px; }
+      .sidebar .eyebrow { font-size: 9px; }
+      .intro, .direction-copy, .sidebar-foot { display: none; }
+      .variants { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .variant-choice { display: flex; flex-direction: column; gap: 9px; padding: 11px 4px; text-align: center; }
+      .variant-choice strong { font-size: 11px; margin: 0; }
+      .variant-choice small { display: none; }
+      .mini-node { width: 46px; height: 28px; border-radius: 9px; }
+      .mini-node::after { top: 10px; }
+      .tuning { margin-top: 16px; }
+      .tuning-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; padding-top: 4px; }
+      .control { margin-top: 13px; }
+      .reset { align-self: center; margin-top: 25px; text-align: left; }
+      .canvas-heading { padding: 17px 18px; min-height: 90px; gap: 8px; flex-wrap: wrap; }
+      .canvas-heading p { font-size: 10px; }
+      .canvas-heading h2 { font-size: 14px; }
+      .scene-tabs { margin-left: auto; }
+      .scene-tabs button { padding: 8px; font-size: 10px; }
+      .canvas { min-height: 710px; }
+      .canvas-label { left: 19px; top: 25px; font-size: 9px; }
+      .appearance { right: 18px; font-size: 10px; }
+      .board { top: 67px; left: 12px; right: 12px; bottom: 139px; }
+      .canvas-footnote { left: 20px; right: 20px; bottom: 103px; font-size: 9px; }
+      .canvas-footnote .interaction-hint { display: none; }
+      .specimen { grid-template-columns: 1fr 1fr; gap: 18px 12px; padding: 20px; }
+      .specimen > :last-child { grid-column: 1 / -1; border-top: 1px solid var(--ui-line); padding-top: 15px; }
+      .switcher { left: 50%; bottom: 16px; }
+      .main { padding-bottom: 70px; }
+    }
+    @media (max-width: 370px) {
+      .brand { font-size: 14px; }
+      .prototype-label { letter-spacing: 0; }
+      .canvas-heading { flex-direction: column; align-items: flex-start; }
+      .scene-tabs { margin-left: 0; margin-top: 6px; }
+      .canvas-footnote .palette { display: none; }
+    }
+    .theme-picker { margin: 0 0 20px; padding-bottom: 16px; border-bottom: 1px solid var(--ui-line); }
+    .theme-picker summary { cursor: pointer; color: var(--ui-muted); font-size: 11px; }
+    .theme-picker .variants { margin-top: 14px; }
+    .preset-field { margin: 21px 0 0; }
+    .preset-field h2 { margin: 0 0 12px; font-size: 12px; font-weight: 600; }
+    .preset-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .preset-choice { background: transparent; border: 1px solid var(--ui-line); border-radius: 12px; padding: 11px 8px; min-width: 0; }
+    .preset-choice[aria-pressed=true] { background: #fff; border-color: var(--ui-accent); outline: 1px solid var(--ui-accent); }
+    .preset-help { margin: 12px 0 0; font-size: 10px; line-height: 1.8; color: var(--ui-muted); }
+    .preset-info { margin-top: 22px; padding: 18px 0 0; border-top: 1px solid var(--ui-line); min-height: 136px; }
+    .preset-info .eyebrow { font-size: 9px; letter-spacing: 1.4px; }
+    .preset-info h2 { font-size: 17px; margin: 7px 0; letter-spacing: -.5px; }
+    .preset-info p { color: var(--ui-muted); font-size: 11px; line-height: 1.9; margin: 0; }
+    .preset-info .preset-rule { color: var(--ui-accent); font-size: 10px; margin-top: 10px; }
+    .preset-gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 30px; padding: 90px 38px 50px; }
+    .preset-item { min-width: 0; }
+    .preset-item-heading { display: flex; align-items: baseline; gap: 9px; margin: 0 0 17px; }
+    .preset-number { font: 11px "Avenir Next", sans-serif; color: var(--muted); }
+    .preset-item-heading h3 { margin: 0; font-size: 13px; font-weight: 550; }
+    .preset-item-heading .preset-en { margin-left: auto; color: var(--muted); font-size: 9px; letter-spacing: 1px; }
+    .preset-caption { font-size: 11px; color: var(--muted); line-height: 1.8; margin: 16px 0 0; }
+    .preset-caption span { display: block; font-size: 10px; opacity: .85; margin-top: 3px; }
+    .preset-node {
+      --preset-fill: var(--blue-fill, #c8dff3); --preset-ink: var(--ink, #34372f);
+      position: relative; color: var(--preset-ink); border: 0; box-shadow: none;
+    }
+    .map-node.preset-node { position: absolute; background: transparent; border: 0; box-shadow: none; padding: 18px 26px; text-align: center; align-items: center; }
+    .preset-node[data-preset=terminal] { --preset-fill: var(--yellow-fill, #f3dc83); }
+    .preset-node[data-preset=decision] { --preset-fill: var(--peach-fill, #f8dec1); }
+    .preset-node[data-preset=direction] { --preset-fill: var(--green-fill, #d9e7b5); }
+    .preset-node[data-preset=io] { --preset-fill: var(--io-fill, #c5e4dd); }
+    .preset-node[data-preset=document] { --preset-fill: var(--note-fill, #fffef8); }
+    .canvas[data-dark=true] { --peach-fill: #5e4e35; --io-fill: #314e4a; --note-fill: #30372f; }
+    .canvas[data-theme=A][data-dark=true] {
+      --paper: #202329; --dot: #353a43; --ink: #aab3c2; --muted: #aab3c2; --line: #4a525e;
+      --yellow-fill: #d1be75; --blue-fill: #adc1d3; --green-fill: #bbc89f;
+      --peach-fill: #d5c0a9; --io-fill: #abc5c0; --note-fill: #dbdbd7;
+      --pink-fill: #d0ae9f; --selection: #a3c5ff;
+    }
+    .canvas[data-theme=A][data-dark=true] .preset-node { --preset-ink: #20262d; }
+    .canvas[data-theme=A][data-dark=true][data-monochrome=true] .shape-face { fill: #c9cdd2; }
+    .node-shape { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .shape-face { fill: var(--preset-fill); stroke: var(--preset-ink); stroke-width: var(--node-stroke, 3.5px); stroke-linejoin: round; }
+    .shape-selection { fill: none; stroke: var(--selection, #4579cd); stroke-width: 1.3px; opacity: 0; transform: scale(1.045); transform-origin: center; }
+    .selected .shape-selection { opacity: 1; }
+    .map-node.preset-node.selected::before { display: none; }
+    .preset-copy { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: inherit; width: 100%; pointer-events: none; }
+    .map-node.preset-node strong { font-size: 19px; line-height: 1.5; font-weight: 650; color: inherit; }
+    .map-node.preset-node[data-preset=terminal] strong { font-size: 23px; font-weight: 700; }
+    .map-node.preset-node .node-description { font-size: 12px; line-height: 1.7; opacity: .8; }
+    .map-node.preset-node[data-preset=decision] { padding: 24px calc(var(--node-inline, 100%) * .22); }
+    .map-node.preset-node[data-preset=decision] strong { font-size: 17px; }
+    .map-node.preset-node[data-preset=decision] .node-description { font-size: 11px; margin-top: 4px; }
+    .map-node.preset-node[data-preset=direction] { padding: 18px calc(var(--node-inline, 100%) * .26) 18px calc(var(--node-inline, 100%) * .09); }
+    .map-node.preset-node[data-preset=io] { padding-left: calc(var(--node-inline, 100%) * .17); padding-right: calc(var(--node-inline, 100%) * .17); }
+    .map-node.preset-node[data-preset=document] { padding-bottom: 38px; text-align: left; align-items: flex-start; }
+    .map-node.preset-node.leaf { padding: 7px 14px; }
+    .map-node.preset-node.leaf strong { font-size: 14px; }
+    .map-node.preset-node.leaf[data-preset=decision] { padding-left: calc(var(--node-inline, 100%) * .22); padding-right: calc(var(--node-inline, 100%) * .22); }
+    .map-node.preset-node.leaf[data-preset=direction] { padding-right: calc(var(--node-inline, 100%) * .26); }
+    .map-node.preset-node.leaf[data-preset=io] { padding-left: calc(var(--node-inline, 100%) * .17); padding-right: calc(var(--node-inline, 100%) * .17); }
+    .map-node.preset-node.leaf[data-preset=document] { padding-bottom: 16px; }
+    .map-node.gallery-node { position: relative; width: 100%; height: 200px; display: flex; flex-direction: column; justify-content: center; }
+    .gallery-node[data-preset=decision] .node-description { margin-top: 8px; }
+    .gallery-node[data-preset=document] { padding-left: 31px; }
+    .preset-thumb-art { display: flex; align-items: center; justify-content: center; width: 100%; height: 58px; }
+    .preset-thumb-art .shape-face { stroke-width: 8px; }
+    .preset-thumb-art .shape-selection { display: none; }
+    .thumb-heading { position: relative; height: 3px; width: 30%; border-radius: 2px; background: currentColor; opacity: .65; }
+    .preset-thumb-art[data-preset=direction] .thumb-heading { margin-right: 17%; }
+    .preset-thumb-art[data-preset=document] .thumb-heading { margin-bottom: 9%; }
+    .outline-toggle { right: 115px; }
+    .canvas[data-monochrome=true] .shape-face { fill: var(--paper); }
+    .map-node.preset-node[data-preset=io] .node-port.left { left: calc(8% - 4px); }
+    .map-node.preset-node[data-preset=io] .node-port.right { right: calc(8% - 4px); }
+    .map-node.preset-node[data-preset=document] .node-port.bottom { bottom: calc(12% - 4px); }
+    body[data-presets=true] .direction-copy, body[data-presets=true] .switcher { display: none; }
+    body[data-presets=true] .sidebar-foot { margin-top: 18px; }
+    body[data-scene=presets] .canvas { min-height: 0 !important; overflow: visible; }
+    body[data-scene=presets] .main { align-self: start; width: 100%; }
+    body[data-scene=presets] .board, body[data-scene=presets] .canvas-footnote { display: none; }
+    body[data-scene=presets] .routing-control { display: none; }
+    body[data-scene=presets] .specimen { grid-template-columns: 1fr 1fr; }
+    body[data-scene=presets] .edge-specimen { display: none; }
+    [hidden] { display: none !important; }
+    @media (max-width: 1240px) { .preset-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 84px 28px 36px; gap: 29px 24px; } }
+    @media (max-width: 1080px) { .canvas-heading { flex-wrap: wrap; } .scene-tabs { margin-left: 0; } .preset-gallery { padding-left: 23px; padding-right: 23px; gap: 28px 22px; } }
+    @media (max-width: 800px) {
+      body[data-presets=true] .sidebar { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+      body[data-presets=true] .sidebar > .eyebrow, body[data-presets=true] .sidebar > h1, body[data-presets=true] .theme-picker, body[data-presets=true] .tuning { grid-column: 1 / -1; }
+      body[data-presets=true] .theme-picker { margin-bottom: 0; padding-bottom: 10px; }
+      .preset-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+      .preset-field { margin-top: 14px; }
+      .preset-field h2 { font-size: 11px; margin-bottom: 8px; }
+      .preset-choice { padding: 7px 4px; }
+      .preset-thumb-art { height: 43px; }
+      .preset-info { min-height: 0; margin-top: 14px; padding: 0; border: 0; }
+      .preset-info h2 { font-size: 15px; }
+      .preset-info p { font-size: 10px; line-height: 1.7; }
+      .preset-help, body[data-presets=true] .sidebar-foot { display: none; }
+      .preset-gallery { padding: 77px 24px 30px; gap: 28px 23px; }
+      .map-node.gallery-node { height: 200px; }
+      .preset-item-heading .preset-en { display: none; }
+      body[data-scene=presets] .specimen > :last-child { grid-column: auto; border-top: 0; padding-top: 0; }
+      body[data-scene=presets] .main { padding-bottom: 0; }
+    }
+    @media (max-width: 540px) { .preset-gallery { grid-template-columns: 1fr; padding: 107px 31px 35px; gap: 30px; } .map-node.gallery-node { height: 190px; } .preset-item-heading .preset-en { display: block; } body[data-scene=presets] .canvas-label { top: 66px; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand">Better Canvas</span>
+    <span class="divider"></span><span class="context">主题设计工作台</span>
+    <span class="prototype-label">VISUAL STUDY / 2026.10</span>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="风格选择与微调">
+      <div class="eyebrow">Round corners. Clear thoughts.</div>
+      <h1>形与线。</h1>
+      <p class="intro">把想法放进圆角方块，<br>用清晰的线，连接下一步。</p>
+      <details class="theme-picker"><summary id="theme-picker-label">风格方向 · 软糖白板</summary><nav class="variants" aria-label="三个视觉方向">
+        <button class="variant-choice" data-variant="A" aria-pressed="true"><span class="mini-node" aria-hidden="true"></span><span><strong>A · 软糖白板</strong><small>柔和色块 / 自由发散</small></span></button>
+        <button class="variant-choice" data-variant="B" aria-pressed="false"><span class="mini-node" aria-hidden="true"></span><span><strong>B · 分支图谱</strong><small>同色分支 / 层级清晰</small></span></button>
+        <button class="variant-choice" data-variant="C" aria-pressed="false"><span class="mini-node" aria-hidden="true"></span><span><strong>C · 模块流程</strong><small>硬朗轮廓 / 大块结构</small></span></button>
+      </nav></details>
+      <section class="preset-field" id="preset-field">
+        <h2>功能预设</h2>
+        <div class="preset-picker" id="preset-picker"></div>
+        <p class="preset-help" id="preset-help">点击缩略卡片，查看对应的功能预设。</p>
+      </section>
+      <section class="preset-info" id="preset-info" aria-live="polite">
+        <div class="eyebrow" id="preset-info-label"></div>
+        <h2 id="preset-info-title"></h2>
+        <p id="preset-info-description"></p>
+        <p class="preset-rule" id="preset-info-rule"></p>
+      </section>
+      <section class="direction-copy">
+        <h2 id="direction-title"></h2>
+        <p id="direction-description"></p>
+      </section>
+      <details class="tuning" open>
+        <summary>微调一下手感</summary>
+        <div class="tuning-fields">
+          <div class="control"><label for="radius">节点圆角 <output id="radius-value" for="radius">27 px</output></label><input id="radius" type="range" min="12" max="40" value="27" step="1"></div>
+          <div class="control"><label for="stroke">描边粗细 <output id="stroke-value" for="stroke">3.5 px</output></label><input id="stroke" type="range" min="2" max="6" value="3.5" step=".5"></div>
+          <div class="control routing-control"><label for="routing">连线方式</label><select id="routing"><option value="curve">柔和曲线</option><option value="elbow">圆角折线</option><option value="straight">干净直线</option></select></div>
+          <button class="reset" id="reset" type="button">恢复这套方案的默认值</button>
+        </div>
+      </details>
+      <p class="sidebar-foot">视觉探索原型 · 软糖白板已接入插件<br>点选节点，观察选中轮廓与连接点。</p>
+    </aside>
+    <main class="main">
+      <div class="canvas-heading">
+        <div><h2 id="scene-title">一场更有意思的读书会</h2><p id="scene-subtitle">从一个主题，长出更多可能。</p></div>
+        <div class="scene-tabs" aria-label="示例场景">
+          <button data-scene="presets" aria-pressed="false">六种预设</button>
+          <button data-scene="mindmap" aria-pressed="true">思维导图</button>
+          <button data-scene="flow" aria-pressed="false">流程图</button>
+        </div>
+      </div>
+      <section class="canvas" id="canvas" data-theme="A" data-dark="false" aria-label="圆角节点主题预览">
+        <div class="canvas-label" id="canvas-label">A / SOFT BLOCKS</div>
+        <button class="appearance outline-toggle" id="monochrome" aria-pressed="false">统一颜色</button>
+        <button class="appearance" id="appearance" aria-pressed="false">深色预览</button>
+        <div class="preset-gallery" id="preset-gallery" hidden></div>
+        <div class="board" id="board">
+          <div class="world" id="world">
+            <svg class="edges" id="edges" aria-hidden="true"></svg>
+            <div id="nodes"></div>
+          </div>
+        </div>
+        <div class="canvas-footnote"><span id="visual-note">暖白底 · 浅彩色块 · 无投影</span><span class="interaction-hint">点击节点看选中态</span><div class="palette" aria-label="黄色、蓝色、绿色、陶粉色"><span></span><span></span><span></span><span></span></div></div>
+        <nav class="switcher" aria-label="切换风格方案">
+          <button id="previous" aria-label="上一个方案">←</button>
+          <span id="current-variant" aria-live="polite">A · 软糖白板 <small>1 / 3</small></span>
+          <button id="next" aria-label="下一个方案">→</button>
+        </nav>
+      </section>
+      <section class="specimen" aria-label="当前视觉规格">
+        <div><div class="spec-label">NODE / 节点语言</div><strong class="swatch-line"><i aria-hidden="true" id="stroke-sample"></i><span id="node-spec"></span></strong><p id="node-detail"></p></div>
+        <div class="edge-specimen"><div class="spec-label">EDGE / 关系表达</div><strong id="edge-spec"></strong><p id="edge-detail"></p></div>
+        <div><div class="spec-label">FOCUS / 选中状态</div><strong class="selection-value" id="selected-label" role="status" aria-live="polite"></strong><p>外侧细轮廓 + 四边连接点，保留节点原有色彩。</p></div>
+      </section>
+    </main>
+  </div>
+  <script>
+    const $ = selector => document.querySelector(selector);
+    const $$ = selector => [...document.querySelectorAll(selector)];
+    const themes = {
+      A: { name: "软糖白板", english: "SOFT BLOCKS", title: "像积木一样，把想法拼起来。",
+        description: "奶油黄、雾蓝和浅绿，配统一的深色轮廓。节点松弛、亲近，适合头脑风暴与日常规划。",
+        radius: 27, stroke: 3.5, routing: "curve", note: "暖白底 · 浅彩色块 · 无投影",
+        nodeDetail: "中心实色，分支浅彩，末级节点留白。", edgeDetail: "统一墨色，把注意力留给内容。" },
+      B: { name: "分支图谱", english: "BRANCH ATLAS", title: "让层级，比装饰更醒目。",
+        description: "深色中心向外生长，每条分支共享一种颜色。柔和的框线与充足留白，适合知识梳理和长时间阅读。",
+        radius: 21, stroke: 3, routing: "curve", note: "浅绿白底 · 同色分支 · 居中排字",
+        nodeDetail: "深色中心，淡彩主干，轻描边末级。", edgeDetail: "连线继承分支色，层级一眼可读。" },
+      C: { name: "模块流程", english: "BOLD MODULES", title: "每个方块，都有明确的下一步。",
+        description: "更饱满的圆角方块、更粗的描边，配轻微硬阴影。步骤编号与折线箭头，适合流程、决策和执行计划。",
+        radius: 29, stroke: 4, routing: "elbow", note: "淡方格底 · 明亮色块 · 5 px 硬阴影",
+        nodeDetail: "编号在上、标题在下，形成模块节奏。", edgeDetail: "圆角转弯，流程方向清楚而有力度。" }
+    };
+    const mindNodes = [
+      { id: "root", title: "周末读书会", desc: "让好想法，发生连接", kicker: "THE BIG IDEA", color: "yellow", kind: "root" },
+      { id: "people", title: "和谁一起", desc: "6—8 位好奇的朋友", kicker: "01 / PEOPLE", color: "blue" },
+      { id: "topic", title: "聊点什么", desc: "一本书，也是一种视角", kicker: "02 / TOPIC", color: "green" },
+      { id: "place", title: "在哪里见", desc: "安静、有光、可以久坐", kicker: "03 / PLACE", color: "pink" },
+      { id: "outcome", title: "带走什么", desc: "让交流继续生长", kicker: "04 / TAKEAWAY", color: "yellow" },
+      { id: "friends", title: "老朋友 + 新面孔", desc: "", color: "blue", kind: "leaf" },
+      { id: "question", title: "每人带来一个问题", desc: "", color: "green", kind: "leaf" },
+      { id: "cafe", title: "街角的独立书店", desc: "", color: "pink", kind: "leaf" },
+      { id: "notes", title: "一张共同的想法地图", desc: "", color: "yellow", kind: "leaf" }
+    ];
+    const flowNodes = [
+      { id: "start", title: "开始筹备", desc: "周末读书会", color: "yellow", kind: "root" },
+      { id: "invite", title: "收集报名", desc: "姓名 · 时间 · 阅读偏好", color: "blue" },
+      { id: "check", title: "人数合适？", desc: "6—8 人", color: "pink" },
+      { id: "meet", title: "安排活动", desc: "确认书店与交流主题", color: "blue" },
+      { id: "adjust", title: "进入交流", desc: "衔接现场讨论", color: "green" },
+      { id: "record", title: "讨论纪要", desc: "记录观点与下一步", color: "yellow" }
+    ];
+    const presets = [
+      { id: "terminal", name: "起止 / 主题", english: "TERMINAL", title: "从这里开始", desc: "一个主题，或一段流程的起点。",
+        use: "标记起点、终点或导图中心。", detail: "胶囊轮廓，两端完整弧线。用于流程的开始与结束，也能作为思维导图的中心主题。",
+        rule: "胶囊形 · 两端圆弧 · 标题居中", shapeName: "胶囊形", color: "yellow" },
+      { id: "process", name: "步骤 / 任务", english: "PROCESS", title: "安排读书会", desc: "确认场地、时间与交流主题。",
+        use: "表达一个具体操作或执行步骤。", detail: "圆角矩形保留充足的文字空间，用于任务、操作与普通概念。它是连接其他功能节点的基础形状。",
+        rule: "圆角矩形 · 内容空间完整", shapeName: "圆角矩形", color: "blue" },
+      { id: "decision", name: "判断 / 分支", english: "DECISION", title: "人数合适？", desc: "是 / 否",
+        use: "提出条件，并分出不同结果。", detail: "圆角菱形，四个顶点明确分支方向。文字放在中央，问题保持简短；是、否等结果写在对应连线上。",
+        rule: "菱形 · 四角圆化 · 条件分支", shapeName: "圆角菱形", color: "pink" },
+      { id: "direction", name: "流转 / 下一阶段", english: "DIRECTION", title: "进入下一阶段", desc: "衔接后续流程",
+        use: "强调推进、交接或阶段转换。", detail: "节点本身采用宽箭头轮廓，表示向下一阶段推进。它承载阶段名称；普通节点之间的连接仍然使用连线。",
+        rule: "箭头形 · 明确的推进语义", shapeName: "箭头形", color: "green" },
+      { id: "io", name: "输入 / 输出", english: "INPUT / OUTPUT", title: "收集报名信息", desc: "姓名、可参加时间、阅读偏好。",
+        use: "表达进入或离开流程的信息。", detail: "两侧倾斜的平行四边形，用于表单输入、数据接收与结果输出。斜边让它和执行步骤明确区分。",
+        rule: "平行四边形 · 倾斜侧边", shapeName: "平行四边形", color: "blue" },
+      { id: "document", name: "文档 / 产出", english: "DOCUMENT", title: "留下一份纪要", desc: "把观点、结论与下一步，\n整理成可回看的记录。",
+        use: "表示笔记、报告与文档成果。", detail: "主体保留圆角，底部采用波浪轮廓。用于讨论纪要、资料、报告与输出文档，让产出物和过程节点分开。",
+        rule: "波浪底文档形 · 内容左对齐", shapeName: "文档形", color: "yellow" }
+    ];
+    const presetOverrides = {};
+    const defaultPresets = { root: "terminal", start: "terminal", people: "process", topic: "process", place: "process",
+      outcome: "document", invite: "io", check: "decision", meet: "process", adjust: "direction", record: "document" };
+    const query = new URL(location.href).searchParams;
+    let variant = Object.hasOwn(themes, query.get("variant")) ? query.get("variant") : "A";
+    let scene = ["presets", "mindmap", "flow"].includes(query.get("scene")) ? query.get("scene") : "presets";
+    if (scene === "presets") variant = "A";
+    let selected = scene === "presets" ? "sample-terminal" : scene === "flow" ? "start" : "root";
+    let dark = false;
+    let radius, stroke, routing, visibleNodes, visibleEdges;
+    let mobile = false;
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+
+    function nodePreset(node) {
+      if (variant !== "A" || !node) return null;
+      const id = node.preset || presetOverrides[`${scene}:${node.id}`] || defaultPresets[node.id] || "process";
+      return presets.find(p => p.id === id);
+    }
+
+    function updatePresetInfo() {
+      const preset = nodePreset(visibleNodes?.find(n => n.id === selected));
+      $$(".preset-choice").forEach(el => el.setAttribute("aria-pressed", String(el.dataset.presetChoice === preset?.id)));
+      if (!preset) return;
+      const actualStroke = stroke;
+      $("#preset-info-label").textContent = `${String(presets.indexOf(preset) + 1).padStart(2, "0")} / ${preset.english}`;
+      $("#preset-info-title").textContent = preset.name;
+      $("#preset-info-description").textContent = preset.detail;
+      $("#preset-info-rule").textContent = preset.rule;
+      $("#node-spec").textContent = `${preset.shapeName} / ${actualStroke} px 描边`;
+      $("#node-detail").textContent = `${preset.name} · ${preset.rule}`;
+      $("#stroke-sample").style.borderWidth = `${actualStroke}px`;
+      $("#stroke-sample").style.borderStyle = "solid";
+      $("#stroke-sample").style.borderRadius = "6px";
+    }
+
+    function roundedPolygon(points, rounding) {
+      const corners = points.map((point, i) => {
+        const previous = points[(i + points.length - 1) % points.length], next = points[(i + 1) % points.length];
+        const before = Math.hypot(previous[0] - point[0], previous[1] - point[1]);
+        const after = Math.hypot(next[0] - point[0], next[1] - point[1]);
+        const distance = Math.min(rounding, before / 3, after / 3);
+        return { point, start: point.map((v, j) => v + (previous[j] - v) * distance / before),
+          end: point.map((v, j) => v + (next[j] - v) * distance / after) };
+      });
+      return `M ${corners[0].start.join(" ")} ` + corners.map((c, i) =>
+        `Q ${c.point.join(" ")} ${c.end.join(" ")} L ${corners[(i + 1) % corners.length].start.join(" ")}`).join(" ") + " Z";
+    }
+
+    function shapeMarkup(preset, width = 300, height = 180, thumbnail = false) {
+      const w = width, h = height, m = 5, r = Math.min(radius || 27, h / 3);
+      let d;
+      if (preset.id === "terminal") {
+        const end = (h - m * 2) / 2;
+        d = `M ${m + end} ${m} H ${w - m - end} A ${end} ${end} 0 0 1 ${w - m - end} ${h - m} H ${m + end} A ${end} ${end} 0 0 1 ${m + end} ${m} Z`;
+      } else if (preset.id === "decision") {
+        d = roundedPolygon([[w / 2, m], [w - m, h / 2], [w / 2, h - m], [m, h / 2]], r * .7);
+      } else if (preset.id === "direction") {
+        d = roundedPolygon([[m, h * .25], [w * .68, h * .25], [w * .68, m], [w - m, h / 2],
+          [w * .68, h - m], [w * .68, h * .75], [m, h * .75]], r * .32);
+      } else if (preset.id === "io") {
+        d = roundedPolygon([[w * .17, m], [w - m, m], [w * .83, h - m], [m, h - m]], r * .45);
+      } else if (preset.id === "document") {
+        const point = (x, y) => `${m + x * (w - m * 2)} ${m + y * (h - m * 2)}`;
+        d = `M ${m + r} ${m} H ${w - m - r} Q ${w - m} ${m} ${w - m} ${m + r}
+          V ${m + .72 * (h - m * 2)}
+          C ${point(1, .84)} ${point(.96, .86)} ${point(.9, .82)}
+          C ${point(.84, .78)} ${point(.16, .93)} ${point(.1, .9)}
+          C ${point(.04, .87)} ${point(0, .86)} ${point(0, .76)}
+          V ${m + r} Q ${m} ${m} ${m + r} ${m} Z`;
+      } else {
+        d = roundedPolygon([[m, m], [w - m, m], [w - m, h - m], [m, h - m]], r);
+      }
+      return `<svg class="node-shape" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        <path class="shape-selection" d="${d}"/><path class="shape-face" d="${d}" ${thumbnail ? "" : 'vector-effect="non-scaling-stroke"'}/>
+      </svg>`;
+    }
+
+    function renderPresetPicker() {
+      $("#preset-picker").innerHTML = presets.map(p =>
+        `<button class="preset-choice" data-preset-choice="${p.id}" aria-label="${p.name}" title="${p.name}：${p.use}" aria-pressed="false">
+          <span class="preset-thumb-art preset-node" data-preset="${p.id}" aria-hidden="true">${shapeMarkup(p, 300, 180, true)}<span class="thumb-heading"></span></span>
+        </button>`).join("");
+      $$(".preset-choice").forEach(el => el.addEventListener("click", () => {
+        if (scene === "presets") {
+          selectNode(`sample-${el.dataset.presetChoice}`);
+        } else {
+          presetOverrides[`${scene}:${selected}`] = el.dataset.presetChoice;
+          renderBoard();
+        }
+      }));
+    }
+
+    function nodeMarkup(n, gallery = false) {
+      const preset = nodePreset(n);
+      const classes = `map-node ${n.kind || ""} ${preset ? "preset-node" : ""} ${gallery ? "gallery-node" : ""}`;
+      const kicker = !preset && n.kicker && n.kind !== "leaf" ? `<span class="node-kicker">${escapeHtml(n.kicker)}</span>` : "";
+      return `<button type="button" class="${classes}" data-node="${n.id}" data-color="${n.color}" ${preset ? `data-preset="${preset.id}"` : ""}
+        ${gallery ? `aria-label="${preset.name}示例：${escapeHtml(n.title)}"` : `style="--node-inline:${n.w}px;left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px"`} aria-pressed="false">
+        ${preset ? shapeMarkup(preset, gallery ? 300 : n.w, gallery ? 200 : n.h) : ""}
+        <span class="preset-copy">${kicker}<strong>${escapeHtml(n.title)}</strong>${n.desc ? `<span class="node-description">${escapeHtml(n.desc)}</span>` : ""}</span>
+        <span class="node-port left" aria-hidden="true"></span><span class="node-port right" aria-hidden="true"></span><span class="node-port top" aria-hidden="true"></span><span class="node-port bottom" aria-hidden="true"></span>
+      </button>`;
+    }
+
+    function renderGallery() {
+      visibleNodes = presets.map(p => ({ id: `sample-${p.id}`, preset: p.id, title: p.title, desc: p.desc, color: p.color }));
+      visibleEdges = [];
+      $("#nodes").innerHTML = "";
+      $("#edges").innerHTML = "";
+      $("#preset-gallery").innerHTML = presets.map((p, i) => `<article class="preset-item">
+        <div class="preset-item-heading"><span class="preset-number">0${i + 1}</span><h3>${p.name}</h3><span class="preset-en">${p.english}</span></div>
+        ${nodeMarkup(visibleNodes[i], true)}
+        <p class="preset-caption">${p.use}<span>${p.rule}</span></p>
+      </article>`).join("");
+      $$(".gallery-node").forEach(el => el.addEventListener("click", () => selectNode(el.dataset.node)));
+      if (!visibleNodes.some(n => n.id === selected)) selected = visibleNodes[0].id;
+      selectNode(selected);
+    }
+
+    function updateSceneChrome() {
+      const hasPresets = variant === "A";
+      document.body.dataset.presets = String(hasPresets);
+      document.body.dataset.scene = scene;
+      $("#preset-field").hidden = !hasPresets;
+      $("#preset-info").hidden = !hasPresets;
+      $("#monochrome").hidden = !hasPresets;
+      $("#preset-gallery").hidden = scene !== "presets";
+      $("#theme-picker-label").textContent = `风格方向 · ${themes[variant].name}`;
+      $(".sidebar h1").textContent = hasPresets ? "形状即功能。" : "形与线。";
+      $(".intro").innerHTML = hasPresets ? "六种轮廓，六种用途。<br>用形状读懂节点的角色。" : "把想法放进圆角方块，<br>用清晰的线，连接下一步。";
+      $("#preset-help").textContent = scene === "presets" ? "点击缩略卡片或大卡片，查看用途与样式规则。" : "先点选画布节点，再点缩略卡片应用预设。文字内容保留。";
+      $("#scene-title").textContent = scene === "presets" ? "六种形状，六种功能" : scene === "flow" ? "从一个想法，到一次见面" : "一场更有意思的读书会";
+      $("#scene-subtitle").textContent = scene === "presets" ? "起止、步骤、判断、流转、输入输出与文档。" : scene === "flow" ? "用步骤、判断和回路，把计划变成行动。" : "从一个主题，长出更多可能。";
+      $("#canvas-label").textContent = scene === "presets" ? "SOFT BLOCKS / FUNCTIONAL PRESETS" : `${variant} / ${themes[variant].english}`;
+      $$(".scene-tabs [data-scene]").forEach(el => el.setAttribute("aria-pressed", String(el.dataset.scene === scene)));
+    }
+
+    function geometry() {
+      mobile = $("#board").clientWidth < 760;
+      if (mobile) {
+        if (scene === "flow") {
+          return { width: 340, height: 1040, nodes: flowNodes.map((n, i) => ({
+            ...n, x: 48, y: [12, 167, 327, 537, 692, 877][i], w: 244, h: [110, 115, 165, 110, 140, 140][i]
+          })), edges: [["start", "invite"], ["invite", "check"], ["check", "meet", "是"],
+            ["check", "invite", "否", true], ["meet", "adjust"], ["adjust", "record"]] };
+        }
+        const compact = [mindNodes[0], ...mindNodes.slice(1, 5)].map((n, i) => ({
+          ...n, desc: i ? [n.desc, mindNodes[i + 4].title].join("\n") : n.desc,
+          x: i === 0 ? 43 : i % 2 ? 9 : 177, y: i === 0 ? 15 : i < 3 ? 218 : 408,
+          w: i === 0 ? 254 : 154, h: i === 0 ? 122 : 139
+        }));
+        return { width: 340, height: 568, nodes: compact, edges: [["root", "people"], ["root", "topic"], ["people", "place", "", false, true], ["topic", "outcome", "", false, true]] };
+      }
+      if (scene === "flow") {
+        return { width: 1040, height: 540, nodes: flowNodes.map((n, i) => ({
+          ...n, x: [25, 394, 780, 25, 394, 780][i], y: [70, 70, 40, 345, 310, 320][i],
+          w: [220, 230, 220, 220, 230, 220][i], h: [125, 125, 185, 130, 180, 170][i]
+        })), edges: [["start", "invite"], ["invite", "check"], ["check", "meet", "是"],
+          ["check", "invite", "否，继续收集", true], ["meet", "adjust"], ["adjust", "record"]] };
+      }
+      const positions = variant === "A"
+        ? [[410, 177, 220, 139], [91, 65, 210, 110], [739, 65, 210, 110], [91, 332, 210, 110], [739, 332, 210, 110],
+          [99, 211, 194, 56], [747, 211, 194, 56], [99, 474, 194, 56], [747, 474, 194, 56]]
+        : variant === "B"
+          ? [[410, 177, 220, 137], [111, 100, 206, 99], [724, 100, 206, 99], [111, 346, 206, 99], [724, 346, 206, 99],
+            [111, 24, 206, 52], [724, 24, 206, 52], [111, 473, 206, 52], [724, 473, 206, 52]]
+          : [[406, 168, 226, 157], [88, 62, 211, 137], [741, 62, 211, 137], [88, 346, 211, 137], [741, 346, 211, 137],
+            [93, 231, 201, 57], [746, 231, 201, 57], [93, 516, 201, 57], [746, 516, 201, 57]];
+      return { width: 1040, height: variant === "C" ? 600 : 554,
+        nodes: mindNodes.map((n, i) => ({ ...n, x: positions[i][0], y: positions[i][1], w: positions[i][2], h: positions[i][3] })),
+        edges: [["root", "people"], ["root", "topic"], ["root", "place"], ["root", "outcome"], ["people", "friends"], ["topic", "question"], ["place", "cafe"], ["outcome", "notes"]] };
+    }
+
+    function docking(a, b) {
+      const dx = b.x + b.w / 2 - a.x - a.w / 2;
+      const dy = b.y + b.h / 2 - a.y - a.h / 2;
+      const horizontal = Math.abs(dx) / ((a.w + b.w) / 2) > Math.abs(dy) / ((a.h + b.h) / 2);
+      const shape = nodePreset(a)?.id;
+      const halfWidth = a.w * (shape === "io" ? .42 : .5);
+      return { x: a.x + a.w / 2 + (horizontal ? Math.sign(dx) * halfWidth : 0),
+        y: a.y + a.h / 2 + (horizontal ? 0 : Math.sign(dy) * a.h * (shape === "direction" ? .25 : shape === "document" && dy > 0 ? .38 : .5)), horizontal };
+    }
+
+    function pathBetween(a, b, isReturn) {
+      if (scene === "flow" && a.id === "check" && b.id === "invite") {
+        if (mobile) return { d: `M ${a.x + a.w} ${a.y + a.h / 2} H 328 V ${b.y + b.h / 2} H ${b.x + b.w * .92}`, lx: 315, ly: 305 };
+        return { d: `M ${a.x + a.w / 2} ${a.y} V 24 Q ${a.x + a.w / 2} 8 ${a.x + a.w / 2 - 16} 8 H ${b.x + b.w / 2 + 16} Q ${b.x + b.w / 2} 8 ${b.x + b.w / 2} 24 V ${b.y}`, lx: 689, ly: 10 };
+      }
+      if (!mobile && scene === "flow" && a.id === "check" && b.id === "meet") {
+        return { d: `M ${a.x + a.w / 2} ${a.y + a.h} V 256 Q ${a.x + a.w / 2} 274 ${a.x + a.w / 2 - 18} 274 H ${b.x + b.w / 2 + 18} Q ${b.x + b.w / 2} 274 ${b.x + b.w / 2} 292 V ${b.y}`, lx: 680, ly: 263 };
+      }
+      const p = docking(a, b), q = docking(b, a);
+      let d;
+      if (routing === "straight") {
+        d = `M ${p.x} ${p.y} L ${q.x} ${q.y}`;
+      } else if (routing === "curve") {
+        const reach = Math.max(32, Math.hypot(q.x - p.x, q.y - p.y) * .48);
+        const c1x = p.x + (p.horizontal ? Math.sign(q.x - p.x) * reach : 0);
+        const c1y = p.y + (p.horizontal ? 0 : Math.sign(q.y - p.y) * reach);
+        const c2x = q.x - (q.horizontal ? Math.sign(q.x - p.x) * reach : 0);
+        const c2y = q.y - (q.horizontal ? 0 : Math.sign(q.y - p.y) * reach);
+        d = `M ${p.x} ${p.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${q.x} ${q.y}`;
+      } else if (p.horizontal && q.horizontal) {
+        const mid = (p.x + q.x) / 2, sx = Math.sign(q.x - p.x), sy = Math.sign(q.y - p.y);
+        const r = Math.min(18, Math.abs(q.y - p.y) / 2, Math.abs(q.x - p.x) / 4);
+        d = `M ${p.x} ${p.y} H ${mid - sx * r} Q ${mid} ${p.y} ${mid} ${p.y + sy * r} V ${q.y - sy * r} Q ${mid} ${q.y} ${mid + sx * r} ${q.y} H ${q.x}`;
+      } else if (!p.horizontal && !q.horizontal) {
+        const mid = (p.y + q.y) / 2, sx = Math.sign(q.x - p.x), sy = Math.sign(q.y - p.y);
+        const r = Math.min(18, Math.abs(q.x - p.x) / 2, Math.abs(q.y - p.y) / 4);
+        d = `M ${p.x} ${p.y} V ${mid - sy * r} Q ${p.x} ${mid} ${p.x + sx * r} ${mid} H ${q.x - sx * r} Q ${q.x} ${mid} ${q.x} ${mid + sy * r} V ${q.y}`;
+      } else {
+        const cx = p.horizontal ? q.x : p.x, cy = p.horizontal ? p.y : q.y;
+        const r = Math.min(18, Math.abs(q.x - p.x) / 2, Math.abs(q.y - p.y) / 2);
+        const sx = Math.sign(q.x - p.x), sy = Math.sign(q.y - p.y);
+        d = p.horizontal
+          ? `M ${p.x} ${p.y} H ${cx - sx * r} Q ${cx} ${cy} ${cx} ${cy + sy * r} V ${q.y}`
+          : `M ${p.x} ${p.y} V ${cy - sy * r} Q ${cx} ${cy} ${cx + sx * r} ${cy} H ${q.x}`;
+      }
+      return { d, lx: (p.x + q.x) / 2 + (p.x === q.x ? 27 : 0), ly: (p.y + q.y) / 2 - 13 };
+    }
+
+    function drawEdges() {
+      if (scene === "presets") return;
+      const ink = getComputedStyle($("#canvas"));
+      let markup = "<defs>";
+      const colors = ["yellow", "blue", "green", "pink"];
+      colors.forEach(color => {
+        const colorValue = ink.getPropertyValue(variant === "B" ? `--${color}-ink` : "--ink").trim();
+        markup += `<marker id="arrow-${color}" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 2 2 L 10 6 L 2 10" fill="none" stroke="${colorValue}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></marker>`;
+      });
+      markup += "</defs>";
+      visibleEdges.forEach(([from, to, label, dashed, hidden]) => {
+        if (hidden) return;
+        const a = visibleNodes.find(n => n.id === from), b = visibleNodes.find(n => n.id === to);
+        const color = b.color;
+        const lineColor = variant === "B" ? `var(--${color}-ink)` : "var(--ink)";
+        const { d, lx, ly } = pathBetween(a, b, dashed);
+        markup += `<path class="edge-line" d="${d}" stroke="${lineColor}" ${dashed ? 'stroke-dasharray="7 7" opacity=".65"' : ""} ${scene === "flow" ? `marker-end="url(#arrow-${color})"` : ""}/>`;
+        if (label) markup += `<text class="edge-label" x="${lx}" y="${ly}">${escapeHtml(label)}</text>`;
+      });
+      // Compact maps retain four root branches; outer lanes avoid crossing the upper nodes.
+      if (mobile && scene === "mindmap") {
+        ["place", "outcome"].forEach((id, index) => {
+          const n = visibleNodes.find(item => item.id === id);
+          const root = visibleNodes[0], lane = index ? 338 : 2, x = index ? n.x + n.w : n.x;
+          const lineColor = variant === "B" ? `var(--${n.color}-ink)` : "var(--ink)";
+          markup += `<path class="edge-line" stroke="${lineColor}" d="M ${index ? root.x + root.w : root.x} ${root.y + root.h / 2} H ${lane} V ${n.y + n.h / 2} H ${x}"/>`;
+        });
+      }
+      $("#edges").innerHTML = markup;
+    }
+
+    function selectNode(id) {
+      selected = id;
+      $$(".map-node").forEach(el => {
+        el.classList.toggle("selected", el.dataset.node === id);
+        el.setAttribute("aria-pressed", String(el.dataset.node === id));
+      });
+      $("#selected-label").textContent = `已选中「${visibleNodes.find(n => n.id === id)?.title ?? ""}」`;
+      updatePresetInfo();
+    }
+
+    function renderBoard() {
+      if (scene === "presets") { renderGallery(); return; }
+      $("#preset-gallery").innerHTML = "";
+      const g = geometry();
+      visibleNodes = g.nodes;
+      visibleEdges = g.edges;
+      const board = $("#board"), world = $("#world");
+      // On narrow screens reflow nodes instead of shrinking desktop text.
+      if (mobile) $("#canvas").style.minHeight = `${g.height + 206}px`;
+      else $("#canvas").style.removeProperty("min-height");
+      const scale = Math.min(board.clientWidth / g.width, board.clientHeight / g.height, 1.18);
+      world.style.width = `${g.width}px`;
+      world.style.height = `${g.height}px`;
+      world.style.transform = `translate(${(board.clientWidth - g.width * scale) / 2}px, ${(board.clientHeight - g.height * scale) / 2}px) scale(${scale})`;
+      $("#edges").setAttribute("viewBox", `0 0 ${g.width} ${g.height}`);
+      $("#nodes").innerHTML = visibleNodes.map(n => nodeMarkup(n)).join("");
+      $$(".map-node").forEach(el => el.addEventListener("click", () => selectNode(el.dataset.node)));
+      if (!visibleNodes.some(n => n.id === selected)) selected = visibleNodes[0].id;
+      selectNode(selected);
+      drawEdges();
+    }
+
+    function updateSpecs() {
+      $("#canvas").style.setProperty("--node-radius", `${radius}px`);
+      $("#canvas").style.setProperty("--node-stroke", `${stroke}px`);
+      $("#canvas").style.setProperty("--edge-stroke", `${Math.max(2, stroke - .5)}px`);
+      $("#radius-value").textContent = `${radius} px`;
+      $("#stroke-value").textContent = `${stroke} px`;
+      $("#node-spec").textContent = `${radius} px 圆角 / ${stroke} px 描边`;
+      $("#node-detail").textContent = themes[variant].nodeDetail;
+      $("#edge-spec").textContent = `${{ curve: "柔和曲线", elbow: "圆角折线", straight: "干净直线" }[routing]}${scene === "flow" ? " + 开口箭头" : " / 无箭头"}`;
+      $("#edge-detail").textContent = themes[variant].edgeDetail;
+      $("#stroke-sample").style.borderWidth = `${stroke}px`;
+      $("#stroke-sample").style.borderStyle = "solid";
+      $("#stroke-sample").style.borderRadius = `${radius / 4}px`;
+      updatePresetInfo();
+    }
+
+    function syncUrl() {
+      const url = new URL(location.href);
+      url.searchParams.set("variant", variant);
+      url.searchParams.set("scene", scene);
+      history.replaceState(null, "", url);
+    }
+
+    function applyTheme(animate = false) {
+      if (variant !== "A" && scene === "presets") scene = "mindmap";
+      const t = themes[variant];
+      radius = t.radius; stroke = t.stroke; routing = t.routing;
+      $("#canvas").dataset.theme = variant;
+      $("#radius").value = radius; $("#stroke").value = stroke; $("#routing").value = routing;
+      $("#direction-title").textContent = t.title;
+      $("#direction-description").textContent = t.description;
+      $("#canvas-label").textContent = `${variant} / ${t.english}`;
+      $("#visual-note").textContent = dark ? "石墨底 · 柔和粉彩 · 深墨轮廓" : t.note;
+      $("#current-variant").innerHTML = `${variant} · ${t.name} <small>${["A", "B", "C"].indexOf(variant) + 1} / 3</small>`;
+      $$(".variant-choice").forEach(el => el.setAttribute("aria-pressed", String(el.dataset.variant === variant)));
+      updateSceneChrome();
+      updateSpecs();
+      renderBoard();
+      syncUrl();
+      if (animate) {
+        $("#canvas").classList.remove("reveal");
+        requestAnimationFrame(() => $("#canvas").classList.add("reveal"));
+      }
+    }
+
+    function applyScene() {
+      selected = scene === "presets" ? "sample-terminal" : scene === "flow" ? "start" : "root";
+      if (scene === "presets" && variant !== "A") { variant = "A"; applyTheme(); return; }
+      updateSceneChrome();
+      updateSpecs();
+      renderBoard();
+      syncUrl();
+    }
+
+    function cycle(direction) {
+      if (scene === "presets") {
+        const index = visibleNodes.findIndex(n => n.id === selected);
+        selectNode(visibleNodes[(index + direction + presets.length) % presets.length].id);
+        return;
+      }
+      const keys = ["A", "B", "C"];
+      variant = keys[(keys.indexOf(variant) + direction + keys.length) % keys.length];
+      applyTheme(true);
+    }
+
+    $$(".variant-choice").forEach(el => el.addEventListener("click", () => { variant = el.dataset.variant; applyTheme(true); }));
+    $$(".scene-tabs [data-scene]").forEach(el => el.addEventListener("click", () => { scene = el.dataset.scene; applyScene(); }));
+    $("#radius").addEventListener("input", e => { radius = Number(e.target.value); updateSpecs(); renderBoard(); });
+    $("#stroke").addEventListener("input", e => { stroke = Number(e.target.value); updateSpecs(); drawEdges(); });
+    $("#routing").addEventListener("change", e => { routing = e.target.value; updateSpecs(); drawEdges(); });
+    $("#reset").addEventListener("click", () => {
+      if (variant === "A" && scene !== "presets") {
+        Object.keys(presetOverrides).filter(key => key.startsWith(`${scene}:`)).forEach(key => delete presetOverrides[key]);
+      }
+      applyTheme();
+    });
+    $("#previous").addEventListener("click", () => cycle(-1));
+    $("#next").addEventListener("click", () => cycle(1));
+    $("#appearance").addEventListener("click", () => {
+      dark = !dark; $("#canvas").dataset.dark = String(dark);
+      $("#appearance").textContent = dark ? "浅色预览" : "深色预览";
+      $("#appearance").setAttribute("aria-pressed", String(dark));
+      $("#visual-note").textContent = dark ? "石墨底 · 柔和粉彩 · 深墨轮廓" : themes[variant].note;
+      drawEdges();
+    });
+    $("#monochrome").addEventListener("click", () => {
+      const enabled = $("#canvas").dataset.monochrome !== "true";
+      $("#canvas").dataset.monochrome = String(enabled);
+      $("#monochrome").setAttribute("aria-pressed", String(enabled));
+      $("#monochrome").textContent = enabled ? "恢复配色" : "统一颜色";
+    });
+    document.addEventListener("keydown", e => {
+      if (e.target.closest("input, textarea, select, [contenteditable]") || e.altKey || e.metaKey || e.ctrlKey) return;
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); cycle(e.key === "ArrowLeft" ? -1 : 1); }
+    });
+    if (matchMedia("(max-width: 800px)").matches) $(".tuning").open = false;
+    renderPresetPicker();
+    applyTheme();
+    applyScene();
+    let resizeFrame;
+    new ResizeObserver(() => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(renderBoard); }).observe($("#board"));
+  </script>
+</body>
+</html>

@@ -5,6 +5,8 @@ import { SKETCH_FONT_CSS } from "./sketch-font";
 import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
 import { clearSoftNotesNode, ensureSoftNotesGeometry, softNotesClip, softNotesPreset } from "./soft-notes-style";
 import { decorateCanvasTheme, resolveCanvasTheme, setCanvasTheme, type CanvasThemeId } from "./canvas-theme";
+import { clearRoundedMapNode, roundedMapCss } from "./rounded-map-style";
+import { ROUNDED_MAP_PRESETS } from "./node-visual-style";
 
 /**
  * Mirrors Obsidian's native control markup (a `div.canvas-control-item`) rather
@@ -26,6 +28,7 @@ const EDITOR_STYLE_ID = "bc-scrapbook-editor";
 const SKETCH_EDITOR_STYLE_ID = "bc-sketch-editor";
 const SOFT_EDITOR_STYLE_ID = "bc-soft-notes-editor";
 const FONT_STYLE_ID = "bc-sketch-font";
+const ROUNDED_EDITOR_STYLE_ID = "bc-rounded-map-editor";
 const EDITOR_CSS = `
 body { color-scheme: light; --background-primary: #fff8e8; --background-secondary: #f2e7d2;
   --text-normal: #43372f; --text-muted: #766758; --text-faint: #8c7b68;
@@ -78,6 +81,7 @@ class CanvasThemeModal extends Modal {
       { id: "default", title: "默认", detail: "跟随 Obsidian · 清晰简洁" },
       { id: "scrapbook", title: "拼贴手账", detail: "暖纸 · 胶带 · 收藏灵感" },
       { id: "sketch", title: "手绘白板", detail: "白纸 · 手绘线 · 功能预设" },
+      { id: "rounded-map", title: "软糖白板", detail: "大圆角 · 粗描边 · 六种功能形状" },
       { id: "soft-notes", title: "柔软便签", detail: "浅粉彩 · 柔软曲线 · 自由文字" }
     ];
     for (const theme of themes) {
@@ -91,7 +95,7 @@ class CanvasThemeModal extends Modal {
       board.createSpan({
         cls: "bc-theme-mini-caption",
         text: theme.id === "scrapbook" ? "little things, kept."
-          : theme.id === "sketch" ? "think in ink."
+          : theme.id === "sketch" ? "think in ink." : theme.id === "rounded-map" ? "connect the ideas."
           : theme.id === "soft-notes" ? "让想法自由生长"
             : "A space to think."
       });
@@ -111,6 +115,13 @@ class CanvasThemeModal extends Modal {
           const sample = board.createSpan({ cls: "bc-soft-mini bc-mini-" + kind, text });
           sample.style.setProperty("--bc-soft-clip", softNotesClip(preset));
           sample.style.setProperty("--bc-soft-color", preset.color);
+        }
+      } else if (theme.id === "rounded-map") {
+        for (const preset of ROUNDED_MAP_PRESETS.slice(0, 3)) {
+          const sample = board.createSpan({ cls: "bc-rounded-preview bc-mini-rounded-" + preset.id });
+          for (const [key, value] of Object.entries(roundedMapCss(preset.style.shape, 88, 54))) sample.style.setProperty(key, value);
+          sample.style.setProperty("--bc-rounded-fill", preset.style.color);
+          sample.createSpan({ text: preset.sample });
         }
       } else if (theme.id === "sketch") {
         for (const [kind, text] of [["concept", "想法"], ["action", "下一步"], ["risk", "待确认"]]) {
@@ -158,7 +169,7 @@ export default class CanvasThemeController {
   start(): void {
     this.ensureFont();
     const workspace = this.plugin.app.workspace as any;
-    for (const name of ["layout-change", "active-leaf-change", "advanced-canvas:data-loaded:after",
+    for (const name of ["layout-change", "active-leaf-change", "css-change", "advanced-canvas:data-loaded:after",
       "advanced-canvas:node-added", "advanced-canvas:node-changed", "advanced-canvas:node-editing-state-changed",
       "advanced-canvas:canvas-changed", "advanced-canvas:viewport-changed:after"]) {
       this.plugin.registerEvent(workspace.on(name, () => this.schedule()));
@@ -253,7 +264,7 @@ export default class CanvasThemeController {
         this.controls.set(canvas, group);
       }
       const control = group.firstElementChild as HTMLElement;
-      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : theme === "soft-notes" ? "柔软便签" : "默认";
+      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : theme === "rounded-map" ? "软糖白板" : theme === "soft-notes" ? "柔软便签" : "默认";
       control.setAttribute("aria-label", "画布主题 · " + themeName);
     }
     for (const [canvas, group] of this.controls) {
@@ -276,6 +287,22 @@ export default class CanvasThemeController {
         const scrapbook = doc.getElementById(EDITOR_STYLE_ID);
         const sketch = doc.getElementById(SKETCH_EDITOR_STYLE_ID);
         const soft = doc.getElementById(SOFT_EDITOR_STYLE_ID);
+        const rounded = doc.getElementById(ROUNDED_EDITOR_STYLE_ID);
+        if (theme === "rounded-map") {
+          soft?.remove();
+          scrapbook?.remove();
+          sketch?.remove();
+          const style = rounded ?? doc.createElement("style");
+          style.id = ROUNDED_EDITOR_STYLE_ID;
+          const dark = canvas.wrapperEl.ownerDocument?.body.classList.contains("theme-dark");
+          const ink = dark ? "#20262d" : "#34372f";
+          const css = `body { color-scheme: light; --text-normal: ${ink}; --text-muted: #515b60; --text-faint: #6c747c; --text-accent: #315b86; --text-accent-hover: #24486b; --background-primary: #e5e7e1; --background-secondary: #d7dbd5; --code-background: #d7dbd5; --code-normal: ${ink}; --text-selection: #a9c3d8; color: ${ink}; background: transparent; }
+.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: ${ink}; }`;
+          if (style.textContent !== css) style.textContent = css;
+          if (!rounded) (doc.body ?? doc.head).appendChild(style);
+          continue;
+        }
+        rounded?.remove();
         if (theme === "default") {
           scrapbook?.remove();
           sketch?.remove();
@@ -322,6 +349,9 @@ export default class CanvasThemeController {
     if (canvas.wrapperEl?.dataset) delete canvas.wrapperEl.dataset.bcTheme;
     clearSketchCanvas(canvas);
     for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-soft-notes]") ?? []) clearSoftNotesNode(el);
+    for (const node of canvas.nodes?.values?.() ?? []) {
+      clearRoundedMapNode(node?.nodeEl ?? node?.containerEl ?? node?.el);
+    }
     for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-paper]") ?? []) {
       delete el.dataset.bcPaper;
       delete el.dataset.bcPaperBorder;

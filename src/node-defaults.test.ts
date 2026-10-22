@@ -3,9 +3,7 @@ import type { CanvasNodeData } from "./canvas";
 import {
   applyDefaultNodePreferences,
   applyDefaultNodeTextAlignment,
-  configuredDefaultNodeSize,
-  normalizeDefaultNodeHeight,
-  normalizeDefaultNodeWidth,
+  defaultNodeSize,
   normalizeDefaultNodeTextAlignment
 } from "./node-defaults";
 
@@ -85,34 +83,11 @@ describe("default text alignment for new Canvas nodes", () => {
   });
 });
 
-describe("default node size settings", () => {
-  it("keeps configured widths within the settings range", () => {
-    expect(normalizeDefaultNodeWidth(400)).toBe(400);
-    expect(normalizeDefaultNodeWidth(50)).toBe(50);
-    expect(normalizeDefaultNodeWidth(20)).toBe(20);
-    expect(normalizeDefaultNodeWidth(19)).toBe(20);
-    expect(normalizeDefaultNodeWidth(9999)).toBe(1200);
-    expect(normalizeDefaultNodeWidth(undefined)).toBe(280);
-    expect(normalizeDefaultNodeWidth("abc")).toBe(280);
-  });
-
-  it("keeps configured heights within the settings range", () => {
-    expect(normalizeDefaultNodeHeight(220)).toBe(220);
-    expect(normalizeDefaultNodeHeight(20)).toBe(20);
-    expect(normalizeDefaultNodeHeight(19)).toBe(20);
-    expect(normalizeDefaultNodeHeight(10)).toBe(20);
-    expect(normalizeDefaultNodeHeight(9999)).toBe(1000);
-    expect(normalizeDefaultNodeHeight(undefined)).toBe(140);
-    expect(normalizeDefaultNodeHeight("abc")).toBe(140);
-  });
-
-  it("reads the configured default size with safe fallbacks", () => {
-    expect(configuredDefaultNodeSize({ defaultNodeWidth: 320, defaultNodeHeight: 180 }))
-      .toEqual({ width: 320, height: 180 });
-    expect(configuredDefaultNodeSize({})).toEqual({ width: 280, height: 140 });
-    expect(configuredDefaultNodeSize(null)).toEqual({ width: 280, height: 140 });
-    expect(configuredDefaultNodeSize(undefined)).toEqual({ width: 280, height: 140 });
-    expect(configuredDefaultNodeSize({ defaultNodeWidth: 10, defaultNodeHeight: 5 }))
-      .toEqual({ width: 20, height: 20 });
+describe("fixed creation size", () => {
+  it("returns the standard blank-card dimensions without a shared mutable object", () => {
+    const size = defaultNodeSize();
+    expect(size).toEqual({ width: 280, height: 140 });
+    size.width = 900;
+    expect(defaultNodeSize()).toEqual({ width: 280, height: 140 });
   });
 });
