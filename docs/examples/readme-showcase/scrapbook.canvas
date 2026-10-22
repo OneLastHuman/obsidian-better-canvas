@@ -1,0 +1,103 @@
+{
+  "bcTheme": "scrapbook",
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 430,
+      "y": 0,
+      "width": 480,
+      "height": 130,
+      "text": "# 周末，留给阅读\n\n一本书 · 一杯茶 · 几个新问题",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "label",
+      "color": "#8ba4ad"
+    },
+    {
+      "id": "idea",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 310,
+      "text": "## 本周灵感\n\n把读书会办在窗边。\n\n每个人带来一本正在读的书，\n从喜欢的一句话聊起。",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "tape",
+      "color": "#bd9455"
+    },
+    {
+      "id": "list",
+      "type": "text",
+      "x": 0,
+      "y": 395,
+      "width": 320,
+      "height": 260,
+      "text": "## 随身清单\n\n- [x] 一本短书\n- [x] 铅笔与便签\n- [ ] 一段想分享的摘录",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "lined",
+      "color": "#91a17c"
+    },
+    {
+      "id": "quote",
+      "type": "text",
+      "x": 1030,
+      "y": 0,
+      "width": 320,
+      "height": 300,
+      "text": "## 今日摘录\n\n慢一点读，\n给自己的问题\n留一点空白。\n\n*示例手记*",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "torn",
+      "color": "#bf826c"
+    },
+    {
+      "id": "later",
+      "type": "text",
+      "x": 1030,
+      "y": 420,
+      "width": 320,
+      "height": 235,
+      "text": "## 留给下次\n\n交换一份书单。\n沿着别人的问题，\n重新读自己的书。",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "tape",
+      "color": "#a194b0"
+    },
+    {
+      "id": "photo",
+      "type": "file",
+      "file": "Better Canvas 展示/postcard.svg",
+      "x": 420,
+      "y": 240,
+      "width": 500,
+      "height": 375,
+      "bcScrapbookPreset": "photo",
+      "bcAutoResize": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "idea-title",
+      "fromNode": "idea",
+      "toNode": "title",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "photo-quote",
+      "fromNode": "photo",
+      "toNode": "quote",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "photo-later",
+      "fromNode": "photo",
+      "toNode": "later",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    }
+  ]
+}
+
