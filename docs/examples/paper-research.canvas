@@ -1,0 +1,130 @@
+{
+  "bcTheme": "research",
+  "nodes": [
+    {
+      "id": "source",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 350,
+      "height": 360,
+      "text": "# 索引与检索\n\n资料的价值，不只在于被保存，也在于能否在需要时再次被找到。\n\n在阅读过程中，把材料和当时的问题放在一起，比孤立地保存一段摘录更容易恢复思考的上下文。\n\n**让资料可以被重新理解，而不只是被重新打开。**",
+      "color": "#a84e34",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "left",
+      "bcResearchPreset": "source",
+      "bcResearchIntensity": 26,
+      "bcAutoResize": false
+    },
+    {
+      "id": "quote",
+      "type": "text",
+      "x": 400,
+      "y": 0,
+      "width": 350,
+      "height": 360,
+      "text": "> 整理资料，是让问题与证据再次相遇。\n\n在阅读中保留的不只是句子，还有它回应的问题，以及它通向的下一份资料。",
+      "color": "#b48a28",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "left",
+      "bcResearchPreset": "quote",
+      "bcResearchIntensity": 26,
+      "bcAutoResize": false
+    },
+    {
+      "id": "annotation",
+      "type": "text",
+      "x": 800,
+      "y": 0,
+      "width": 350,
+      "height": 360,
+      "text": "## 从摘录到理解\n\n一个反复出现的现象：同一概念在不同资料里，总有细微的意义偏移。\n\n把它们放在一起比较，新的问题才会显现。",
+      "color": "#416879",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "left",
+      "bcResearchPreset": "annotation",
+      "bcResearchIntensity": 26,
+      "bcAutoResize": false
+    },
+    {
+      "id": "argument",
+      "type": "text",
+      "x": 0,
+      "y": 440,
+      "width": 350,
+      "height": 360,
+      "text": "# 关系，比收藏更重要\n\n当资料之间建立了可追溯的关联，一张画布才开始成为思考的工具。\n\n**先保留证据，再写下自己的解释。**\n\n让观点能够回到它的来源，也容得下新的修正。",
+      "color": "#63734a",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "left",
+      "bcResearchPreset": "argument",
+      "bcResearchIntensity": 26,
+      "bcAutoResize": false
+    },
+    {
+      "id": "question",
+      "type": "text",
+      "x": 400,
+      "y": 440,
+      "width": 350,
+      "height": 360,
+      "text": "## 哪些资料值得长期保留？\n\n- 它是否回应一个持续的问题？\n- 能否与已有资料形成新的联系？",
+      "color": "#63734a",
+      "bcShape": "default",
+      "bcBorderStyle": "dashed",
+      "bcTextAlign": "left",
+      "bcResearchPreset": "question",
+      "bcResearchIntensity": 26,
+      "bcAutoResize": false
+    },
+    {
+      "id": "section",
+      "type": "text",
+      "x": 800,
+      "y": 440,
+      "width": 350,
+      "height": 360,
+      "text": "# 让资料开始对话",
+      "color": "#416879",
+      "bcShape": "square",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "bcResearchPreset": "section",
+      "bcResearchIntensity": 26,
+      "bcAutoResize": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "source",
+      "fromSide": "right",
+      "toNode": "quote",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "摘录"
+    },
+    {
+      "id": "e2",
+      "fromNode": "quote",
+      "fromSide": "right",
+      "toNode": "argument",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "支持"
+    },
+    {
+      "id": "e3",
+      "fromNode": "annotation",
+      "fromSide": "right",
+      "toNode": "question",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "延伸"
+    }
+  ]
+}

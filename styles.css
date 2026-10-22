@@ -1776,6 +1776,216 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .bc-soft-mini.bc-mini-action { right: 12px; top: 44px; width: 90px; height: 62px; }
 .bc-soft-mini.bc-mini-question { right: 20px; top: 104px; width: 95px; height: 62px; padding-bottom: 12px; }
 
+/* Paper research stays a light paper surface even in a dark host.
+   All ornaments are CSS; headings and quotations always come from Markdown. */
+.canvas-wrapper[data-bc-theme="research"],
+.bc-node-style-panel[data-bc-theme="research"],
+.bc-theme-mini-board[data-bc-theme="research"] {
+  color-scheme: light;
+  --bc-research-paper: #fffdf7;
+  --bc-research-ink: #303831;
+  --bc-research-serif: "Songti SC", "Noto Serif CJK SC", "STSong", "SimSun", serif;
+  --background-primary: #fffdf7;
+  --background-secondary: #eeece5;
+  --background-modifier-border: #d9d9ce;
+  --background-modifier-hover: #e6e6db;
+  --text-normal: #303831;
+  --text-muted: #65705b;
+  --text-faint: #85877c;
+  --text-accent: #416879;
+  --text-accent-hover: #304f5c;
+  --color-accent: #a84e34;
+  --interactive-accent: #a84e34;
+  --code-background: #eeece5;
+  --code-normal: #303831;
+  --text-selection: #e9d791;
+  --canvas-background: #eeece5;
+  --canvas-color: #63734a;
+  --canvas-dot-pattern: #d1d2c5;
+  color: var(--text-normal);
+}
+.canvas-wrapper[data-bc-theme="research"] {
+  background: radial-gradient(ellipse at 35% 20%, #f5f2e9, #eeece5 75%);
+}
+.canvas-wrapper[data-bc-theme="research"] .canvas-background { background: transparent; opacity: .3; }
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] {
+  --bc-research-title-color: var(--bc-research-ink);
+  --bc-research-title-size: 1.55em;
+  --bc-research-title-padding: 0 0 15px;
+  --bc-research-title-margin: 0 0 17px;
+  --bc-research-title-background: transparent;
+  --bc-research-title-border: 1px solid color-mix(in srgb, var(--bc-research-accent) 40%, transparent);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] .canvas-node-container {
+  color: var(--bc-research-ink);
+  background: var(--bc-research-fill, var(--bc-research-paper));
+  border-color: color-mix(in srgb, var(--bc-research-accent) 45%, #d9d9ce);
+  box-shadow: 0 1px 2px #3038310c;
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] :is(.canvas-node-content, .markdown-preview-view, .markdown-source-view, .cm-editor, .markdown-embed) {
+  color: var(--bc-research-ink);
+  background-color: transparent;
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] :is(.markdown-preview-view, .cm-content) {
+  font-family: var(--bc-research-serif);
+  font-size: 16px;
+  line-height: 1.9;
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] .markdown-preview-view {
+  padding: 24px;
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] .markdown-preview-sizer { min-height: 0; }
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--bc-research-serif);
+  color: var(--bc-research-ink);
+  line-height: 1.5;
+}
+/* Support both direct Markdown blocks and Obsidian's virtualized block wrappers.
+   The header/footer containers do not count as user content. */
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] :is(
+  .markdown-rendered > :is(h1, h2, h3, h4, h5, h6):first-child,
+  .markdown-preview-sizer > :nth-child(1 of :not(.mod-header, .mod-footer, .markdown-preview-pusher)) > :is(h1, h2, h3, h4, h5, h6)
+) {
+  color: var(--bc-research-title-color);
+  font-size: var(--bc-research-title-size);
+  padding: var(--bc-research-title-padding);
+  margin: var(--bc-research-title-margin);
+  background: var(--bc-research-title-background);
+  border-bottom: var(--bc-research-title-border);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] blockquote {
+  color: var(--bc-research-ink);
+  border-inline-start-color: var(--bc-research-accent);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="source"]:is([data-bc-shape="square"], [data-bc-shape="default"]) .canvas-node-container {
+  box-shadow: inset 7px 0 var(--bc-research-accent), inset 0 0 0 6px var(--bc-research-paper), inset 0 0 0 7px color-mix(in srgb, var(--bc-research-accent) 20%, var(--bc-research-paper));
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="quote"] .canvas-node-container {
+  box-shadow: inset 0 -4px var(--bc-research-accent);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="quote"] blockquote {
+  padding: 16px 12px;
+  margin: 0 0 21px;
+  font-size: 1.5em;
+  line-height: 1.6;
+  background: #fffdf838;
+  border: 0;
+  border-block: 1px solid color-mix(in srgb, var(--bc-research-accent) 52%, transparent);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="annotation"] {
+  --bc-research-title-color: var(--bc-research-accent);
+  --bc-research-title-border: 0;
+  --bc-research-title-padding: 0;
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="annotation"] .markdown-preview-view {
+  padding-left: 35px;
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 28px;
+  background-image: linear-gradient(90deg, transparent 21px, color-mix(in srgb, var(--bc-research-accent) 40%, transparent) 21px 22px, transparent 22px);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="annotation"] .markdown-rendered p {
+  background: repeating-linear-gradient(to bottom, transparent 0 27px, color-mix(in srgb, var(--bc-research-accent) 22%, transparent) 27px 28px);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="argument"] {
+  --bc-research-title-color: #fffdf7;
+  --bc-research-title-background: var(--bc-research-accent);
+  --bc-research-title-margin: -24px -24px 21px;
+  --bc-research-title-padding: 20px 24px;
+  --bc-research-title-border: 0;
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="argument"] .markdown-rendered strong {
+  text-decoration: underline color-mix(in srgb, var(--bc-research-accent) 28%, transparent) 4px;
+  text-underline-offset: 2px;
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="argument"] :is(h1, h2, h3, h4, h5, h6) :is(strong, em, code, a) { color: inherit; }
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="question"] {
+  --bc-research-title-color: var(--bc-research-accent);
+  --bc-research-title-border: 1px dashed color-mix(in srgb, var(--bc-research-accent) 45%, transparent);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="question"][data-bc-shape="default"] .canvas-node-container { border-radius: 14px; }
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="question"] li { margin-block: 10px; }
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="section"] {
+  --bc-research-title-color: var(--bc-research-accent);
+  --bc-research-title-size: 2.3em;
+  --bc-research-title-padding: 0;
+  --bc-research-title-margin: 0;
+  --bc-research-title-border: 0;
+  --bc-research-title-background: linear-gradient(transparent 76%, color-mix(in srgb, var(--bc-research-accent) 17%, transparent) 76% 93%, transparent 93%);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="section"] .canvas-node-container {
+  box-shadow: inset 0 2px var(--bc-research-accent);
+}
+.canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="section"] .markdown-preview-view { padding-inline: 0; }
+.canvas-wrapper[data-bc-theme="research"] .canvas-node:is(.is-selected, .is-focused, .is-editing) .canvas-node-container {
+  outline: 2px solid #a84e34;
+  outline-offset: 5px;
+}
+.canvas-wrapper[data-bc-theme="research"] :is(.canvas-control-group, .canvas-card-menu) {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border);
+}
+.canvas-wrapper[data-bc-theme="research"] .canvas-group-label {
+  color: #63734a;
+  font-family: var(--bc-research-serif);
+  background: var(--canvas-background);
+}
+.canvas-wrapper[data-bc-theme="research"] .canvas-path-label { background: #eeece5; color: #65705b; }
+.bc-research-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.bc-research-preset {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  padding: 4px;
+  height: auto;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-shadow: none;
+}
+.bc-research-preset:hover { background: var(--background-modifier-hover); }
+.bc-research-preset[aria-pressed="true"] { border-color: var(--interactive-accent); }
+.bc-research-preset[aria-pressed="mixed"],
+.bc-research-intensity[aria-pressed="mixed"] { border: 1px dashed var(--interactive-accent); }
+.bc-research-preview {
+  --bc-research-accent: #a84e34;
+  display: block;
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1.65;
+  padding: 13px 12px;
+  border: 1px solid #d9d9ce;
+  background: #fffdf7;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.bc-research-preview::before { content: ""; display: block; height: 4px; width: 64%; background: var(--bc-research-accent); margin-bottom: 9px; }
+.bc-research-preview::after { content: ""; display: block; width: 88%; height: 16px; background: repeating-linear-gradient(#c3c6b8 0 1px, transparent 1px 5px); }
+.bc-research-preview[data-bc-research-preset="source"] { border-left: 5px solid var(--bc-research-accent); box-shadow: inset 0 0 0 3px #fffdf7, inset 0 0 0 4px #e3dfd0; }
+.bc-research-preview[data-bc-research-preset="quote"] { --bc-research-accent: #b48a28; background: #ebd898; border-bottom: 3px solid var(--bc-research-accent); }
+.bc-research-preview[data-bc-research-preset="quote"]::before { width: 100%; height: 17px; background: #fffcdf77; border-block: 1px solid var(--bc-research-accent); margin-bottom: 6px; }
+.bc-research-preview[data-bc-research-preset="annotation"] { --bc-research-accent: #416879; background: #ced6d6; border-left: 2px solid var(--bc-research-accent); padding-left: 19px; }
+.bc-research-preview[data-bc-research-preset="annotation"]::after { height: 26px; width: 100%; background: repeating-linear-gradient(transparent 0 6px, #889da77a 6px 7px); }
+.bc-research-preview[data-bc-research-preset="argument"] { --bc-research-accent: #63734a; padding-top: 30px; }
+.bc-research-preview[data-bc-research-preset="argument"]::before { position: absolute; inset: 0 0 auto; width: 100%; height: 23px; }
+.bc-research-preview[data-bc-research-preset="question"] { --bc-research-accent: #63734a; border: 1px dashed var(--bc-research-accent); border-radius: 9px; background: #ebeddf; }
+.bc-research-preview[data-bc-research-preset="question"]::before { width: 75%; margin-inline: auto; }
+.bc-research-preview[data-bc-research-preset="section"] { --bc-research-accent: #416879; border: 0; border-top: 2px solid var(--bc-research-accent); background: transparent; padding: 22px 1px 0; }
+.bc-research-preview[data-bc-research-preset="section"]::before { width: 90%; height: 10px; box-shadow: 0 5px #41687929; }
+.bc-research-preview[data-bc-research-preset="section"]::after { display: none; }
+.bc-research-intensities { display: flex; gap: 4px; }
+.bc-research-intensity { flex: 1; padding: 5px; background: var(--background-secondary); color: var(--text-normal); box-shadow: none; }
+.bc-research-intensity[aria-pressed="true"] { background: #dce0d1; }
+.bc-theme-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bc-theme-mini-board[data-bc-theme="research"] { background: #eeece5; }
+.bc-theme-mini-board[data-bc-theme="research"] .bc-theme-mini-caption { color: #a84e34; font-family: var(--bc-research-serif); }
+.bc-theme-mini-board[data-bc-theme="research"] .bc-research-preview { position: absolute; width: 70px; height: 56px; }
+.bc-theme-mini-board[data-bc-theme="research"] .bc-mini-source { left: 18px; top: 57px; }
+.bc-theme-mini-board[data-bc-theme="research"] .bc-mini-quote { right: 20px; top: 40px; }
+.bc-theme-mini-board[data-bc-theme="research"] .bc-mini-argument { right: 32px; top: 107px; height: 40px; }
+
 /* Directional node, including its non-theme fallback. */
 :is(.canvas-node[data-bc-shape="right-arrow"], .bc-node-shape-preview.shape-right-arrow) {
   --bc-shape-outline: polygon(0 20%, 68% 20%, 68% 0, 100% 50%, 68% 100%, 68% 80%, 0 80%);

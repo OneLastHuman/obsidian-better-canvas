@@ -392,6 +392,33 @@ describe("node style panel rendering", () => {
     }
   });
 
+  it("applies six research presets and intensity to cards, with mixed state and readonly guards", () => {
+    const panel = createStylePanel([{ bcResearchPreset: "quote" }, { bcResearchPreset: "source" }, { type: "group" }], 3, "research");
+    expect(buttons(panel.surface).filter(button => button.className.includes("bc-research-preset"))).toHaveLength(6);
+    expect(optionButton(panel.surface, "research-quote").getAttribute("aria-pressed")).toBe("mixed");
+    optionButton(panel.surface, "research-argument").click();
+    expect(panel.getData().nodes.map(node => node.bcResearchPreset)).toEqual(["argument", "argument", undefined]);
+    expect(panel.getData().nodes[0].text).toBe("节点 1");
+    expect(panel.canvas.requestSave).toHaveBeenCalledWith(false);
+    optionButton(panel.surface, "research-40").click();
+    expect(panel.getData().nodes.map(node => node.bcResearchIntensity)).toEqual([40, 40, undefined]);
+    optionButton(panel.surface, "color-blue").click();
+    expect(panel.getData().nodes[0].color).toBe("#416879");
+    panel.canvas.readonly = true;
+    optionButton(panel.surface, "research-section").click();
+    expect(panel.getData().nodes[0].bcResearchPreset).toBe("argument");
+    panel.close();
+  });
+
+  it("disables research presets for empty or group-only selection", () => {
+    for (const selectedCount of [0, 1]) {
+      const panel = createStylePanel([{ type: "group" }], selectedCount, "research");
+      expect(optionButton(panel.surface, "research-source").disabled).toBe(true);
+      expect(optionButton(panel.surface, "research-26").disabled).toBe(true);
+      panel.close();
+    }
+  });
+
   it("shows mixed sketch fill state and rejects changes on a read-only canvas", () => {
     const panel = createStylePanel([
       { bcSketchFill: "hachure" },
