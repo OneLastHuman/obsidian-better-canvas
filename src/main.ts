@@ -46,6 +46,7 @@ interface NodeTemplate {
   bcAutoResize?: boolean;
   bcScrapbookPreset?: string;
   bcSketchPreset?: string;
+  bcSoftNotesPreset?: string;
   bcSketchFill?: string;
 }
 
@@ -788,6 +789,7 @@ export default class BetterCanvasPlugin extends Plugin {
         ...(typeof source.bcCustomClass === "string" ? { bcCustomClass: source.bcCustomClass } : {}),
         ...(typeof source.bcScrapbookPreset === "string" ? { bcScrapbookPreset: source.bcScrapbookPreset } : {}),
         ...(typeof source.bcSketchPreset === "string" ? { bcSketchPreset: source.bcSketchPreset } : {}),
+        ...(typeof source.bcSoftNotesPreset === "string" ? { bcSoftNotesPreset: source.bcSoftNotesPreset } : {}),
         ...(typeof source.bcSketchFill === "string" ? { bcSketchFill: source.bcSketchFill } : {}),
         ...(typeof source.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: source.bcZoomBreakpoint } : {}),
         ...(typeof source.bcAutoResize === "boolean" ? { bcAutoResize: source.bcAutoResize } : {})
@@ -821,6 +823,7 @@ export default class BetterCanvasPlugin extends Plugin {
         ...(template.bcCustomClass ? { bcCustomClass: template.bcCustomClass } : {}),
         ...(template.bcScrapbookPreset ? { bcScrapbookPreset: template.bcScrapbookPreset } : {}),
         ...(template.bcSketchPreset ? { bcSketchPreset: template.bcSketchPreset } : {}),
+        ...(template.bcSoftNotesPreset ? { bcSoftNotesPreset: template.bcSoftNotesPreset } : {}),
         ...(template.bcSketchFill ? { bcSketchFill: template.bcSketchFill } : {}),
         ...(typeof template.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: template.bcZoomBreakpoint } : {}),
         ...(typeof template.bcAutoResize === "boolean" ? { bcAutoResize: template.bcAutoResize } : {})
