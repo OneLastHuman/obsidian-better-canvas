@@ -16,7 +16,7 @@ import CanvasThemeController from "./canvas-theme-controller";
 import { addNodeAIContextMenuItems } from "./node-ai-context-menu";
 import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
-import { configuredDefaultNodeSize, DEFAULT_NODE_HEIGHT, DEFAULT_NODE_WIDTH } from "./node-defaults";
+import { defaultNodeSize } from "./node-defaults";
 import type { ModelCapabilityReport } from "./model-capabilities";
 import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
 import { AIUsageModal } from "./ai-usage-modal";
@@ -31,24 +31,6 @@ import {
   readCanvasData
 } from "./canvas";
 
-interface NodeTemplate {
-  name: string;
-  text: string;
-  width: number;
-  height: number;
-  color?: string;
-  styleAttributes?: Record<string, unknown>;
-  bcShape?: string;
-  bcBorderStyle?: string;
-  bcTextAlign?: string;
-  bcCustomClass?: string;
-  bcZoomBreakpoint?: number;
-  bcAutoResize?: boolean;
-  bcScrapbookPreset?: string;
-  bcSketchPreset?: string;
-  bcSketchFill?: string;
-}
-
 interface BetterCanvasSettings {
   baseUrl: string;
   apiKey: string;
@@ -61,10 +43,7 @@ interface BetterCanvasSettings {
   gapX: number;
   gapY: number;
   defaultNodeTextAlign: "left" | "center" | "right";
-  defaultNodeWidth: number;
-  defaultNodeHeight: number;
   attachmentFolder: string;
-  templates: NodeTemplate[];
   mindMapShortcutChildTabEnabled: boolean;
   mindMapShortcutSiblingEnterEnabled: boolean;
   mindMapShortcutAltArrowNavigationEnabled: boolean;
@@ -91,10 +70,7 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   gapX: 100,
   gapY: 44,
   defaultNodeTextAlign: "center",
-  defaultNodeWidth: DEFAULT_NODE_WIDTH,
-  defaultNodeHeight: DEFAULT_NODE_HEIGHT,
   attachmentFolder: "Better Canvas/Generated Images",
-  templates: [],
   mindMapShortcutChildTabEnabled: true,
   mindMapShortcutSiblingEnterEnabled: true,
   mindMapShortcutAltArrowNavigationEnabled: true,
@@ -156,33 +132,6 @@ class PromptModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
-  }
-}
-
-class TemplatePickerModal extends Modal {
-  constructor(
-    app: App,
-    private readonly templates: NodeTemplate[],
-    private readonly onPick: (template: NodeTemplate) => void
-  ) {
-    super(app);
-  }
-
-  onOpen(): void {
-    this.contentEl.empty();
-    this.contentEl.createEl("h2", { text: "插入节点模板" });
-    if (this.templates.length === 0) {
-      this.contentEl.createEl("p", { text: "还没有模板。先选择一个节点，运行“保存所选节点为模板”。" });
-      return;
-    }
-    const list = this.contentEl.createDiv({ cls: "better-canvas-template-list" });
-    for (const template of this.templates) {
-      const button = list.createEl("button", { text: template.name });
-      button.addEventListener("click", () => {
-        this.close();
-        this.onPick(template);
-      });
-    }
   }
 }
 
@@ -308,8 +257,8 @@ export default class BetterCanvasPlugin extends Plugin {
   private nodeMenuUnifier: NodeMenuUnifier;
 
   async onload(): Promise<void> {
+    // Keep unknown/retired fields inert so upgrading never discards saved user data.
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
-    this.settings.templates = Array.isArray(this.settings.templates) ? this.settings.templates : [];
     this.settings.systemPromptProfiles = normalizeNamedPromptProfiles(this.settings.systemPromptProfiles);
     if (this.settings.flashcardOutputMode !== "spaced-repetition") this.settings.flashcardOutputMode = "canvas";
     if (typeof this.settings.spacedRepetitionFolder !== "string") this.settings.spacedRepetitionFolder = "Better Canvas/Flashcards";
@@ -403,8 +352,6 @@ export default class BetterCanvasPlugin extends Plugin {
     this.addCommand({ id: "generate-flashcards", name: "从所选节点生成复习闪卡", callback: () => this.features.generateFlashcardsFromSelection() });
     this.addCommand({ id: "generate-image", name: "根据所选节点生成图片", callback: () => this.features.generateImageFromSelection() });
     this.addCommand({ id: "add-web-link", name: "在画布中添加网页链接卡片", callback: () => this.addWebLink() });
-    this.addCommand({ id: "save-node-template", name: "保存所选节点为模板", callback: () => this.saveNodeTemplate() });
-    this.addCommand({ id: "insert-node-template", name: "插入节点模板", callback: () => this.insertNodeTemplate() });
     this.addCommand({ id: "apply-css-style-preset", name: "应用 CSS 自定义样式预设", callback: () => { void this.applyCustomStylePreset(); } });
     this.addCommand({ id: "search-canvas", name: "搜索当前画布", callback: () => this.searchCanvas() });
     this.addCommand({ id: "start-presentation", name: "开始画布演示", callback: () => this.startPresentation() });
@@ -626,15 +573,15 @@ export default class BetterCanvasPlugin extends Plugin {
     if (candidates[0]) this.selectNode(canvas, candidates[0].node.id);
   }
 
-  private configuredDefaultSize(): { width: number; height: number } {
-    return configuredDefaultNodeSize(this.settings);
+  private defaultSize(): { width: number; height: number } {
+    return defaultNodeSize();
   }
 
   private createChildNode(): void {
     const selected = this.selectedOrNotice();
     if (!selected) return;
     const { canvas, node } = selected;
-    const size = this.configuredDefaultSize();
+    const size = this.defaultSize();
     const child = makeTextNode("", node.x + node.width + this.settings.gapX, node.y, size);
     insertCanvasNode(canvas, child, node.id);
     window.setTimeout(() => {
@@ -661,7 +608,7 @@ export default class BetterCanvasPlugin extends Plugin {
       .map(edge => data.nodes.find(item => item.id === edge.toNode))
       .filter((item): item is CanvasNodeData => Boolean(item));
     const y = siblings.reduce((bottom, sibling) => Math.max(bottom, sibling.y + sibling.height), node.y + node.height) + 36;
-    const sibling = makeTextNode("", node.x, y, this.configuredDefaultSize());
+    const sibling = makeTextNode("", node.x, y, this.defaultSize());
     insertCanvasNode(canvas, sibling, incoming.fromNode);
     window.setTimeout(() => {
       const internal = canvas.nodes?.get?.(sibling.id);
@@ -677,7 +624,7 @@ export default class BetterCanvasPlugin extends Plugin {
     const selected = this.selectedOrNotice();
     if (!selected) return;
     const { canvas, node } = selected;
-    const floating = makeTextNode("", node.x + node.width + this.settings.gapX, node.y + node.height + 40, this.configuredDefaultSize());
+    const floating = makeTextNode("", node.x + node.width + this.settings.gapX, node.y + node.height + 40, this.defaultSize());
     insertCanvasNode(canvas, floating);
     window.setTimeout(() => {
       const internal = canvas.nodes?.get?.(floating.id);
@@ -718,7 +665,7 @@ export default class BetterCanvasPlugin extends Plugin {
       const child = makeTextNode(heading.heading.trim(),
         node.x + node.width + this.settings.gapX,
         node.y + (index - (headings.length - 1) / 2) * 170,
-        this.configuredDefaultSize());
+        this.defaultSize());
       insertCanvasNode(canvas, child, node.id);
     });
     new Notice(`已从“${file.basename}”创建 ${headings.length} 个标题节点。`);
@@ -755,75 +702,6 @@ export default class BetterCanvasPlugin extends Plugin {
         y: selected ? selected.y : 0,
         width: 360,
         height: 220
-      };
-      insertCanvasNode(canvas, node, selected?.id);
-    }).open();
-  }
-
-  private saveNodeTemplate(): void {
-    const selected = this.selectedOrNotice();
-    if (!selected) return;
-    const { node } = selected;
-    new PromptModal(this.app, "保存节点模板", "模板名称", async name => {
-      const source = node as CanvasNodeData & {
-        styleAttributes?: Record<string, unknown>;
-        bcShape?: string;
-        bcBorderStyle?: string;
-        bcTextAlign?: string;
-        bcCustomClass?: string;
-        bcZoomBreakpoint?: number;
-        bcAutoResize?: boolean;
-      };
-      this.settings.templates.push({
-        name,
-        text: typeof node.text === "string" ? node.text : "",
-        width: node.width,
-        height: node.height,
-        ...(typeof node.color === "string" ? { color: node.color } : {}),
-        ...(source.styleAttributes && typeof source.styleAttributes === "object"
-          ? { styleAttributes: JSON.parse(JSON.stringify(source.styleAttributes)) as Record<string, unknown> } : {}),
-        ...(typeof source.bcShape === "string" ? { bcShape: source.bcShape } : {}),
-        ...(typeof source.bcBorderStyle === "string" ? { bcBorderStyle: source.bcBorderStyle } : {}),
-        ...(typeof source.bcTextAlign === "string" ? { bcTextAlign: source.bcTextAlign } : {}),
-        ...(typeof source.bcCustomClass === "string" ? { bcCustomClass: source.bcCustomClass } : {}),
-        ...(typeof source.bcScrapbookPreset === "string" ? { bcScrapbookPreset: source.bcScrapbookPreset } : {}),
-        ...(typeof source.bcSketchPreset === "string" ? { bcSketchPreset: source.bcSketchPreset } : {}),
-        ...(typeof source.bcSketchFill === "string" ? { bcSketchFill: source.bcSketchFill } : {}),
-        ...(typeof source.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: source.bcZoomBreakpoint } : {}),
-        ...(typeof source.bcAutoResize === "boolean" ? { bcAutoResize: source.bcAutoResize } : {})
-      });
-      await this.saveSettings();
-      new Notice(`已保存模板“${name}”。`);
-    }).open();
-  }
-
-  private insertNodeTemplate(): void {
-    const canvas = this.getCanvas();
-    if (!canvas) {
-      new Notice("请先打开一个 Obsidian Canvas。");
-      return;
-    }
-    if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再插入模板。");
-      return;
-    }
-    const selected = this.getSelectedRecord(canvas);
-    new TemplatePickerModal(this.app, this.settings.templates, template => {
-      const node = {
-        ...makeTextNode(template.text,
-          selected ? selected.x + selected.width + this.settings.gapX : 0,
-          selected ? selected.y : 0,
-          { width: template.width, height: template.height, ...(template.color ? { color: template.color } : {}) }),
-        ...(template.styleAttributes ? { styleAttributes: JSON.parse(JSON.stringify(template.styleAttributes)) } : {}),
-        ...(template.bcShape ? { bcShape: template.bcShape } : {}),
-        ...(template.bcBorderStyle ? { bcBorderStyle: template.bcBorderStyle } : {}),
-        ...(template.bcTextAlign ? { bcTextAlign: template.bcTextAlign } : {}),
-        ...(template.bcCustomClass ? { bcCustomClass: template.bcCustomClass } : {}),
-        ...(template.bcScrapbookPreset ? { bcScrapbookPreset: template.bcScrapbookPreset } : {}),
-        ...(template.bcSketchPreset ? { bcSketchPreset: template.bcSketchPreset } : {}),
-        ...(template.bcSketchFill ? { bcSketchFill: template.bcSketchFill } : {}),
-        ...(typeof template.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: template.bcZoomBreakpoint } : {}),
-        ...(typeof template.bcAutoResize === "boolean" ? { bcAutoResize: template.bcAutoResize } : {})
       };
       insertCanvasNode(canvas, node, selected?.id);
     }).open();

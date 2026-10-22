@@ -18,9 +18,9 @@ Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思�
 | 模块 | 主要能力 |
 | --- | --- |
 | **Canvas 编辑** | 自定义节点颜色、形状、边框和文本样式；设置新建文本节点默认左/中/右对齐；设置连线颜色、箭头与路径；网格对齐、焦点模式、锁定交互、搜索、克隆和布局调整。 |
-| **组织与导出** | 分组与折叠、Canvas Portal、节点模板、frontmatter 编辑、演示模式；导出 JSON Canvas，以及视口、全画布或选区的 PNG/SVG。 |
+| **组织与导出** | 分组与折叠、Canvas Portal、frontmatter 编辑、演示模式；导出 JSON Canvas，以及视口、全画布或选区的 PNG/SVG。 |
 | **思维导图** | 创建子节点、同级节点和游离节点；从 Markdown H1 拆分节点；使用 LR、RL、TB、BT 方向布局；生成 Canvas 闪卡或 Spaced Repetition 兼容卡组。 |
-| **AI 工作流** | 关联节点问答、提示词库、图片生成、网页和 YouTube 字幕导入、PDF 文本/图像上下文与批量 Prompt；支持 OpenAI-compatible、Anthropic、Gemini、MCP，以及桌面端 Codex CLI 和 OpenCode ACP。 |
+| **AI 工作流** | 关联节点问答、提示词库、图片生成、网页正文导入、PDF 文本/图像上下文与批量 Prompt；支持 OpenAI-compatible、Anthropic、Gemini、MCP，以及桌面端 Codex CLI 和 OpenCode ACP。 |
 
 详细功能状态与兼容性注意事项见 [功能整合矩阵](docs/INTEGRATION_MATRIX.md)；其他专题文档见 [文档索引](docs/README.md)。
 
@@ -96,10 +96,12 @@ npm run build
 
 ## 快速配置
 
-- **Canvas 与思维导图：** 安装并启用插件即可使用，无需 API Key。可在“画布与布局”设置中调整新建文本节点的默认对齐和尺寸。
-- **AI 与模型：** 文本生成可使用配置的模型 API、OpenCode ACP 或 Codex CLI。图片生成有独立的服务商、模型和保存目录设置。
-- **连接与索引：** 可在设置中配置 MCP endpoint、本地服务及 Canvas 内容来源。
-- **本地 OpenCode / Codex：** 需要在桌面端预先安装并登录对应 CLI。
+- **画布：** 设置新卡片的文字对齐、自动布局方向、卡片间距和网格。卡片尺寸沿用固定创建与自动调整规则；外观在画布主题和节点样式面板中调整。
+- **操作：** 设置四组思维导图快捷键及只读模式下的右键菜单、平移和缩放行为。
+- **AI 助手：** 选择模型服务 API、OpenCode ACP 或 Codex CLI；按需展开回答偏好、图片生成、学习卡片和 MCP 外部工具。本地工具需在桌面端预先安装并登录。
+- **文件：** 设置笔记链接索引、按笔记属性自动连线、导出清晰度和背景。
+
+修改后点击 **保存更改** 生效，也可 **放弃更改**。节点模板和 YouTube 字幕导入已移除。
 
 详细配置与使用说明见 [AI 与 MCP 配置指南](docs/AI_SETUP.md) 和 [功能指南](docs/FEATURE_GUIDE.md)，安装方法见 [安装与构建指南](docs/INSTALLATION.md)。
 
