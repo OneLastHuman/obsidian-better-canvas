@@ -4,6 +4,7 @@ import { layoutMarkdownForSvg, type SvgMarkdownRun } from "./svg-markdown";
 import { SKETCH_FONT_CSS } from "./sketch-font";
 import { renderSketchNodeSvg, SKETCH_EDGE_FILTER_ID } from "./sketch-renderer";
 import { resolveSketchStyle } from "./sketch-style";
+import { researchColor, researchFill, researchPreset, RESEARCH_SERIF } from "./research-style";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import { roundedMapInsets, roundedMapPath, ROUNDED_MAP_INK, ROUNDED_MAP_PAPER, ROUNDED_MAP_STROKE } from "./rounded-map-style";
 
@@ -245,9 +246,9 @@ function polygonPoints(x: number, y: number, w: number, h: number, sides: number
   return points.join(" ");
 }
 
-function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false): string {
+function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false, research = false): string {
   const hasMarkdownText = typeof node.text === "string" && node.text.trim().length > 0;
-  const raw = hasMarkdownText ? String(node.text) : nodeText(node);
+  const raw = research && node.type === "text" ? String(node.text ?? "") : hasMarkdownText ? String(node.text) : nodeText(node);
   if (!raw) return "";
   const attrs = (node as any).styleAttributes ?? {};
   const sketchStyle = sketch ? resolveSketchStyle(node) : null;
@@ -259,7 +260,7 @@ function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false): str
   const startX = anchor === "middle" ? node.x + node.width / 2 : anchor === "end" ? node.x + node.width - 12 : node.x + 12;
   const fontFamily = sketch
     ? "BC Sketch Hand, Segoe Print, cursive"
-    : xml(String(attrs.fontFamily ?? attrs.font ?? "Inter,Arial,sans-serif"));
+    : xml(String(attrs.fontFamily ?? attrs.font ?? (research ? RESEARCH_SERIF : "Inter,Arial,sans-serif")));
   const rawWeight = String(attrs.fontWeight ?? "normal");
   const resolvedWeight = /^(?:normal|bold|bolder|lighter|[1-9]00)$/i.test(rawWeight) ? rawWeight : "normal";
   const fontWeight = sketch && resolvedWeight === "normal" ? "600" : resolvedWeight;
@@ -269,7 +270,7 @@ function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false): str
   const textDecoration = /^(?:none|underline|overline|line-through)$/i.test(rawDecoration) ? rawDecoration : "none";
   const textColor = sketch
     ? sketchStyle?.preset?.id === "annotation" ? "#696b65" : "#262520"
-    : xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, "#202124"));
+    : xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, research ? "#303831" : "#202124"));
   const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * (sketch ? 0.95 : 0.58))));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
   const lines = layoutMarkdownForSvg(raw, maxChars, maxLines, fontSize);
@@ -289,6 +290,34 @@ function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false): str
       if (decorations.length) runAttrs.push('text-decoration="' + decorations.join(" ") + '"');
       return '<tspan' + (runAttrs.length ? " " + runAttrs.join(" ") : "") + '>' + xml(run.text) + "</tspan>";
     }).join("");
+
+  if (research && !lines.some(line => line.tableRow)) {
+    const preset = researchPreset(node.bcResearchPreset).id;
+    const accent = researchColor(node);
+    const leadingTitle = lines[0]?.fontScale > 1;
+    let inTitle = leadingTitle;
+    let cursorY = node.y + 24;
+    const markup: string[] = [];
+    for (const line of lines) {
+      if (line.fontScale === 1) inTitle = false;
+      const titleBand = inTitle && preset === "argument";
+      const size = line.fontScale * fontSize * (preset === "section" ? 1.5 : 1);
+      const lineHeight = Math.max(28, size * 1.55);
+      if (cursorY + size > node.y + node.height - 8) break;
+      if (titleBand) {
+        markup.push(`<rect x="${node.x}" y="${cursorY - 16}" width="${node.width}" height="${lineHeight + 1}" fill="${accent}"/>`);
+      } else if (preset === "annotation") {
+        markup.push(`<path d="M${node.x + 35} ${cursorY + size + 4}H${node.x + node.width - 24}" stroke="${accent}" stroke-opacity=".22"/>`);
+      } else if (inTitle && preset === "section") {
+        markup.push(`<rect x="${node.x}" y="${cursorY + size - 6}" width="${node.width}" height="7" fill="${accent}" fill-opacity=".17"/>`);
+      }
+      const inset = preset === "annotation" ? 35 : preset === "section" ? 0 : 24;
+      const textX = anchor === "middle" ? node.x + node.width / 2 : anchor === "end" ? node.x + node.width - inset : node.x + inset;
+      markup.push(`<text x="${textX}" y="${cursorY + size}" font-family="${fontFamily}" font-size="${size}" font-weight="${line.bold ? "600" : fontWeight}" font-style="${fontStyle}" fill="${titleBand ? "#fffdf7" : textColor}" text-anchor="${anchor}">${renderRuns(line.runs)}</text>`);
+      cursorY += lineHeight;
+    }
+    return `<g clip-path="url(#${clipId})">${markup.join("")}</g>`;
+  }
 
   // Table rows require geometry, rather than a pipe-delimited text label.
   // Keep every cell clipped to the Canvas node bounds and use static SVG only.
@@ -434,7 +463,7 @@ function renderRoundedMapExportNode(node: CanvasNodeData, index: number): string
     (image || wrapNodeText(textNode, clipId)) + "</g>";
 }
 
-function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded = false): string {
+function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded = false, research = false): string {
   if (sketch) return renderSketchExportNode(node, index);
   if (rounded) {
     const result = renderRoundedMapExportNode(node, index);
@@ -444,8 +473,9 @@ function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded
   const width = Math.max(1, number(node.width, 280)), height = Math.max(1, number(node.height, 140));
   const attrs = (node as any).styleAttributes ?? {};
   const shape = String(attrs.shape ?? (node as any).bcShape ?? (node as any).shape ?? "rectangle").toLowerCase();
-  const fill = nodeColor(node);
-  const border = String(attrs.borderColor ?? "#858b93");
+  research = research && node.type !== "group";
+  const fill = research ? researchFill(node) : nodeColor(node);
+  const border = research ? researchColor(node) : String(attrs.borderColor ?? "#858b93");
   const borderStyle = String((node as any).bcBorderStyle ?? attrs.borderStyle ?? attrs.border ?? "");
   const dash = borderStyle.includes("dash") ? ' stroke-dasharray="8 5"' : borderStyle.includes("dot") ? ' stroke-dasharray="2 5"' : "";
   const stroke = borderStyle === "invisible" ? "none" : border;
@@ -524,7 +554,7 @@ function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded
       (x + width - inset) + " " + y + " V " + (y + height) +
       '" fill="none" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
   } else {
-    const radius = shape.includes("round") ? 22 : 7;
+    const radius = shape.includes("round") ? 22 : research ? (shape === "square" || shape === "rectangle" ? 0 : 14) : 7;
     geometry = '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height +
       '" rx="' + radius + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '"' + dash + "/>";
   }
@@ -538,7 +568,18 @@ function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded
     geometry += '<g transform="translate(' + tx + " " + ty + ') scale(' + sx + " " + sy + ')">' + inner + "</g>";
   }
 
-  const text = wrapNodeText(node, clipId);
+  if (research) {
+    const accent = researchColor(node);
+    const preset = researchPreset(node.bcResearchPreset).id;
+    if (preset === "source" && ["rectangle", "square", "default"].includes(shape)) {
+      geometry += `<rect x="${x}" y="${y}" width="7" height="${height}" fill="${accent}"/>` +
+        `<rect x="${x + 7}" y="${y + 7}" width="${Math.max(1, width - 14)}" height="${Math.max(1, height - 14)}" fill="none" stroke="${accent}" stroke-opacity=".2"/>`;
+    }
+    if (preset === "quote") geometry += `<path d="M${x} ${y + height - 2}H${x + width}" stroke="${accent}" stroke-width="4"/>`;
+    if (preset === "annotation") geometry += `<path d="M${x + 21} ${y}V${y + height}" stroke="${accent}" stroke-opacity=".4"/>`;
+    if (preset === "section") geometry += `<path d="M${x} ${y + 1}H${x + width}" stroke="${accent}" stroke-width="2"/>`;
+  }
+  const text = wrapNodeText(node, clipId, false, research);
   const clipPath = '<clipPath id="' + clipId + '"><rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="5"/></clipPath>';
   const imageDataUrl = typeof (node as any).bcExportImageDataUrl === "string"
     ? String((node as any).bcExportImageDataUrl)
@@ -600,6 +641,7 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
   });
 
   const sketch = data.bcTheme === "sketch";
+  const research = data.bcTheme === "research";
   const rounded = data.bcTheme === "rounded-map";
   const sketchFilter = '<filter id="' + SKETCH_EDGE_FILTER_ID + '" x="-8%" y="-20%" width="116%" height="140%">' +
     '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="7" result="noise"/>' +
@@ -610,12 +652,12 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
     (sketch ? sketchFilter + fontStyle : "") + "</defs>";
   const background = options.backgroundColor
     ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + xml(options.backgroundColor) + '"/>'
-    : sketch
-      ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#fffefb"/>'
+    : sketch || research
+      ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + (research ? "#eeece5" : "#fffefb") + '"/>'
       : rounded ? `<rect width="${width}" height="${height}" fill="${ROUNDED_MAP_PAPER}"/>` : "";
   const nodeMap = new Map(translatedNodes.map(node => [node.id, node]));
   const edgeMarkup = translatedEdges.map((edge, index) => renderEdge(edge, nodeMap, index, sketch, rounded, margin)).join("");
-  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index, sketch, rounded)).join("");
+  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index, sketch, rounded, research)).join("");
 
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height +
     '" viewBox="0 0 ' + width + " " + height + '">' +
