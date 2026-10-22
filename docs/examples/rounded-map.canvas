@@ -1,0 +1,164 @@
+{
+  "bcTheme": "rounded-map",
+  "nodes": [
+    {
+      "id": "terminal",
+      "type": "text",
+      "text": "开始筹备",
+      "x": 0,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "color": "#f3dc83",
+      "bcShape": "pill",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "pill",
+        "border": "solid",
+        "textAlign": "center"
+      },
+      "bcAutoResize": false
+    },
+    {
+      "id": "process",
+      "type": "text",
+      "text": "安排活动",
+      "x": 0,
+      "y": 320,
+      "width": 300,
+      "height": 200,
+      "color": "#c8dff3",
+      "bcShape": "default",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "border": "solid",
+        "textAlign": "center"
+      },
+      "bcAutoResize": false
+    },
+    {
+      "id": "decision",
+      "type": "text",
+      "text": "人数合适？",
+      "x": 780,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "color": "#f8dec1",
+      "bcShape": "diamond",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "diamond",
+        "border": "solid",
+        "textAlign": "center"
+      },
+      "bcAutoResize": false
+    },
+    {
+      "id": "direction",
+      "type": "text",
+      "text": "进入交流",
+      "x": 390,
+      "y": 320,
+      "width": 300,
+      "height": 200,
+      "color": "#d9e7b5",
+      "bcShape": "right-arrow",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "right-arrow",
+        "border": "solid",
+        "textAlign": "center"
+      },
+      "bcAutoResize": false
+    },
+    {
+      "id": "io",
+      "type": "text",
+      "text": "收集报名",
+      "x": 390,
+      "y": 0,
+      "width": 300,
+      "height": 200,
+      "color": "#c5e4dd",
+      "bcShape": "parallelogram",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "parallelogram",
+        "border": "solid",
+        "textAlign": "center"
+      },
+      "bcAutoResize": false
+    },
+    {
+      "id": "document",
+      "type": "text",
+      "text": "讨论纪要",
+      "x": 780,
+      "y": 320,
+      "width": 300,
+      "height": 200,
+      "color": "#fffef8",
+      "bcShape": "document",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "document",
+        "border": "solid",
+        "textAlign": "left"
+      },
+      "bcAutoResize": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "start-input",
+      "fromNode": "terminal",
+      "fromSide": "right",
+      "toNode": "io",
+      "toSide": "left"
+    },
+    {
+      "id": "input-decision",
+      "fromNode": "io",
+      "fromSide": "right",
+      "toNode": "decision",
+      "toSide": "left"
+    },
+    {
+      "id": "decision-task",
+      "fromNode": "decision",
+      "fromSide": "bottom",
+      "toNode": "process",
+      "toSide": "top",
+      "label": "是"
+    },
+    {
+      "id": "task-stage",
+      "fromNode": "process",
+      "fromSide": "right",
+      "toNode": "direction",
+      "toSide": "left"
+    },
+    {
+      "id": "stage-doc",
+      "fromNode": "direction",
+      "fromSide": "right",
+      "toNode": "document",
+      "toSide": "left"
+    },
+    {
+      "id": "decision-input",
+      "fromNode": "decision",
+      "fromSide": "top",
+      "toNode": "io",
+      "toSide": "top",
+      "label": "否，补充报名"
+    }
+  ]
+}
