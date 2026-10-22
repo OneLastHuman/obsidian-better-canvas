@@ -16,3 +16,7 @@
 ## 一条底线
 
 样式入口挂在原生 `.canvas-controls` 控件栈里，**不要 patch 或替换原生节点右键菜单**：它承载原生操作和其他插件的条目，替换会吞掉它们。新增入口时同样要 feature-detect，找不到控件容器就安静跳过。
+
+## 软糖白板
+
+`bcTheme: "rounded-map"` 的六种组合定义在 `src/node-visual-style.ts`，应用时复用 `bcShape`、`bcBorderStyle`、`bcTextAlign`、颜色及 `styleAttributes`。`src/rounded-map-style.ts` 按节点尺寸生成同源路径，供容器 CSS `clip-path: path(...)`、锚元素 mask 描边、预设缩略图及静态导出使用。尺寸变更时重新计算装饰；切换主题或卸载时移除私有 CSS 变量。路径仅绘制视觉，不改变原生矩形交互几何。
