@@ -4,6 +4,8 @@ import { clearSketchCanvas } from "./sketch-renderer";
 import { SKETCH_FONT_CSS } from "./sketch-font";
 import { clearResearchNode, RESEARCH_SERIF } from "./research-style";
 import { decorateCanvasTheme, resolveCanvasTheme, setCanvasTheme, type CanvasThemeId } from "./canvas-theme";
+import { clearRoundedMapNode, roundedMapCss } from "./rounded-map-style";
+import { ROUNDED_MAP_PRESETS } from "./node-visual-style";
 
 /**
  * Mirrors Obsidian's native control markup (a `div.canvas-control-item`) rather
@@ -25,6 +27,7 @@ const EDITOR_STYLE_ID = "bc-scrapbook-editor";
 const SKETCH_EDITOR_STYLE_ID = "bc-sketch-editor";
 const RESEARCH_EDITOR_STYLE_ID = "bc-research-editor";
 const FONT_STYLE_ID = "bc-sketch-font";
+const ROUNDED_EDITOR_STYLE_ID = "bc-rounded-map-editor";
 const EDITOR_CSS = `
 body { color-scheme: light; --background-primary: #fff8e8; --background-secondary: #f2e7d2;
   --text-normal: #43372f; --text-muted: #766758; --text-faint: #8c7b68;
@@ -72,6 +75,7 @@ class CanvasThemeModal extends Modal {
       { id: "default", title: "默认", detail: "跟随 Obsidian · 清晰简洁" },
       { id: "scrapbook", title: "拼贴手账", detail: "暖纸 · 胶带 · 收藏灵感" },
       { id: "sketch", title: "手绘白板", detail: "白纸 · 手绘线 · 功能预设" },
+      { id: "rounded-map", title: "软糖白板", detail: "大圆角 · 粗描边 · 六种功能形状" },
       { id: "research", title: "纸本研究", detail: "资料 · 引文 · 严谨编排" }
     ];
     for (const theme of themes) {
@@ -86,6 +90,7 @@ class CanvasThemeModal extends Modal {
         cls: "bc-theme-mini-caption",
         text: theme.id === "scrapbook" ? "little things, kept."
           : theme.id === "sketch" ? "think in ink."
+          : theme.id === "rounded-map" ? "connect the ideas."
           : theme.id === "research" ? "让资料开始对话"
             : "A space to think."
       });
@@ -98,7 +103,14 @@ class CanvasThemeModal extends Modal {
         : "M82 67 C125 60 100 104 152 100 M145 94 L153 100 L146 106");
       svg.appendChild(path);
       board.appendChild(svg);
-      if (theme.id === "sketch") {
+      if (theme.id === "rounded-map") {
+        for (const preset of ROUNDED_MAP_PRESETS.slice(0, 3)) {
+          const sample = board.createSpan({ cls: "bc-rounded-preview bc-mini-rounded-" + preset.id });
+          for (const [key, value] of Object.entries(roundedMapCss(preset.style.shape, 88, 54))) sample.style.setProperty(key, value);
+          sample.style.setProperty("--bc-rounded-fill", preset.style.color);
+          sample.createSpan({ text: preset.sample });
+        }
+      } else if (theme.id === "sketch") {
         for (const [kind, text] of [["concept", "想法"], ["action", "下一步"], ["risk", "待确认"]]) {
           const sample = board.createSpan({ cls: "bc-sketch-mini bc-mini-" + kind, text });
           sample.dataset.bcSketchPreview = kind;
@@ -128,7 +140,7 @@ class CanvasThemeModal extends Modal {
         this.close();
       });
     }
-    this.contentEl.createEl("p", { cls: "bc-theme-footnote", text: "主题随画布保存。手绘白板和纸本研究均提供六种功能预设，可在「节点样式」中选择。" });
+    this.contentEl.createEl("p", { cls: "bc-theme-footnote", text: "主题随画布保存。在「节点样式」中选择主题的功能预设。" });
   }
 
   onClose(): void {
@@ -149,7 +161,7 @@ export default class CanvasThemeController {
   start(): void {
     this.ensureFont();
     const workspace = this.plugin.app.workspace as any;
-    for (const name of ["layout-change", "active-leaf-change", "advanced-canvas:data-loaded:after",
+    for (const name of ["layout-change", "active-leaf-change", "css-change", "advanced-canvas:data-loaded:after",
       "advanced-canvas:node-added", "advanced-canvas:node-changed", "advanced-canvas:node-editing-state-changed",
       "advanced-canvas:canvas-changed", "advanced-canvas:viewport-changed:after"]) {
       this.plugin.registerEvent(workspace.on(name, () => this.schedule()));
@@ -240,7 +252,7 @@ export default class CanvasThemeController {
         this.controls.set(canvas, group);
       }
       const control = group.firstElementChild as HTMLElement;
-      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : theme === "research" ? "纸本研究" : "默认";
+      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : theme === "rounded-map" ? "软糖白板" : theme === "research" ? "纸本研究" : "默认";
       control.setAttribute("aria-label", "画布主题 · " + themeName);
     }
     for (const [canvas, group] of this.controls) {
@@ -263,6 +275,22 @@ export default class CanvasThemeController {
         const scrapbook = doc.getElementById(EDITOR_STYLE_ID);
         const sketch = doc.getElementById(SKETCH_EDITOR_STYLE_ID);
         const research = doc.getElementById(RESEARCH_EDITOR_STYLE_ID);
+        const rounded = doc.getElementById(ROUNDED_EDITOR_STYLE_ID);
+        if (theme === "rounded-map") {
+          scrapbook?.remove();
+          sketch?.remove();
+          research?.remove();
+          const style = rounded ?? doc.createElement("style");
+          style.id = ROUNDED_EDITOR_STYLE_ID;
+          const dark = canvas.wrapperEl.ownerDocument?.body.classList.contains("theme-dark");
+          const ink = dark ? "#20262d" : "#34372f";
+          const css = `body { color-scheme: light; --text-normal: ${ink}; --text-muted: #515b60; --text-faint: #6c747c; --text-accent: #315b86; --text-accent-hover: #24486b; --background-primary: #e5e7e1; --background-secondary: #d7dbd5; --code-background: #d7dbd5; --code-normal: ${ink}; --text-selection: #a9c3d8; color: ${ink}; background: transparent; }
+.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: ${ink}; }`;
+          if (style.textContent !== css) style.textContent = css;
+          if (!rounded) doc.head.appendChild(style);
+          continue;
+        }
+        rounded?.remove();
         if (theme === "default") {
           scrapbook?.remove();
           sketch?.remove();
@@ -302,6 +330,7 @@ export default class CanvasThemeController {
     clearSketchCanvas(canvas);
     for (const node of canvas.nodes?.values?.() ?? []) {
       const element = node.nodeEl ?? node.containerEl ?? node.el;
+      clearRoundedMapNode(element);
       if (element?.dataset) clearResearchNode(element);
     }
     for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-paper]") ?? []) {

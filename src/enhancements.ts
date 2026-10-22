@@ -33,6 +33,7 @@ const CANONICAL_NODE_SHAPES: Record<string, string> = {
   triangle: "triangle",
   trapezoid: "trapezoid",
   chevron: "chevron",
+  "right-arrow": "right-arrow",
   cloud: "cloud"
 };
 

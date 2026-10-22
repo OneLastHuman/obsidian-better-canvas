@@ -56,6 +56,11 @@ function shapePath(shape: string, width: number, height: number): string {
     case "diamond":
     case "decision":
       return `M ${w / 2} 0 L ${w} ${h / 2} L ${w / 2} ${h} L 0 ${h / 2} Z`;
+    case "right-arrow":
+      return `M 0 ${h * .2} H ${w * .68} V 0 L ${w} ${h / 2} L ${w * .68} ${h} V ${h * .8} H 0 Z`;
+    case "parallelogram":
+    case "input-output":
+      return `M ${w * .14} 0 H ${w} L ${w * .86} ${h} H 0 Z`;
     case "hexagon":
       return `M ${w * 0.25} 0 L ${w * 0.75} 0 L ${w} ${h / 2} L ${w * 0.75} ${h} L ${w * 0.25} ${h} L 0 ${h / 2} Z`;
     case "document":
