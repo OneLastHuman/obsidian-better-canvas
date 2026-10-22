@@ -4,6 +4,8 @@ import { layoutMarkdownForSvg, type SvgMarkdownRun } from "./svg-markdown";
 import { SKETCH_FONT_CSS } from "./sketch-font";
 import { renderSketchNodeSvg, SKETCH_EDGE_FILTER_ID } from "./sketch-renderer";
 import { resolveSketchStyle } from "./sketch-style";
+import { resolveSoftNotesStyle } from "./soft-notes-style";
+import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
 import { researchColor, researchFill, researchPreset, RESEARCH_SERIF } from "./research-style";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import { roundedMapInsets, roundedMapPath, ROUNDED_MAP_INK, ROUNDED_MAP_PAPER, ROUNDED_MAP_STROKE } from "./rounded-map-style";
@@ -246,19 +248,21 @@ function polygonPoints(x: number, y: number, w: number, h: number, sides: number
   return points.join(" ");
 }
 
-function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false, research = false): string {
+function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false, research = false, soft = false): string {
   const hasMarkdownText = typeof node.text === "string" && node.text.trim().length > 0;
   const raw = research && node.type === "text" ? String(node.text ?? "") : hasMarkdownText ? String(node.text) : nodeText(node);
   if (!raw) return "";
   const attrs = (node as any).styleAttributes ?? {};
   const sketchStyle = sketch ? resolveSketchStyle(node) : null;
-  const fontSize = sketchStyle
+  const softStyle = soft ? resolveSoftNotesStyle(node) : null;
+  const freeHeading = softStyle?.preset.id === "free" && /^#{1,6}\s/m.test(raw);
+  const fontSize = softStyle ? softStyle.preset.id === "free" ? freeHeading ? 16 : 30 : 18 : sketchStyle
     ? sketchStyle.fontSize
     : Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
-  const alignRaw = sketchStyle?.align ?? String(attrs.textAlign ?? attrs.textAlignment ?? (node as any).bcTextAlign ?? "left");
+  const alignRaw = softStyle?.align ?? sketchStyle?.align ?? String(attrs.textAlign ?? attrs.textAlignment ?? (node as any).bcTextAlign ?? "left");
   const anchor = alignRaw === "center" ? "middle" : alignRaw === "right" ? "end" : "start";
   const startX = anchor === "middle" ? node.x + node.width / 2 : anchor === "end" ? node.x + node.width - 12 : node.x + 12;
-  const fontFamily = sketch
+  const fontFamily = softStyle?.preset.id === "free" && !freeHeading ? "BC Soft Notes Title, cursive" : sketch || soft
     ? "BC Sketch Hand, Segoe Print, cursive"
     : xml(String(attrs.fontFamily ?? attrs.font ?? (research ? RESEARCH_SERIF : "Inter,Arial,sans-serif")));
   const rawWeight = String(attrs.fontWeight ?? "normal");
@@ -268,10 +272,10 @@ function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false, rese
   const fontStyle = /^(?:normal|italic|oblique)$/i.test(rawFontStyle) ? rawFontStyle : "normal";
   const rawDecoration = String(attrs.textDecoration ?? "none");
   const textDecoration = /^(?:none|underline|overline|line-through)$/i.test(rawDecoration) ? rawDecoration : "none";
-  const textColor = sketch
+  const textColor = soft ? "#292e28" : sketch
     ? sketchStyle?.preset?.id === "annotation" ? "#696b65" : "#262520"
     : xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, research ? "#303831" : "#202124"));
-  const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * (sketch ? 0.95 : 0.58))));
+  const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * (sketch || soft ? 0.95 : 0.58))));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
   const lines = layoutMarkdownForSvg(raw, maxChars, maxLines, fontSize);
 
@@ -381,13 +385,19 @@ function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false, rese
     return '<g clip-path="url(#' + clipId + ')">' + tableMarkup.join("") + "</g>";
   }
 
-  const startY = node.y + 18 + fontSize;
+  const lineSize = (line: (typeof lines)[number]): number =>
+    soft && line.fontScale > 1 ? softStyle?.preset.id === "free" ? 42 : 28 : Math.max(8, fontSize * line.fontScale);
+  const startY = node.y + 18 + (soft && lines[0] ? lineSize(lines[0]) : fontSize);
   const markup = lines.map((line, index) => {
-    const lineFontSize = Math.max(8, fontSize * line.fontScale);
-    const dy = index === 0 ? 0 : Math.max(fontSize * 1.35, lineFontSize * 1.2);
+    const lineFontSize = lineSize(line);
+    const dy = index === 0 ? 0 : soft
+      ? (lineSize(lines[index - 1]) + lineFontSize) * .75
+      : Math.max(fontSize * 1.35, lineFontSize * 1.2);
     const lineWeight = line.bold ? "bold" : fontWeight;
     return '<tspan x="' + startX + '" dy="' + dy + '" font-size="' + lineFontSize +
-      '" font-weight="' + lineWeight + '">' + renderRuns(line.runs) + "</tspan>";
+      '" font-weight="' + (soft && line.fontScale > 1 ? "400" : lineWeight) +
+      (soft && line.fontScale > 1 ? '" font-family="BC Soft Notes Title, cursive' : "") +
+      '">' + renderRuns(line.runs) + "</tspan>";
   }).join("");
   return '<text clip-path="url(#' + clipId + ')" x="' + startX + '" y="' + startY +
     '" font-family="' + fontFamily + '" font-size="' + fontSize + '" font-weight="' + fontWeight +
@@ -430,6 +440,22 @@ function renderSketchExportNode(node: CanvasNodeData, index: number): string {
   return clipPath + '<g class="bc-full-node bc-full-sketch-node">' + geometry + imageMarkup + displayedText + "</g>";
 }
 
+function renderSoftNotesExportNode(node: CanvasNodeData, index: number): string {
+  const { preset, color } = resolveSoftNotesStyle(node);
+  const x = number(node.x), y = number(node.y);
+  const width = Math.max(1, number(node.width)), height = Math.max(1, number(node.height));
+  const clipId = "bc-soft-export-" + index;
+  const outline = preset.path
+    ? '<path d="' + preset.path + '" transform="translate(' + x + ' ' + y + ') scale(' + width / 320 + ' ' + height / 240 + ')"/>'
+    : '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '"/>';
+  const [top, right, bottom, left] = preset.inset;
+  const contentNode = { ...node, x: x + width * left - 12, y: y + height * top - 18,
+    width: Math.max(24, width * (1 - left - right) + 24), height: Math.max(26, height * (1 - top - bottom) + 26) };
+  return '<g class="bc-full-node bc-full-soft-notes-node"><clipPath id="' + clipId + '">' + outline +
+    '</clipPath><g fill="' + color + '" stroke="none">' + (preset.path ? outline : "") + "</g>" +
+    wrapNodeText(contentNode, clipId, false, false, true) + "</g>";
+}
+
 function renderRoundedMapExportNode(node: CanvasNodeData, index: number): string | null {
   if (node.type === "group") return null;
   const shape = resolveCanvasNodeShape(node as CanvasNodeStyleSource);
@@ -463,7 +489,8 @@ function renderRoundedMapExportNode(node: CanvasNodeData, index: number): string
     (image || wrapNodeText(textNode, clipId)) + "</g>";
 }
 
-function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded = false, research = false): string {
+function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded = false, research = false, soft = false): string {
+  if (soft && node.type === "text") return renderSoftNotesExportNode(node, index);
   if (sketch) return renderSketchExportNode(node, index);
   if (rounded) {
     const result = renderRoundedMapExportNode(node, index);
@@ -641,23 +668,26 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
   });
 
   const sketch = data.bcTheme === "sketch";
+  const soft = data.bcTheme === "soft-notes";
   const research = data.bcTheme === "research";
   const rounded = data.bcTheme === "rounded-map";
   const sketchFilter = '<filter id="' + SKETCH_EDGE_FILTER_ID + '" x="-8%" y="-20%" width="116%" height="140%">' +
     '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="7" result="noise"/>' +
     '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.75" xChannelSelector="R" yChannelSelector="G"/>' +
     "</filter>";
-  const fontStyle = sketch && SKETCH_FONT_CSS ? "<style>" + SKETCH_FONT_CSS + "</style>" : "";
+  const fontStyle = sketch || soft ? "<style>" + SKETCH_FONT_CSS + (soft ? SOFT_NOTES_FONT_CSS : "") + "</style>" : "";
   const defs = '<defs><marker id="bc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8794"/></marker>' +
-    (sketch ? sketchFilter + fontStyle : "") + "</defs>";
+    (sketch ? sketchFilter : "") + fontStyle + "</defs>";
   const background = options.backgroundColor
     ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + xml(options.backgroundColor) + '"/>'
+    : soft
+      ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#fcfcf8"/>'
     : sketch || research
       ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + (research ? "#eeece5" : "#fffefb") + '"/>'
       : rounded ? `<rect width="${width}" height="${height}" fill="${ROUNDED_MAP_PAPER}"/>` : "";
   const nodeMap = new Map(translatedNodes.map(node => [node.id, node]));
   const edgeMarkup = translatedEdges.map((edge, index) => renderEdge(edge, nodeMap, index, sketch, rounded, margin)).join("");
-  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index, sketch, rounded, research)).join("");
+  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index, sketch, rounded, research, soft)).join("");
 
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height +
     '" viewBox="0 0 ' + width + " " + height + '">' +

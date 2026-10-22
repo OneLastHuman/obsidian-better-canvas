@@ -23,6 +23,14 @@ const fixture: CanvasData = {
 };
 
 describe("applyNodeVisualStyle", () => {
+  it("preserves the previous nested style snapshot for native undo", () => {
+    const before = structuredClone(fixture);
+    const result = applyNodeVisualStyle(fixture, ["node-1"], { align: "right" });
+    expect(result.data.nodes[0].styleAttributes).toMatchObject({ textAlign: "right", custom: "keep" });
+    expect(result.data.nodes[0].styleAttributes).not.toBe(fixture.nodes[0].styleAttributes);
+    expect(fixture).toEqual(before);
+  });
+
   it("applies a full preset to the target node and preserves unrelated data", () => {
     const preset = NODE_STYLE_PRESETS.flow;
     const result = applyNodeVisualStyle(fixture, ["node-1"], {

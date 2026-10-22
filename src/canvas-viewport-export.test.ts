@@ -9,6 +9,22 @@ function node(tagName: string, classes: string[] = []): HTMLElement {
 }
 
 describe("viewport SVG export filter", () => {
+  it("carries Soft Notes clip definitions into the isolated export", () => {
+    const geometryCopy = {};
+    const geometry = { cloneNode: vi.fn(() => geometryCopy) };
+    const clone = { attributes: [], appendChild: vi.fn(), querySelectorAll: () => [] };
+    const container = {
+      dataset: { bcTheme: "soft-notes" },
+      ownerDocument: { getElementById: vi.fn(() => geometry) },
+      cloneNode: () => clone,
+      querySelectorAll: () => []
+    };
+    prepareViewportSvgExportClone(container as unknown as HTMLElement);
+    expect(container.ownerDocument.getElementById).toHaveBeenCalledWith("bc-soft-geometry");
+    expect(geometry.cloneNode).toHaveBeenCalledWith(true);
+    expect(clone.appendChild).toHaveBeenCalledWith(geometryCopy);
+  });
+
   it("excludes active and executable embedded content", () => {
     expect(shouldIncludeViewportSvgNode(node("IFRAME"))).toBe(false);
     expect(shouldIncludeViewportSvgNode(node("SCRIPT"))).toBe(false);
@@ -16,11 +32,39 @@ describe("viewport SVG export filter", () => {
     expect(shouldIncludeViewportSvgNode(node("EMBED"))).toBe(false);
   });
 
+  it("snapshots a controlled Soft Notes text editor without exporting its iframe", () => {
+    const contentCopy = {};
+    const source = {
+      matches: () => true,
+      closest: () => ({}),
+      contentDocument: { querySelector: () => ({ cloneNode: () => contentCopy }) }
+    };
+    const frame = { replaceWith: vi.fn() };
+    const cursorSentinel = { remove: vi.fn() };
+    const snapshot = { className: "", appendChild: vi.fn(), querySelectorAll: () => [cursorSentinel] };
+    const clone = {
+      attributes: [],
+      querySelectorAll: (selector: string) => selector === "iframe" ? [frame] : []
+    };
+    const container = {
+      ownerDocument: { createElement: () => snapshot },
+      cloneNode: () => clone,
+      querySelectorAll: () => [source]
+    };
+    prepareViewportSvgExportClone(container as unknown as HTMLElement);
+    expect(frame.replaceWith).toHaveBeenCalledWith(snapshot);
+    expect(snapshot.className).toContain("markdown-source-view");
+    expect(snapshot.appendChild).toHaveBeenCalledWith(contentCopy);
+    expect(cursorSentinel.remove).toHaveBeenCalledOnce();
+  });
+
   it("excludes Canvas controls and Better Canvas card toolbars", () => {
     for (const className of [
       "canvas-control-item",
       "canvas-controls",
       "canvas-control",
+      "canvas-card-menu",
+      "canvas-menu-container",
       "bc-card-toolbar",
       "bc-card-action"
     ]) {
@@ -55,7 +99,7 @@ describe("viewport SVG export filter", () => {
       querySelectorAll: (selector: string) => {
         if (selector === "iframe") return [cloneFrame];
         if (selector.startsWith(".canvas-control-item")) return [toolbar];
-        if (selector === "script, object, embed") return [script];
+        if (selector === "iframe, script, object, embed") return [script];
         if (selector === "*") return [unsafeElement];
         return [];
       }

@@ -360,6 +360,38 @@ describe("node style panel rendering", () => {
     panel.close();
   });
 
+  it("offers six borderless Soft Notes presets, applies free text and supports mixed selection", () => {
+    const panel = createStylePanel([
+      { bcSoftNotesPreset: "free", color: undefined, bcTextAlign: "center" },
+      { bcSoftNotesPreset: "question", color: "#ffdbcb" }
+    ], 2, "soft-notes");
+    expect(optionButton(panel.surface, "soft-free").getAttribute("aria-pressed")).toBe("mixed");
+    for (const id of ["spark", "excerpt", "concept", "action", "question", "free"]) {
+      const button = optionButton(panel.surface, "soft-" + id);
+      expect(button.textContent).toBe("");
+      expect(button.children[0].tagName).toBe("svg");
+    }
+    expect(panel.surface.textContent).not.toContain("边框实线");
+    optionButton(panel.surface, "soft-free").click();
+    expect(panel.getData().nodes.every(node => node.bcSoftNotesPreset === "free" && node.color === undefined)).toBe(true);
+    expect(panel.getData().nodes.every(node => node.bcBorderStyle === "invisible")).toBe(true);
+    expect(panel.canvas.requestSave).toHaveBeenCalledWith(false);
+    expect(panel.getData().nodes[0].text).toBe("节点 1");
+    panel.canvas.readonly = true;
+    optionButton(panel.surface, "soft-action").click();
+    expect(panel.getData().nodes[0].bcSoftNotesPreset).toBe("free");
+    panel.close();
+  });
+
+  it("disables Soft Notes presets without a text selection", () => {
+    for (const panel of [createStylePanel([], 0, "soft-notes"), createStylePanel([{ type: "group" }], 1, "soft-notes")]) {
+      expect(optionButton(panel.surface, "soft-spark").disabled).toBe(true);
+      optionButton(panel.surface, "soft-spark").click();
+      expect(panel.canvas.importData).not.toHaveBeenCalled();
+      panel.close();
+    }
+  });
+
   it("applies six research presets and intensity to cards, with mixed state and readonly guards", () => {
     const panel = createStylePanel([{ bcResearchPreset: "quote" }, { bcResearchPreset: "source" }, { type: "group" }], 3, "research");
     expect(buttons(panel.surface).filter(button => button.className.includes("bc-research-preset"))).toHaveLength(6);

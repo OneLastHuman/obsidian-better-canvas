@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { setIcon } = vi.hoisted(() => ({ setIcon: vi.fn() }));
 vi.mock("obsidian", () => ({ Modal: class {}, Notice: class {}, setIcon }));
+vi.mock("./sketch-font", () => ({ SKETCH_FONT_CSS: "/* sketch font */" }));
+vi.mock("./soft-notes-font", () => ({ SOFT_NOTES_FONT_CSS: "/* soft font */" }));
 import CanvasThemeController, { createThemeControl } from "./canvas-theme-controller";
 
 afterEach(() => {
@@ -10,6 +12,14 @@ afterEach(() => {
 });
 
 describe("Canvas theme lifecycle", () => {
+  it("refreshes an existing font style on hot reload", () => {
+    const style = { textContent: "old font version" };
+    vi.stubGlobal("document", { head: {}, getElementById: () => style });
+    const controller = new CanvasThemeController({} as never);
+    (controller as any).ensureFont();
+    expect(style.textContent).toBe("/* sketch font *//* soft font */");
+  });
+
   it("builds the entry as a native 32px control, not a button", () => {
     let created: any;
     vi.stubGlobal("document", {
@@ -43,12 +53,17 @@ describe("Canvas theme lifecycle", () => {
     const doc = {
       head: { appendChild(value: any) { style = value; } },
       getElementById: () => style,
-      createElement: () => ({ remove() { style = undefined; } })
+      createElement: () => ({
+        setAttribute() {},
+        getAttribute() { return null; },
+        remove() { style = undefined; }
+      })
     };
     const nodeEl = { dataset: {} as Record<string, string> };
     const wrapperEl = {
       dataset: {} as Record<string, string>,
-      querySelectorAll: (selector: string) => selector === "[data-bc-paper]" ? [nodeEl] : [{ contentDocument: doc }]
+      querySelectorAll: (selector: string) => selector === "[data-bc-paper]" ? [nodeEl]
+        : selector === "[data-bc-soft-notes]" ? [] : [{ contentDocument: doc }]
     };
     const canvas = { wrapperEl, nodes: new Map([["a", { nodeEl }]]), getData: () => ({ bcTheme: "scrapbook", nodes: [{ id: "a", type: "text" }], edges: [] }) };
     const events = new Map<string, () => void>();
