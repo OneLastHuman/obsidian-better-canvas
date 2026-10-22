@@ -1,0 +1,188 @@
+{
+  "bcTheme": "sketch",
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 1170,
+      "height": 110,
+      "text": "# 从一个问题，到一次小实验",
+      "bcAutoResize": false,
+      "bcSketchPreset": "heading",
+      "bcSketchFill": "none",
+      "bcShape": "square",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "color": "#d9b64a",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      }
+    },
+    {
+      "id": "question",
+      "type": "text",
+      "x": 0,
+      "y": 200,
+      "width": 270,
+      "height": 190,
+      "text": "## 怎样让读书会\n人人都有话可说？",
+      "bcAutoResize": false,
+      "bcSketchPreset": "concept",
+      "bcSketchFill": "hachure",
+      "bcShape": "ellipse",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "color": "#719cf4",
+      "styleAttributes": {
+        "shape": "ellipse",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "action",
+      "type": "text",
+      "x": 385,
+      "y": 210,
+      "width": 260,
+      "height": 155,
+      "text": "## 每人带来一段摘录",
+      "bcAutoResize": false,
+      "bcSketchPreset": "action",
+      "bcSketchFill": "hachure",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "color": "#78b58c",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "decision",
+      "type": "text",
+      "x": 760,
+      "y": 175,
+      "width": 260,
+      "height": 230,
+      "text": "## 讨论\n展开了吗？",
+      "bcAutoResize": false,
+      "bcSketchPreset": "decision",
+      "bcSketchFill": "solid",
+      "bcShape": "diamond",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "color": "#e8b75a",
+      "styleAttributes": {
+        "shape": "diamond",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "end",
+      "type": "text",
+      "x": 1110,
+      "y": 210,
+      "width": 240,
+      "height": 155,
+      "text": "## 写下新的问题",
+      "bcAutoResize": false,
+      "bcSketchPreset": "action",
+      "bcSketchFill": "hachure",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "color": "#78b58c",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "note",
+      "type": "text",
+      "x": 340,
+      "y": 470,
+      "width": 350,
+      "height": 160,
+      "text": "## 先分享原话，\n再讲自己的理解。",
+      "bcAutoResize": false,
+      "bcSketchPreset": "annotation",
+      "bcSketchFill": "none",
+      "bcShape": "square",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "color": "#89919d",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      }
+    },
+    {
+      "id": "risk",
+      "type": "text",
+      "x": 790,
+      "y": 490,
+      "width": 400,
+      "height": 160,
+      "text": "## 待确认：\n留出安静思考的时间",
+      "bcAutoResize": false,
+      "bcSketchPreset": "risk",
+      "bcSketchFill": "cross-hatch",
+      "bcShape": "square",
+      "bcBorderStyle": "dashed",
+      "bcTextAlign": "left",
+      "color": "#e8798f",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "dashed",
+        "textAlign": "left"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "question-action",
+      "fromNode": "question",
+      "toNode": "action",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "action-decision",
+      "fromNode": "action",
+      "toNode": "decision",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "decision-end",
+      "fromNode": "decision",
+      "toNode": "end",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "是"
+    },
+    {
+      "id": "decision-risk",
+      "fromNode": "decision",
+      "toNode": "risk",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "还没有"
+    }
+  ]
+}
