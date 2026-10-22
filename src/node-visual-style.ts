@@ -48,6 +48,7 @@ export const NODE_STYLE_SHAPES = [
   { id: "pill", label: "胶囊形" },
   { id: "diamond", label: "菱形" },
   { id: "circle", label: "圆形" },
+  { id: "ellipse", label: "椭圆形" },
   { id: "hexagon", label: "六边形" },
   { id: "document", label: "文档" },
   { id: "database", label: "数据库" }

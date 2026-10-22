@@ -37,6 +37,7 @@ class FakeElement {
   private ownText = "";
   className = "";
   type = "";
+  disabled = false;
   offsetParent: FakeElement | null = null;
 
   constructor(tagName: string) {
@@ -117,6 +118,7 @@ class FakeElement {
   }
 
   click(): void {
+    if (this.disabled) return;
     const event = {
       preventDefault: () => undefined,
       stopPropagation: () => undefined
@@ -181,10 +183,12 @@ type TestCanvasData = {
 
 function createStylePanel(
   nodePatches: Array<Record<string, unknown>> = [{}],
-  selectedCount = nodePatches.length
+  selectedCount = nodePatches.length,
+  theme?: string
 ): {
   surface: FakeElement;
   canvas: {
+    readonly: boolean;
     importData: ReturnType<typeof vi.fn>;
     requestSave: ReturnType<typeof vi.fn>;
     requestFrame: ReturnType<typeof vi.fn>;
@@ -195,6 +199,7 @@ function createStylePanel(
   const unifier = new NodeMenuUnifier({ app: {} } as never);
   const harness = unifier as unknown as PanelHarness;
   let data: TestCanvasData = {
+    ...(theme ? { bcTheme: theme } : {}),
     nodes: nodePatches.map((patch, index) => ({
       id: "n" + (index + 1),
       type: "text",
@@ -209,6 +214,7 @@ function createStylePanel(
     edges: []
   };
   const canvas = {
+    readonly: false,
     getData: () => data,
     importData: vi.fn((next: TestCanvasData) => {
       data = next;
@@ -263,6 +269,77 @@ afterEach(() => {
 });
 
 describe("node style panel rendering", () => {
+  it("opens without a selection", () => {
+    const panel = createStylePanel([{}], 0);
+
+    expect(panel.surface.textContent).toContain("未选择节点");
+    expect(descendants(panel.surface).some(element => element.className === "bc-node-style-empty")).toBe(false);
+    panel.close();
+  });
+
+  it("disables style options until a node is selected", () => {
+    const panel = createStylePanel([{}], 0);
+    const options = buttons(panel.surface).filter(button => button.dataset.styleOption);
+
+    expect(options.length).toBeGreaterThan(0);
+    for (const option of options) expect(option.disabled).toBe(true);
+    expect(optionButton(panel.surface, "preset-flow").getAttribute("aria-pressed")).toBe("false");
+
+    optionButton(panel.surface, "preset-flow").click();
+    expect(panel.canvas.importData).not.toHaveBeenCalled();
+    panel.close();
+  });
+
+  it("shows scrapbook treatments and applies them to the full selection preserving explicit styles", () => {
+    const panel = createStylePanel([{ bcShape: "diamond" }, {}], 2, "scrapbook");
+    const tape = optionButton(panel.surface, "paper-tape");
+    expect(tape.getAttribute("aria-label")).toContain("胶带便签");
+    optionButton(panel.surface, "paper-lined").click();
+    expect(panel.getData().nodes.map(node => node.bcScrapbookPreset)).toEqual(["lined", "lined"]);
+    expect(panel.getData().nodes[0].bcShape).toBe("diamond");
+    expect(panel.getData().nodes[0].color).toBe("#3b82f6");
+    panel.close();
+  });
+
+  it("rejects paper changes on a read-only canvas", () => {
+    const panel = createStylePanel([{}], 1, "scrapbook");
+    (panel.canvas as any).readonly = true;
+    optionButton(panel.surface, "paper-photo").click();
+    expect(panel.getData().nodes[0].bcScrapbookPreset).toBeUndefined();
+    panel.close();
+  });
+  it("shows six sketch presets, applies them in batch and keeps explicit styles editable", () => {
+    const panel = createStylePanel([{ bcShape: "diamond" }, {}], 2, "sketch");
+    for (const id of ["heading", "concept", "action", "decision", "annotation", "risk"]) {
+      expect(optionButton(panel.surface, "sketch-" + id)).toBeDefined();
+    }
+    optionButton(panel.surface, "sketch-concept").click();
+    expect(panel.getData().nodes.map(node => node.bcSketchPreset)).toEqual(["concept", "concept"]);
+    expect(panel.getData().nodes[0]).toMatchObject({
+      bcShape: "ellipse", bcSketchFill: "hachure", bcBorderStyle: "solid",
+      bcTextAlign: "center", color: "#719cf4"
+    });
+    expect(panel.getData().nodes[0].text).toBe("节点 1");
+
+    optionButton(panel.surface, "sketch-fill-cross-hatch").click();
+    expect(panel.getData().nodes.map(node => node.bcSketchFill)).toEqual(["cross-hatch", "cross-hatch"]);
+    optionButton(panel.surface, "shape-square").click();
+    expect(panel.getData().nodes.map(node => node.bcShape)).toEqual(["square", "square"]);
+    panel.close();
+  });
+
+  it("shows mixed sketch fill state and rejects changes on a read-only canvas", () => {
+    const panel = createStylePanel([
+      { bcSketchFill: "hachure" },
+      { bcSketchFill: "solid" }
+    ], 2, "sketch");
+    expect(optionButton(panel.surface, "sketch-fill-hachure").getAttribute("aria-pressed")).toBe("mixed");
+    panel.canvas.readonly = true;
+    optionButton(panel.surface, "sketch-fill-none").click();
+    expect(panel.getData().nodes.map(node => node.bcSketchFill)).toEqual(["hachure", "solid"]);
+    panel.close();
+  });
+
   it("renders every option instead of printing its name", () => {
     const surface = renderStylePanel();
 

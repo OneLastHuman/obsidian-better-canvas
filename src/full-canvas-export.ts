@@ -1,6 +1,9 @@
 import type { CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
 import { routePointsForMethod, type CanvasEdgeRouteMethod, type RouteBox } from "./enhancements";
 import { layoutMarkdownForSvg, type SvgMarkdownRun } from "./svg-markdown";
+import { SKETCH_FONT_CSS } from "./sketch-font";
+import { renderSketchNodeSvg, SKETCH_EDGE_FILTER_ID } from "./sketch-renderer";
+import { resolveSketchStyle } from "./sketch-style";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -136,7 +139,7 @@ function arrowMarker(id: string, style: string, color: string): string {
     '" stroke-width="' + strokeWidth + '" stroke-linejoin="round" stroke-linecap="round"/></marker>';
 }
 
-function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, index: number): string {
+function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, index: number, sketch = false): string {
   const from = nodes.get(edge.fromNode);
   const to = nodes.get(edge.toNode);
   if (!from || !to) return "";
@@ -197,6 +200,7 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
   return (markers.length ? "<defs>" + markers.join("") + "</defs>" : "") +
     '<path id="bc-edge-' + index + '" d="' + xml(d) + '" fill="none" stroke="' + xml(color) +
     '" stroke-width="' + lineWidth + '" stroke-linecap="round"' +
+    (sketch ? ' filter="url(#' + SKETCH_EDGE_FILTER_ID + ')"' : "") +
     (dash ? ' stroke-dasharray="' + dash + '"' : "") + markerAttrs.join("") + "/>";
 }
 
@@ -211,24 +215,32 @@ function polygonPoints(x: number, y: number, w: number, h: number, sides: number
   return points.join(" ");
 }
 
-function wrapNodeText(node: CanvasNodeData, clipId: string): string {
+function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false): string {
   const hasMarkdownText = typeof node.text === "string" && node.text.trim().length > 0;
   const raw = hasMarkdownText ? String(node.text) : nodeText(node);
   if (!raw) return "";
   const attrs = (node as any).styleAttributes ?? {};
-  const fontSize = Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
-  const alignRaw = String(attrs.textAlign ?? attrs.textAlignment ?? (node as any).bcTextAlign ?? "left");
+  const sketchStyle = sketch ? resolveSketchStyle(node) : null;
+  const fontSize = sketchStyle
+    ? sketchStyle.fontSize
+    : Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
+  const alignRaw = sketchStyle?.align ?? String(attrs.textAlign ?? attrs.textAlignment ?? (node as any).bcTextAlign ?? "left");
   const anchor = alignRaw === "center" ? "middle" : alignRaw === "right" ? "end" : "start";
   const startX = anchor === "middle" ? node.x + node.width / 2 : anchor === "end" ? node.x + node.width - 12 : node.x + 12;
-  const fontFamily = xml(String(attrs.fontFamily ?? attrs.font ?? "Inter,Arial,sans-serif"));
+  const fontFamily = sketch
+    ? "BC Sketch Hand, Segoe Print, cursive"
+    : xml(String(attrs.fontFamily ?? attrs.font ?? "Inter,Arial,sans-serif"));
   const rawWeight = String(attrs.fontWeight ?? "normal");
-  const fontWeight = /^(?:normal|bold|bolder|lighter|[1-9]00)$/i.test(rawWeight) ? rawWeight : "normal";
+  const resolvedWeight = /^(?:normal|bold|bolder|lighter|[1-9]00)$/i.test(rawWeight) ? rawWeight : "normal";
+  const fontWeight = sketch && resolvedWeight === "normal" ? "600" : resolvedWeight;
   const rawFontStyle = String(attrs.fontStyle ?? "normal");
   const fontStyle = /^(?:normal|italic|oblique)$/i.test(rawFontStyle) ? rawFontStyle : "normal";
   const rawDecoration = String(attrs.textDecoration ?? "none");
   const textDecoration = /^(?:none|underline|overline|line-through)$/i.test(rawDecoration) ? rawDecoration : "none";
-  const textColor = xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, "#202124"));
-  const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * 0.58)));
+  const textColor = sketch
+    ? sketchStyle?.preset?.id === "annotation" ? "#696b65" : "#262520"
+    : xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, "#202124"));
+  const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * (sketch ? 0.95 : 0.58))));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
   const lines = layoutMarkdownForSvg(raw, maxChars, maxLines, fontSize);
 
@@ -334,7 +346,33 @@ function boxPolygonPoints(
   return points.map(([px, py]) => (x + px * width) + "," + (y + py * height)).join(" ");
 }
 
-function renderNode(node: CanvasNodeData, index: number): string {
+function renderSketchExportNode(node: CanvasNodeData, index: number): string {
+  const x = number(node.x), y = number(node.y);
+  const width = Math.max(1, number(node.width, 280)), height = Math.max(1, number(node.height, 140));
+  const clipId = "bc-clip-" + index;
+  const clipPath = '<clipPath id="' + clipId + '"><rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="5"/></clipPath>';
+  const ink = resolveSketchStyle(node).preset?.id === "annotation" ? "#696b65" : "#262520";
+  const geometry = '<g transform="translate(' + x + ' ' + y + ')">' +
+    renderSketchNodeSvg(node, { ink }) + "</g>";
+  const imageDataUrl = typeof (node as any).bcExportImageDataUrl === "string"
+    ? String((node as any).bcExportImageDataUrl)
+    : "";
+  const imageMarkup = imageDataUrl.startsWith("data:image/") && node.type === "file"
+    ? '<image x="' + (x + 6) + '" y="' + (y + 6) + '" width="' + Math.max(1, width - 12) +
+      '" height="' + Math.max(1, height - 30) + '" href="' + xml(imageDataUrl) +
+      '" preserveAspectRatio="xMidYMid meet" clip-path="url(#' + clipId + ')"/>'
+    : "";
+  const text = wrapNodeText(node, clipId, true);
+  const displayedText = imageMarkup && typeof node.file === "string"
+    ? '<text x="' + (x + 8) + '" y="' + (y + height - 8) +
+      '" font-family="BC Sketch Hand, Segoe Print, cursive" font-size="12" font-weight="600" fill="#696b65">' +
+      xml(node.file.split("/").pop() ?? node.file) + "</text>"
+    : text;
+  return clipPath + '<g class="bc-full-node bc-full-sketch-node">' + geometry + imageMarkup + displayedText + "</g>";
+}
+
+function renderNode(node: CanvasNodeData, index: number, sketch = false): string {
+  if (sketch) return renderSketchExportNode(node, index);
   const x = number(node.x), y = number(node.y);
   const width = Math.max(1, number(node.width, 280)), height = Math.max(1, number(node.height, 140));
   const attrs = (node as any).styleAttributes ?? {};
@@ -492,13 +530,22 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
     return { ...edge, fromNode: fromInfo?.id ?? edge.fromNode, toNode: toInfo?.id ?? edge.toNode };
   });
 
-  const defs = '<defs><marker id="bc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8794"/></marker></defs>';
+  const sketch = data.bcTheme === "sketch";
+  const sketchFilter = '<filter id="' + SKETCH_EDGE_FILTER_ID + '" x="-8%" y="-20%" width="116%" height="140%">' +
+    '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="7" result="noise"/>' +
+    '<feDisplacementMap in="SourceGraphic" in2="noise" scale="0.75" xChannelSelector="R" yChannelSelector="G"/>' +
+    "</filter>";
+  const fontStyle = sketch && SKETCH_FONT_CSS ? "<style>" + SKETCH_FONT_CSS + "</style>" : "";
+  const defs = '<defs><marker id="bc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8794"/></marker>' +
+    (sketch ? sketchFilter + fontStyle : "") + "</defs>";
   const background = options.backgroundColor
     ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="' + xml(options.backgroundColor) + '"/>'
-    : "";
+    : sketch
+      ? '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#fffefb"/>'
+      : "";
   const nodeMap = new Map(translatedNodes.map(node => [node.id, node]));
-  const edgeMarkup = translatedEdges.map((edge, index) => renderEdge(edge, nodeMap, index)).join("");
-  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index)).join("");
+  const edgeMarkup = translatedEdges.map((edge, index) => renderEdge(edge, nodeMap, index, sketch)).join("");
+  const nodeMarkup = translatedNodes.map((node, index) => renderNode(node, index, sketch)).join("");
 
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height +
     '" viewBox="0 0 ' + width + " " + height + '">' +
