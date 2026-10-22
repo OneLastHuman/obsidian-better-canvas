@@ -1,7 +1,8 @@
 import { readCanvasData, type CanvasData } from "./canvas";
 import { clearSketchCanvas, decorateSketchCanvas } from "./sketch-renderer";
+import { clearResearchNode, decorateResearchNode } from "./research-style";
 
-export type CanvasThemeId = "default" | "scrapbook" | "sketch";
+export type CanvasThemeId = "default" | "scrapbook" | "sketch" | "research";
 
 export const SCRAPBOOK_PRESETS = [
   { id: "tape", label: "胶带便签", sample: "拾起灵感", color: "#f4dfaa" },
@@ -27,6 +28,7 @@ export const SCRAPBOOK_COLORS = [
 export function resolveCanvasTheme(data: Partial<CanvasData>): CanvasThemeId {
   if (data.bcTheme === "scrapbook") return "scrapbook";
   if (data.bcTheme === "sketch") return "sketch";
+  if (data.bcTheme === "research") return "research";
   return "default";
 }
 
@@ -82,6 +84,8 @@ export function decorateCanvasTheme(canvas: any): void {
     const node = canvas?.nodes?.get?.(item.id);
     const el = node?.nodeEl ?? node?.containerEl ?? node?.el;
     if (!el?.dataset) continue;
+    if (theme === "research" && item.type !== "group") decorateResearchNode(el, item);
+    else clearResearchNode(el);
     if (theme === "scrapbook") {
       el.dataset.bcPaper = item.type === "group" ? "group" : scrapbookPreset(item.bcScrapbookPreset);
       const attrs = item.styleAttributes as Record<string, unknown> | undefined;
