@@ -47,6 +47,8 @@ interface NodeTemplate {
   bcScrapbookPreset?: string;
   bcSketchPreset?: string;
   bcSketchFill?: string;
+  bcResearchPreset?: string;
+  bcResearchIntensity?: number;
 }
 
 interface BetterCanvasSettings {
@@ -789,6 +791,8 @@ export default class BetterCanvasPlugin extends Plugin {
         ...(typeof source.bcScrapbookPreset === "string" ? { bcScrapbookPreset: source.bcScrapbookPreset } : {}),
         ...(typeof source.bcSketchPreset === "string" ? { bcSketchPreset: source.bcSketchPreset } : {}),
         ...(typeof source.bcSketchFill === "string" ? { bcSketchFill: source.bcSketchFill } : {}),
+        ...(typeof source.bcResearchPreset === "string" ? { bcResearchPreset: source.bcResearchPreset } : {}),
+        ...(typeof source.bcResearchIntensity === "number" ? { bcResearchIntensity: source.bcResearchIntensity } : {}),
         ...(typeof source.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: source.bcZoomBreakpoint } : {}),
         ...(typeof source.bcAutoResize === "boolean" ? { bcAutoResize: source.bcAutoResize } : {})
       });
@@ -822,6 +826,8 @@ export default class BetterCanvasPlugin extends Plugin {
         ...(template.bcScrapbookPreset ? { bcScrapbookPreset: template.bcScrapbookPreset } : {}),
         ...(template.bcSketchPreset ? { bcSketchPreset: template.bcSketchPreset } : {}),
         ...(template.bcSketchFill ? { bcSketchFill: template.bcSketchFill } : {}),
+        ...(template.bcResearchPreset ? { bcResearchPreset: template.bcResearchPreset } : {}),
+        ...(typeof template.bcResearchIntensity === "number" ? { bcResearchIntensity: template.bcResearchIntensity } : {}),
         ...(typeof template.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: template.bcZoomBreakpoint } : {}),
         ...(typeof template.bcAutoResize === "boolean" ? { bcAutoResize: template.bcAutoResize } : {})
       };

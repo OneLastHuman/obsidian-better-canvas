@@ -9,6 +9,26 @@ const sample: CanvasData = {
 };
 
 describe("Canvas themes", () => {
+  it("decorates research nodes without content mutations and clears them on theme change", () => {
+    let data = withCanvasTheme(sample, "research");
+    const nodeEl = { dataset: {} as Record<string, string>, style: {
+      setProperty: (key: string, value: string) => properties.set(key, value),
+      removeProperty: (key: string) => properties.delete(key)
+    } };
+    const properties = new Map<string, string>();
+    const wrapperEl = { dataset: {} as Record<string, string> };
+    const canvas = { getData: () => data, wrapperEl, nodes: new Map([["a", { nodeEl }]]) };
+    decorateCanvasTheme(canvas);
+    expect(resolveCanvasTheme(data)).toBe("research");
+    expect(nodeEl.dataset.bcResearchPreset).toBe("source");
+    expect(properties.get("--bc-research-accent")).toBe("#ff0000");
+    expect(data.nodes).toBe(sample.nodes);
+    data = withCanvasTheme(data, "scrapbook");
+    decorateCanvasTheme(canvas);
+    expect(nodeEl.dataset.bcResearchPreset).toBeUndefined();
+    expect(properties.size).toBe(0);
+    expect(nodeEl.dataset.bcPaper).toBe("tape");
+  });
   it("falls back safely for old and unknown theme metadata", () => {
     expect(resolveCanvasTheme(sample)).toBe("default");
     expect(resolveCanvasTheme({ ...sample, bcTheme: "future" })).toBe("default");
