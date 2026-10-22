@@ -1,0 +1,127 @@
+<!doctype html>
+<!-- Throwaway prototype. Open with the adjacent prototype-assets directory; no remote resources or persistence. -->
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Better Canvas · 手绘白板主题原型</title>
+<style>
+@font-face{font-family:"Sketch Notes Demo";src:url("./excalidraw-theme.prototype-assets/SketchNotesDemo.woff2?v=3") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+:root{color-scheme:light;--paper:#fffefb;--ink:#262520;--muted:#696b65;--line:#e4e5df;--chrome:#f7f7f5;--accent:#6554c0;--blue:#dbeafe;--green:#d3f1df;--yellow:#fff0b3;--pink:#ffdce3;--grid:#e4e3dc;--sketch:"Sketch Notes Demo",sans-serif}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--paper);font:14px "Segoe UI","Microsoft YaHei",sans-serif}body.dark{color-scheme:dark;--paper:#202126;--ink:#e6e6e8;--muted:#a8a9b1;--line:#41424a;--chrome:#292a30;--accent:#b5a7ff;--blue:#273f5c;--green:#29493d;--yellow:#534a2b;--pink:#533640;--grid:#42434b}
+button,select,input{font:inherit}button,select{color:inherit;background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px 11px;cursor:pointer}button:hover{border-color:var(--accent)}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}button[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--paper))}
+header{height:65px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 25px;gap:14px;background:var(--chrome)}.logo{font-family:var(--sketch);font-size:24px;border:2px solid var(--ink);border-radius:7px 11px 6px 10px;padding:0 7px;transform:rotate(-5deg)}header strong{font-weight:600}header .slash{color:var(--muted)}header small{color:var(--muted)}.badge{margin-left:auto;font-size:11px;letter-spacing:.1em;color:var(--muted);border:1px solid var(--line);padding:5px 8px;border-radius:4px}
+.workspace{display:grid;grid-template-columns:235px 1fr;height:calc(100vh - 65px);min-height:650px}aside{padding:25px 19px;border-right:1px solid var(--line);background:var(--chrome);overflow:auto}h1{font-size:21px;margin:8px 0 10px;letter-spacing:-.5px}.eyebrow{font-size:10px;letter-spacing:.17em;color:var(--muted)}p{line-height:1.8;color:var(--muted)}aside p{font-size:12px;margin:0 0 22px}.field{border-top:1px solid var(--line);padding:17px 0}.field label,.field .label{display:block;font-size:12px;font-weight:600;margin-bottom:10px}.row{display:flex;gap:6px}.row button{flex:1;font-size:12px;padding:7px 4px}select{width:100%;font-size:12px}input[type=range]{width:100%;accent-color:var(--accent)}.swatches{display:flex;gap:9px}.swatches button{width:29px;height:29px;border-radius:50%;padding:0;border:1px solid color-mix(in srgb,var(--ink) 25%,transparent)}.swatches button[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:3px}.hint{font-size:11px;line-height:1.8;color:var(--muted)}#state{white-space:pre-line;font-size:11px;color:var(--muted);line-height:1.9;margin-top:10px}
+main{position:relative;overflow:hidden;background:var(--paper)}main[data-bg=dots]{background-image:radial-gradient(var(--grid) .8px,transparent .8px);background-size:22px 22px}main[data-bg=grid]{background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px}.canvas-top{position:absolute;top:22px;left:27px;right:23px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}.canvas-top strong{font-weight:500;font-size:12px}.canvas-top small{display:block;color:var(--muted);font-size:10px;margin-top:6px}.controls{display:flex;flex-direction:column;gap:5px;pointer-events:auto}.controls button{width:34px;height:34px;padding:0;font-size:17px;box-shadow:0 2px 6px #00000008}.controls button[aria-pressed=true]{background:var(--paper)}
+#board{width:100%;height:calc(100% - 110px);margin-top:38px;touch-action:manipulation}svg text{fill:var(--ink);font-family:var(--sketch);font-size:25px}svg .caption{font-size:19px;fill:var(--muted)}svg .heading{font-size:43px}svg path{stroke-linecap:round;stroke-linejoin:round}svg .node{cursor:pointer;outline:none}svg .node:focus-visible .selection{opacity:1}svg .selection{fill:none;stroke:var(--accent);stroke-width:1;stroke-dasharray:5 4;opacity:0}svg .selected .selection{opacity:1}svg .node:hover{--ink:var(--accent)}svg .edge-label{font-size:19px;fill:var(--muted)}svg .subtitle{font-size:16px}svg .node-title{font-size:25px}#font-status{font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:14px}.font-sample{font:22px var(--sketch);color:var(--ink);margin-top:8px}
+.switcher{position:absolute;bottom:51px;left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--paper);box-shadow:0 5px 24px #0000000a;white-space:nowrap}.switcher button{border:0;background:transparent}.switcher #variant{min-width:190px;font-size:12px;text-align:center}.status{position:absolute;bottom:17px;left:26px;right:25px;display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--muted)}.note{position:absolute;right:26px;bottom:111px;font:14px var(--sketch);color:var(--muted);transform:rotate(-3deg)}
+dialog{max-width:570px;width:calc(100% - 32px);padding:28px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:14px}dialog::backdrop{background:#0005}.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}.themes button{padding:16px 8px;min-height:100px}.themes span{display:block;font-size:26px;margin-bottom:12px}dialog p{font-size:12px}dialog h2{font-size:20px;margin:0}
+@media(max-width:850px){.workspace{grid-template-columns:190px 1fr}aside{padding:20px 13px}header{padding:0 15px}header small{display:none}.note{display:none}.status span:last-child{display:none}.canvas-top{left:17px}.switcher #variant{min-width:145px}}@media(max-width:600px){.workspace{display:flex;flex-direction:column;height:auto}aside{border:0;padding:15px;display:flex;flex-wrap:wrap;gap:12px}aside h1{font-size:17px}aside>p,aside>.eyebrow,.hint,#state{display:none}.field{padding:5px;border:0;min-width:130px;flex:1}.field label,.field .label{margin-bottom:5px}main{height:620px}.badge{font-size:9px}.canvas-top{top:15px}}
+svg .node-title,svg .heading{stroke:var(--ink);stroke-width:.35px;paint-order:stroke fill}svg .node .caption{stroke:var(--muted);stroke-width:.15px;paint-order:stroke fill}svg .node{user-select:none}
+:root{--risk-ink:#a64650}.dark{--risk-ink:#f2a0a8}.workspace{grid-template-columns:270px 1fr}.preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.preset-choice{padding:5px 7px;text-align:left}.preset-choice svg{display:block;width:100%;height:46px}.preset-choice strong{display:block;font-size:11px;font-weight:500;margin:3px 0}.preset-choice small{font-size:10px;color:var(--muted)}#preset-detail{margin-top:10px;font-size:11px;line-height:1.8;color:var(--muted)}.gallery-link{width:100%;margin-top:10px;font-size:11px}.specimen-label{font:11px "Segoe UI","Microsoft YaHei",sans-serif;fill:var(--muted);letter-spacing:1px}.specimen-purpose{font:13px "Segoe UI","Microsoft YaHei",sans-serif;fill:var(--muted)}.preset-grid+div{min-height:44px}#state{padding-bottom:16px}.field{padding:13px 0}aside>p{margin-bottom:12px}#font-status{margin-bottom:10px}.font-sample{display:none}
+@media(max-width:850px){.workspace{grid-template-columns:225px 1fr}}@media(max-width:600px){.preset-field{flex-basis:100%}.preset-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.workspace{display:flex}}
+</style>
+<header><span class="logo">b.</span><strong>Better Canvas</strong><span class="slash">/</span><small>主题实验室</small><span class="badge">FUNCTIONAL PRESETS · 03</span><button id="mode" aria-pressed="false">深色</button></header>
+<div class="workspace">
+<aside>
+  <div class="eyebrow">CANVAS / HAND DRAWN</div><h1>手绘白板</h1><p>随手写下，随手画出。<br>保留落笔、重描与涂色的痕迹。</p><div id="font-status" role="status">正在加载中文手写字体…</div><div class="font-sample">把想法随手画下来</div>
+ <div class="field preset-field"><span class="label">功能预设 · 应用到所选节点</span><div class="preset-grid" id="presets"></div><div id="preset-detail" aria-live="polite"></div><button class="gallery-link" id="gallery">查看六种预设总览</button></div>
+ <div class="field"><label for="background">画布背景</label><select id="background"><option value="dots">细点阵</option><option value="plain">纯色白板</option><option value="grid">淡方格</option></select></div>
+ <div class="field"><label for="roughness">手绘程度 <span id="rough-label">随手画</span></label><input id="roughness" type="range" min="0" max="2" value="2" step="1"></div>
+ <div class="field"><span class="label">所选节点填充</span><div class="row" id="fills"><button data-fill="solid" aria-pressed="false">淡彩</button><button data-fill="hachure" aria-pressed="true">排线</button><button data-fill="cross-hatch" aria-pressed="false">交叉</button><button data-fill="none" aria-pressed="false">留白</button></div></div>
+ <div class="field"><span class="label">所选节点颜色</span><div class="swatches" id="colors"><button data-color="blue" style="background:var(--blue)" aria-label="雾蓝" aria-pressed="true"></button><button data-color="green" style="background:var(--green)" aria-label="浅绿" aria-pressed="false"></button><button data-color="yellow" style="background:var(--yellow)" aria-label="浅黄" aria-pressed="false"></button><button data-color="pink" style="background:var(--pink)" aria-label="浅粉" aria-pressed="false"></button></div></div>
+ <div class="field"><label for="edge">连线</label><select id="edge"><option value="curve">手绘曲线</option><option value="straight">直线箭头</option><option value="dashed">虚线箭头</option><option value="elbow">折线箭头</option></select></div>
+ <div class="hint">先点选节点，再点预设。<br>预设设置外观，文字内容保留。</div><div id="state" role="status" aria-live="polite"></div>
+</aside>
+<main data-bg="dots"><div class="canvas-top"><div><strong id="filename">把一个想法变成现实.canvas</strong><small>Better Canvas / 手绘白板</small></div><div class="controls"><button id="theme" title="画布主题" aria-label="画布主题" aria-pressed="true">▧</button><button id="reset" title="重置原型" aria-label="重置原型">↺</button></div></div>
+<svg id="board" viewBox="0 0 1080 640" role="group" aria-label="交互式手绘主题画布"></svg>
+<div class="note">a little rough, a lot of room to think.</div>
+<nav class="switcher" aria-label="切换原型布局"><button id="previous" aria-label="上一个布局">←</button><span id="variant"></span><button id="next" aria-label="下一个布局">→</button></nav>
+<div class="status"><span>独立视觉原型 · 非 Obsidian 运行画面</span><span>点选节点 · ← → 切换布局 · 无远程资源</span></div>
+</main></div>
+<dialog id="theme-dialog"><h2>画布主题</h2><p>建议接入现有的画布主题选择器，按每张画布保存。</p><div class="themes"><button disabled><span>□</span>默认</button><button disabled><span>▱</span>拼贴手账</button><button aria-pressed="true" id="choose-sketch"><span>✎</span>手绘白板</button></div><p>此原型仅展示手绘白板。正式版本保留现有主题，并支持主题切换的撤销与重做。</p><button id="close-dialog">返回画布</button></dialog>
+<script src="./excalidraw-theme.prototype-assets/rough-4.6.6.js"></script>
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+// Functional combinations inspired by Excalidraw primitives, not official preset names.
+const presets=[
+ {id:'heading',name:'章节标题',use:'组织阅读顺序',shape:'text',fill:'none',color:'yellow',align:'left',size:32,detail:'大号手写字 · 无边框 · 短划线。用于主题、章节和区域名称。'},
+ {id:'concept',name:'核心概念',use:'聚焦讨论对象',shape:'ellipse',fill:'hachure',color:'blue',align:'center',size:25,detail:'椭圆 · 蓝色排线 · 居中。用于中心主题、对象和关键概念。'},
+ {id:'action',name:'行动步骤',use:'表达具体动作',shape:'rect',fill:'hachure',color:'green',align:'center',size:25,detail:'矩形 · 绿色排线 · 居中。用于流程步骤、操作和待办事项。'},
+ {id:'decision',name:'判断分支',use:'提出分支条件',shape:'diamond',fill:'solid',color:'yellow',align:'center',size:23,detail:'菱形 · 浅黄实色 · 短句居中。用于是非判断和条件分支，出口标签由连线表达。'},
+ {id:'annotation',name:'旁注说明',use:'补充背景信息',shape:'text',fill:'none',color:'blue',align:'left',size:22,detail:'小号手写字 · 无边框 · 左对齐。用于解释、来源和补充说明，可搭配虚线引导。'},
+ {id:'risk',name:'风险提醒',use:'标记待确认事项',shape:'rect',fill:'cross-hatch',color:'pink',align:'left',size:25,detail:'矩形 · 红色虚线 · 淡红交叉排线。用于风险、阻塞和待确认项，不只靠颜色区分。'}
+];
+const presetFor=id=>presets.find(p=>p.id===id);
+const layouts=[
+ {name:'A · 想法流程',file:'把一个想法变成现实.canvas',title:'好想法，从一笔开始。',subtitle:'THINK IT THROUGH / 从问题到行动',nodes:[
+ ['question',110,200,215,105,'从一个问题开始','什么值得被解决？','blue','rect'],
+ ['decision',428,176,180,160,'值得试试？','','yellow','diamond'],
+ ['action',725,200,220,105,'做一个小实验','让想法遇见现实','green','rect'],
+ ['note',420,435,235,92,'再想一想','把新的线索记下来','pink','rect']],edges:[[0,1,'提出假设'],[1,2,'是'],[1,3,'还不确定']],group:true},
+ {name:'B · 发散思考',file:'寻找更多可能.canvas',title:'先发散，再找到方向。',subtitle:'MAKE CONNECTIONS / 给灵感留一点空间',nodes:[
+ ['center',425,260,220,115,'一个新想法','从这里向外生长','yellow','ellipse'],
+ ['people',110,165,205,90,'为谁而做','真实的人与情境','blue','rect'],
+ ['value',755,165,205,90,'为什么重要','值得投入的改变','green','rect'],
+ ['risk',120,440,205,90,'还有哪些未知','把疑问写下来','pink','rect'],
+ ['next',745,440,205,90,'下一小步','今天就可以开始','blue','rect']],edges:[[0,1,'人'],[0,2,'价值'],[0,3,'问题'],[0,4,'行动']]},
+ {name:'C · 研究笔记',file:'收集与整理.canvas',title:'收集碎片，也收集可能。',subtitle:'COLLECT & CONNECT / 一张可以慢慢长大的白板',nodes:[
+ ['observation',105,190,245,210,'观察记录','01  找到真实的情境\n02  记下反复出现的问题\n03  保留不同的声音','blue','rect'],
+ ['insight',440,210,230,115,'一个小发现','更少的步骤，更清晰的方向','yellow','rect'],
+ ['experiment',755,335,230,145,'下一次尝试','用一个小实验\n检验最重要的假设','green','rect'],
+ ['aside',430,445,235,90,'别急着下结论','留一点空白给意外','pink','rect']],edges:[[0,1,'归纳'],[1,2,'验证'],[3,2,'补充']],group:true},
+ {name:'D · 六种功能预设',file:'手绘白板 · 功能预设.canvas',title:'同一支笔，六种表达。',subtitle:'标题组织内容，图形表达关系，旁注补充信息。',nodes:[
+ ['sample-heading',95,222,250,145,'项目启动','从这里展开讨论','yellow','text','heading'],
+ ['sample-concept',415,222,245,145,'用户需求','我们要解决什么','blue','ellipse','concept'],
+ ['sample-action',735,225,245,140,'访谈三位用户','记录真实使用过程','green','rect','action'],
+ ['sample-decision',115,454,205,148,'验证通过？','是 / 否','yellow','diamond','decision'],
+ ['sample-annotation',415,454,245,145,'补充说明','样本来自首次使用者\n记录于本次访谈','blue','text','annotation'],
+ ['sample-risk',735,457,245,140,'需要确认','样本数量仍然不足\n结论暂不作为定论','pink','rect','risk']],edges:[],gallery:true}
+];
+let variant=Math.max(0,['A','B','C','D'].indexOf(new URL(location.href).searchParams.get('variant')||'D'));
+let selected=0, roughness=2, edge='curve', overrides={};
+const pen=rough.svg($('#board'));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function options(seed,extra={}){return {seed,roughness:[0,1.4,2.6][roughness],bowing:1.9,stroke:'var(--ink)',strokeWidth:1.8,disableMultiStroke:roughness===0,...extra};}
+function shapeMarkup(x,y,w,h,shape,seed,extra={}){const o=options(seed,extra);const el=shape==='ellipse'?pen.ellipse(x+w/2,y+h/2,w,h,o):shape==='diamond'?pen.polygon([[x+w/2,y],[x+w,y+h/2],[x+w/2,y+h],[x,y+h/2]],o):pen.rectangle(x,y,w,h,o);if(['hachure','cross-hatch'].includes(extra.fillStyle))el.querySelectorAll('path').forEach(p=>{if(p.getAttribute('stroke')===extra.fill)p.setAttribute('opacity',extra.fillStyle==='cross-hatch'?'.28':'.5');});return el.outerHTML;}
+function strokePath(d,seed,extra={}){return pen.path(d,options(seed,extra)).outerHTML;}
+function handText(text,x,y,cls='',center=false,seed=0){return `<text class="${cls}" x="${x}" y="${y}" ${center?'text-anchor="middle"':''}>${[...text].map((char,i)=>`<tspan dy="${roughness?Math.sin((i+seed)*2.1)*.7:0}" rotate="${roughness?Math.sin((i+seed)*1.7)*1.5:0}">${esc(char)}</tspan>`).join('')}</text>`;}
+function dock(n,other){const dx=other[1]+other[3]/2-n[1]-n[3]/2,dy=other[2]+other[4]/2-n[2]-n[4]/2;const cx=n[1]+n[3]/2,cy=n[2]+n[4]/2;return Math.abs(dx)/n[3]>Math.abs(dy)/n[4]?[cx+Math.sign(dx)*n[3]/2,cy]:[cx,cy+Math.sign(dy)*n[4]/2]}
+function nodeStyle(n){const o=overrides[n[0]]||{},preset=presetFor(o.preset||n[9]);return {shape:n[8],fill:'hachure',color:n[7],align:'center',size:25,...preset,...o,preset};}
+function nodeArt(n,i){const [,x,y,w,h,title,desc]=n;const style=nodeStyle(n),{shape,fill,color:c,align,size,preset}=style;const ink=preset?.id==='risk'?'var(--risk-ink)':'var(--ink)';let s='';
+ if(shape!=='text'){
+ s+=shapeMarkup(x,y,w,h,shape,200+i,{fill:fill==='none'?'var(--paper)':`var(--${c})`,fillStyle:'solid',stroke:'none',roughness:roughness*.7});
+ s+=shapeMarkup(x,y,w,h,shape,300+i,{...(['hachure','cross-hatch'].includes(fill)?{fill:{blue:'#739fc6',green:'#70a889',yellow:'#c7a244',pink:'#c28b9c'}[c],fillStyle:fill,hachureAngle:-48+i*3,hachureGap:9,fillWeight:.8}:{}),stroke:ink,strokeWidth:1.9,strokeLineDash:preset?.id==='risk'?[8,6]:[]});
+ }else if(fill!=='none')s+=shapeMarkup(x,y+12,w,h-24,'rect',200+i,{fill:`var(--${c})`,fillStyle:fill,stroke:'none',fillWeight:.7,hachureGap:9});
+ const lines=desc?desc.split('\n'):[],left=align==='left';const tx=left?x+18:x+w/2;const ty=y+h/2-(lines.length?lines.length*12:0)+7;
+ s+=`<g ${preset?.id==='risk'?'style="--ink:var(--risk-ink)"':''}>${handText(title,tx,ty,'node-title',!left,i).replace('class="node-title"',`class="node-title" style="font-size:${Math.min(size,(w-36)/title.length)}px"`)}</g>`;
+ lines.forEach((line,j)=>s+=handText(line,tx,ty+30+j*27,'caption',!left,j+i));
+ if(preset?.id==='heading')s+=strokePath(`M${tx} ${ty+9} Q${tx+70} ${ty+13} ${tx+Math.min(w-38,title.length*size)} ${ty+8}`,400+i,{stroke:'#d6ad40',strokeWidth:2.6});
+ return s;
+}
+function renderPresets(){const grid=$('#presets');grid.innerHTML=presets.map((p,i)=>`<button class="preset-choice" data-preset="${p.id}" aria-pressed="false" title="${p.detail}"><svg viewBox="0 0 220 100" aria-hidden="true">${nodeArt(['thumb-'+p.id,15,12,190,76,p.name,'',p.color,p.shape,p.id],i)}</svg><strong>${p.name}</strong><small>${p.use}</small></button>`).join('');$$('[data-preset]').forEach(b=>b.onclick=()=>{const n=layouts[variant].nodes[selected];overrides[n[0]]={preset:b.dataset.preset};draw();});}
+function draw(){
+ const l=layouts[variant];let s=handText(l.title,105,86,'heading')+handText(l.subtitle,107,126,'caption subtitle');
+ s+=strokePath('M108 98 Q285 106 475 98',91,{stroke:'#e9b949',strokeWidth:3.5});
+ if(l.group)s+=shapeMarkup(76,158,938,416,'rect',22,{stroke:'var(--muted)',strokeWidth:.8,strokeLineDash:[8,10],disableMultiStroke:true})+handText(variant===0?'探索 → 判断 → 行动':'RESEARCH NOTES / 持续整理中',95,604,'caption');
+ for(const [a,b,label] of l.edges){const [x,y]=dock(l.nodes[a],l.nodes[b]),[u,v]=dock(l.nodes[b],l.nodes[a]);const mid=(x+u)/2;const vertical=x===u;const c1=[x+(u-x)*.4,y+(vertical?(v-y)*.35:0)],c2=[u-(u-x)*.4,v-(vertical?(v-y)*.35:0)];const d=edge==='straight'||edge==='dashed'?`M${x} ${y} L${u} ${v}`:edge==='elbow'?`M${x} ${y} H${mid} V${v} H${u}`:`M${x} ${y} C${c1[0]} ${c1[1]+9},${c2[0]} ${c2[1]-9},${u} ${v}`;
+ const angle=edge==='curve'?Math.atan2(v-(c2[1]-9),u-c2[0]):edge==='elbow'&&!vertical?Math.atan2(0,u-mid):Math.atan2(v-y,u-x);const wing=t=>[u-17*Math.cos(angle+t),v-17*Math.sin(angle+t)];const p=wing(.5),q=wing(-.5);
+ s+=`<g class="edge">${strokePath(d,100+a*7+b,{strokeLineDash:edge==='dashed'?[7,7]:[]})}${strokePath(`M${p[0]} ${p[1]} L${u} ${v} L${q[0]} ${q[1]}`,150+a*7+b,{roughness:roughness*.7})}</g><g style="paint-order:stroke;stroke:var(--paper);stroke-width:7px;stroke-linejoin:round">${handText(label,mid+8,(y+v)/2-15,'edge-label',true)}</g>`;}
+ l.nodes.forEach((n,i)=>{const [id,x,y,w,h,title]=n;const style=nodeStyle(n);
+ if(l.gallery){const p=presetFor(n[9]);s+=`<text x="${x}" y="${y-29}" class="specimen-label">0${i+1} / ${p.name}</text><text x="${x}" y="${y-9}" class="specimen-purpose">${p.use}</text>`;}
+ s+=`<g class="node ${selected===i?'selected':''}" data-node="${i}" data-fill="${style.fill}" data-color="${style.color}" data-preset-id="${style.preset?.id||''}" tabindex="0" role="button" aria-label="${esc(title)}" aria-pressed="${selected===i}"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="transparent"/><rect class="selection" x="${x-10}" y="${y-10}" width="${w+20}" height="${h+20}" rx="3"/>${nodeArt(n,i)}</g>`;});
+ $('#board').innerHTML=s;$('#variant').textContent=l.name;$('#filename').textContent=l.file;
+ $$('.node').forEach(el=>{const choose=()=>{selected=Number(el.dataset.node);draw();};el.onclick=choose;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();$(`[data-node="${selected}"]`).focus();}}});sync();
+}
+function sync(){const n=layouts[variant].nodes[selected],style=nodeStyle(n),custom=overrides[n[0]];$$('button[data-color]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===style.color)));$$('button[data-fill]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.fill===style.fill)));$$('[data-preset]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.preset===style.preset?.id)));$('#preset-detail').textContent=(style.preset?.detail||'选择一种功能预设，组合形状、填充与文字排版。')+(custom?.fill||custom?.color?'（已微调）':'');$('#rough-label').textContent=['工整','手绘','随手画'][roughness];$('#edge').disabled=!!layouts[variant].gallery;$('#state').textContent=`当前：${n[5]}\n预设：${style.preset?.name||'自由样式'}\n外观：${document.body.classList.contains('dark')?'深色':'浅色'} · ${$('#background').selectedOptions[0].text}\n线条：${['工整','手绘','随手画'][roughness]}`;}
+function changeVariant(delta){variant=(variant+delta+layouts.length)%layouts.length;selected=0;const url=new URL(location.href);url.searchParams.set('variant',['A','B','C','D'][variant]);history.replaceState(null,'',url);draw();}
+$('#gallery').onclick=()=>changeVariant(3-variant);
+$('#previous').onclick=()=>changeVariant(-1);$('#next').onclick=()=>changeVariant(1);
+document.addEventListener('keydown',e=>{if(e.target.closest('input,select,textarea,[contenteditable],dialog')||$('#theme-dialog').open)return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();changeVariant(e.key==='ArrowLeft'?-1:1);}});
+$('#mode').onclick=()=>{const dark=document.body.classList.toggle('dark');$('#mode').textContent=dark?'浅色':'深色';$('#mode').setAttribute('aria-pressed',String(dark));sync();};
+$('#background').onchange=e=>{$('main').dataset.bg=e.target.value;sync();};$('#roughness').oninput=e=>{roughness=Number(e.target.value);renderPresets();draw();};$('#edge').onchange=e=>{edge=e.target.value;draw();};
+$$('button[data-fill],button[data-color]').forEach(b=>b.onclick=()=>{const id=layouts[variant].nodes[selected][0];overrides[id]={...overrides[id],...(b.dataset.fill?{fill:b.dataset.fill}:{color:b.dataset.color})};draw();});
+$('#theme').onclick=()=>$('#theme-dialog').showModal();$('#close-dialog').onclick=$('#choose-sketch').onclick=()=>$('#theme-dialog').close();
+$('#reset').onclick=()=>{overrides={};roughness=2;edge='curve';selected=0;$('#roughness').value='2';$('#edge').value='curve';$('#background').value='dots';$('main').dataset.bg='dots';document.body.classList.remove('dark');$('#mode').textContent='深色';$('#mode').setAttribute('aria-pressed','false');renderPresets();draw();};renderPresets();draw();
+document.fonts.load('25px "Sketch Notes Demo"','把想法随手画下来').then(fonts=>{if(!fonts.length)throw Error('Font unavailable');$('#font-status').textContent='已加载中文手写体 · 源自「快去写作业」';}).catch(()=>{$('#font-status').textContent='手写字体加载失败，请保留 HTML 旁的 prototype-assets 文件夹。';});
+</script>
+</html>

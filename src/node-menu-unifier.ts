@@ -5,6 +5,15 @@ import { decorateCanvas } from "./enhancements";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import { applyScrapbookPreset, decorateCanvasTheme, recordCanvasStyleHistory, resolveCanvasTheme, scrapbookPreset, SCRAPBOOK_PRESETS, SCRAPBOOK_COLORS } from "./canvas-theme";
 import {
+  applySketchFill as applySketchFillToData,
+  applySketchPreset as applySketchPresetToData,
+  isSketchFill,
+  SKETCH_COLORS,
+  SKETCH_FILLS,
+  SKETCH_PRESETS,
+  type SketchFill
+} from "./sketch-style";
+import {
   applyNodeVisualStyle,
   NODE_STYLE_ALIGNMENTS,
   NODE_STYLE_BORDERS,
@@ -51,7 +60,14 @@ function nodeFromData(canvas: any, nodeId: string): CanvasNodeData | undefined {
   return readCanvasData(canvas).nodes.find(node => node.id === nodeId);
 }
 
-function styleOf(node: CanvasNodeData): { color: string; shape: string; border: string; align: string } {
+function styleOf(node: CanvasNodeData): {
+  color: string;
+  shape: string;
+  border: string;
+  align: string;
+  fill: SketchFill | "";
+  sketchPreset: string;
+} {
   const styleAttributes = node.styleAttributes && typeof node.styleAttributes === "object"
     ? node.styleAttributes as Record<string, unknown>
     : {};
@@ -62,7 +78,9 @@ function styleOf(node: CanvasNodeData): { color: string; shape: string; border: 
     border: border === "none" ? "invisible" : border,
     align: typeof node.bcTextAlign === "string"
       ? node.bcTextAlign
-      : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left"
+      : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left",
+    fill: isSketchFill(node.bcSketchFill) ? node.bcSketchFill : "",
+    sketchPreset: typeof node.bcSketchPreset === "string" ? node.bcSketchPreset : ""
   };
 }
 
@@ -89,6 +107,18 @@ function optionClass(baseClass: string, state: StyleOptionState): string {
 function matchesPreset(style: NodeStyleSnapshot, preset: (typeof NODE_STYLE_PRESET_LIST)[number]): boolean {
   return style.color === preset.style.color.toLowerCase() &&
     style.shape === preset.style.shape &&
+    style.border === preset.style.border &&
+    style.align === preset.style.align;
+}
+
+function matchesSketchPreset(
+  style: NodeStyleSnapshot,
+  preset: (typeof SKETCH_PRESETS)[number]
+): boolean {
+  return style.sketchPreset === preset.id &&
+    style.shape === preset.style.shape &&
+    style.fill === preset.style.fill &&
+    style.color === preset.style.color &&
     style.border === preset.style.border &&
     style.align === preset.style.align;
 }
@@ -474,6 +504,59 @@ export default class NodeMenuUnifier {
     this.renderStylePanel("paper-" + preset);
   }
 
+  private applySketchPreset(presetId: string): void {
+    const active = this.activePanel;
+    if (!active) return;
+    const { canvas, nodeIds } = active;
+    if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    if (nodeIds.some(id => !data.nodes.some(node => node.id === id))) {
+      this.dismissPanel();
+      return;
+    }
+    const result = applySketchPresetToData(data, nodeIds, presetId);
+    if (result.updated === 0) {
+      new Notice("分组节点不应用功能预设。");
+      return;
+    }
+    recordCanvasStyleHistory(canvas, data);
+    canvas.importData(result.data);
+    canvas.requestSave?.(false);
+    recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+    canvas.requestFrame?.();
+    decorateCanvas(canvas);
+    decorateCanvasTheme(canvas);
+    this.renderStylePanel("sketch-" + presetId);
+  }
+
+  private applySketchFill(fill: string): void {
+    const active = this.activePanel;
+    if (!active) return;
+    const { canvas, nodeIds } = active;
+    if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    if (nodeIds.some(id => !data.nodes.some(node => node.id === id))) {
+      this.dismissPanel();
+      return;
+    }
+    const result = applySketchFillToData(data, nodeIds, fill);
+    if (result.updated === 0) return;
+    recordCanvasStyleHistory(canvas, data);
+    canvas.importData(result.data);
+    canvas.requestSave?.(false);
+    recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+    canvas.requestFrame?.();
+    decorateCanvas(canvas);
+    decorateCanvasTheme(canvas);
+    this.renderStylePanel("sketch-fill-" + fill);
+  }
+
   private renderStylePanel(focusKey?: string): void {
     const active = this.activePanel;
     if (!active) return;
@@ -486,7 +569,7 @@ export default class NodeMenuUnifier {
     }
     const nodeStyles = nodes.map(node => styleOf(node as CanvasNodeData));
     const hasSelection = nodeStyles.length > 0;
-    const hasMixedStyles = (["color", "shape", "border", "align"] as const)
+    const hasMixedStyles = (["color", "shape", "border", "align", "fill", "sketchPreset"] as const)
       .some(key => new Set(nodeStyles.map(style => style[key])).size > 1);
     const surface = active.surface;
     surface.replaceChildren();
@@ -526,8 +609,10 @@ export default class NodeMenuUnifier {
       return section;
     };
 
-    const isScrapbook = resolveCanvasTheme(data) === "scrapbook";
-    surface.dataset.bcTheme = isScrapbook ? "scrapbook" : "default";
+    const canvasTheme = resolveCanvasTheme(data);
+    const isScrapbook = canvasTheme === "scrapbook";
+    const isSketch = canvasTheme === "sketch";
+    surface.dataset.bcTheme = canvasTheme;
     if (isScrapbook) {
       const papers = document.createElement("div");
       papers.className = "bc-paper-presets";
@@ -552,7 +637,61 @@ export default class NodeMenuUnifier {
         button.appendChild(preview);
       }
     }
-    if (!isScrapbook) {
+    if (isSketch) {
+      const presetSection = addSection("功能预设");
+      const presets = document.createElement("div");
+      presets.className = "bc-sketch-presets";
+      presetSection.appendChild(presets);
+      for (const preset of SKETCH_PRESETS) {
+        const state = stateForStyles(nodeStyles, style => matchesSketchPreset(style, preset));
+        const button = addButton(
+          presets,
+          preset.label,
+          optionClass("bc-sketch-preset", state),
+          () => this.applySketchPreset(preset.id)
+        );
+        button.dataset.styleOption = "sketch-" + preset.id;
+        button.title = preset.label + " · " + preset.use;
+        button.setAttribute("aria-label", preset.label + "：" + preset.use);
+        button.setAttribute("aria-pressed", state);
+        button.disabled = !hasSelection;
+        const preview = document.createElement("span");
+        preview.className = "bc-sketch-preset-preview shape-" + preset.style.shape +
+          " fill-" + preset.style.fill + " border-" + preset.style.border + " align-" + preset.style.align;
+        preview.style.setProperty("--bc-sketch-preset-color", preset.style.color);
+        preview.setAttribute("aria-hidden", "true");
+        preview.textContent = preset.sample;
+        button.appendChild(preview);
+        const label = document.createElement("span");
+        label.className = "bc-sketch-preset-name";
+        label.textContent = preset.label;
+        button.appendChild(label);
+      }
+
+      const fillSection = addSection("填充");
+      const fills = document.createElement("div");
+      fills.className = "bc-sketch-fills";
+      fillSection.appendChild(fills);
+      for (const fill of SKETCH_FILLS) {
+        const state = stateForStyles(nodeStyles, style => style.fill === fill.id);
+        const button = addButton(
+          fills,
+          fill.label,
+          optionClass("bc-sketch-fill", state),
+          () => this.applySketchFill(fill.id)
+        );
+        button.dataset.styleOption = "sketch-fill-" + fill.id;
+        button.title = fill.label;
+        button.setAttribute("aria-label", fill.label);
+        button.setAttribute("aria-pressed", state);
+        button.disabled = !hasSelection;
+        const swatch = document.createElement("span");
+        swatch.className = "bc-sketch-fill-swatch fill-" + fill.id;
+        swatch.setAttribute("aria-hidden", "true");
+        button.appendChild(swatch);
+      }
+    }
+    if (!isScrapbook && !isSketch) {
     const presetSection = addSection("预设");
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
@@ -588,7 +727,7 @@ export default class NodeMenuUnifier {
     const colors = document.createElement("div");
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
-    for (const color of isScrapbook ? SCRAPBOOK_COLORS : NODE_STYLE_COLORS) {
+    for (const color of isScrapbook ? SCRAPBOOK_COLORS : isSketch ? SKETCH_COLORS : NODE_STYLE_COLORS) {
       const state = stateForStyles(nodeStyles, style => style.color === color.value.toLowerCase());
       const button = addButton(
         colors,

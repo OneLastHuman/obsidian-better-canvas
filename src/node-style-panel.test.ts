@@ -188,6 +188,7 @@ function createStylePanel(
 ): {
   surface: FakeElement;
   canvas: {
+    readonly: boolean;
     importData: ReturnType<typeof vi.fn>;
     requestSave: ReturnType<typeof vi.fn>;
     requestFrame: ReturnType<typeof vi.fn>;
@@ -213,6 +214,7 @@ function createStylePanel(
     edges: []
   };
   const canvas = {
+    readonly: false,
     getData: () => data,
     importData: vi.fn((next: TestCanvasData) => {
       data = next;
@@ -306,6 +308,38 @@ describe("node style panel rendering", () => {
     expect(panel.getData().nodes[0].bcScrapbookPreset).toBeUndefined();
     panel.close();
   });
+  it("shows six sketch presets, applies them in batch and keeps explicit styles editable", () => {
+    const panel = createStylePanel([{ bcShape: "diamond" }, {}], 2, "sketch");
+    for (const id of ["heading", "concept", "action", "decision", "annotation", "risk"]) {
+      expect(optionButton(panel.surface, "sketch-" + id)).toBeDefined();
+    }
+    optionButton(panel.surface, "sketch-concept").click();
+    expect(panel.getData().nodes.map(node => node.bcSketchPreset)).toEqual(["concept", "concept"]);
+    expect(panel.getData().nodes[0]).toMatchObject({
+      bcShape: "ellipse", bcSketchFill: "hachure", bcBorderStyle: "solid",
+      bcTextAlign: "center", color: "#719cf4"
+    });
+    expect(panel.getData().nodes[0].text).toBe("节点 1");
+
+    optionButton(panel.surface, "sketch-fill-cross-hatch").click();
+    expect(panel.getData().nodes.map(node => node.bcSketchFill)).toEqual(["cross-hatch", "cross-hatch"]);
+    optionButton(panel.surface, "shape-square").click();
+    expect(panel.getData().nodes.map(node => node.bcShape)).toEqual(["square", "square"]);
+    panel.close();
+  });
+
+  it("shows mixed sketch fill state and rejects changes on a read-only canvas", () => {
+    const panel = createStylePanel([
+      { bcSketchFill: "hachure" },
+      { bcSketchFill: "solid" }
+    ], 2, "sketch");
+    expect(optionButton(panel.surface, "sketch-fill-hachure").getAttribute("aria-pressed")).toBe("mixed");
+    panel.canvas.readonly = true;
+    optionButton(panel.surface, "sketch-fill-none").click();
+    expect(panel.getData().nodes.map(node => node.bcSketchFill)).toEqual(["hachure", "solid"]);
+    panel.close();
+  });
+
   it("renders every option instead of printing its name", () => {
     const surface = renderStylePanel();
 
