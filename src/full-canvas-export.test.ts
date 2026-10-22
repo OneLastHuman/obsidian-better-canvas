@@ -232,6 +232,28 @@ describe("full content SVG export", () => {
     expect(result.edges).toEqual([]);
   });
 
+  it("renders the sketch theme with deterministic rough geometry, paper and a readable font", () => {
+    const data: CanvasData = {
+      bcTheme: "sketch",
+      nodes: [
+        { id: "h", type: "text", x: 0, y: 0, width: 280, height: 100, text: "项目启动", bcSketchPreset: "heading" },
+        { id: "a", type: "text", x: 360, y: 0, width: 220, height: 120, text: "访谈用户", bcSketchPreset: "action" },
+        { id: "r", type: "text", x: 0, y: 180, width: 240, height: 100, text: "需要确认", bcSketchPreset: "risk" }
+      ],
+      edges: [{ id: "e", fromNode: "h", fromSide: "right", toNode: "a", toSide: "left" }]
+    };
+    const first = canvasDataToFullSvg(data, { margin: 20 });
+    const second = canvasDataToFullSvg(data, { margin: 20 });
+    expect(first.svg).toBe(second.svg);
+    expect(first.svg).toContain('fill="#fffefb"');
+    expect(first.svg).toContain('filter="url(#bc-sketch-wobble)"');
+    expect(first.svg).toContain('font-family="BC Sketch Hand, Segoe Print, cursive"');
+    expect(first.svg).toContain('font-weight="600"');
+    expect(first.svg).toContain("项目启动");
+    expect(first.svg).not.toContain("NaN");
+    expect(canvasDataForSelection(data, ["h", "a"]).bcTheme).toBe("sketch");
+  });
+
   it("supports an optional background and empty canvas", () => {
     const colored = canvasDataToFullSvg(sample, { backgroundColor: "#fff" });
     expect(colored.svg).toContain('fill="#fff"');

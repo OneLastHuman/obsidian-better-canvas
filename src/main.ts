@@ -12,6 +12,7 @@ import { getMindMapEditingCreationShortcut, isMindMapShortcutEnabled } from "./m
 import { EditingIframeShortcutRegistry } from "./canvas-editing-shortcuts";
 import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
 import { decorateCanvas } from "./enhancements";
+import CanvasThemeController from "./canvas-theme-controller";
 import { addNodeAIContextMenuItems } from "./node-ai-context-menu";
 import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
@@ -43,6 +44,9 @@ interface NodeTemplate {
   bcCustomClass?: string;
   bcZoomBreakpoint?: number;
   bcAutoResize?: boolean;
+  bcScrapbookPreset?: string;
+  bcSketchPreset?: string;
+  bcSketchFill?: string;
 }
 
 interface BetterCanvasSettings {
@@ -327,6 +331,7 @@ export default class BetterCanvasPlugin extends Plugin {
     this.features.init();
     this.nodeMenuUnifier = new NodeMenuUnifier(this);
     this.nodeMenuUnifier.start();
+    new CanvasThemeController(this).start();
     this.register(() => this.editingIframeShortcuts.dispose());
     this.registerEvent(this.app.workspace.on("layout-change", () => this.bindCanvasKeyboard()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bindCanvasKeyboard()));
@@ -781,6 +786,9 @@ export default class BetterCanvasPlugin extends Plugin {
         ...(typeof source.bcBorderStyle === "string" ? { bcBorderStyle: source.bcBorderStyle } : {}),
         ...(typeof source.bcTextAlign === "string" ? { bcTextAlign: source.bcTextAlign } : {}),
         ...(typeof source.bcCustomClass === "string" ? { bcCustomClass: source.bcCustomClass } : {}),
+        ...(typeof source.bcScrapbookPreset === "string" ? { bcScrapbookPreset: source.bcScrapbookPreset } : {}),
+        ...(typeof source.bcSketchPreset === "string" ? { bcSketchPreset: source.bcSketchPreset } : {}),
+        ...(typeof source.bcSketchFill === "string" ? { bcSketchFill: source.bcSketchFill } : {}),
         ...(typeof source.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: source.bcZoomBreakpoint } : {}),
         ...(typeof source.bcAutoResize === "boolean" ? { bcAutoResize: source.bcAutoResize } : {})
       });
@@ -811,6 +819,9 @@ export default class BetterCanvasPlugin extends Plugin {
         ...(template.bcBorderStyle ? { bcBorderStyle: template.bcBorderStyle } : {}),
         ...(template.bcTextAlign ? { bcTextAlign: template.bcTextAlign } : {}),
         ...(template.bcCustomClass ? { bcCustomClass: template.bcCustomClass } : {}),
+        ...(template.bcScrapbookPreset ? { bcScrapbookPreset: template.bcScrapbookPreset } : {}),
+        ...(template.bcSketchPreset ? { bcSketchPreset: template.bcSketchPreset } : {}),
+        ...(template.bcSketchFill ? { bcSketchFill: template.bcSketchFill } : {}),
         ...(typeof template.bcZoomBreakpoint === "number" ? { bcZoomBreakpoint: template.bcZoomBreakpoint } : {}),
         ...(typeof template.bcAutoResize === "boolean" ? { bcAutoResize: template.bcAutoResize } : {})
       };
