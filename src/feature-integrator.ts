@@ -79,6 +79,7 @@ import { runLocalCodex } from "./codex-cli";
 import BetterCanvasSettingsTab from "./settings";
 import { normalizeCommandDisplayName } from "./command-names";
 import { joinVaultPath } from "./vault-path";
+import { AIPromptModal } from "./ai-prompt-modal";
 
 interface ProviderProfile {
   id: string;
@@ -346,11 +347,23 @@ export default class BetterCanvasFeatures {
     if (nodeId) this.selectNode(canvas, nodeId);
     const selection = this.selected(canvas);
     if (!selection) return;
-    this.input(
-      "向 AI 提问",
-      "例如：总结这些笔记、指出不确定之处，并给出下一步研究问题",
-      value => void this.runAI(selection.node.id, value)
-    );
+    this.openAIPrompt(selection.node);
+  }
+
+  private openAIPrompt(node: CanvasNodeData, modelOverride?: string): void {
+    const backend = this.settings().backend;
+    const modelLabel = backend === "codex-cli"
+      ? "Codex CLI · 本地配置"
+      : backend === "opencode-acp"
+        ? "OpenCode · 本地配置"
+        : modelOverride || String(node.bcAIModel || this.currentProvider(node).model);
+    const sourceLabel = String(node.text || node.file || node.url || "未命名卡片")
+      .trim().split(/\r?\n/).find(line => line.trim())?.replace(/^#{1,6}\s+/, "").slice(0, 160) || "未命名卡片";
+    new AIPromptModal(this.p.app, {
+      sourceLabel,
+      modelLabel,
+      onSubmit: value => this.runAI(node.id, value, modelOverride)
+    }).open();
   }
 
   generateFlashcardsFromSelection(nodeId?: string): void {
@@ -2547,8 +2560,7 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     this.chooseModel(selection.node, model => {
-      this.input("向 AI 提问", "例如：总结笔记并指出不确定之处", question =>
-        void this.runAI(selection.node.id, question, model), "");
+      this.openAIPrompt(selection.node, model);
     });
   }
 
