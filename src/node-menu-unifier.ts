@@ -1,6 +1,10 @@
 import { Notice, setIcon } from "obsidian";
 import type { Plugin } from "obsidian";
 import { readCanvasData, type CanvasNodeData } from "./canvas";
+import {
+  applyResearchPreset, applyResearchIntensity, researchPreset, researchIntensity,
+  RESEARCH_PRESETS, RESEARCH_COLORS, RESEARCH_INTENSITIES
+} from "./research-style";
 import { decorateCanvas } from "./enhancements";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import { applyRoundedMapPreset, roundedMapCss } from "./rounded-map-style";
@@ -70,6 +74,8 @@ function styleOf(node: CanvasNodeData): {
   align: string;
   fill: SketchFill | "";
   sketchPreset: string;
+  researchPreset: string;
+  researchIntensity: number;
 } {
   const styleAttributes = node.styleAttributes && typeof node.styleAttributes === "object"
     ? node.styleAttributes as Record<string, unknown>
@@ -83,7 +89,9 @@ function styleOf(node: CanvasNodeData): {
       ? node.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left",
     fill: isSketchFill(node.bcSketchFill) ? node.bcSketchFill : "",
-    sketchPreset: typeof node.bcSketchPreset === "string" ? node.bcSketchPreset : ""
+    sketchPreset: typeof node.bcSketchPreset === "string" ? node.bcSketchPreset : "",
+    researchPreset: researchPreset(node.bcResearchPreset).id,
+    researchIntensity: researchIntensity(node.bcResearchIntensity)
   };
 }
 
@@ -615,6 +623,38 @@ export default class NodeMenuUnifier {
     this.renderStylePanel("soft-" + presetId);
   }
 
+  private applyResearch(value: string | number): void {
+    const active = this.activePanel;
+    if (!active) return;
+    const { canvas, nodeIds } = active;
+    if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    if (nodeIds.some(id => !data.nodes.some(node => node.id === id))) {
+      this.dismissPanel();
+      return;
+    }
+    const result = typeof value === "number"
+      ? applyResearchIntensity(data, nodeIds, value)
+      : applyResearchPreset(data, nodeIds, value);
+    if (!result.updated) return;
+    try {
+      recordCanvasStyleHistory(canvas, data);
+      canvas.importData(result.data);
+      canvas.requestSave?.(false);
+      recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+      canvas.requestFrame?.();
+      decorateCanvas(canvas);
+      decorateCanvasTheme(canvas);
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : "应用纸本样式失败。");
+      return;
+    }
+    this.renderStylePanel("research-" + value);
+  }
+
   private renderStylePanel(focusKey?: string): void {
     const active = this.activePanel;
     if (!active) return;
@@ -627,7 +667,7 @@ export default class NodeMenuUnifier {
     }
     const nodeStyles = nodes.map(node => styleOf(node as CanvasNodeData));
     const hasSelection = nodeStyles.length > 0;
-    const hasMixedStyles = (["color", "shape", "border", "align", "fill", "sketchPreset"] as const)
+    const hasMixedStyles = (["color", "shape", "border", "align", "fill", "sketchPreset", "researchPreset", "researchIntensity"] as const)
       .some(key => new Set(nodeStyles.map(style => style[key])).size > 1);
     const surface = active.surface;
     surface.replaceChildren();
@@ -671,8 +711,40 @@ export default class NodeMenuUnifier {
     const isScrapbook = canvasTheme === "scrapbook";
     const isSketch = canvasTheme === "sketch";
     const isSoft = canvasTheme === "soft-notes";
+    const isResearch = canvasTheme === "research";
     const isRounded = canvasTheme === "rounded-map";
     surface.dataset.bcTheme = canvasTheme;
+    if (isResearch) {
+      const applicable = nodes.filter(node => node?.type !== "group") as CanvasNodeData[];
+      const presets = document.createElement("div");
+      presets.className = "bc-research-presets";
+      addSection("纸本研究 · 功能预设").appendChild(presets);
+      for (const preset of RESEARCH_PRESETS) {
+        const state = optionState(applicable.filter(node => researchPreset(node.bcResearchPreset).id === preset.id).length, applicable.length);
+        const button = addButton(presets, "", optionClass("bc-research-preset", state), () => this.applyResearch(preset.id));
+        button.dataset.styleOption = "research-" + preset.id;
+        button.title = preset.label + " · " + preset.detail;
+        button.setAttribute("aria-label", preset.label + "：" + preset.detail);
+        button.setAttribute("aria-pressed", state);
+        button.disabled = applicable.length === 0;
+        const preview = document.createElement("span");
+        preview.className = "bc-research-preview";
+        preview.dataset.bcResearchPreset = preset.id;
+        preview.style.setProperty("--bc-research-accent", preset.color);
+        preview.setAttribute("aria-hidden", "true");
+        button.appendChild(preview);
+      }
+      const intensities = document.createElement("div");
+      intensities.className = "bc-research-intensities";
+      addSection("纸面色彩浓度").appendChild(intensities);
+      for (const intensity of RESEARCH_INTENSITIES) {
+        const state = optionState(applicable.filter(node => researchIntensity(node.bcResearchIntensity) === intensity.value).length, applicable.length);
+        const button = addButton(intensities, intensity.label, optionClass("bc-research-intensity", state), () => this.applyResearch(intensity.value));
+        button.dataset.styleOption = "research-" + intensity.value;
+        button.setAttribute("aria-pressed", state);
+        button.disabled = applicable.length === 0;
+      }
+    }
     if (isScrapbook) {
       const papers = document.createElement("div");
       papers.className = "bc-paper-presets";
@@ -815,7 +887,7 @@ export default class NodeMenuUnifier {
         button.appendChild(preview);
       }
     }
-    if (!isScrapbook && !isSketch && !isRounded && !isSoft) {
+    if (!isScrapbook && !isSketch && !isRounded && !isResearch && !isSoft) {
     const presetSection = addSection("预设");
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
@@ -852,7 +924,7 @@ export default class NodeMenuUnifier {
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
     const roundedColors = ROUNDED_MAP_PRESETS.map(preset => ({ id: preset.id, label: preset.label, value: preset.style.color }));
-    for (const color of isScrapbook ? SCRAPBOOK_COLORS : isSketch ? SKETCH_COLORS : isRounded ? roundedColors : isSoft ? SOFT_NOTES_COLORS : NODE_STYLE_COLORS) {
+    for (const color of isScrapbook ? SCRAPBOOK_COLORS : isSketch ? SKETCH_COLORS : isRounded ? roundedColors : isResearch ? RESEARCH_COLORS : isSoft ? SOFT_NOTES_COLORS : NODE_STYLE_COLORS) {
       const state = stateForStyles(nodeStyles, style => style.color === color.value.toLowerCase());
       const button = addButton(
         colors,

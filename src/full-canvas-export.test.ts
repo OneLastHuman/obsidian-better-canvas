@@ -287,6 +287,31 @@ describe("full content SVG export", () => {
     expect(empty.height).toBe(600);
   });
 
+  it("exports research paper, title bands and selection metadata without invented card text", () => {
+    const data: CanvasData = {
+      bcTheme: "research",
+      nodes: [
+        { id: "a", type: "text", x: 0, y: 0, width: 340, height: 260, text: "# 我的观点\n\n实际材料", bcResearchPreset: "argument" },
+        { id: "b", type: "text", x: 400, y: 0, width: 340, height: 260, text: "只有正文", bcResearchPreset: "section", bcBorderStyle: "invisible" },
+        { id: "c", type: "text", x: 800, y: 0, width: 340, height: 260, text: "", bcResearchPreset: "quote" }
+      ],
+      edges: []
+    };
+    const before = structuredClone(data);
+    const result = canvasDataToFullSvg(data).svg;
+    expect(result).toContain('fill="#eeece5"');
+    expect(result).toContain("Songti SC");
+    expect(result).toContain("我的观点");
+    expect(result).toContain("只有正文");
+    expect(result).not.toContain("[text node]");
+    expect(result).not.toContain("核心观点");
+    expect(result).not.toContain("章节标题");
+    expect(result).not.toContain("NaN");
+    expect(canvasDataForSelection(data, ["a"]).nodes[0].bcResearchPreset).toBe("argument");
+    expect(canvasDataForSelection(data, ["a"]).bcTheme).toBe("research");
+    expect(data).toEqual(before);
+  });
+
   it("rejects impossible export dimensions before allocating an image canvas", () => {
     expect(() => canvasDataToFullSvg({
       nodes: [{ id: "giant", type: "text", x: 0, y: 0, width: 100_000, height: 100, text: "Giant" }],

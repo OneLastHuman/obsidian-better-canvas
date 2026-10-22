@@ -4,6 +4,7 @@ import { clearSketchCanvas } from "./sketch-renderer";
 import { SKETCH_FONT_CSS } from "./sketch-font";
 import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
 import { clearSoftNotesNode, ensureSoftNotesGeometry, softNotesClip, softNotesPreset } from "./soft-notes-style";
+import { clearResearchNode, RESEARCH_SERIF } from "./research-style";
 import { decorateCanvasTheme, resolveCanvasTheme, setCanvasTheme, type CanvasThemeId } from "./canvas-theme";
 import { clearRoundedMapNode, roundedMapCss } from "./rounded-map-style";
 import { ROUNDED_MAP_PRESETS } from "./node-visual-style";
@@ -27,6 +28,7 @@ export function createThemeControl(): HTMLElement {
 const EDITOR_STYLE_ID = "bc-scrapbook-editor";
 const SKETCH_EDITOR_STYLE_ID = "bc-sketch-editor";
 const SOFT_EDITOR_STYLE_ID = "bc-soft-notes-editor";
+const RESEARCH_EDITOR_STYLE_ID = "bc-research-editor";
 const FONT_STYLE_ID = "bc-sketch-font";
 const ROUNDED_EDITOR_STYLE_ID = "bc-rounded-map-editor";
 const EDITOR_CSS = `
@@ -36,6 +38,15 @@ body { color-scheme: light; --background-primary: #fff8e8; --background-secondar
   --code-background: #eadfc9; --code-normal: #614b3e; --background-modifier-border: #ccbba1;
   --text-selection: #e2c99c; color: #43372f; background: transparent; }
 .markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #43372f; }
+`;
+const RESEARCH_EDITOR_CSS = `
+body { color-scheme: light; --background-primary: #fffdf7; --background-secondary: #eeece5;
+  --text-normal: #303831; --text-muted: #65705b; --text-faint: #85877c;
+  --text-accent: #416879; --text-accent-hover: #304f5c; --color-accent: #a84e34;
+  --code-background: #eeece5; --code-normal: #303831; --background-modifier-border: #d9d9ce;
+  --text-selection: #e9d791; color: #303831; background: transparent; }
+.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #303831; }
+.markdown-preview-view, .cm-content { font-family: ${RESEARCH_SERIF}; line-height: 1.9; }
 `;
 
 function sketchEditorCss(): string {
@@ -82,6 +93,7 @@ class CanvasThemeModal extends Modal {
       { id: "scrapbook", title: "拼贴手账", detail: "暖纸 · 胶带 · 收藏灵感" },
       { id: "sketch", title: "手绘白板", detail: "白纸 · 手绘线 · 功能预设" },
       { id: "rounded-map", title: "软糖白板", detail: "大圆角 · 粗描边 · 六种功能形状" },
+      { id: "research", title: "纸本研究", detail: "资料 · 引文 · 严谨编排" },
       { id: "soft-notes", title: "柔软便签", detail: "浅粉彩 · 柔软曲线 · 自由文字" }
     ];
     for (const theme of themes) {
@@ -95,7 +107,9 @@ class CanvasThemeModal extends Modal {
       board.createSpan({
         cls: "bc-theme-mini-caption",
         text: theme.id === "scrapbook" ? "little things, kept."
-          : theme.id === "sketch" ? "think in ink." : theme.id === "rounded-map" ? "connect the ideas."
+          : theme.id === "sketch" ? "think in ink."
+          : theme.id === "rounded-map" ? "connect the ideas."
+          : theme.id === "research" ? "让资料开始对话"
           : theme.id === "soft-notes" ? "让想法自由生长"
             : "A space to think."
       });
@@ -127,6 +141,11 @@ class CanvasThemeModal extends Modal {
         for (const [kind, text] of [["concept", "想法"], ["action", "下一步"], ["risk", "待确认"]]) {
           const sample = board.createSpan({ cls: "bc-sketch-mini bc-mini-" + kind, text });
           sample.dataset.bcSketchPreview = kind;
+        }
+      } else if (theme.id === "research") {
+        for (const kind of ["source", "quote", "argument"]) {
+          const sample = board.createSpan({ cls: "bc-research-preview bc-mini-" + kind });
+          sample.dataset.bcResearchPreset = kind;
         }
       } else {
         for (const [kind, text] of [["tape", "灵感"], ["lined", "记录"], ["label", "收藏"]]) {
@@ -264,7 +283,7 @@ export default class CanvasThemeController {
         this.controls.set(canvas, group);
       }
       const control = group.firstElementChild as HTMLElement;
-      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : theme === "rounded-map" ? "软糖白板" : theme === "soft-notes" ? "柔软便签" : "默认";
+      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : theme === "rounded-map" ? "软糖白板" : theme === "research" ? "纸本研究" : theme === "soft-notes" ? "柔软便签" : "默认";
       control.setAttribute("aria-label", "画布主题 · " + themeName);
     }
     for (const [canvas, group] of this.controls) {
@@ -287,11 +306,13 @@ export default class CanvasThemeController {
         const scrapbook = doc.getElementById(EDITOR_STYLE_ID);
         const sketch = doc.getElementById(SKETCH_EDITOR_STYLE_ID);
         const soft = doc.getElementById(SOFT_EDITOR_STYLE_ID);
+        const research = doc.getElementById(RESEARCH_EDITOR_STYLE_ID);
         const rounded = doc.getElementById(ROUNDED_EDITOR_STYLE_ID);
         if (theme === "rounded-map") {
           soft?.remove();
           scrapbook?.remove();
           sketch?.remove();
+          research?.remove();
           const style = rounded ?? doc.createElement("style");
           style.id = ROUNDED_EDITOR_STYLE_ID;
           const dark = canvas.wrapperEl.ownerDocument?.body.classList.contains("theme-dark");
@@ -307,13 +328,15 @@ export default class CanvasThemeController {
           scrapbook?.remove();
           sketch?.remove();
           soft?.remove();
+          research?.remove();
           continue;
         }
         const styleId = theme === "scrapbook" ? EDITOR_STYLE_ID
-          : theme === "soft-notes" ? SOFT_EDITOR_STYLE_ID : SKETCH_EDITOR_STYLE_ID;
+          : theme === "soft-notes" ? SOFT_EDITOR_STYLE_ID : theme === "research" ? RESEARCH_EDITOR_STYLE_ID : SKETCH_EDITOR_STYLE_ID;
         if (theme !== "scrapbook") scrapbook?.remove();
         if (theme !== "sketch") sketch?.remove();
         if (theme !== "soft-notes") soft?.remove();
+        if (theme !== "research") research?.remove();
         const anchor = iframe.closest?.("[data-bc-soft-notes]") as HTMLElement | null;
         const preset = anchor?.dataset.bcSoftNotes ?? "";
         const align = anchor?.style.getPropertyValue("--bc-soft-align") ?? "left";
@@ -325,7 +348,7 @@ export default class CanvasThemeController {
         style.id = styleId;
         style.setAttribute("data-bc-editor-key", editorKey);
         style.textContent = theme === "scrapbook" ? EDITOR_CSS
-          : theme === "soft-notes" ? softNotesEditorCss(preset, align) : sketchEditorCss();
+          : theme === "soft-notes" ? softNotesEditorCss(preset, align) : theme === "research" ? RESEARCH_EDITOR_CSS : sketchEditorCss();
         // Obsidian mirrors the parent document's head into controlled iframes;
         // a local head style is removed by that sync. Keep editor-only CSS in body.
         (doc.body ?? doc.head).appendChild(style);
@@ -350,7 +373,9 @@ export default class CanvasThemeController {
     clearSketchCanvas(canvas);
     for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-soft-notes]") ?? []) clearSoftNotesNode(el);
     for (const node of canvas.nodes?.values?.() ?? []) {
-      clearRoundedMapNode(node?.nodeEl ?? node?.containerEl ?? node?.el);
+      const element = node.nodeEl ?? node.containerEl ?? node.el;
+      clearRoundedMapNode(element);
+      if (element?.dataset) clearResearchNode(element);
     }
     for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-paper]") ?? []) {
       delete el.dataset.bcPaper;

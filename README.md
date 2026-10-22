@@ -17,7 +17,7 @@ Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思�
 
 | 模块 | 主要能力 |
 | --- | --- |
-| **Canvas 编辑** | 自定义节点颜色、形状、边框和文本样式；设置新建文本节点默认左/中/右对齐；设置连线颜色、箭头与路径；网格对齐、焦点模式、锁定交互、搜索、克隆和布局调整。 |
+| **Canvas 编辑** | 默认、拼贴手账、手绘白板、软糖白板与纸本研究五种画布主题；自定义节点颜色、形状、边框和文本样式；设置新建文本节点默认左/中/右对齐；设置连线颜色、箭头与路径；网格对齐、焦点模式、锁定交互、搜索、克隆和布局调整。 |
 | **组织与导出** | 分组与折叠、Canvas Portal、frontmatter 编辑、演示模式；导出 JSON Canvas，以及视口、全画布或选区的 PNG/SVG。 |
 | **思维导图** | 创建子节点、同级节点和游离节点；从 Markdown H1 拆分节点；使用 LR、RL、TB、BT 方向布局；生成 Canvas 闪卡或 Spaced Repetition 兼容卡组。 |
 | **AI 工作流** | 关联节点问答、提示词库、图片生成、网页正文导入、PDF 文本/图像上下文与批量 Prompt；支持 OpenAI-compatible、Anthropic、Gemini、MCP，以及桌面端 Codex CLI 和 OpenCode ACP。 |
