@@ -123,6 +123,7 @@
 .canvas-node[data-bc-shape="triangle"] .canvas-node-container,
 .canvas-node[data-bc-shape="trapezoid"] .canvas-node-container,
 .canvas-node[data-bc-shape="chevron"] .canvas-node-container,
+.canvas-node[data-bc-shape="right-arrow"] .canvas-node-container,
 .canvas-node[data-bc-shape="cloud"] .canvas-node-container,
 .canvas-node[data-bc-shape="document"] .canvas-node-container {
   border-radius: 0;
@@ -149,7 +150,8 @@
 }
 :is(
   .canvas-node[data-bc-shape="parallelogram"],
-  .canvas-node[data-bc-shape="input-output"]
+  .canvas-node[data-bc-shape="input-output"],
+  .bc-node-shape-preview.shape-parallelogram
 ) {
   --bc-shape-outline: polygon(14% 0, 100% 0, 86% 100%, 0 100%);
   --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='14,0 100,0 86,100 0,100' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
@@ -226,6 +228,7 @@
 .canvas-node[data-bc-shape="triangle"]::after,
 .canvas-node[data-bc-shape="trapezoid"]::after,
 .canvas-node[data-bc-shape="chevron"]::after,
+.canvas-node[data-bc-shape="right-arrow"]::after,
 .canvas-node[data-bc-shape="cloud"]::after,
 .canvas-node[data-bc-shape="document"]::after {
   content: "";
@@ -1824,3 +1827,209 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .bc-theme-mini-board[data-bc-theme="sketch"] .bc-mini-action { right: 18px; top: 46px; width: 78px; height: 40px; background: repeating-linear-gradient(-48deg, #78b58c66 0 1px, transparent 1px 5px); transform: rotate(1deg); }
 .bc-theme-mini-board[data-bc-theme="sketch"] .bc-mini-risk { right: 30px; top: 99px; width: 74px; height: 36px; border-style: dashed; border-color: #e8798f; background: repeating-linear-gradient(48deg, #e8798f55 0 1px, transparent 1px 5px), repeating-linear-gradient(-48deg, #e8798f55 0 1px, transparent 1px 5px); transform: rotate(-2deg); }
 @media (max-width: 640px) { .bc-theme-choices { grid-template-columns: 1fr; } }
+
+/* Directional node, including its non-theme fallback. */
+:is(.canvas-node[data-bc-shape="right-arrow"], .bc-node-shape-preview.shape-right-arrow) {
+  --bc-shape-outline: polygon(0 20%, 68% 20%, 68% 0, 100% 50%, 68% 100%, 68% 80%, 0 80%);
+  --bc-ring-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,20 68,20 68,0 100,50 68,100 68,80 0,80' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --bc-ring-dashed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,20 68,20 68,0 100,50 68,100 68,80 0,80' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='8 5'/%3E%3C/svg%3E");
+  --bc-ring-dotted: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='0,20 68,20 68,0 100,50 68,100 68,80 0,80' fill='none' stroke='%23fff' stroke-width='2' vector-effect='non-scaling-stroke' stroke-dasharray='1 4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.bc-node-shape-preview:is(.shape-right-arrow, .shape-parallelogram) {
+  border: 0;
+  border-radius: 0;
+  clip-path: var(--bc-shape-outline);
+  background: var(--text-muted);
+}
+
+/* Rounded Map keeps native rectangular anchors and paints only their faces. */
+.canvas-wrapper[data-bc-theme="rounded-map"] {
+  --bc-rounded-ink: #34372f;
+  --bc-rounded-line: #34372f;
+  --bc-rounded-paper: #faf9f5;
+  --bc-rounded-dot: #dedfd6;
+  --canvas-background: var(--bc-rounded-paper);
+  --canvas-dot-pattern: var(--bc-rounded-dot);
+  --canvas-color: #c8dff3;
+  --text-normal: var(--bc-rounded-ink);
+  --text-muted: #62685b;
+  --canvas-edge-color: var(--bc-rounded-line);
+  --canvas-edge-width: 3px;
+  background-color: var(--bc-rounded-paper);
+}
+.theme-dark .canvas-wrapper[data-bc-theme="rounded-map"] {
+  --bc-rounded-ink: #20262d;
+  --bc-rounded-line: #aab3c2;
+  --bc-rounded-paper: #202329;
+  --bc-rounded-dot: #353a43;
+  --text-normal: #dce2ec;
+  --text-muted: #aab3c2;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-background {
+  background-color: var(--bc-rounded-paper);
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node:not(.canvas-node-group) .canvas-node-container {
+  background: var(--canvas-color, #c8dff3);
+  color: var(--bc-rounded-ink);
+  border-color: var(--bc-rounded-ink);
+  border-width: 4px;
+  box-shadow: none;
+}
+.theme-dark .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node:not(.canvas-node-group) .canvas-node-container {
+  background: color-mix(in srgb, var(--canvas-color, #c8dff3) 84%, var(--bc-rounded-paper));
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded] {
+  --text-normal: var(--bc-rounded-ink);
+  --text-muted: #515b60;
+  --text-faint: #6c747c;
+  --text-accent: #315b86;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded] .canvas-node-container {
+  border: 0 !important;
+  border-radius: 0;
+  clip-path: var(--bc-rounded-clip);
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded]::after {
+  content: "";
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--bc-rounded-ink);
+  mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
+  -webkit-mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded][data-bc-border="dashed"]::after {
+  mask-image: var(--bc-rounded-dashed);
+  -webkit-mask-image: var(--bc-rounded-dashed);
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded][data-bc-border="dotted"]::after {
+  mask-image: var(--bc-rounded-dotted);
+  -webkit-mask-image: var(--bc-rounded-dotted);
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded][data-bc-border="double"]::after {
+  mask-image: var(--bc-rounded-ring), var(--bc-rounded-ring);
+  -webkit-mask-image: var(--bc-rounded-ring), var(--bc-rounded-ring);
+  mask-size: 100% 100%, calc(100% - 12px) calc(100% - 12px);
+  -webkit-mask-size: 100% 100%, calc(100% - 12px) calc(100% - 12px);
+  mask-position: 0 0, 6px 6px;
+  -webkit-mask-position: 0 0, 6px 6px;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded]:is([data-bc-border="invisible"], [data-bc-border="none"])::after {
+  display: none;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded]:is(.is-selected, .is-focused, .is-editing)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--color-accent);
+  opacity: .65;
+  transform: scale(1.045);
+  mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
+  -webkit-mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded] .canvas-node-content {
+  box-sizing: border-box;
+  padding: var(--bc-rounded-padding);
+  background: transparent;
+  color: var(--bc-rounded-ink);
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node-content :is(.markdown-preview-view, .markdown-source-view, .cm-editor, .cm-scroller) {
+  color: var(--bc-rounded-ink);
+  background: transparent;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node-content .markdown-preview-view {
+  padding: 0;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node-content .markdown-preview-sizer {
+  min-height: 0 !important;
+  margin-block: auto;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node-content :is(p, h1, h2, h3) {
+  margin-block: .4em;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node-content {
+  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-edges {
+  --canvas-color: var(--bc-rounded-line);
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-edges path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-path-label {
+  background: var(--bc-rounded-paper);
+  border: 1px solid var(--bc-rounded-dot);
+  border-radius: 12px;
+  color: var(--bc-rounded-line);
+}
+.canvas-wrapper[data-bc-theme="rounded-map"] .canvas-group-label {
+  color: var(--bc-rounded-line);
+}
+.bc-rounded-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.bc-rounded-preset {
+  display: grid;
+  place-items: center;
+  height: 96px;
+  padding: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  box-shadow: none;
+  background: var(--background-secondary);
+}
+.bc-rounded-preset.is-selected { border-color: var(--color-accent); background: var(--background-modifier-hover); }
+.bc-rounded-preset.is-mixed { border-style: dashed; border-color: var(--color-accent); }
+.bc-rounded-preset:disabled { opacity: .45; }
+.bc-rounded-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 80px;
+  color: #34372f;
+  font: 600 11px "Avenir Next", "PingFang SC", sans-serif;
+}
+.bc-rounded-preview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bc-rounded-fill, #c8dff3);
+  clip-path: var(--bc-rounded-clip);
+}
+.bc-rounded-preview::after, .bc-node-shape-preview.bc-rounded-shape-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #34372f;
+  mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
+  -webkit-mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
+}
+.bc-rounded-preview > span { position: relative; padding: 0 18px; text-align: center; }
+.bc-node-shape-preview.bc-rounded-shape-preview {
+  position: relative;
+  width: 32px;
+  height: 24px;
+  border: 0;
+  border-radius: 0;
+  background: #c8dff3;
+  clip-path: var(--bc-rounded-clip);
+}
+.bc-theme-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bc-theme-mini-board[data-bc-theme="rounded-map"] {
+  background: radial-gradient(#dedfd6 .8px, transparent .8px) 0 0 / 14px 14px #faf9f5;
+}
+.bc-theme-mini-board[data-bc-theme="rounded-map"] svg { stroke: #34372f; stroke-width: 2.5; }
+.bc-theme-mini-board .bc-rounded-preview { position: absolute; width: 88px; height: 54px; font-size: 9px; }
+.bc-mini-rounded-terminal { left: 14px; top: 54px; }
+.bc-mini-rounded-process { right: 14px; top: 42px; }
+.bc-mini-rounded-decision { right: 28px; top: 101px; }

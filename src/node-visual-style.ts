@@ -47,6 +47,8 @@ export const NODE_STYLE_SHAPES = [
   { id: "square", label: "矩形" },
   { id: "pill", label: "胶囊形" },
   { id: "diamond", label: "菱形" },
+  { id: "right-arrow", label: "流转箭头" },
+  { id: "parallelogram", label: "输入 / 输出" },
   { id: "circle", label: "圆形" },
   { id: "ellipse", label: "椭圆形" },
   { id: "hexagon", label: "六边形" },
@@ -78,6 +80,15 @@ export type NodeStylePreset = {
   label: string;
   style: NodeVisualStyle;
 };
+
+export const ROUNDED_MAP_PRESETS: readonly (NodeStylePreset & { sample: string })[] = [
+  { id: "terminal", label: "起止 / 主题", sample: "开始筹备", style: { color: "#f3dc83", shape: "pill", border: "solid", align: "center" } },
+  { id: "process", label: "步骤 / 任务", sample: "安排活动", style: { color: "#c8dff3", shape: "default", border: "solid", align: "center" } },
+  { id: "decision", label: "判断 / 分支", sample: "人数合适？", style: { color: "#f8dec1", shape: "diamond", border: "solid", align: "center" } },
+  { id: "direction", label: "流转 / 下一阶段", sample: "进入交流", style: { color: "#d9e7b5", shape: "right-arrow", border: "solid", align: "center" } },
+  { id: "io", label: "输入 / 输出", sample: "收集报名", style: { color: "#c5e4dd", shape: "parallelogram", border: "solid", align: "center" } },
+  { id: "document", label: "文档 / 产出", sample: "讨论纪要", style: { color: "#fffef8", shape: "document", border: "solid", align: "left" } }
+];
 
 /**
  * Presets are the panel's primary affordance: one click sets colour, shape,
@@ -140,7 +151,7 @@ export function applyNodeVisualStyle(
     }
     if (!changed) return node;
 
-    const styleAttributes = asRecord(next.styleAttributes);
+    const styleAttributes = { ...asRecord(next.styleAttributes) };
     if (typeof patch.shape === "string") {
       if (patch.shape === "default") delete styleAttributes.shape;
       else styleAttributes.shape = patch.shape === "square" ? "rectangle" : patch.shape;
