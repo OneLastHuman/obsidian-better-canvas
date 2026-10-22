@@ -13,6 +13,7 @@ describe("Canvas themes", () => {
     let data = withCanvasTheme(sample, "research");
     const nodeEl = { dataset: {} as Record<string, string>, style: {
       setProperty: (key: string, value: string) => properties.set(key, value),
+      getPropertyValue: (key: string) => properties.get(key) ?? "",
       removeProperty: (key: string) => properties.delete(key)
     } };
     const properties = new Map<string, string>();
@@ -23,6 +24,16 @@ describe("Canvas themes", () => {
     expect(nodeEl.dataset.bcResearchPreset).toBe("source");
     expect(properties.get("--bc-research-accent")).toBe("#ff0000");
     expect(data.nodes).toBe(sample.nodes);
+    data = withCanvasTheme(data, "rounded-map");
+    decorateCanvasTheme(canvas);
+    expect(nodeEl.dataset.bcResearchPreset).toBeUndefined();
+    expect(properties.has("--bc-research-accent")).toBe(false);
+    expect(nodeEl.dataset.bcRounded).toBe("true");
+    data = withCanvasTheme(data, "research");
+    decorateCanvasTheme(canvas);
+    expect(nodeEl.dataset.bcRounded).toBeUndefined();
+    expect(properties.has("--bc-rounded-clip")).toBe(false);
+    expect(nodeEl.dataset.bcResearchPreset).toBe("source");
     data = withCanvasTheme(data, "scrapbook");
     decorateCanvasTheme(canvas);
     expect(nodeEl.dataset.bcResearchPreset).toBeUndefined();
