@@ -8,6 +8,10 @@ vi.mock("obsidian", () => ({
 }));
 
 vi.mock("./enhancements", () => ({ decorateCanvas: vi.fn() }));
+vi.mock("./canvas-theme", async importOriginal => ({
+  ...await importOriginal<typeof import("./canvas-theme")>(),
+  decorateCanvasTheme: vi.fn()
+}));
 
 import NodeMenuUnifier from "./node-menu-unifier";
 import {
@@ -39,6 +43,7 @@ class FakeElement {
   className = "";
   type = "";
   disabled = false;
+  draggable = false;
   offsetParent: FakeElement | null = null;
 
   constructor(tagName: string) {
@@ -102,6 +107,10 @@ class FakeElement {
     return null;
   }
 
+  closest(): FakeElement | null {
+    return null;
+  }
+
   getBoundingClientRect(): { width: number; height: number; left: number; top: number; right: number; bottom: number } {
     return { width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 };
   }
@@ -116,6 +125,16 @@ class FakeElement {
 
   removeEventListener(type: string, listener: EventListener): void {
     this.listeners.set(type, (this.listeners.get(type) ?? []).filter(handler => handler !== listener));
+  }
+
+  dispatch(type: string, fields: Record<string, unknown> = {}) {
+    const event = {
+      type, target: this,
+      preventDefault: vi.fn(), stopPropagation: vi.fn(), stopImmediatePropagation: vi.fn(),
+      ...fields
+    };
+    for (const listener of this.listeners.get(type) ?? []) listener.call(this, event as unknown as Event);
+    return event;
   }
 
   click(): void {
@@ -143,16 +162,18 @@ const originalGlobals = {
 };
 
 let body: FakeElement;
+let documentEvents: FakeElement;
 
 function installFakeDom(): void {
   body = new FakeElement("body");
+  documentEvents = new FakeElement("document");
   const documentStub = {
     body,
     documentElement: new FakeElement("html"),
     createElement: (tagName: string) => new FakeElement(tagName),
     createElementNS: (_namespace: string, tagName: string) => new FakeElement(tagName),
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined
+    addEventListener: documentEvents.addEventListener.bind(documentEvents),
+    removeEventListener: documentEvents.removeEventListener.bind(documentEvents)
   };
   const globals = globalThis as Record<string, unknown>;
   globals.document = documentStub;
@@ -180,23 +201,14 @@ type PanelHarness = {
 type TestCanvasData = {
   nodes: Array<Record<string, any>>;
   edges: Array<Record<string, any>>;
+  bcTheme?: string;
 };
 
 function createStylePanel(
   nodePatches: Array<Record<string, unknown>> = [{}],
   selectedCount = nodePatches.length,
   theme?: string
-): {
-  surface: FakeElement;
-  canvas: {
-    readonly: boolean;
-    importData: ReturnType<typeof vi.fn>;
-    requestSave: ReturnType<typeof vi.fn>;
-    requestFrame: ReturnType<typeof vi.fn>;
-  };
-  getData: () => TestCanvasData;
-  close: () => void;
-} {
+) {
   const unifier = new NodeMenuUnifier({ app: {} } as never);
   const harness = unifier as unknown as PanelHarness;
   let data: TestCanvasData = {
@@ -214,15 +226,22 @@ function createStylePanel(
     })),
     edges: []
   };
+  const liveNodes = new Map(data.nodes.map(node => [node.id, node]));
   const canvas = {
     readonly: false,
+    wrapperEl: new FakeElement("div"),
+    posCenter: vi.fn(() => ({ x: 500, y: 300 })),
+    posFromClient: vi.fn(({ x, y }: { x: number; y: number }) => ({ x: (x - 100) / 2 + 500, y: (y - 50) / 2 + 300 })),
+    selectOnly: vi.fn(),
+    pushHistory: vi.fn(),
     getData: () => data,
     importData: vi.fn((next: TestCanvasData) => {
       data = next;
+      for (const node of next.nodes) liveNodes.set(node.id, node);
     }),
     requestSave: vi.fn(),
     requestFrame: vi.fn(),
-    nodes: new Map(data.nodes.map(node => [node.id, node]))
+    nodes: liveNodes
   };
   const nodeIds = data.nodes.slice(0, selectedCount).map(node => String(node.id));
   harness.showStylePanel(canvas, nodeIds);
@@ -257,6 +276,24 @@ function optionButton(root: FakeElement, styleOption: string): FakeElement {
   return button as FakeElement;
 }
 
+function presetTransfer() {
+  return {
+    types: [] as string[],
+    effectAllowed: "",
+    dropEffect: "",
+    setData(type: string) { this.types.push(type); }
+  };
+}
+
+const creationCases = [
+  ["default", "preset-flow", { bcShape: "pill", color: "#65b9a7", bcTextAlign: "center", styleAttributes: { shape: "pill", border: "solid", textAlign: "center" } }],
+  ["scrapbook", "paper-lined", { bcScrapbookPreset: "lined" }],
+  ["sketch", "sketch-concept", { bcSketchPreset: "concept", bcSketchFill: "hachure", bcShape: "ellipse" }],
+  ["rounded-map", "rounded-decision", { bcShape: "diamond", color: "#f8dec1" }],
+  ["research", "research-quote", { bcResearchPreset: "quote" }],
+  ["soft-notes", "soft-free", { bcSoftNotesPreset: "free", bcBorderStyle: "invisible" }]
+] as const;
+
 beforeEach(() => {
   installFakeDom();
 });
@@ -270,6 +307,113 @@ afterEach(() => {
 });
 
 describe("node style panel rendering", () => {
+  it.each(creationCases)("creates a %s preset at the viewport center with one history step", (theme, option, style) => {
+    const panel = createStylePanel([{}], 0, theme);
+    const before = structuredClone(panel.getData());
+    const button = optionButton(panel.surface, option);
+    expect(button.disabled).toBe(false);
+    expect(button.draggable).toBe(true);
+    button.click();
+    const data = panel.getData();
+    expect(data.nodes).toHaveLength(2);
+    expect(data.nodes[0]).toEqual(before.nodes[0]);
+    expect(data.edges).toEqual(before.edges);
+    expect(data.bcTheme).toBe(theme);
+    expect(data.nodes[1]).toMatchObject({ type: "text", text: "", x: 360, y: 230, width: 280, height: 140, ...style });
+    expect(data.nodes[1].id).not.toBe(data.nodes[0].id);
+    expect(panel.canvas.importData).toHaveBeenCalledTimes(1);
+    expect(panel.canvas.pushHistory.mock.calls.map(call => call[0])).toEqual([before, data]);
+    expect(panel.canvas.requestSave).toHaveBeenCalledWith(false);
+    expect(panel.canvas.selectOnly).toHaveBeenCalledWith(data.nodes[1]);
+    expect(optionButton(panel.surface, option).getAttribute("aria-pressed")).toBe("true");
+    // Once the new card is selected, clicking applies rather than duplicating it.
+    optionButton(panel.surface, option).click();
+    expect(panel.getData().nodes).toHaveLength(2);
+    panel.close();
+  });
+
+  it.each(creationCases)("drags a %s preset into canvas coordinates without restyling the selection", (theme, option, style) => {
+    const panel = createStylePanel([{}], 1, theme);
+    const existing = structuredClone(panel.getData().nodes[0]);
+    const transfer = presetTransfer();
+    optionButton(panel.surface, option).dispatch("dragstart", { dataTransfer: transfer });
+    expect(transfer.effectAllowed).toBe("copy");
+    expect(transfer.types).toEqual(["application/x-better-canvas-node-preset"]);
+    const fields = { dataTransfer: transfer, clientX: 400, clientY: 250 };
+    const over = panel.canvas.wrapperEl.dispatch("dragover", fields);
+    expect(over.preventDefault).toHaveBeenCalled();
+    expect(transfer.dropEffect).toBe("copy");
+    expect(panel.getData().nodes).toHaveLength(1);
+    const drop = panel.canvas.wrapperEl.dispatch("drop", fields);
+    expect(drop.stopImmediatePropagation).toHaveBeenCalled();
+    expect(panel.getData().nodes).toHaveLength(2);
+    expect(panel.getData().nodes[0]).toEqual(existing);
+    expect(panel.getData().nodes[1]).toMatchObject({ x: 510, y: 330, text: "", ...style });
+    // A repeated drop event cannot create a duplicate.
+    panel.canvas.wrapperEl.dispatch("drop", fields);
+    expect(panel.getData().nodes).toHaveLength(2);
+    panel.close();
+  });
+
+  it("creates a preset on an entirely empty canvas", () => {
+    const panel = createStylePanel([], 0);
+    optionButton(panel.surface, "preset-flow").click();
+    expect(panel.getData().nodes).toHaveLength(1);
+    expect(panel.getData().nodes[0].bcShape).toBe("pill");
+    panel.close();
+  });
+
+  it.each(["readonly", "bc-readonly"])("rejects click and drop when %s is enabled after opening", mode => {
+    const panel = createStylePanel([], 0);
+    const transfer = presetTransfer();
+    const button = optionButton(panel.surface, "preset-flow");
+    button.dispatch("dragstart", { dataTransfer: transfer });
+    if (mode === "readonly") panel.canvas.readonly = true;
+    else panel.canvas.wrapperEl.classList.add("bc-readonly");
+    button.click();
+    panel.canvas.wrapperEl.dispatch("drop", { dataTransfer: transfer, clientX: 400, clientY: 250 });
+    expect(transfer.dropEffect).toBe("none");
+    expect(panel.canvas.importData).not.toHaveBeenCalled();
+    expect(panel.canvas.pushHistory).not.toHaveBeenCalled();
+    expect(button.dispatch("dragstart", { dataTransfer: presetTransfer() }).preventDefault).toHaveBeenCalled();
+    panel.close();
+  });
+
+  it.each(["cancel", "close", "theme", "coordinates"])("rejects a drag after %s changes", reason => {
+    const panel = createStylePanel([], 0);
+    const transfer = presetTransfer();
+    optionButton(panel.surface, "preset-flow").dispatch("dragstart", { dataTransfer: transfer });
+    if (reason === "cancel") documentEvents.dispatch("dragend");
+    if (reason === "close") panel.close();
+    if (reason === "theme") panel.getData().bcTheme = "sketch";
+    if (reason === "coordinates") panel.canvas.posFromClient.mockReturnValue({ x: NaN, y: 0 });
+    panel.canvas.wrapperEl.dispatch("drop", { dataTransfer: transfer, clientX: 400, clientY: 250 });
+    expect(panel.canvas.importData).not.toHaveBeenCalled();
+    panel.close();
+  });
+
+  it("ignores external payloads and drops on canvas controls", () => {
+    const panel = createStylePanel([], 0);
+    const transfer = presetTransfer();
+    transfer.setData("application/x-better-canvas-node-preset");
+    const foreign = panel.canvas.wrapperEl.dispatch("drop", { dataTransfer: transfer });
+    expect(foreign.preventDefault).not.toHaveBeenCalled();
+    optionButton(panel.surface, "preset-flow").dispatch("dragstart", { dataTransfer: transfer });
+    const control = new FakeElement("button");
+    control.closest = () => control;
+    panel.canvas.wrapperEl.dispatch("drop", { dataTransfer: transfer, target: control });
+    expect(panel.canvas.importData).not.toHaveBeenCalled();
+    panel.close();
+  });
+
+  it("does not create cards with invalid viewport coordinates", () => {
+    const panel = createStylePanel([], 0);
+    panel.canvas.posCenter.mockReturnValue({ x: Infinity, y: 0 });
+    optionButton(panel.surface, "preset-flow").click();
+    expect(panel.canvas.importData).not.toHaveBeenCalled();
+    panel.close();
+  });
+
   it("applies rounded map presets to eligible selected nodes and updates mixed state", () => {
     const panel = createStylePanel([{}, {}, { type: "group" }], 3, "rounded-map");
     for (const preset of ROUNDED_MAP_PRESETS) {
@@ -293,12 +437,10 @@ describe("node style panel rendering", () => {
     mixed.close();
   });
 
-  it("disables rounded presets for empty or group-only selections", () => {
-    for (const count of [0, 1]) {
-      const panel = createStylePanel([{ type: "group" }], count, "rounded-map");
-      for (const preset of ROUNDED_MAP_PRESETS) expect(optionButton(panel.surface, "rounded-" + preset.id).disabled).toBe(true);
-      panel.close();
-    }
+  it("disables rounded presets for group-only selections", () => {
+    const panel = createStylePanel([{ type: "group" }], 1, "rounded-map");
+    for (const preset of ROUNDED_MAP_PRESETS) expect(optionButton(panel.surface, "rounded-" + preset.id).disabled).toBe(true);
+    panel.close();
   });
 
   it("opens without a selection", () => {
@@ -309,16 +451,16 @@ describe("node style panel rendering", () => {
     panel.close();
   });
 
-  it("disables style options until a node is selected", () => {
+  it("enables presets but disables individual style options without a selection", () => {
     const panel = createStylePanel([{}], 0);
     const options = buttons(panel.surface).filter(button => button.dataset.styleOption);
 
     expect(options.length).toBeGreaterThan(0);
-    for (const option of options) expect(option.disabled).toBe(true);
+    for (const option of options) expect(option.disabled).toBe(!option.dataset.styleOption.startsWith("preset-"));
     expect(optionButton(panel.surface, "preset-flow").getAttribute("aria-pressed")).toBe("false");
 
     optionButton(panel.surface, "preset-flow").click();
-    expect(panel.canvas.importData).not.toHaveBeenCalled();
+    expect(panel.getData().nodes).toHaveLength(2);
     panel.close();
   });
 
@@ -383,8 +525,9 @@ describe("node style panel rendering", () => {
     panel.close();
   });
 
-  it("disables Soft Notes presets without a text selection", () => {
-    for (const panel of [createStylePanel([], 0, "soft-notes"), createStylePanel([{ type: "group" }], 1, "soft-notes")]) {
+  it("disables Soft Notes presets for non-text selections", () => {
+    for (const type of ["group", "file", "link"]) {
+      const panel = createStylePanel([{ type }], 1, "soft-notes");
       expect(optionButton(panel.surface, "soft-spark").disabled).toBe(true);
       optionButton(panel.surface, "soft-spark").click();
       expect(panel.canvas.importData).not.toHaveBeenCalled();
@@ -410,10 +553,10 @@ describe("node style panel rendering", () => {
     panel.close();
   });
 
-  it("disables research presets for empty or group-only selection", () => {
+  it("disables research intensity without eligible nodes and presets for group-only selection", () => {
     for (const selectedCount of [0, 1]) {
       const panel = createStylePanel([{ type: "group" }], selectedCount, "research");
-      expect(optionButton(panel.surface, "research-source").disabled).toBe(true);
+      expect(optionButton(panel.surface, "research-source").disabled).toBe(selectedCount > 0);
       expect(optionButton(panel.surface, "research-26").disabled).toBe(true);
       panel.close();
     }

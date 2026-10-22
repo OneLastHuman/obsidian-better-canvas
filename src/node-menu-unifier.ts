@@ -1,6 +1,7 @@
 import { Notice, setIcon } from "obsidian";
 import type { Plugin } from "obsidian";
-import { readCanvasData, type CanvasNodeData } from "./canvas";
+import { makeTextNode, readCanvasData, type CanvasData, type CanvasNodeData } from "./canvas";
+import { defaultNodeSize } from "./node-defaults";
 import {
   applyResearchPreset, applyResearchIntensity, researchPreset, researchIntensity,
   RESEARCH_PRESETS, RESEARCH_COLORS, RESEARCH_INTENSITIES
@@ -53,7 +54,11 @@ type ActivePanel = {
   outsideHandler: (event: PointerEvent) => void;
   keyHandler: (event: KeyboardEvent) => void;
   resizeHandler: () => void;
+  cleanupDrag: () => void;
 };
+
+type PresetTransform = (data: CanvasData, ids: readonly string[]) => CanvasData;
+const PRESET_DRAG_TYPE = "application/x-better-canvas-node-preset";
 
 function selectedNodeIds(canvas: any): string[] | null {
   const selected = Array.from(canvas?.selection?.values?.() ?? []) as any[];
@@ -205,6 +210,7 @@ export default class NodeMenuUnifier {
   private readonly controlGroups = new Map<HTMLElement, ControlGroup>();
   private activePanel: ActivePanel | null = null;
   private panelRefreshFrame: number | null = null;
+  private presetDrag: { panel: ActivePanel; transform: PresetTransform; theme: string } | null = null;
 
   constructor(plugin: Plugin) {
     this.plugin = plugin;
@@ -341,9 +347,13 @@ export default class NodeMenuUnifier {
     const active = this.activePanel;
     if (!active || active.canvas !== canvas) return;
     const selectedItems = Array.from(canvas?.selection?.values?.() ?? []) as any[];
-    // Keep the last target when the user clears the selection. A non-empty
-    // edge or mixed selection cannot be styled as nodes, so close the panel.
-    if (selectedItems.length === 0) return;
+    if (selectedItems.length === 0) {
+      if (active.nodeIds.length) {
+        active.nodeIds = [];
+        this.renderStylePanel();
+      }
+      return;
+    }
     if (!nodeIds) {
       this.dismissPanel();
       return;
@@ -383,7 +393,8 @@ export default class NodeMenuUnifier {
       surface,
       outsideHandler: () => undefined,
       keyHandler: () => undefined,
-      resizeHandler: () => this.positionPanel()
+      resizeHandler: () => this.positionPanel(),
+      cleanupDrag: () => undefined
     };
     active.outsideHandler = event => {
       if (surface.contains(event.target as Node)) return;
@@ -401,6 +412,7 @@ export default class NodeMenuUnifier {
       this.dismissPanel();
     };
     this.activePanel = active;
+    this.installPresetDrop(active);
     document.addEventListener("pointerdown", active.outsideHandler, true);
     document.addEventListener("keydown", active.keyHandler, true);
     window.addEventListener("resize", active.resizeHandler);
@@ -447,6 +459,8 @@ export default class NodeMenuUnifier {
     document.removeEventListener("pointerdown", active.outsideHandler, true);
     document.removeEventListener("keydown", active.keyHandler, true);
     window.removeEventListener("resize", active.resizeHandler);
+    active.cleanupDrag();
+    this.presetDrag = null;
     active.surface.remove();
     this.activePanel = null;
     for (const [container] of this.controlGroups) {
@@ -454,6 +468,99 @@ export default class NodeMenuUnifier {
         ?.find((leaf: any) => leaf?.view?.containerEl === container)?.view?.canvas;
       if (canvas) this.syncControlState(container, canvas);
     }
+  }
+
+  private isReadonly(canvas: any): boolean {
+    return Boolean(canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly"));
+  }
+
+  private createPresetNode(active: ActivePanel, transform: PresetTransform, position?: { x: number; y: number }): void {
+    if (this.activePanel !== active || this.isReadonly(active.canvas)) return;
+    const { canvas } = active;
+    const center = position ?? canvas.posCenter?.();
+    if (!center || !Number.isFinite(center.x) || !Number.isFinite(center.y)) {
+      new Notice("无法确定画布位置，未创建卡片。");
+      return;
+    }
+    const before = readCanvasData(canvas);
+    const node = makeTextNode("", 0, 0, defaultNodeSize());
+    node.x = center.x - node.width / 2;
+    node.y = center.y - node.height / 2;
+    const next = transform({ ...before, nodes: [...before.nodes, node] }, [node.id]);
+    try {
+      // Import the styled node once so creation and its preset share one undo step.
+      recordCanvasStyleHistory(canvas, before);
+      canvas.importData(next);
+      canvas.requestSave?.(false);
+      recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+      const liveNode = canvas.nodes?.get?.(node.id);
+      if (liveNode) canvas.selectOnly?.(liveNode);
+      active.nodeIds = [node.id];
+      canvas.requestFrame?.();
+      decorateCanvas(canvas);
+      decorateCanvasTheme(canvas);
+      this.renderStylePanel();
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : "创建预设卡片失败。");
+    }
+  }
+
+  private addPresetButton(
+    parent: HTMLElement, label: string, className: string, apply: () => void,
+    transform: PresetTransform, eligible: boolean
+  ): HTMLButtonElement {
+    const active = this.activePanel!;
+    const button = addButton(parent, label, className, () => {
+      if (this.activePanel !== active || this.isReadonly(active.canvas)) return;
+      if (active.nodeIds.length === 0) this.createPresetNode(active, transform);
+      else apply();
+    });
+    button.disabled = this.isReadonly(active.canvas) || (active.nodeIds.length > 0 && !eligible);
+    button.draggable = !button.disabled;
+    button.addEventListener("dragstart", event => {
+      if (button.disabled || this.activePanel !== active || this.isReadonly(active.canvas) || !event.dataTransfer) {
+        event.preventDefault();
+        return;
+      }
+      this.presetDrag = { panel: active, transform, theme: resolveCanvasTheme(readCanvasData(active.canvas)) };
+      event.dataTransfer.effectAllowed = "copy";
+      // No text fallback: native Canvas must not also create a plain text card.
+      event.dataTransfer.setData(PRESET_DRAG_TYPE, "preset");
+      event.stopPropagation();
+    });
+    return button;
+  }
+
+  private installPresetDrop(active: ActivePanel): void {
+    const target = active.canvas.wrapperEl as HTMLElement | undefined;
+    if (!target?.addEventListener) return;
+    const end = (): void => { this.presetDrag = null; };
+    const handle = (event: DragEvent): void => {
+      const drag = this.presetDrag;
+      if (!drag || drag.panel !== active || !event.dataTransfer?.types.includes(PRESET_DRAG_TYPE)) return;
+      const element = event.target as Element | null;
+      if (element?.closest(".canvas-controls, .canvas-card-menu, .canvas-menu")) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const allowed = !this.isReadonly(active.canvas) &&
+        drag.theme === resolveCanvasTheme(readCanvasData(active.canvas));
+      event.dataTransfer.dropEffect = allowed ? "copy" : "none";
+      if (event.type !== "drop") return;
+      end();
+      if (!allowed || typeof active.canvas.posFromClient !== "function") return;
+      const position = active.canvas.posFromClient({ x: event.clientX, y: event.clientY });
+      // Never fall back to the viewport center when the host cannot resolve a drop.
+      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return;
+      this.createPresetNode(active, drag.transform, position);
+    };
+    target.addEventListener("dragover", handle, true);
+    target.addEventListener("drop", handle, true);
+    document.addEventListener("dragend", end, true);
+    active.cleanupDrag = () => {
+      target.removeEventListener("dragover", handle, true);
+      target.removeEventListener("drop", handle, true);
+      document.removeEventListener("dragend", end, true);
+    };
   }
 
   private applyStyle(patch: NodeVisualStylePatch, focusKey?: string): void {
@@ -695,6 +802,12 @@ export default class NodeMenuUnifier {
     const body = document.createElement("div");
     body.className = "bc-node-style-scroll";
     surface.appendChild(body);
+    const hint = document.createElement("p");
+    hint.className = "bc-node-style-preset-hint";
+    hint.textContent = hasSelection
+      ? "点击预设应用到选区；拖入画布新建卡片。"
+      : "点击在视口中心新建，或拖入画布指定位置。";
+    body.appendChild(hint);
 
     const addSection = (label: string): HTMLElement => {
       const section = document.createElement("section");
@@ -721,12 +834,13 @@ export default class NodeMenuUnifier {
       addSection("纸本研究 · 功能预设").appendChild(presets);
       for (const preset of RESEARCH_PRESETS) {
         const state = optionState(applicable.filter(node => researchPreset(node.bcResearchPreset).id === preset.id).length, applicable.length);
-        const button = addButton(presets, "", optionClass("bc-research-preset", state), () => this.applyResearch(preset.id));
+        const button = this.addPresetButton(presets, "", optionClass("bc-research-preset", state),
+          () => this.applyResearch(preset.id),
+          (data, ids) => applyResearchPreset(data, ids, preset.id).data, applicable.length > 0);
         button.dataset.styleOption = "research-" + preset.id;
         button.title = preset.label + " · " + preset.detail;
         button.setAttribute("aria-label", preset.label + "：" + preset.detail);
         button.setAttribute("aria-pressed", state);
-        button.disabled = applicable.length === 0;
         const preview = document.createElement("span");
         preview.className = "bc-research-preview";
         preview.dataset.bcResearchPreset = preset.id;
@@ -755,12 +869,13 @@ export default class NodeMenuUnifier {
           applicable.filter(node => scrapbookPreset(node?.bcScrapbookPreset) === preset.id).length,
           applicable.length
         ) : "false";
-        const button = addButton(papers, "", optionClass("bc-paper-preset", state), () => this.applyPaper(preset.id));
+        const button = this.addPresetButton(papers, "", optionClass("bc-paper-preset", state),
+          () => this.applyPaper(preset.id),
+          (data, ids) => applyScrapbookPreset(data, ids, preset.id), applicable.length > 0);
         button.dataset.styleOption = "paper-" + preset.id;
         button.setAttribute("aria-label", preset.label);
         button.setAttribute("title", preset.label);
         button.setAttribute("aria-pressed", state);
-        button.disabled = !hasSelection || applicable.length === 0;
         const preview = document.createElement("span");
         preview.className = "bc-paper-preview";
         preview.dataset.bcPaper = preset.id;
@@ -776,17 +891,18 @@ export default class NodeMenuUnifier {
       presetSection.appendChild(presets);
       for (const preset of SKETCH_PRESETS) {
         const state = stateForStyles(nodeStyles, style => matchesSketchPreset(style, preset));
-        const button = addButton(
+        const button = this.addPresetButton(
           presets,
           preset.label,
           optionClass("bc-sketch-preset", state),
-          () => this.applySketchPreset(preset.id)
+          () => this.applySketchPreset(preset.id),
+          (data, ids) => applySketchPresetToData(data, ids, preset.id).data,
+          nodes.some(node => node?.type !== "group")
         );
         button.dataset.styleOption = "sketch-" + preset.id;
         button.title = preset.label + " · " + preset.use;
         button.setAttribute("aria-label", preset.label + "：" + preset.use);
         button.setAttribute("aria-pressed", state);
-        button.disabled = !hasSelection;
         const preview = document.createElement("span");
         preview.className = "bc-sketch-preset-preview shape-" + preset.style.shape +
           " fill-" + preset.style.fill + " border-" + preset.style.border + " align-" + preset.style.align;
@@ -833,12 +949,13 @@ export default class NodeMenuUnifier {
           const style = resolveSoftNotesStyle(node);
           return style.preset.id === preset.id && style.color === preset.color && style.align === preset.align;
         }).length, applicable.length);
-        const button = addButton(presets, "", optionClass("bc-soft-preset", state), () => this.applySoftPreset(preset.id));
+        const button = this.addPresetButton(presets, "", optionClass("bc-soft-preset", state),
+          () => this.applySoftPreset(preset.id),
+          (data, ids) => applySoftNotesPreset(data, ids, preset.id).data, applicable.length > 0);
         button.dataset.styleOption = "soft-" + preset.id;
         button.title = preset.label + " · " + preset.use;
         button.setAttribute("aria-label", button.title);
         button.setAttribute("aria-pressed", state);
-        button.disabled = !applicable.length;
         const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         preview.setAttribute("viewBox", "0 0 320 240");
         preview.setAttribute("aria-hidden", "true");
@@ -869,13 +986,13 @@ export default class NodeMenuUnifier {
       const applicable = nodes.filter(node => node?.type !== "group").map(node => styleOf(node as CanvasNodeData));
       for (const preset of ROUNDED_MAP_PRESETS) {
         const state = stateForStyles(applicable, style => matchesPreset(style, preset));
-        const button = addButton(presets, "", optionClass("bc-rounded-preset", state),
-          () => this.applyRoundedPreset(preset.id));
+        const button = this.addPresetButton(presets, "", optionClass("bc-rounded-preset", state),
+          () => this.applyRoundedPreset(preset.id),
+          (data, ids) => applyRoundedMapPreset(data, ids, preset.id).data, applicable.length > 0);
         button.dataset.styleOption = "rounded-" + preset.id;
         button.setAttribute("aria-label", preset.label);
         button.setAttribute("aria-pressed", state);
         button.title = preset.label;
-        button.disabled = applicable.length === 0;
         const preview = document.createElement("span");
         preview.className = "bc-rounded-preview";
         preview.setAttribute("aria-hidden", "true");
@@ -894,17 +1011,17 @@ export default class NodeMenuUnifier {
     presetSection.appendChild(presets);
     for (const preset of NODE_STYLE_PRESET_LIST) {
       const state = stateForStyles(nodeStyles, style => matchesPreset(style, preset));
-      const button = addButton(
+      const button = this.addPresetButton(
         presets,
         "",
         optionClass("bc-node-style-preset", state),
-        () => this.applyStyle({ ...preset.style }, "preset-" + preset.id)
+        () => this.applyStyle({ ...preset.style }, "preset-" + preset.id),
+        (data, ids) => applyNodeVisualStyle(data, ids, preset.style).data, hasSelection
       );
       button.dataset.styleOption = "preset-" + preset.id;
       button.title = preset.label + "预设";
       button.setAttribute("aria-label", preset.label + "预设");
       button.setAttribute("aria-pressed", state);
-      button.disabled = !hasSelection;
 
       const preview = document.createElement("span");
       preview.className = "bc-node-style-preset-preview shape-" + preset.style.shape +
