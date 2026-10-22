@@ -1,0 +1,166 @@
+{
+  "bcTheme": "soft-notes",
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 480,
+      "y": 295,
+      "width": 420,
+      "height": 220,
+      "text": "# 把想法放在一起\n\n周末读书会 · 从一个念头开始",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "free",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "spark",
+      "type": "text",
+      "x": 20,
+      "y": 0,
+      "width": 370,
+      "height": 285,
+      "text": "## 一个念头\n\n用一场小型读书会，\n交换各自读到的世界。",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "spark",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#efd4f7"
+    },
+    {
+      "id": "excerpt",
+      "type": "text",
+      "x": 480,
+      "y": -40,
+      "width": 360,
+      "height": 245,
+      "text": "## 留住一句话\n\n把阅读时冒出的疑问\n留在书页旁边。\n\n*读书笔记 · 示例*",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "excerpt",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#bce7f7"
+    },
+    {
+      "id": "concept",
+      "type": "text",
+      "x": 990,
+      "y": 40,
+      "width": 350,
+      "height": 215,
+      "text": "## 本周主题\n\n阅读，如何变成行动？",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "concept",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "center"
+      },
+      "color": "#d0f3ad"
+    },
+    {
+      "id": "question",
+      "type": "text",
+      "x": 20,
+      "y": 430,
+      "width": 375,
+      "height": 260,
+      "text": "## 留个问题\n\n读完一本书之后，\n什么会留在生活里？",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "question",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#ffdbcb"
+    },
+    {
+      "id": "action",
+      "type": "text",
+      "x": 980,
+      "y": 360,
+      "width": 365,
+      "height": 320,
+      "text": "## 开始筹备\n\n- [x] 选一本短书\n- [x] 找到讨论主题\n- [ ] 邀请 6 位朋友\n- [ ] 准备一张记录卡",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "action",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#fff1a5"
+    }
+  ],
+  "edges": [
+    {
+      "id": "spark-title",
+      "fromNode": "spark",
+      "toNode": "title",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "excerpt-title",
+      "fromNode": "excerpt",
+      "toNode": "title",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "title-concept",
+      "fromNode": "title",
+      "toNode": "concept",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "title-action",
+      "fromNode": "title",
+      "toNode": "action",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "question-title",
+      "fromNode": "question",
+      "toNode": "title",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "bcTheme": "research",
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 1180,
+      "height": 125,
+      "text": "# 从阅读到自己的观点",
+      "bcAutoResize": false,
+      "bcResearchPreset": "section",
+      "bcResearchIntensity": 26,
+      "bcTextAlign": "left",
+      "bcShape": "square",
+      "bcBorderStyle": "invisible",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      }
+    },
+    {
+      "id": "source",
+      "type": "text",
+      "x": 0,
+      "y": 165,
+      "width": 330,
+      "height": 390,
+      "text": "# 阅读材料\n\n一段值得保留的笔记，需要哪些上下文？\n\n**观察记录 · 示例材料**\n\n只留下摘录，往往会忘记当时为什么标记这句话。记录问题和出处，才能在写作时重新使用。",
+      "bcAutoResize": false,
+      "bcResearchPreset": "source",
+      "color": "#a84e34",
+      "bcResearchIntensity": 26,
+      "bcTextAlign": "left",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "solid",
+        "textAlign": "left"
+      }
+    },
+    {
+      "id": "quote",
+      "type": "text",
+      "x": 435,
+      "y": 165,
+      "width": 330,
+      "height": 270,
+      "text": "> 保留一句话，也保留当时的问题。\n\n摘录自左侧示例材料。",
+      "bcAutoResize": false,
+      "bcResearchPreset": "quote",
+      "color": "#b48a28",
+      "bcResearchIntensity": 26,
+      "bcTextAlign": "left",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "solid",
+        "textAlign": "left"
+      }
+    },
+    {
+      "id": "annotation",
+      "type": "text",
+      "x": 435,
+      "y": 495,
+      "width": 330,
+      "height": 205,
+      "text": "## 我的批注\n\n摘录负责保留原话。\n批注负责记录理解。",
+      "bcAutoResize": false,
+      "bcResearchPreset": "annotation",
+      "color": "#416879",
+      "bcResearchIntensity": 26,
+      "bcTextAlign": "left",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "solid",
+        "textAlign": "left"
+      }
+    },
+    {
+      "id": "argument",
+      "type": "text",
+      "x": 875,
+      "y": 165,
+      "width": 355,
+      "height": 305,
+      "text": "# 让观点能够回到来源\n\n把证据与解释分开记录，\n再用连线说明两者的关系。\n\n**写作从整理关系开始。**",
+      "bcAutoResize": false,
+      "bcResearchPreset": "argument",
+      "color": "#63734a",
+      "bcResearchIntensity": 26,
+      "bcTextAlign": "left",
+      "bcShape": "square",
+      "bcBorderStyle": "solid",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "solid",
+        "textAlign": "left"
+      }
+    },
+    {
+      "id": "question",
+      "type": "text",
+      "x": 875,
+      "y": 530,
+      "width": 355,
+      "height": 215,
+      "text": "## 继续追问\n\n哪些证据会改变这个判断？",
+      "bcAutoResize": false,
+      "bcResearchPreset": "question",
+      "bcBorderStyle": "dashed",
+      "color": "#63734a",
+      "bcResearchIntensity": 26,
+      "bcTextAlign": "left",
+      "bcShape": "default",
+      "styleAttributes": {
+        "shape": "default",
+        "border": "dashed",
+        "textAlign": "left"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "source-quote",
+      "fromNode": "source",
+      "toNode": "quote",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "摘录"
+    },
+    {
+      "id": "quote-argument",
+      "fromNode": "quote",
+      "toNode": "argument",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "支持"
+    },
+    {
+      "id": "annotation-argument",
+      "fromNode": "annotation",
+      "toNode": "argument",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "argument-question",
+      "fromNode": "argument",
+      "toNode": "question",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "toEnd": "arrow"
+    }
+  ]
+}

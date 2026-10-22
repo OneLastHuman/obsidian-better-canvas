@@ -1,132 +1,188 @@
 <h1 align="center">Better Canvas</h1>
 
 <p align="center">
-  <strong>让 Obsidian Canvas 更适合编辑、整理知识与使用 AI。</strong>
+  <strong>在 Obsidian 里，把想法整理成图。</strong>
 </p>
 
+<p align="center">记录灵感 · 梳理流程 · 阅读批注 · 关联 AI</p>
+
 <p align="center">
-  <img alt="Obsidian 1.5.0+" src="https://img.shields.io/badge/Obsidian-1.5.0%2B-7C3AED" />
+  <img alt="最低要求 Obsidian 1.5.0" src="https://img.shields.io/badge/Obsidian-1.5.0%2B-526b59" />
   <img alt="License GPL-3.0-or-later" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue" />
 </p>
 
-Better Canvas 为 Obsidian Canvas 增加更丰富的节点与连线控制、思维导图、导出工具和可配置的 AI 工作流。
+<p align="center">
+  <a href="#安装">安装</a> ·
+  <a href="#选一种适合内容的画布">画布主题</a> ·
+  <a href="#从第一张卡片开始">开始使用</a> ·
+  <a href="docs/FEATURE_GUIDE.md">功能指南</a>
+</p>
 
-> **项目状态：** 项目仍在持续整合与验证。部分功能依赖 Obsidian 内部 API；“已实现”不代表已在所有版本、主题和设备上验证。具体状态请查看 [功能整合矩阵](docs/INTEGRATION_MATRIX.md)。
+![柔软便签主题：围绕读书会，用灵感卡、摘录卡、概念卡、问题卡和行动清单组织想法](docs/screenshots/soft-notes.png)
 
-## 功能一览
+Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法，用连线表达关系，再把内容整理成思维导图、流程图或阅读工作台。需要继续分析时，可以向 AI 提问，并把回答留在来源旁边。
 
-| 模块 | 主要能力 |
-| --- | --- |
-| **Canvas 编辑** | 默认、拼贴手账、手绘白板、软糖白板与纸本研究五种画布主题；自定义节点颜色、形状、边框和文本样式；设置新建文本节点默认左/中/右对齐；设置连线颜色、箭头与路径；网格对齐、焦点模式、锁定交互、搜索、克隆和布局调整。 |
-| **组织与导出** | 分组与折叠、Canvas Portal、frontmatter 编辑、演示模式；导出 JSON Canvas，以及视口、全画布或选区的 PNG/SVG。 |
-| **思维导图** | 创建子节点、同级节点和游离节点；从 Markdown H1 拆分节点；使用 LR、RL、TB、BT 方向布局；生成 Canvas 闪卡或 Spaced Repetition 兼容卡组。 |
-| **AI 工作流** | 关联节点问答、提示词库、图片生成、网页正文导入、PDF 文本/图像上下文与批量 Prompt；支持 OpenAI-compatible、Anthropic、Gemini、MCP，以及桌面端 Codex CLI 和 OpenCode ACP。 |
+**画布编辑和主题无需配置 AI。** 内容仍保存在 Vault 的 `.canvas` 文件中。
 
-详细功能状态与兼容性注意事项见 [功能整合矩阵](docs/INTEGRATION_MATRIX.md)；其他专题文档见 [文档索引](docs/README.md)。
+*截图来自 Windows / Obsidian 1.14.4 的真实界面。示例内容可在[示例画布](docs/examples/readme-showcase/)中取得；采集与验证范围见[截图说明](docs/screenshots/README.md)。*
 
-## 界面预览
+## 选一种适合内容的画布
 
-以下截图来自真实 Obsidian 桌面版运行插件生产构建后的界面。示例内容来自合成测试 Vault，未包含真实笔记或凭据；AI 回答由本地 mock 服务生成，未调用真实模型。采集环境见 [截图说明](docs/screenshots/README.md)。实际界面会因 Obsidian 版本、主题和服务配置而异。
-
-**Canvas 增强：** 通过样式面板调整节点颜色、形状、边框、文本对齐和组合预设。选中单个节点后，点击 Canvas 右侧控件栈中的调色板按钮打开面板。详细说明见 [功能指南](docs/FEATURE_GUIDE.md#节点样式面板与默认尺寸)。
+每张画布可以单独选择主题。点击画布右侧的 **画布主题**，再从 **节点样式** 中选用配套预设。切换主题保留已有内容和位置，主题选择随画布保存。
 
 <p align="center">
-  <img src="docs/screenshots/canvas-enhancements.png" alt="迁移前的界面截图：Canvas 中带颜色、形状、边框的节点与带标签连线，悬停节点时显示 AI、Img、卡片、模型按钮" width="100%" />
+  <img src="docs/screenshots/theme-picker.png" alt="画布主题选择器：同时展示默认、拼贴手账、手绘白板、软糖白板、纸本研究和柔软便签 6 个入口" width="640" />
 </p>
+
+首图使用 **柔软便签**：用浅彩曲线区分灵感、摘录、概念、行动和问题。自由文字适合放标题，行动卡可以直接使用 Markdown 任务清单。
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <strong>思维导图</strong><br />
-      用“创建子节点 / 创建同级节点”生成节点树后执行“自动整理思维导图”。<br />
-      <img src="docs/screenshots/mind-map.png" alt="自动整理后的思维导图，根节点向右展开为多级分支，右上角提示已整理 9 个节点" width="100%" />
+      <h3>软糖白板 · 规划流程</h3>
+      <p>用胶囊表示起止，用菱形提出判断，用文档卡收束结果。</p>
+      <a href="docs/screenshots/rounded-map.png"><img src="docs/screenshots/rounded-map.png" alt="软糖白板：读书会筹备流程，包含人数判断、是与否分支、报名输入和讨论纪要" width="100%" /></a>
     </td>
     <td width="50%" valign="top">
-      <strong>AI 工作流</strong><br />
-      对选中节点提问后，回答保存为与来源节点相连的新节点。<br />
-      <img src="docs/screenshots/ai-workflow.png" alt="AI 生成的答案节点通过连线连接到来源节点，节点工具栏显示 AI、Img、卡片、模型与重新生成按钮" width="100%" />
+      <h3>纸本研究 · 从材料到观点</h3>
+      <p>把原文、重点引文、阅读批注和自己的观点放在一起。</p>
+      <a href="docs/screenshots/research.png"><img src="docs/screenshots/research.png" alt="纸本研究：阅读材料连接到摘录和观点，旁边保留批注与待解问题" width="100%" /></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>手绘白板 · 推敲一个想法</h3>
+      <p>用手绘轮廓、排线和旁注，表达概念、步骤与待确认事项。</p>
+      <a href="docs/screenshots/sketch.png"><img src="docs/screenshots/sketch.png" alt="手绘白板：从讨论问题到小实验，展示概念、行动、判断、旁注和风险提醒" width="100%" /></a>
+    </td>
+    <td width="50%" valign="top">
+      <h3>拼贴手账 · 收藏阅读片刻</h3>
+      <p>把图片、摘录和清单放进胶带便签、横线纸与照片框。</p>
+      <a href="docs/screenshots/scrapbook.png"><img src="docs/screenshots/scrapbook.png" alt="拼贴手账：围绕一张山景插画，排列阅读灵感、摘录、清单与后续想法" width="100%" /></a>
     </td>
   </tr>
 </table>
 
-**导出：** 支持导出 Canvas 的 PNG 和 SVG，可选择当前视口、全画布或选中节点。
+喜欢 Obsidian 原有外观，可以继续使用 **默认** 主题。共 6 种主题，适合不同的内容和表达方式。点击图片可查看大图。
 
-**柔软便签主题：** 在画布右侧的「画布主题」入口选择「柔软便签」，再通过「节点样式」为选中的文本节点应用六款预设：鹅卵石灵感卡、折角摘录卡、胶囊概念卡、清单页签行动卡、气泡问题卡、自由文字。五款卡片使用浅粉彩和平滑曲线，自由文字保持透明；所有预设均无边框、无阴影，选中时保留原生操作手柄。主题随画布保存，预设支持批量应用和撤销重做，不替换正文或插入示例文案；任务列表沿用原生 Markdown 勾选功能。字体随插件打包，不联网加载。
+## 一边输入，一边展开思路
 
-此主题保持浅色纸面，兼容深色宿主界面。功能预设仅用于文本节点，文件、链接和分组保持原有行为；原生连线端点、框选和缩放手柄仍按矩形边界工作。完整内容和选区 SVG／PNG 导出使用同一组曲线；静态导出的 Markdown 排版与实时编辑器可能不同。形状内留有内容安全区，正文较长时可增大节点或在节点内滚动。
+选中卡片后，按 `Tab` 创建子节点，按 `Enter` 创建同级节点。编辑文字时，改用 `Shift + Tab` 和 `Shift + Enter`，可以继续扩展当前想法。
 
-<p align="center">
-  <img src="docs/screenshots/export.png" alt="Better Canvas 导出的整张 Canvas PNG，在 Obsidian 中打开后的静态图像结果" width="100%" />
-</p>
+![默认主题下的思维导图：从读什么、和谁读、留下什么三个方向展开读书会计划](docs/screenshots/mind-map.png)
+
+- **整理结构：** 运行“自动整理思维导图”，按左、右、上、下方向布局。
+- **减少手动调整：** 新建文本卡片默认随内容调整尺寸；手动拖动角点后停止自动调整。
+- **从笔记开始：** 将 Markdown 文件的一级标题拆成节点，再继续补充。
+- **沿着关系浏览：** 用 `Alt + 方向键` 选择相邻卡片，或用焦点模式突出当前内容。
+
+### 让卡片表达不同的意思
+
+选中一个或多个节点，点击画布右侧的 **节点样式** 调色板按钮。
+
+- 先选组合预设，再按需调整颜色、形状和边框。
+- 文字可以靠左、居中或靠右显示。
+- 多选卡片可以批量应用样式；预设不替换正文。
+- 连线可以设置颜色、线型、箭头和路径，说明卡片之间的关系。
+
+各主题提供的选项不同。例如，柔软便签保持无边框，纸本研究提供纸面色彩浓度。详细操作见[节点样式指南](docs/FEATURE_GUIDE.md#节点样式面板与默认尺寸)。
+
+## 沿着笔记继续问 AI
+
+选中节点，通过右键菜单或命令面板打开 **向 AI 提问所选节点**。插件将所选节点及关联上下文交给配置的服务，并把回答保存为连接到来源的新节点。
+
+![选中纸本研究中的观点卡后，打开向 AI 提问弹窗，输入寻找证据缺口与后续问题的提示词](docs/screenshots/ai-prompt.png)
+
+*图中展示提问入口，未提交请求，也未生成模型回答。*
+
+- **继续推敲：** 总结材料、比较观点、寻找遗漏，支持流式回答、停止和重新生成。
+- **辅助学习：** 生成闪卡，或导出 Spaced Repetition 兼容卡组。
+- **处理素材：** 导入网页正文，或用支持相应能力的模型分析 PDF 页面、生成图片。
+- **选择服务：** 支持 OpenAI-compatible、Anthropic 和 Gemini；桌面端也可使用已安装并登录的 Codex CLI 或 OpenCode ACP。
+- **连接外部工具：** 按需配置 MCP 工具、资源和提示模板。
+
+AI 功能需要单独配置，能力取决于服务和模型。提示词与所需上下文会发送给所配置的服务；本地 CLI 也可能调用远程模型。配置方法见 [AI 与 MCP 指南](docs/AI_SETUP.md)。
+
+## 整理之后，继续使用
+
+| 想完成的事 | 可以使用的功能 |
+| --- | --- |
+| 收起暂时不看的内容 | 分组与折叠、焦点模式 |
+| 把大画布拆成几个主题 | 将选区封装为新 Canvas；用 Portal 引用另一张画布 |
+| 让笔记与画布互相连接 | 节点链接、Canvas 链接与反向链接浏览 |
+| 边读 PDF 边记录 | 固定页面、提取摘录、画笔与高亮；按页码范围识别文字（AI OCR） |
+| 向别人说明思路 | 演示模式；导出全画布、当前视口或选区的 PNG / SVG |
+
+主题的静态导出效果可能与编辑界面不同。拼贴手账的纸纹和胶带等装饰暂不在全画布、选区静态导出中还原。详细范围见[功能指南](docs/FEATURE_GUIDE.md)和[已知限制](docs/KNOWN_LIMITATIONS.md)。
 
 ## 安装
 
-### 方式一：下载 Release（推荐）
+### 下载正式版
 
-1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)，下载 `obsidian-better-canvas.zip`。
-2. 将压缩包解压到 Vault 的 `.obsidian/plugins/` 目录。确认最终结构为：
+1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)。
+2. 下载 `obsidian-better-canvas.zip`。
+3. 将压缩包解压到 Vault 的 `.obsidian/plugins/` 目录。
+4. 在 Obsidian **设置 → 社区插件** 中重新加载插件列表。
+5. 启用 **Better Canvas**。
 
-   ```text
-   <Vault>/.obsidian/plugins/obsidian-better-canvas/
-   ├── main.js
-   ├── manifest.json
-   └── styles.css
-   ```
+插件目录应包含以下文件：
 
-3. 在 Obsidian 的 **设置 → 社区插件** 中重新加载插件列表，并启用 **Better Canvas**。
+```text
+<Vault>/.obsidian/plugins/obsidian-better-canvas/
+├── main.js
+├── manifest.json
+└── styles.css
+```
 
-### 方式二：手动安装最新构建
+### 体验主分支构建
 
-将以下三个文件放入 `<Vault>/.obsidian/plugins/obsidian-better-canvas/`：
+本页介绍当前源码中的功能，正式版可能尚未包含全部更新。要体验主分支构建，将以下 3 个文件放入上述插件目录，再重新加载插件：
 
 - [main.js](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/main.js)
 - [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/manifest.json)
 - [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/styles.css)
 
-之后重新加载插件列表并启用插件。仓库的 [`release/` 目录](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 由成功的 `main` 分支 Build workflow 自动同步，提供最新通过 CI 构建的三个安装文件；它代表主分支最新构建，不一定是正式版。正式版请优先使用上面的 GitHub Releases。也可以从 **Actions → Build** 下载近期构建工件（工件保留 14 天）。
+[`release/`](release/) 由成功的主分支 Build workflow 自动同步。主分支构建与正式版的区别、Actions 工件下载和源码构建方法见[安装指南](docs/INSTALLATION.md)。
 
-### 方式三：从源码构建
+## 从第一张卡片开始
 
-需要 Node.js 22 和 npm：
+1. 新建或打开一个 Obsidian Canvas。
+2. 点击右侧 **画布主题**，选择适合内容的主题。
+3. 添加文本卡片，写下一个想法。
+4. 选中卡片，在 **节点样式** 中选择预设。
+5. 按 `Tab` 添加子节点，继续展开。
 
-```bash
-git clone https://github.com/OneLastHuman/obsidian-better-canvas.git
-cd obsidian-better-canvas
-npm install
-npm run build
-```
+也可以把[示例画布](docs/examples/readme-showcase/)复制到 Vault，直接编辑截图中的内容。
 
-将生成的 `main.js` 与 `manifest.json`、`styles.css` 一起复制到插件目录。
+插件设置分为 **画布、操作、AI 助手、文件** 4 类。可以设置布局间距、快捷键、模型服务和导出选项。修改后点击 **保存更改** 生效，或点击 **放弃更改** 恢复已保存设置。
 
-## 快速配置
-
-- **画布：** 设置新卡片的文字对齐、自动布局方向、卡片间距和网格。卡片尺寸沿用固定创建与自动调整规则；外观在画布主题和节点样式面板中调整。
-- **操作：** 设置四组思维导图快捷键及只读模式下的右键菜单、平移和缩放行为。
-- **AI 助手：** 选择模型服务 API、OpenCode ACP 或 Codex CLI；按需展开回答偏好、图片生成、学习卡片和 MCP 外部工具。本地工具需在桌面端预先安装并登录。
-- **文件：** 设置笔记链接索引、按笔记属性自动连线、导出清晰度和背景。
-
-修改后点击 **保存更改** 生效，也可 **放弃更改**。节点模板和 YouTube 字幕导入已移除。
-
-详细配置与使用说明见 [AI 与 MCP 配置指南](docs/AI_SETUP.md) 和 [功能指南](docs/FEATURE_GUIDE.md)，安装方法见 [安装与构建指南](docs/INSTALLATION.md)。
-
-## 常用快捷键
+### 常用快捷键
 
 | 快捷键 | 操作 |
 | --- | --- |
-| `Tab` | 未编辑时为选中节点创建子节点 |
-| `Enter` | 未编辑时为选中节点创建同级节点 |
-| `Shift + Tab` | 编辑卡片时创建子节点 |
-| `Shift + Enter` | 编辑卡片时创建同级节点 |
+| `Tab` / `Enter` | 未编辑文字时，创建子节点 / 同级节点 |
+| `Shift + Tab` / `Shift + Enter` | 编辑文字时，创建子节点 / 同级节点 |
 | `Alt + ↑ / ↓ / ← / →` | 选择空间位置相邻的节点 |
 | `Ctrl/Cmd + Shift + 方向键` | 按指定方向创建子节点 |
 
-未编辑节点时，选中节点后按 `Tab` 创建子节点，按 `Enter` 创建同级节点。编辑卡片文本时，按 `Shift + Tab` 创建子节点，按 `Shift + Enter` 创建同级节点。可以在插件设置中分别关闭子节点和同级节点快捷键。
+快捷键可在 **设置 → Better Canvas → 操作** 中按组关闭。
+
+## 兼容性与数据
+
+- **版本：** 最低要求为 Obsidian 1.5.0。部分功能依赖内部 API；较新主题的实机截图来自 1.14.4，不代表所有版本均已验证。
+- **设备与外观：** 移动端、第三方 Obsidian 主题和复杂画布仍有待验证的行为。非矩形卡片的连线端点、框选与缩放范围仍按原生矩形边界工作。
+- **Portal 与 PDF：** Portal 主要支持单层同步。PDF 批注保存在 Canvas 中；完整的原生 PDF 高亮编辑和多页批注管理尚未完成。
+- **AI 与工具：** 使用前确认服务的数据处理政策。MCP 本地 stdio 服务以当前用户权限运行，只应连接可信服务，并在执行前检查工具参数。
+- **HTML 预览：** 使用沙盒 iframe；只预览可信或已检查的代码。
+
+逐项实现与验证状态见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。配置、限制、自定义样式与其他专题见[文档索引](docs/README.md)。
 
 ## 开发
 
+需要 Node.js 22 和 npm。在源码目录执行：
+
 ```bash
 npm install
-npm run dev
 npm run lint
 npm run validate:metadata
 npm run typecheck
@@ -134,26 +190,12 @@ npm test
 npm run build
 ```
 
-| 命令 | 用途 |
-| --- | --- |
-| `npm run dev` | 开发构建 |
-| `npm run typecheck` | TypeScript 类型检查 |
-| `npm test` | 单元测试 |
-| `npm run build` | 生产构建 |
-| `npm run lint` | Obsidian 官方规则与代码质量检查；存量问题先以警告方式逐步清理，安全规则作为错误拦截。 |
-| `npm run validate:metadata` | 校验 package.json、manifest.json 与 versions.json 的版本和最低 Obsidian 版本一致；CI 在安装依赖前运行。 |
+将生成的 `main.js` 与 `manifest.json`、`styles.css` 复制到插件目录。`npm run dev` 用于开发构建。
 
-CI 会检查类型、单元测试和构建产物，但不会启动 Obsidian 图形界面。涉及原生 Canvas 交互、Portal、PDF、主题/DOM 或真实 AI 请求时，仍需在目标环境中手动验证。 版本号同步、打 tag 和 GitHub Release 发布步骤见 [发版流程](docs/RELEASING.md)。
-
-## 兼容性与隐私
-
-- 最低要求为 Obsidian 1.5.0。部分功能使用内部 API 或 DOM 行为，升级 Obsidian 后可能需要重新验证。
-- 使用 AI 时，提示词、所选节点内容及所需上下文会发送给所配置的服务。请先了解服务商的数据处理政策。
-- MCP 本地 stdio 服务以当前用户权限运行，可能访问其有权访问的文件和网络。只配置可信服务，并在执行工具前检查参数。
-- HTML 预览使用沙盒 iframe；仍建议只预览可信或已检查的代码。
-
-查看 [已知限制与安全注意事项](docs/KNOWN_LIMITATIONS.md) 了解运行时风险；[功能整合矩阵](docs/INTEGRATION_MATRIX.md) 记录逐项实现与验证状态。CSS 样式预设见 [自定义样式预设指南](docs/CUSTOM_STYLE_PRESETS.md)，上游来源与许可证说明见 [致谢文档](docs/ACKNOWLEDGEMENTS.md)。
+测试分层和桌面验证要求见[测试规范](docs/TESTING.md)，提交与审查约定见[仓库治理](docs/REPOSITORY_GOVERNANCE.md)，版本发布见[发版流程](docs/RELEASING.md)。
 
 ## 致谢与许可证
 
-本项目的部分功能方向参考了 [Advanced Canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas)、[Canvas MindMap](https://github.com/Quorafind/Obsidian-Canvas-MindMap) 和 [Obsidian AI Canvas](https://github.com/testy-cool/obsidian-ai-canvas)；这不代表已与上游完全兼容。许可证见 [LICENSE](LICENSE)。
+部分功能方向参考了 [Advanced Canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas)、[Canvas MindMap](https://github.com/Quorafind/Obsidian-Canvas-MindMap) 和 [Obsidian AI Canvas](https://github.com/testy-cool/obsidian-ai-canvas)。
+
+本项目使用 [GPL-3.0-or-later](LICENSE) 许可证。上游来源和第三方资源说明见[致谢文档](docs/ACKNOWLEDGEMENTS.md)。

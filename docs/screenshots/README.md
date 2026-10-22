@@ -1,37 +1,57 @@
-# 界面预览截图 / README Screenshot Provenance
+# README 截图说明
 
-本目录中的 PNG 是 [README 界面预览](../../README.md#界面预览)使用的真实截图，不是示意图。
+本目录保存 [README](../../README.md) 使用的产品截图。图片来自真实 Obsidian 界面，内容使用本任务编写的合成示例。
 
 ## 采集环境
 
 | 项目 | 值 |
 | --- | --- |
-| 应用 | Obsidian 桌面版 **1.14.4**（官方 AppImage，Electron，Linux） |
-| 插件构建 | 仓库 `main` 分支 `d2fef6b`（`test: cover MCP stdio session reset and process cleanup (#57)`） |
-| `main.js` SHA-256 | `d10d11e64ea9ab315f204466954aff9fb76bdd079d0fd5b3c24588655e87f0d2`（与该 commit 提交的 `main.js` 一致） |
-| 窗口 | 1600 × 1000，默认主题，未安装其他第三方插件 |
-| 数据 | 全部来自合成的临时 Vault（`demo/` 下的示例 `.canvas` 与 Markdown），无真实笔记、凭据或 API Key |
-| AI 回答 | 由本机 `127.0.0.1` 上的 mock OpenAI-compatible 服务返回，未访问外网、未使用真实模型 |
+| 日期 | 2026-10-23，Asia/Shanghai |
+| 应用 | Windows / Obsidian Desktop 1.14.4，installer 1.14.4 |
+| 插件来源 | `46c8a46183edb249b3486b8e22b1a1de5e7ff1c2` 中的安装构建 |
+| 部署核对 | 仓库根目录、`release/` 与测试 Vault 的 `main.js` SHA-256 一致 |
+| `main.js` SHA-256 | `c45816ee43003e21dce9151483d6e8e26bb9b336a82fa356f1d2bfc88abf5877` |
+| 外观 | Obsidian 默认主题、浅色外观；画布分别使用插件的 6 种主题 |
+| 窗口 | 2048 × 1112 CSS 像素，设备像素比 1.25 |
+| 数据 | [6 张示例画布](../examples/readme-showcase/)，无真实笔记、凭据或外部素材请求 |
+| AI | 仅打开提问弹窗并输入示例提示词；未提交请求，未调用真实模型或 mock 服务 |
 
-## 每张截图实际执行的操作
+截图通过官方 CLI 的 `dev:screenshot` 采集。使用 `eval` 核对当前画布、主题属性、节点数量和界面状态。后台窗口出现旧帧的截图已弃用；最终图片逐张目视核对。
 
-| 文件 | 操作路径 |
-| --- | --- |
-| `canvas-enhancements.png` | 打开示例 `.canvas` → 用插件命令“设置节点颜色 / 设置节点形状 / 设置节点边框 / 设置所选节点文字对齐”逐个设置 → 悬停在节点上显示 AI / Img / 卡片 / 模型 按钮 |
-| `mind-map.png` | 在空白示例画布上用“创建子节点 / 创建同级节点”命令生成 9 个节点的树 → 选中根节点执行“自动整理思维导图”（提示“已整理 9 个节点。”） |
-| `ai-workflow.png` | 选中“文档与截图”节点 → 执行“向 AI 提问所选节点” → 在弹窗中提交问题 → 流式生成的回答节点出现在画布上并与来源节点相连 |
-| `export.png` | 在样式画布上执行“导出 Canvas 全内容 PNG（按所有节点边界）” → 在 Obsidian 中打开导出的 PNG |
+图片裁掉标题栏、标签栏与文件路径。场景图保留画布区域，主题选择器图裁至弹窗及周围留白。使用无损 PNG 压缩，未拼接界面或修改截图中的文字、颜色和产品控件。
 
-所有命令都通过 Obsidian 的真实命令面板接口调用，弹窗通过真实 DOM 点击确认，画布内容用真实鼠标点击选择；断言对象是磁盘上真实的 `.canvas` 文件与导出的 PNG。
+## 取材与操作
 
-## 已知限制
+| 文件 | 展示内容 | 实际操作 |
+| --- | --- | --- |
+| `theme-picker.png` | 6 种主题的入口、缩略预览与名称 | 打开柔软便签示例，执行 `obsidian-better-canvas:choose-canvas-theme`；核对 6 个选项均完整可见后截图，未切换主题 |
+| `soft-notes.png` | 灵感、摘录、概念、问题和行动清单 | 打开柔软便签示例，调整视口，取消选择后截图 |
+| `rounded-map.png` | 起止、步骤、判断、流转、输入与文档形状 | 打开读书会流程示例，显示是 / 否分支和结果卡片 |
+| `research.png` | 材料、引文、批注、观点和待解问题 | 打开纸本研究示例，显示完整的阅读关系 |
+| `sketch.png` | 手绘轮廓、排线、功能预设和旁注 | 打开手绘示例，显示概念到实验的流程 |
+| `scrapbook.png` | 胶带、横线纸、撕边纸、标签与照片框 | 打开拼贴示例，加载本地 `postcard.svg` |
+| `mind-map.png` | 默认外观下的分支结构 | 打开预先编排的 10 节点示例，显示完整结构 |
+| `ai-prompt.png` | 从观点卡发起提问 | 选中 `argument` 节点，执行 `obsidian-better-canvas:ask-ai`，填写提示词后截图，未提交 |
 
-- 截图只证明上述路径在 Obsidian 1.14.4 桌面版上可见且可用，不代表其他版本、主题或移动端的外观与行为一致。功能覆盖状态见 [功能整合矩阵](../INTEGRATION_MATRIX.md)。
-- 思维导图截图使用命令面板入口生成节点树；键盘 `Tab` / `Enter` 快捷键走的是同一段代码（`src/main.ts` 的 `createChildNode` / `createSiblingNode`），但本次采集没有用快捷键逐键录制。
-- AI 截图的回答来自 mock 服务，只用于展示插件的界面与数据流，不代表任何真实模型的质量。
+示例的文字、位置与连线预先写入 `.canvas` 文件。截图展示当前构建的渲染效果，不将示例导入称为通过快捷键创建或自动布局的验证。拼贴插画复用仓库已有的 `docs/examples/scrapbook-postcard.svg`。
 
-## 如何重新采集
+## 复现
 
-1. `npm run build` 生成 `main.js`（本目录截图对应 `main` 分支的生产构建）。
-2. 用一个临时 Vault 启动 Obsidian 桌面版，把 `main.js`、`manifest.json`、`styles.css` 放进 `<Vault>/.obsidian/plugins/obsidian-better-canvas/` 并启用插件。
-3. 按上表执行同样的命令，截图覆盖本目录同名文件。
+1. 使用不含私人内容的测试 Vault。
+2. 安装表中 commit 的 `main.js`、`manifest.json` 和 `styles.css`。
+3. 按[示例说明](../examples/readme-showcase/README.md)复制画布与插画。
+4. 使用浅色 Obsidian 默认主题，收起两侧栏。
+5. 打开目标画布，缩放到全部节点可见。
+6. 用 `dev:screenshot` 截图，并与当前 DOM 状态核对。
+
+本次临时文件放在测试 Vault 的 `bc-verify-temp/readme-product-showcase/`。采集时，拼贴图片路径指向该临时目录；可下载的示例使用 `Better Canvas 展示/postcard.svg`。两者使用相同插画。
+
+## 证据边界
+
+- 这些截图证明上述内容在指定桌面环境中的外观。
+- 本轮未逐键验证快捷键，未重新验收自动布局、导出、Portal、PDF 或真实 AI 请求。
+- 默认主题示例为预先编排的数据，不声称图中布局是本轮执行自动布局命令的结果。
+- AI 图仅展示输入界面，不证明上下文传递、生成质量或模型服务可用性。
+- 移动端、其他 Obsidian 版本与第三方主题不在本轮范围内。
+
+功能级验证记录见[功能整合矩阵](../INTEGRATION_MATRIX.md)。旧版 Canvas 增强、mock AI 回答和导出预览截图已从本次 README 取材中移除。
