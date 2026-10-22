@@ -684,6 +684,20 @@
   opacity: 0.42;
   pointer-events: none;
 }
+
+.bc-node-style-panel button[draggable="true"] {
+  cursor: grab;
+}
+
+.bc-node-style-panel button[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.bc-node-style-preset-hint {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
 .bc-node-style-header {
   display: flex;
   flex: 0 0 auto;
