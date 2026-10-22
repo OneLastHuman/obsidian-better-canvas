@@ -14,6 +14,7 @@ import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFr
 import { decorateCanvas } from "./enhancements";
 import CanvasThemeController from "./canvas-theme-controller";
 import { addNodeAIContextMenuItems } from "./node-ai-context-menu";
+import { selectedCanvasNodeIds } from "./edge-highlight";
 import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import { defaultNodeSize } from "./node-defaults";
@@ -390,6 +391,26 @@ export default class BetterCanvasPlugin extends Plugin {
       }));
     });
     this.registerEvent(ref);
+
+    this.registerEvent(workspace.on("canvas:selection-menu", (menu: any, canvas: any) => {
+      if (!menu?.addItem || !canvas) return;
+      const nodeIds = selectedCanvasNodeIds(canvas, readCanvasData(canvas).nodes.map(node => node.id));
+      if (!nodeIds.length) return;
+      const target = { canvas, nodeIds };
+      addNodeAIContextMenuItems(menu, false, actionId => {
+        switch (actionId) {
+          case "ask":
+            this.features.askSelectedNode(target);
+            break;
+          case "image":
+            this.features.generateImageFromSelection(target);
+            break;
+          case "flashcards":
+            this.features.generateFlashcardsFromSelection(target);
+            break;
+        }
+      });
+    }));
   }
 
   private async loadedCustomStyleDefinitions(): Promise<CustomStyleDefinition[]> {
