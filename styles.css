@@ -621,6 +621,94 @@
   transition: filter 100ms ease, stroke-width 100ms ease, opacity 100ms ease;
 }
 
+/* A focused composer for the node AI entry points, using the host theme. */
+.modal.bc-ai-prompt {
+  width: min(560px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 22px 24px;
+  border-radius: 16px;
+}
+.bc-ai-prompt .modal-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 650; }
+.bc-ai-prompt .modal-content { margin-top: 10px; }
+.bc-ai-prompt-mark { display: flex; color: var(--text-accent); }
+.bc-ai-prompt svg { width: 16px; height: 16px; flex-shrink: 0; }
+.bc-ai-prompt-mark svg { width: 18px; height: 18px; }
+.bc-ai-prompt-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 28px 20px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  min-width: 0;
+}
+.bc-ai-prompt-context-icon { display: flex; flex-shrink: 0; }
+.bc-ai-prompt-context-icon svg { width: 13px; height: 13px; }
+.bc-ai-prompt-source-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-ai-prompt-composer {
+  display: flex;
+  flex-direction: column;
+  height: 212px;
+  min-height: 168px;
+  max-height: 55vh;
+  overflow: hidden;
+  resize: vertical;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  transition: border-color 140ms ease;
+}
+.bc-ai-prompt-composer:focus-within {
+  border-color: var(--background-modifier-border);
+}
+.bc-ai-prompt textarea.bc-ai-prompt-input {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 15px 14px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+  resize: none;
+}
+.bc-ai-prompt textarea.bc-ai-prompt-input:focus { border: 0; box-shadow: none; outline: none; }
+.bc-ai-prompt-input::placeholder { color: var(--text-faint); }
+.bc-ai-prompt-toolbar { display: flex; flex-shrink: 0; align-items: center; gap: 12px; padding: 8px 14px 14px; }
+.bc-ai-prompt-model { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; }
+.bc-ai-prompt button.bc-ai-prompt-send { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: 50%; }
+.bc-ai-prompt-send:disabled { opacity: 0.45; }
+.bc-ai-prompt-starters { display: flex; flex-wrap: wrap; align-items: center; }
+.bc-ai-prompt button.bc-ai-prompt-starter {
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.bc-ai-prompt-starter:first-child { padding-left: 0; }
+.bc-ai-prompt-starter + .bc-ai-prompt-starter::before { content: "·"; margin-right: 7px; color: var(--text-muted); }
+.bc-ai-prompt button.bc-ai-prompt-starter:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.bc-ai-prompt button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
+.bc-ai-prompt-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 8px; margin-top: 12px; }
+.bc-ai-prompt-shortcut { color: var(--text-muted); font-size: 10px; white-space: nowrap; }
+@media (max-width: 480px) {
+  .modal.bc-ai-prompt { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-ai-prompt-composer { transition: none; }
+}
+
 /* Inline validation message for prompt modals (kept visible while the modal stays open). */
 .bc-prompt-error {
   margin: 6px 0 0;
