@@ -1,8 +1,9 @@
 import { readCanvasData, type CanvasData } from "./canvas";
 import { clearSketchCanvas, decorateSketchCanvas } from "./sketch-renderer";
 import { clearSoftNotesNode, decorateSoftNotesNode } from "./soft-notes-style";
+import { clearRoundedMapNode, decorateRoundedMapNode } from "./rounded-map-style";
 
-export type CanvasThemeId = "default" | "scrapbook" | "sketch" | "soft-notes";
+export type CanvasThemeId = "default" | "scrapbook" | "sketch" | "rounded-map" | "soft-notes";
 
 export const SCRAPBOOK_PRESETS = [
   { id: "tape", label: "胶带便签", sample: "拾起灵感", color: "#f4dfaa" },
@@ -29,6 +30,7 @@ export function resolveCanvasTheme(data: Partial<CanvasData>): CanvasThemeId {
   if (data.bcTheme === "scrapbook") return "scrapbook";
   if (data.bcTheme === "sketch") return "sketch";
   if (data.bcTheme === "soft-notes") return "soft-notes";
+  if (data.bcTheme === "rounded-map") return "rounded-map";
   return "default";
 }
 
@@ -86,6 +88,8 @@ export function decorateCanvasTheme(canvas: any): void {
     if (!el?.dataset) continue;
     if (theme === "soft-notes") decorateSoftNotesNode(el, item);
     else clearSoftNotesNode(el);
+    if (theme === "rounded-map") decorateRoundedMapNode(el, item);
+    else clearRoundedMapNode(el);
     if (theme === "scrapbook") {
       el.dataset.bcPaper = item.type === "group" ? "group" : scrapbookPreset(item.bcScrapbookPreset);
       const attrs = item.styleAttributes as Record<string, unknown> | undefined;

@@ -16,7 +16,8 @@ import {
   NODE_STYLE_COLORS,
   NODE_STYLE_PRESET_LIST,
   NODE_STYLE_PRESETS,
-  NODE_STYLE_SHAPES
+  NODE_STYLE_SHAPES,
+  ROUNDED_MAP_PRESETS
 } from "./node-visual-style";
 
 /**
@@ -269,6 +270,37 @@ afterEach(() => {
 });
 
 describe("node style panel rendering", () => {
+  it("applies rounded map presets to eligible selected nodes and updates mixed state", () => {
+    const panel = createStylePanel([{}, {}, { type: "group" }], 3, "rounded-map");
+    for (const preset of ROUNDED_MAP_PRESETS) {
+      optionButton(panel.surface, "rounded-" + preset.id).click();
+      expect(panel.getData().nodes.slice(0, 2).map(node => node.bcShape)).toEqual([preset.style.shape, preset.style.shape]);
+      expect(panel.getData().nodes[2].bcShape).toBeUndefined();
+      expect(panel.getData().nodes[0].text).toBe("节点 1");
+      expect(optionButton(panel.surface, "rounded-" + preset.id).getAttribute("aria-pressed")).toBe("true");
+    }
+    expect(panel.canvas.requestSave).toHaveBeenCalledWith(false);
+    panel.canvas.readonly = true;
+    const before = structuredClone(panel.getData());
+    optionButton(panel.surface, "rounded-decision").click();
+    expect(panel.getData()).toEqual(before);
+    panel.close();
+
+    const mixed = createStylePanel([
+      { ...before.nodes[0] }, { color: "#c8dff3", bcShape: "default", bcBorderStyle: "solid", bcTextAlign: "center" }
+    ], 2, "rounded-map");
+    expect(optionButton(mixed.surface, "rounded-document").getAttribute("aria-pressed")).toBe("mixed");
+    mixed.close();
+  });
+
+  it("disables rounded presets for empty or group-only selections", () => {
+    for (const count of [0, 1]) {
+      const panel = createStylePanel([{ type: "group" }], count, "rounded-map");
+      for (const preset of ROUNDED_MAP_PRESETS) expect(optionButton(panel.surface, "rounded-" + preset.id).disabled).toBe(true);
+      panel.close();
+    }
+  });
+
   it("opens without a selection", () => {
     const panel = createStylePanel([{}], 0);
 

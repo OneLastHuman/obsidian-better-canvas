@@ -3,6 +3,7 @@ import type { Plugin } from "obsidian";
 import { readCanvasData, type CanvasNodeData } from "./canvas";
 import { decorateCanvas } from "./enhancements";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { applyRoundedMapPreset, roundedMapCss } from "./rounded-map-style";
 import { applyScrapbookPreset, decorateCanvasTheme, recordCanvasStyleHistory, resolveCanvasTheme, scrapbookPreset, SCRAPBOOK_PRESETS, SCRAPBOOK_COLORS } from "./canvas-theme";
 import { applySoftNotesPreset, resolveSoftNotesStyle, SOFT_NOTES_COLORS, SOFT_NOTES_PRESETS } from "./soft-notes-style";
 import {
@@ -21,6 +22,7 @@ import {
   NODE_STYLE_COLORS,
   NODE_STYLE_PRESET_LIST,
   NODE_STYLE_SHAPES,
+  ROUNDED_MAP_PRESETS,
   type NodeVisualStylePatch
 } from "./node-visual-style";
 
@@ -539,6 +541,30 @@ export default class NodeMenuUnifier {
     this.renderStylePanel("sketch-" + presetId);
   }
 
+  private applyRoundedPreset(presetId: string): void {
+    const active = this.activePanel;
+    if (!active) return;
+    const { canvas, nodeIds } = active;
+    if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    if (nodeIds.some(id => !data.nodes.some(node => node.id === id))) {
+      this.dismissPanel();
+      return;
+    }
+    const result = applyRoundedMapPreset(data, nodeIds, presetId);
+    if (!result.updated) return;
+    recordCanvasStyleHistory(canvas, data);
+    canvas.importData(result.data);
+    canvas.requestSave?.(false);
+    recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+    canvas.requestFrame?.();
+    decorateCanvas(canvas);
+    this.renderStylePanel("rounded-" + presetId);
+  }
+
   private applySketchFill(fill: string): void {
     const active = this.activePanel;
     if (!active) return;
@@ -645,6 +671,7 @@ export default class NodeMenuUnifier {
     const isScrapbook = canvasTheme === "scrapbook";
     const isSketch = canvasTheme === "sketch";
     const isSoft = canvasTheme === "soft-notes";
+    const isRounded = canvasTheme === "rounded-map";
     surface.dataset.bcTheme = canvasTheme;
     if (isScrapbook) {
       const papers = document.createElement("div");
@@ -763,7 +790,32 @@ export default class NodeMenuUnifier {
       hint.textContent = "应用到选中的文本节点；保留正文。所有预设均无边框。";
       body.appendChild(hint);
     }
-    if (!isScrapbook && !isSketch && !isSoft) {
+    if (isRounded) {
+      const presets = document.createElement("div");
+      presets.className = "bc-rounded-presets";
+      addSection("软糖白板 · 功能预设").appendChild(presets);
+      const applicable = nodes.filter(node => node?.type !== "group").map(node => styleOf(node as CanvasNodeData));
+      for (const preset of ROUNDED_MAP_PRESETS) {
+        const state = stateForStyles(applicable, style => matchesPreset(style, preset));
+        const button = addButton(presets, "", optionClass("bc-rounded-preset", state),
+          () => this.applyRoundedPreset(preset.id));
+        button.dataset.styleOption = "rounded-" + preset.id;
+        button.setAttribute("aria-label", preset.label);
+        button.setAttribute("aria-pressed", state);
+        button.title = preset.label;
+        button.disabled = applicable.length === 0;
+        const preview = document.createElement("span");
+        preview.className = "bc-rounded-preview";
+        preview.setAttribute("aria-hidden", "true");
+        for (const [key, value] of Object.entries(roundedMapCss(preset.style.shape, 120, 80))) preview.style.setProperty(key, value);
+        preview.style.setProperty("--bc-rounded-fill", preset.style.color);
+        const sample = document.createElement("span");
+        sample.textContent = preset.sample;
+        preview.appendChild(sample);
+        button.appendChild(preview);
+      }
+    }
+    if (!isScrapbook && !isSketch && !isRounded && !isSoft) {
     const presetSection = addSection("预设");
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
@@ -799,7 +851,8 @@ export default class NodeMenuUnifier {
     const colors = document.createElement("div");
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
-    for (const color of isScrapbook ? SCRAPBOOK_COLORS : isSketch ? SKETCH_COLORS : isSoft ? SOFT_NOTES_COLORS : NODE_STYLE_COLORS) {
+    const roundedColors = ROUNDED_MAP_PRESETS.map(preset => ({ id: preset.id, label: preset.label, value: preset.style.color }));
+    for (const color of isScrapbook ? SCRAPBOOK_COLORS : isSketch ? SKETCH_COLORS : isRounded ? roundedColors : isSoft ? SOFT_NOTES_COLORS : NODE_STYLE_COLORS) {
       const state = stateForStyles(nodeStyles, style => style.color === color.value.toLowerCase());
       const button = addButton(
         colors,
@@ -840,6 +893,13 @@ export default class NodeMenuUnifier {
       // accessible label instead of printed text under the preview.
       const preview = document.createElement("span");
       preview.className = "bc-node-shape-preview shape-" + shape.id;
+      if (isRounded) {
+        const css = roundedMapCss(shape.id, 32, 24);
+        if (Object.keys(css).length) {
+          preview.className += " bc-rounded-shape-preview";
+          for (const [key, value] of Object.entries(css)) preview.style.setProperty(key, value);
+        }
+      }
       preview.setAttribute("aria-hidden", "true");
       button.appendChild(preview);
     }
