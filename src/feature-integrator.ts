@@ -36,7 +36,7 @@ import {
   selectAllCanvasEdges,
   toggleGroupCollapse
 } from "./enhancements";
-import { retrieveWebpage, retrieveYouTubeTranscript } from "./web";
+import { retrieveWebpage } from "./web";
 import { readCanvasFrontmatter, replaceCanvasFrontmatter } from "./canvas-frontmatter";
 import { parsePdfPageSelection } from "./pdf-range";
 import { buildAutoFileNodeEdges } from "./canvas-auto-edges";
@@ -45,7 +45,7 @@ import { cloneCanvasNodeInDirection, createNodeExpansionEdge, type CloneDirectio
 import { flipCanvasNodePositions, swapCanvasNodePositions } from "./canvas-arrangement";
 import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
-import { applyDefaultNodePreferences, configuredDefaultNodeSize, normalizeDefaultNodeHeight, normalizeDefaultNodeWidth } from "./node-defaults";
+import { applyDefaultNodePreferences, defaultNodeSize, DEFAULT_NODE_HEIGHT } from "./node-defaults";
 import { isCanvasReadOnly } from "./canvas-command-guards";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
@@ -96,11 +96,7 @@ interface FeatureSettings {
   activeProviderId: string;
   autoFileNodeEdgesEnabled: boolean;
   autoEdgesFrontmatterKey: string;
-  customColors: string[];
-  youtubeLanguage: string;
   gridSize: number;
-  defaultNodeWidth: number;
-  defaultNodeHeight: number;
   mcpEndpoint: string;
   mcpApiKey: string;
   mcpTransport: "http" | "sse" | "stdio";
@@ -283,8 +279,6 @@ class CanvasLinkExplorerModal extends Modal {
 
 export default class BetterCanvasFeatures {
   private focusedCanvases = new Map<any, string>();
-  private paletteStyle: HTMLStyleElement | null = null;
-  private customCssStyle: HTMLStyleElement | null = null;
   private boundContainers = new WeakSet<HTMLElement>();
   private boundRouteContainers = new WeakSet<HTMLElement>();
   private resizeObservers = new WeakSet<HTMLElement>();
@@ -493,10 +487,6 @@ export default class BetterCanvasFeatures {
     this.advancedCanvasEventBridge = null;
     for (const active of this.activeGenerations.values()) active.controller.abort();
     this.activeGenerations.clear();
-    this.paletteStyle?.remove();
-    this.paletteStyle = null;
-    this.customCssStyle?.remove();
-    this.customCssStyle = null;
   }
 
   private migrateSettings(): void {
@@ -527,17 +517,12 @@ export default class BetterCanvasFeatures {
     }
     if (typeof s.autoFileNodeEdgesEnabled !== "boolean") s.autoFileNodeEdgesEnabled = true;
     if (typeof s.autoEdgesFrontmatterKey !== "string") s.autoEdgesFrontmatterKey = "canvas-edges";
-    if (!Array.isArray(s.customColors)) s.customColors = ["#d14d41", "#438c7a", "#5c6bc0"];
-    if (typeof s.youtubeLanguage !== "string") s.youtubeLanguage = "en";
     if (!Number.isFinite(s.gridSize) || s.gridSize < 1 || s.gridSize > 500) s.gridSize = 20;
-    s.defaultNodeWidth = normalizeDefaultNodeWidth(s.defaultNodeWidth);
-    s.defaultNodeHeight = normalizeDefaultNodeHeight(s.defaultNodeHeight);
     if (typeof s.mcpEndpoint !== "string") s.mcpEndpoint = "";
     if (typeof s.mcpApiKey !== "string") s.mcpApiKey = "";
     if (s.mcpTransport !== "stdio" && s.mcpTransport !== "sse" && s.mcpTransport !== "http") s.mcpTransport = "http";
     if (typeof s.mcpStdioConfig !== "string") s.mcpStdioConfig = '{"command":"","args":[],"env":{},"cwd":""}';
     if (typeof s.canvasMetadataEnabled !== "boolean") s.canvasMetadataEnabled = true;
-    if (typeof s.customCss !== "string") s.customCss = "";
     if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
     if (typeof s.exportBackgroundColor !== "string") s.exportBackgroundColor = "";
     if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
@@ -717,8 +702,7 @@ export default class BetterCanvasFeatures {
     add("bc-export-full-svg", "导出 Canvas 全内容 SVG（按所有节点边界）", () => void this.exportFullContent("svg"));
     add("bc-export-selection-png", "仅导出选区 PNG", () => void this.exportFullContent("png", true));
     add("bc-export-selection-svg", "仅导出选区 SVG", () => void this.exportFullContent("svg", true));
-    add("bc-ingest-web", "导入网页正文", () => this.input("导入网页正文", "完整 URL", value => void this.ingest(value, false)));
-    add("bc-ingest-youtube", "导入 YouTube 字幕", () => this.input("导入 YouTube 字幕", "YouTube 视频 URL", value => void this.ingest(value, true)));
+    add("bc-ingest-web", "导入网页正文", () => this.input("导入网页正文", "完整 URL", value => void this.ingestWebpage(value)));
     add("bc-gemini-youtube-video", "用 Gemini 直接分析 YouTube 视频", () => this.askGeminiAboutYoutube());
     add("bc-set-node-provider", "为节点指定 AI 供应商", () => this.setNodeProvider());
     add("bc-set-node-model", "为节点指定 AI 模型（自动发现）", () => this.setNodeModel());
@@ -785,8 +769,6 @@ export default class BetterCanvasFeatures {
   }
 
   private refresh(): void {
-    this.applyPalette();
-    this.applyUserCss();
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as any;
       if (!view?.canvas) continue;
@@ -827,31 +809,6 @@ export default class BetterCanvasFeatures {
       host.classList.remove("bc-has-card-toolbar");
     }
     this.applyFocus(canvas);
-  }
-
-  applyUserCss(): void {
-    this.customCssStyle?.remove();
-    const css = String(this.settings().customCss ?? "");
-    if (!css.trim()) { this.customCssStyle = null; return; }
-    this.customCssStyle = document.createElement("style");
-    this.customCssStyle.dataset.owner = "obsidian-better-canvas";
-    this.customCssStyle.textContent = css;
-    document.head.appendChild(this.customCssStyle);
-  }
-  private applyPalette(): void {
-    this.paletteStyle?.remove();
-    const s = this.settings();
-    const colors = (Array.isArray(s.customColors) ? s.customColors : []).filter((color: string) => {
-      const span = document.createElement("span");
-      span.style.color = color;
-      return Boolean(span.style.color);
-    }).slice(0, 12);
-    if (!colors.length) return;
-    this.paletteStyle = document.createElement("style");
-    this.paletteStyle.textContent = "body{" + colors.map((color: string, index: number) =>
-      "--canvas-color-" + (7 + index) + ":" + color + ";"
-    ).join("") + "}";
-    document.head.appendChild(this.paletteStyle);
   }
 
   private setNodeColor(): void {
@@ -972,8 +929,8 @@ export default class BetterCanvasFeatures {
     );
   }
 
-  private makeConfiguredTextNode(text: string, x: number, y: number, height?: number): CanvasNodeData {
-    const size = configuredDefaultNodeSize(this.settings());
+  private makeDefaultTextNode(text: string, x: number, y: number, height?: number): CanvasNodeData {
+    const size = defaultNodeSize();
     return makeTextNode(text, x, y, { width: size.width, height: height ?? size.height });
   }
   private setZoomBreakpoint(): void {
@@ -1157,7 +1114,7 @@ export default class BetterCanvasFeatures {
         : direction === "right" ? node.x + node.width + gap : node.x;
       const y = direction === "up" ? node.y - node.height - gap
         : direction === "down" ? node.y + node.height + gap : node.y;
-      const created = makeTextNode("", x, y, configuredDefaultNodeSize(this.settings()));
+      const created = makeTextNode("", x, y, defaultNodeSize());
       insertCanvasNode(canvas, created, event.shiftKey ? node.id : undefined);
       window.setTimeout(() => {
         const internal = canvas.nodes?.get?.(created.id);
@@ -2495,7 +2452,7 @@ export default class BetterCanvasFeatures {
     })();
   }
 
-  private async ingest(raw: string, youtube: boolean): Promise<void> {
+  private async ingestWebpage(raw: string): Promise<void> {
     const canvas = this.canvas();
     if (!canvas) {
       new Notice("请先打开 Canvas。");
@@ -2508,9 +2465,7 @@ export default class BetterCanvasFeatures {
     const selection = this.selected(canvas);
     const notice = new Notice("正在读取来源内容…", 0);
     try {
-      const page = youtube
-        ? await retrieveYouTubeTranscript(raw, this.settings().youtubeLanguage || "en")
-        : await retrieveWebpage(raw);
+      const page = await retrieveWebpage(raw);
       const body = "# " + page.title + "\n\nSource: " + page.url + "\n\n" + page.text;
       const node = makeTextNode(body,
         selection ? selection.node.x + selection.node.width + 100 : 0,
@@ -2518,7 +2473,7 @@ export default class BetterCanvasFeatures {
         { width: 420, height: Math.max(220, Math.min(720, Math.ceil(body.length / 55) * 22)) });
       insertCanvasNode(canvas, node, selection?.node.id);
       notice.hide();
-      new Notice((youtube ? "YouTube 字幕" : "网页正文") + "已导入。");
+      new Notice("网页正文已导入。");
     } catch (error) {
       notice.hide();
       new Notice(error instanceof Error ? error.message : String(error), 8000);
@@ -2940,7 +2895,7 @@ export default class BetterCanvasFeatures {
         notice.hide();
         new Notice("已将分组名称更新为：" + title);
       } else {
-        const suggestion = this.makeConfiguredTextNode("标题建议\n" + title, node.x + node.width + 100, node.y);
+        const suggestion = this.makeDefaultTextNode("标题建议\n" + title, node.x + node.width + 100, node.y);
         insertCanvasNode(selected.canvas, suggestion, node.id);
         notice.hide();
         new Notice("已创建标题建议节点；原节点内容未修改。");
@@ -2966,8 +2921,8 @@ export default class BetterCanvasFeatures {
         : [];
       if (!questions.length) throw new Error("AI 没有返回有效的问题列表。");
       for (let i = 0; i < questions.length; i++) {
-        const defaultHeight = normalizeDefaultNodeHeight(this.settings().defaultNodeHeight);
-        const node = this.makeConfiguredTextNode("研究问题：" + questions[i],
+        const defaultHeight = DEFAULT_NODE_HEIGHT;
+        const node = this.makeDefaultTextNode("研究问题：" + questions[i],
           selected.node.x + selected.node.width + 100, selected.node.y + i * (defaultHeight + 20));
         insertCanvasNode(selected.canvas, node, selected.node.id);
       }
@@ -3016,7 +2971,7 @@ export default class BetterCanvasFeatures {
         for (let i = 0; i < rootItems.length; i++) {
           const item = rootItems[i];
           if (!fallbackRoot) {
-            rootNode = this.makeConfiguredTextNode(String(item.text).trim(), baseX, baseY);
+            rootNode = this.makeDefaultTextNode(String(item.text).trim(), baseX, baseY);
             insertCanvasNode(canvas, rootNode);
           }
           const itemId = String(item.id ?? "root");
