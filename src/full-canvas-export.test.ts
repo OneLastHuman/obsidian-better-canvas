@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canvasDataForSelection, canvasDataToFullSvg } from "./full-canvas-export";
 import type { CanvasData } from "./canvas";
+import { applySoftNotesPreset, SOFT_NOTES_PRESETS } from "./soft-notes-style";
 
 const sample: CanvasData = {
   nodes: [
@@ -13,6 +14,30 @@ const sample: CanvasData = {
 };
 
 describe("full content SVG export", () => {
+  it("exports Soft Notes curves without strokes and keeps free text transparent", () => {
+    let data: CanvasData = {
+      bcTheme: "soft-notes",
+      nodes: SOFT_NOTES_PRESETS.map((preset, index) => ({
+        id: preset.id, type: "text", x: index * 400, y: 0, width: 380, height: 300, text: "## 标题\n\n原文 & <保持>"
+      })),
+      edges: []
+    };
+    for (const preset of SOFT_NOTES_PRESETS) data = applySoftNotesPreset(data, [preset.id], preset.id).data;
+    const svg = canvasDataToFullSvg(data).svg;
+    expect(svg.match(/class="bc-full-node bc-full-soft-notes-node"/g)).toHaveLength(6);
+    for (const preset of SOFT_NOTES_PRESETS.filter(item => item.path)) {
+      expect(svg).toContain('d="' + preset.path + '"');
+      expect(svg).toContain('fill="' + preset.color + '" stroke="none"');
+    }
+    expect(svg).toContain('font-family="BC Soft Notes Title, cursive"');
+    expect(svg).toContain('&amp; &lt;保持&gt;');
+    const selection = canvasDataForSelection(data, ["free"]);
+    const freeSvg = canvasDataToFullSvg(selection, { backgroundColor: "transparent" }).svg;
+    expect(selection.bcTheme).toBe("soft-notes");
+    expect(freeSvg).toContain('<g fill="transparent" stroke="none"></g>');
+    expect(freeSvg).not.toContain("#efd4f7");
+  });
+
   it("uses the union of node positions rather than a viewport size", () => {
     const result = canvasDataToFullSvg(sample, { margin: 10 });
     expect(result.width).toBe(740);

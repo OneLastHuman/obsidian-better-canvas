@@ -9,6 +9,7 @@ import { decorateCanvas } from "./enhancements";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import { applyRoundedMapPreset, roundedMapCss } from "./rounded-map-style";
 import { applyScrapbookPreset, decorateCanvasTheme, recordCanvasStyleHistory, resolveCanvasTheme, scrapbookPreset, SCRAPBOOK_PRESETS, SCRAPBOOK_COLORS } from "./canvas-theme";
+import { applySoftNotesPreset, resolveSoftNotesStyle, SOFT_NOTES_COLORS, SOFT_NOTES_PRESETS } from "./soft-notes-style";
 import {
   applySketchFill as applySketchFillToData,
   applySketchPreset as applySketchPresetToData,
@@ -479,10 +480,16 @@ export default class NodeMenuUnifier {
     }
 
     try {
+      const soft = resolveCanvasTheme(current) === "soft-notes";
+      if (soft) recordCanvasStyleHistory(canvas, current);
       canvas.importData(result.data);
-      canvas.requestSave?.();
+      if (soft) {
+        canvas.requestSave?.(false);
+        recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+      } else canvas.requestSave?.();
       canvas.requestFrame?.();
       decorateCanvas(canvas);
+      if (soft) decorateCanvasTheme(canvas);
     } catch (error) {
       new Notice(error instanceof Error ? error.message : "应用节点样式失败。");
       return;
@@ -591,6 +598,31 @@ export default class NodeMenuUnifier {
     this.renderStylePanel("sketch-fill-" + fill);
   }
 
+  private applySoftPreset(presetId: string): void {
+    const active = this.activePanel;
+    if (!active) return;
+    const { canvas, nodeIds } = active;
+    if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
+      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      return;
+    }
+    const data = readCanvasData(canvas);
+    if (nodeIds.some(id => !data.nodes.some(node => node.id === id))) {
+      this.dismissPanel();
+      return;
+    }
+    const result = applySoftNotesPreset(data, nodeIds, presetId);
+    if (!result.updated) return;
+    recordCanvasStyleHistory(canvas, data);
+    canvas.importData(result.data);
+    canvas.requestSave?.(false);
+    recordCanvasStyleHistory(canvas, readCanvasData(canvas));
+    canvas.requestFrame?.();
+    decorateCanvas(canvas);
+    decorateCanvasTheme(canvas);
+    this.renderStylePanel("soft-" + presetId);
+  }
+
   private applyResearch(value: string | number): void {
     const active = this.activePanel;
     if (!active) return;
@@ -678,6 +710,7 @@ export default class NodeMenuUnifier {
     const canvasTheme = resolveCanvasTheme(data);
     const isScrapbook = canvasTheme === "scrapbook";
     const isSketch = canvasTheme === "sketch";
+    const isSoft = canvasTheme === "soft-notes";
     const isResearch = canvasTheme === "research";
     const isRounded = canvasTheme === "rounded-map";
     surface.dataset.bcTheme = canvasTheme;
@@ -790,6 +823,45 @@ export default class NodeMenuUnifier {
         button.appendChild(swatch);
       }
     }
+    if (isSoft) {
+      const presets = document.createElement("div");
+      presets.className = "bc-soft-presets";
+      addSection("柔软便签 · 功能预设").appendChild(presets);
+      const applicable = nodes.filter((node): node is CanvasNodeData => node?.type === "text");
+      for (const preset of SOFT_NOTES_PRESETS) {
+        const state = optionState(applicable.filter(node => {
+          const style = resolveSoftNotesStyle(node);
+          return style.preset.id === preset.id && style.color === preset.color && style.align === preset.align;
+        }).length, applicable.length);
+        const button = addButton(presets, "", optionClass("bc-soft-preset", state), () => this.applySoftPreset(preset.id));
+        button.dataset.styleOption = "soft-" + preset.id;
+        button.title = preset.label + " · " + preset.use;
+        button.setAttribute("aria-label", button.title);
+        button.setAttribute("aria-pressed", state);
+        button.disabled = !applicable.length;
+        const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        preview.setAttribute("viewBox", "0 0 320 240");
+        preview.setAttribute("aria-hidden", "true");
+        const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        shape.setAttribute("d", preset.path);
+        shape.setAttribute("fill", preset.color);
+        preview.appendChild(shape);
+        const sample = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        sample.setAttribute("d", preset.id === "free"
+          ? "M105 55H215M160 55V165M130 165H190M100 200H220"
+          : "M90 92H220M90 123H230M90 152H180");
+        sample.setAttribute("fill", "none");
+        sample.setAttribute("stroke", preset.id === "free" ? "currentColor" : "#535d48");
+        sample.setAttribute("stroke-width", "9");
+        sample.setAttribute("stroke-linecap", "round");
+        preview.appendChild(sample);
+        button.appendChild(preview);
+      }
+      const hint = document.createElement("p");
+      hint.className = "bc-soft-hint";
+      hint.textContent = "应用到选中的文本节点；保留正文。所有预设均无边框。";
+      body.appendChild(hint);
+    }
     if (isRounded) {
       const presets = document.createElement("div");
       presets.className = "bc-rounded-presets";
@@ -815,7 +887,7 @@ export default class NodeMenuUnifier {
         button.appendChild(preview);
       }
     }
-    if (!isScrapbook && !isSketch && !isRounded && !isResearch) {
+    if (!isScrapbook && !isSketch && !isRounded && !isResearch && !isSoft) {
     const presetSection = addSection("预设");
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
@@ -852,7 +924,7 @@ export default class NodeMenuUnifier {
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
     const roundedColors = ROUNDED_MAP_PRESETS.map(preset => ({ id: preset.id, label: preset.label, value: preset.style.color }));
-    for (const color of isScrapbook ? SCRAPBOOK_COLORS : isSketch ? SKETCH_COLORS : isRounded ? roundedColors : isResearch ? RESEARCH_COLORS : NODE_STYLE_COLORS) {
+    for (const color of isScrapbook ? SCRAPBOOK_COLORS : isSketch ? SKETCH_COLORS : isRounded ? roundedColors : isResearch ? RESEARCH_COLORS : isSoft ? SOFT_NOTES_COLORS : NODE_STYLE_COLORS) {
       const state = stateForStyles(nodeStyles, style => style.color === color.value.toLowerCase());
       const button = addButton(
         colors,
@@ -871,6 +943,7 @@ export default class NodeMenuUnifier {
       button.appendChild(swatch);
     }
 
+    if (!isSoft) {
     const shapeSection = addSection("形状");
     const shapes = document.createElement("div");
     shapes.className = "bc-node-style-shapes";
@@ -919,6 +992,7 @@ export default class NodeMenuUnifier {
       button.dataset.styleOption = "border-" + border.id;
       button.setAttribute("aria-pressed", state);
       button.disabled = !hasSelection;
+    }
     }
 
     const alignSection = addSection("文本对齐");
