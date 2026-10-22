@@ -280,6 +280,11 @@ class CanvasLinkExplorerModal extends Modal {
   }
 }
 
+export interface AISelectionTarget {
+  canvas: any;
+  nodeIds: readonly string[];
+}
+
 export default class BetterCanvasFeatures {
   private focusedCanvases = new Map<any, string>();
   private boundContainers = new WeakSet<HTMLElement>();
@@ -338,42 +343,36 @@ export default class BetterCanvasFeatures {
    * profiles, streaming, cancellation, multimodal context and node metadata
    * behave consistently.
    */
-  askSelectedNode(nodeId?: string): void {
-    const canvas = this.canvas();
-    if (!canvas) {
-      new Notice("请先打开一个 Canvas。");
-      return;
-    }
-    if (nodeId) this.selectNode(canvas, nodeId);
-    const selection = this.selected(canvas);
+  askSelectedNode(target?: string | AISelectionTarget): void {
+    const selection = this.aiSelection(target);
     if (!selection) return;
-    this.openAIPrompt(selection.node);
+    this.openAIPrompt(selection);
   }
 
-  private openAIPrompt(node: CanvasNodeData, modelOverride?: string): void {
+  private openAIPrompt(selection: AISelectionTarget & { node: CanvasNodeData }, modelOverride?: string): void {
+    const { node, canvas, nodeIds } = selection;
     const backend = this.settings().backend;
     const modelLabel = backend === "codex-cli"
       ? "Codex CLI · 本地配置"
       : backend === "opencode-acp"
         ? "OpenCode · 本地配置"
         : modelOverride || String(node.bcAIModel || this.currentProvider(node).model);
-    const sourceLabel = String(node.text || node.file || node.url || "未命名卡片")
-      .trim().split(/\r?\n/).find(line => line.trim())?.replace(/^#{1,6}\s+/, "").slice(0, 160) || "未命名卡片";
+    const sourceLabel = nodeIds.length > 1 ? `已选 ${nodeIds.length} 个节点` :
+      String(node.text || node.file || node.url || "未命名卡片")
+        .trim().split(/\r?\n/).find(line => line.trim())?.replace(/^#{1,6}\s+/, "").slice(0, 160) || "未命名卡片";
     new AIPromptModal(this.p.app, {
       sourceLabel,
       modelLabel,
-      onSubmit: value => this.runAI(node.id, value, modelOverride)
+      onSubmit: value => this.runAI(nodeIds, value, modelOverride, undefined, undefined, canvas)
     }).open();
   }
 
-  generateFlashcardsFromSelection(nodeId?: string): void {
-    if (nodeId) this.selectNode(this.canvas(), nodeId);
-    void this.generateFlashcardNodes();
+  generateFlashcardsFromSelection(target?: string | AISelectionTarget): void {
+    void this.generateFlashcardNodes(target);
   }
 
-  generateImageFromSelection(nodeId?: string): void {
-    if (nodeId) this.selectNode(this.canvas(), nodeId);
-    void this.generateImageForNode();
+  generateImageFromSelection(target?: string | AISelectionTarget): void {
+    void this.generateImageForNode(target);
   }
 
   chooseModelForNode(nodeId: string): void {
@@ -622,6 +621,42 @@ export default class BetterCanvasFeatures {
 
   private canvas(): any | null {
     return this.activeCanvasView()?.canvas ?? null;
+  }
+
+  private aiSelection(target?: string | AISelectionTarget): (AISelectionTarget & {
+    node: CanvasNodeData;
+    nodes: CanvasNodeData[];
+  }) | null {
+    const canvas = typeof target === "object" ? target.canvas : this.canvas();
+    if (!canvas) {
+      new Notice("请先打开一个 Canvas。");
+      return null;
+    }
+    if (isCanvasReadOnly(canvas)) {
+      new Notice("当前 Canvas 处于只读模式。请先解除只读模式。");
+      return null;
+    }
+    const data = readCanvasData(canvas);
+    const nodeIds = [...new Set(typeof target === "string" ? [target] :
+      target?.nodeIds ?? selectedCanvasNodeIds(canvas, data.nodes.map(node => node.id)))];
+    if (!nodeIds.length) {
+      new Notice("请在画布中选择一个或多个节点。");
+      return null;
+    }
+    const records = new Map(data.nodes.map(node => [node.id, node]));
+    if (nodeIds.some(id => !records.has(id))) {
+      new Notice("部分所选节点已不存在，请重新选择。");
+      return null;
+    }
+    const nodes = nodeIds.map(id => records.get(id)!);
+    return { canvas, nodeIds, nodes, node: nodes[0] };
+  }
+
+  private aiOutputPosition(nodes: readonly CanvasNodeData[]): { x: number; y: number } {
+    return {
+      x: Math.max(...nodes.map(node => node.x + node.width)) + 100,
+      y: Math.min(...nodes.map(node => node.y))
+    };
   }
 
   private selected(canvas = this.canvas()): { canvas: any; node: CanvasNodeData } | null {
@@ -2557,10 +2592,10 @@ export default class BetterCanvasFeatures {
   }
 
   private askWithModel(): void {
-    const selection = this.selected();
+    const selection = this.aiSelection();
     if (!selection) return;
     this.chooseModel(selection.node, model => {
-      this.openAIPrompt(selection.node, model);
+      this.openAIPrompt(selection, model);
     });
   }
 
@@ -2805,19 +2840,23 @@ export default class BetterCanvasFeatures {
       "。最多处理 20 篇 Markdown，内容已发送给供应商“" + profile.name + "”。");
   }
 
-  private async getNodeContext(canvas: any, rootId: string): Promise<string> {
+  private aiContextNodes(canvas: any, rootIds: string | readonly string[]): CanvasNodeData[] {
     const data = readCanvasData(canvas);
-    const root = data.nodes.find((node: CanvasNodeData) => node.id === rootId);
-    if (!root) throw new Error("找不到所选节点。");
-    const connected = new Set<string>([rootId]);
+    const roots = new Set(typeof rootIds === "string" ? [rootIds] : rootIds);
+    const records = new Map(data.nodes.map(node => [node.id, node]));
+    if (!roots.size || [...roots].some(id => !records.has(id))) throw new Error("找不到所选节点。");
+    const connected = new Set(roots);
     for (const edge of data.edges) {
-      if (edge.fromNode === rootId) connected.add(edge.toNode);
-      if (edge.toNode === rootId) connected.add(edge.fromNode);
+      if (roots.has(edge.fromNode)) connected.add(edge.toNode);
+      if (roots.has(edge.toNode)) connected.add(edge.fromNode);
     }
+    return [...connected].flatMap(id => records.has(id) ? [records.get(id)!] : []);
+  }
+
+  private async getNodeContext(canvas: any, rootIds: string | readonly string[]): Promise<string> {
+    const roots = new Set(typeof rootIds === "string" ? [rootIds] : rootIds);
     const sections: string[] = [];
-    for (const id of connected) {
-      const node = data.nodes.find((candidate: CanvasNodeData) => candidate.id === id);
-      if (!node) continue;
+    for (const node of this.aiContextNodes(canvas, rootIds)) {
       let body = String(node.text ?? node.file ?? node.url ?? "[" + node.type + " node]");
       if (node.type === "file" && node.file) {
         const file = this.p.app.vault.getAbstractFileByPath(node.file);
@@ -2835,21 +2874,15 @@ export default class BetterCanvasFeatures {
           }
         }
       }
-      sections.push("[Node " + node.id + (id === rootId ? " — selected" : "") + "]\n" + body.slice(0, 3000));
+      sections.push("[Node " + node.id + (roots.has(node.id) ? " — selected" : "") + "]\n" + body.slice(0, 3000));
     }
     return sections.join("\n\n--- Connected node ---\n\n").slice(0, 14000);
   }
 
-  private async getConnectedImages(canvas: any, rootId: string): Promise<Array<{ type: "image_url"; image_url: { url: string; detail: "auto" } }>> {
-    const data = readCanvasData(canvas);
-    const ids = new Set<string>([rootId]);
-    for (const edge of data.edges) {
-      if (edge.fromNode === rootId) ids.add(edge.toNode);
-      if (edge.toNode === rootId) ids.add(edge.fromNode);
-    }
+  private async getConnectedImages(canvas: any, rootIds: string | readonly string[]): Promise<Array<{ type: "image_url"; image_url: { url: string; detail: "auto" } }>> {
     const images: Array<{ type: "image_url"; image_url: { url: string; detail: "auto" } }> = [];
-    for (const node of data.nodes) {
-      if (!ids.has(node.id) || node.type !== "file" || !node.file) continue;
+    for (const node of this.aiContextNodes(canvas, rootIds)) {
+      if (node.type !== "file" || !node.file) continue;
       const file = this.p.app.vault.getAbstractFileByPath(node.file);
       if (!(file instanceof TFile)) continue;
       const ext = file.extension.toLowerCase();
@@ -3070,13 +3103,14 @@ export default class BetterCanvasFeatures {
     return path;
   }
 
-  private async generateFlashcardNodes(): Promise<void> {
-    const selected = this.selected();
+  private async generateFlashcardNodes(target?: string | AISelectionTarget): Promise<void> {
+    const selected = this.aiSelection(target);
     if (!selected) return;
     const spacedRepetition = this.settings().flashcardOutputMode === "spaced-repetition";
     const notice = new Notice(spacedRepetition ? "正在生成并导出复习卡组…" : "正在生成独立闪卡…", 0);
     try {
-      const context = await this.getNodeContext(selected.canvas, selected.node.id);
+      const context = await this.getNodeContext(selected.canvas, selected.nodeIds);
+      if (!this.aiSelection(selected)) return;
       const raw = await this.completeStructured(
         "基于以下资料生成 5 至 10 张中文复习闪卡，只返回 JSON：{\"cards\":[{\"question\":\"...\",\"answer\":\"...\"}]}. " +
         "问题要能主动回忆，答案简洁可验证；不要补充资料中没有的事实。资料：\n" + context,
@@ -3087,6 +3121,8 @@ export default class BetterCanvasFeatures {
         typeof card.question === "string" && Boolean(card.question.trim()) &&
         typeof card.answer === "string" && Boolean(card.answer.trim())) : [];
       if (!cards.length) throw new Error("AI 未返回有效的复习闪卡。");
+      const fresh = this.aiSelection(selected);
+      if (!fresh) return;
 
       if (spacedRepetition) {
         const filePath = await this.saveSpacedRepetitionDeck(cards, selected.node);
@@ -3095,29 +3131,36 @@ export default class BetterCanvasFeatures {
         return;
       }
 
+      const position = this.aiOutputPosition(fresh.nodes);
       for (let i = 0; i < cards.length; i++) {
         const card = cards[i];
         const text = "问题：" + card.question!.trim() + "\n\n答案：" + card.answer!.trim();
-        const node = makeTextNode(text, selected.node.x + selected.node.width + 100,
-          selected.node.y + i * 180, { width: 330, height: 150 });
-        insertCanvasNode(selected.canvas, node, selected.node.id);
+        const node = makeTextNode(text, position.x,
+          position.y + i * 180, { width: 330, height: 150 });
+        insertCanvasNode(selected.canvas, node, selected.nodeIds);
       }
       notice.hide();
       new Notice("已创建 " + cards.length + " 张独立复习闪卡节点。");
     } catch (error) {
       notice.hide();
       new Notice(error instanceof Error ? error.message : String(error), 8000);
+    } finally {
+      notice.hide();
     }
   }
-  private async runAI(nodeId: string, instruction: string, modelOverride?: string, replaceNodeId?: string, nativeVideoUrl?: string): Promise<void> {
-    const canvas = this.canvas();
-    if (!canvas) return;
-    const data = readCanvasData(canvas);
-    const source = data.nodes.find((node: CanvasNodeData) => node.id === nodeId);
-    if (!source) {
-      new Notice("找不到 AI 上下文的源节点。");
-      return;
-    }
+  private async runAI(
+    rootIds: string | readonly string[],
+    instruction: string,
+    modelOverride?: string,
+    replaceNodeId?: string,
+    nativeVideoUrl?: string,
+    canvas = this.canvas()
+  ): Promise<void> {
+    const selection = this.aiSelection({ canvas, nodeIds: typeof rootIds === "string" ? [rootIds] : rootIds });
+    if (!selection) return;
+    const { node: source, nodeIds } = selection;
+    const nodeId = source.id;
+    const sourceMetadata = nodeIds.length > 1 ? { bcSourceNodes: [...nodeIds] } : {};
 
     const previous = this.activeGenerations.get(canvas);
     if (previous) previous.controller.abort();
@@ -3130,8 +3173,8 @@ export default class BetterCanvasFeatures {
     let lastFlushedLength = 0;
 
     try {
-      const context = await this.getNodeContext(canvas, nodeId);
-      const images = await this.getConnectedImages(canvas, nodeId);
+      const context = await this.getNodeContext(canvas, nodeIds);
+      const images = await this.getConnectedImages(canvas, nodeIds);
       if (controller.signal.aborted) throw new DOMException("The AI request was aborted.", "AbortError");
       const prompt = "请基于所给 Obsidian Canvas 笔记回答，不要声称读取了未提供的来源。\n\n任务：" + instruction + "\n\n画布上下文：\n" + context;
       const contentParts: Exclude<ChatMessageContent, string> = [
@@ -3141,21 +3184,24 @@ export default class BetterCanvasFeatures {
       ];
       const content: ChatMessageContent = images.length || nativeVideoUrl ? contentParts : prompt;
 
-      const fresh = readCanvasData(canvas).nodes.find((node: CanvasNodeData) => node.id === nodeId) ?? source;
+      const fresh = this.aiSelection(selection);
+      if (!fresh) return;
+      const position = this.aiOutputPosition(fresh.nodes);
       const placeholder: CanvasNodeData = {
-        ...makeTextNode("", fresh.x + fresh.width + 100, fresh.y, {
-          width: Math.max(300, fresh.width),
+        ...makeTextNode("", position.x, position.y, {
+          width: Math.max(300, fresh.node.width),
           height: 180
         }),
         bcGenerating: true,
         bcGenerated: false,
         bcPrompt: instruction,
         bcSourceNode: nodeId,
+        ...sourceMetadata,
         bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
         bcAIProvider: this.currentProvider(source).id
       };
       responseNodeId = placeholder.id;
-      insertCanvasNode(canvas, placeholder, nodeId);
+      insertCanvasNode(canvas, placeholder, nodeIds);
 
       const answer = await chatCompletionStream(
         this.aiSettings(source, modelOverride),
@@ -3176,14 +3222,8 @@ export default class BetterCanvasFeatures {
       );
 
       accumulated = answer;
-      if (replaceNodeId && replaceNodeId !== responseNodeId) {
-        const latest = readCanvasData(canvas);
-        canvas.importData({
-          ...latest,
-          nodes: latest.nodes.filter((node: CanvasNodeData) => node.id !== replaceNodeId),
-          edges: latest.edges.filter((edge: any) => edge.fromNode !== replaceNodeId && edge.toNode !== replaceNodeId)
-        });
-      }
+      const replaced = !replaceNodeId || replaceNodeId === responseNodeId ||
+        removeCanvasNode(canvas, replaceNodeId);
       patchNode(canvas, responseNodeId, {
         text: answer,
         bcGenerating: false,
@@ -3191,11 +3231,12 @@ export default class BetterCanvasFeatures {
         bcStopped: false,
         bcPrompt: instruction,
         bcSourceNode: nodeId,
+        ...sourceMetadata,
         bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
         bcAIProvider: this.currentProvider(source).id
       });
       notice.hide();
-      new Notice("AI 回复已添加为关联节点。");
+      new Notice(replaced ? "AI 回复已添加为关联节点。" : "新的 AI 回复已生成，但旧回复未能自动移除。");
     } catch (error) {
       const stopped = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
       let cleanupFailed = false;
@@ -3235,6 +3276,7 @@ export default class BetterCanvasFeatures {
       else if (cleanupFailed) new Notice("AI 生成失败，无法自动移除占位节点；已停止加载状态。", 8000);
       else new Notice(error instanceof Error ? error.message : String(error), 8000);
     } finally {
+      notice.hide();
       if (this.activeGenerations.get(canvas)?.controller === controller) this.activeGenerations.delete(canvas);
     }
   }
@@ -3258,16 +3300,21 @@ export default class BetterCanvasFeatures {
       new Notice("所选节点没有可重新生成的 AI 元数据。");
       return;
     }
-    await this.runAI(node.bcSourceNode, node.bcPrompt, typeof node.bcAIModel === "string" ? node.bcAIModel : undefined, node.id);
+    const sourceIds = Array.isArray(node.bcSourceNodes) && node.bcSourceNodes.length &&
+      node.bcSourceNodes.every((id: unknown) => typeof id === "string")
+      ? node.bcSourceNodes as string[] : [node.bcSourceNode];
+    await this.runAI(sourceIds, node.bcPrompt, typeof node.bcAIModel === "string" ? node.bcAIModel : undefined,
+      node.id, undefined, selection.canvas);
   }
 
-  private async generateImageForNode(): Promise<void> {
-    const selection = this.selected();
+  private async generateImageForNode(target?: string | AISelectionTarget): Promise<void> {
+    const selection = this.aiSelection(target);
     if (!selection) return;
     const { canvas, node } = selection;
     const notice = new Notice("正在生成图片…", 0);
     try {
-      const context = await this.getNodeContext(canvas, node.id);
+      const context = await this.getNodeContext(canvas, selection.nodeIds);
+      if (!this.aiSelection(selection)) return;
       const settings = this.settings();
       const imageProtocol = settings.imageProtocol === "gemini" ? "gemini" : "openai";
       const imageModel = String(settings.imageModel || "gpt-image-1");
@@ -3284,27 +3331,33 @@ export default class BetterCanvasFeatures {
       };
       const result = await generateImage(imageSettings,
         "Create a clear visual based on these notes. Avoid long text in the image.\n\n" + context.slice(0, 7000));
+      const fresh = this.aiSelection(selection);
+      if (!fresh) return;
       const folder = String(settings.attachmentFolder || "Better Canvas/Generated Images");
       await this.ensureFolder(folder);
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
       const path = folder + "/better-canvas-" + stamp + "." + result.extension;
       const bytes = result.bytes.slice();
       await this.p.app.vault.createBinary(path, bytes.buffer as ArrayBuffer);
+      const position = this.aiOutputPosition(fresh.nodes);
       const imageNode: CanvasNodeData = {
         id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
         type: "file",
         file: path,
-        x: node.x + node.width + 100,
-        y: node.y + node.height + 30,
+        ...position,
+        y: selection.nodeIds.length === 1 ? fresh.node.y + fresh.node.height + 30 :
+          position.y,
         width: 320,
         height: 240
       };
-      insertCanvasNode(canvas, imageNode, node.id);
+      insertCanvasNode(canvas, imageNode, selection.nodeIds);
       notice.hide();
       new Notice("生成图片已保存至 Vault，并连接到源节点。");
     } catch (error) {
       notice.hide();
       new Notice(error instanceof Error ? error.message : String(error), 8000);
+    } finally {
+      notice.hide();
     }
   }
 

@@ -139,14 +139,15 @@ function edgeSides(source: CanvasNodeData, target: CanvasNodeData): [string, str
 export function insertCanvasNode(
   canvas: any,
   node: CanvasNodeData,
-  connectFromId?: string
+  connectFromId?: string | readonly string[]
 ): void {
   const data = readCanvasData(canvas);
   const nodes = [...data.nodes.filter(existing => existing.id !== node.id), node];
   const edges = [...data.edges];
 
-  if (connectFromId) {
-    const source = nodes.find(existing => existing.id === connectFromId);
+  const sourceIds = typeof connectFromId === "string" ? [connectFromId] : connectFromId ?? [];
+  for (const sourceId of new Set(sourceIds)) {
+    const source = nodes.find(existing => existing.id === sourceId);
     if (source && source.id !== node.id) {
       const [fromSide, toSide] = edgeSides(source, node);
       edges.push({
