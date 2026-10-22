@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="460" viewBox="0 0 640 460">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#d2dcd3"/><stop offset="1" stop-color="#f3e4c7"/></linearGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".5" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".1"/></feComponentTransfer><feBlend in="SourceGraphic" mode="multiply"/></filter>
+  </defs>
+  <g filter="url(#grain)">
+    <path fill="url(#sky)" d="M0 0h640v460H0z"/>
+    <circle cx="462" cy="122" r="53" fill="#f3d49c"/>
+    <path d="M0 285 92 208 203 272 314 184 425 258 534 199 640 267V460H0Z" fill="#a7b6a1"/>
+    <path d="M0 338 117 288 256 329 408 254 551 301 640 285V460H0Z" fill="#778e78"/>
+    <path d="M0 398Q135 290 282 379T640 338V460H0Z" fill="#4d6c5b"/>
+    <path d="M370 460Q278 400 335 375T348 326Q392 350 362 378T441 460" fill="#d5c5a3"/>
+    <g stroke="#455c49" stroke-width="5" fill="none"><path d="M74 387V277m0 43-24-28m24 12 22-31m-22 73-32-26m32 8 30-26"/><path d="M567 366V268m0 41-22-23m22 9 20-28m-20 64-28-19m28 7 27-23"/></g>
+  </g>
+  <text x="40" y="52" font-family="Georgia,serif" font-size="16" letter-spacing="4" fill="#566a5a">A SLOW AFTERNOON</text>
+  <text x="40" y="425" font-family="Georgia,serif" font-style="italic" font-size="20" fill="#f5ecd9">somewhere along the way.</text>
+</svg>
