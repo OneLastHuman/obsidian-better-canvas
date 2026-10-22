@@ -140,7 +140,7 @@ export function applyNodeVisualStyle(
     }
     if (!changed) return node;
 
-    const styleAttributes = asRecord(next.styleAttributes);
+    const styleAttributes = { ...asRecord(next.styleAttributes) };
     if (typeof patch.shape === "string") {
       if (patch.shape === "default") delete styleAttributes.shape;
       else styleAttributes.shape = patch.shape === "square" ? "rectangle" : patch.shape;

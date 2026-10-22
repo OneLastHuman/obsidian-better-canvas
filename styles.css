@@ -1824,3 +1824,133 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .bc-theme-mini-board[data-bc-theme="sketch"] .bc-mini-action { right: 18px; top: 46px; width: 78px; height: 40px; background: repeating-linear-gradient(-48deg, #78b58c66 0 1px, transparent 1px 5px); transform: rotate(1deg); }
 .bc-theme-mini-board[data-bc-theme="sketch"] .bc-mini-risk { right: 30px; top: 99px; width: 74px; height: 36px; border-style: dashed; border-color: #e8798f; background: repeating-linear-gradient(48deg, #e8798f55 0 1px, transparent 1px 5px), repeating-linear-gradient(-48deg, #e8798f55 0 1px, transparent 1px 5px); transform: rotate(-2deg); }
 @media (max-width: 640px) { .bc-theme-choices { grid-template-columns: 1fr; } }
+
+/* Soft Notes: a light paper canvas and flat, borderless text cards. */
+.canvas-wrapper[data-bc-theme="soft-notes"] {
+  color-scheme: light;
+  --background-primary: #fcfcf8;
+  --background-secondary: #f0f3e9;
+  --background-modifier-border: #dce2d3;
+  --background-modifier-hover: #e9eedf;
+  --text-normal: #292e28;
+  --text-muted: #78816e;
+  --text-faint: #929b87;
+  --text-accent: #61744e;
+  --color-accent: #80936b;
+  --interactive-accent: #80936b;
+  --text-selection: #cfdfbd;
+  --canvas-background: #fcfcf8;
+  --canvas-dot-pattern: #dfe5d6;
+  --canvas-color: #6b7562;
+  --code-background: #edf0e6;
+  --code-normal: #48543d;
+  --checkbox-color: #79835e;
+  --checkbox-color-hover: #627049;
+  background: #fcfcf8;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-background { opacity: .55; }
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .canvas-node-container {
+  background: var(--bc-soft-color) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  clip-path: var(--bc-soft-clip) !important;
+  transition: none;
+  color: #292e28;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes]::after,
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .canvas-node-container::after {
+  display: none !important;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .canvas-node-content {
+  box-sizing: border-box;
+  padding: var(--bc-soft-top) var(--bc-soft-right) var(--bc-soft-bottom) var(--bc-soft-left);
+  background: transparent !important;
+  color: #292e28;
+  text-align: var(--bc-soft-align) !important;
+  font: 18px/1.65 "BC Sketch Hand", cursive;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] :is(.markdown-preview-view, .markdown-source-view, .cm-content, .markdown-rendered) {
+  background: transparent !important;
+  color: #292e28;
+  font-family: "BC Sketch Hand", cursive;
+  text-align: var(--bc-soft-align) !important;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .markdown-preview-view {
+  padding: 0;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .markdown-preview-sizer {
+  min-height: 0 !important;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] :is(h1,h2,h3,h4,h5,h6,.cm-header) {
+  color: #292e28;
+  font-family: "BC Soft Notes Title", "BC Sketch Hand", cursive;
+  font-weight: 400;
+  line-height: 1.35;
+  margin-block: 0 .55em;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] :is(h1,h2) { font-size: 28px; }
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] p { margin-block: 0 .6em; }
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] blockquote {
+  border: 0;
+  padding: 0;
+  margin-inline: 0;
+  color: #3c514e;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes="free"] :is(.markdown-preview-view, .cm-content) {
+  font-family: "BC Soft Notes Title", "BC Sketch Hand", cursive;
+  font-size: 30px;
+  line-height: 1.6;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes="free"] :is(h1,h2) { font-size: 42px; }
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes="free"] .markdown-preview-sizer:has(h1,h2) p {
+  font: 16px/1.7 "BC Sketch Hand", cursive;
+  color: #78816e;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .canvas-node-label { display: none; }
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-path-label {
+  background: #fcfcf8;
+  color: #78816e;
+  border: 0;
+  box-shadow: none;
+  font-family: "BC Sketch Hand", cursive;
+}
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-edges { --canvas-color: #6b7562; }
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-edges path { stroke-linecap: round; stroke-linejoin: round; }
+.bc-soft-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.bc-soft-preset {
+  padding: 6px;
+  height: 69px;
+  color: var(--text-normal);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.bc-soft-preset svg { width: 100%; height: 100%; display: block; }
+.bc-soft-preset:hover, .bc-soft-preset[aria-pressed="true"] { background: var(--background-modifier-hover); }
+.bc-soft-preset[aria-pressed="mixed"] { background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); }
+.bc-soft-hint { margin: 4px 0 12px; font-size: 11px; color: var(--text-muted); }
+.bc-theme-mini-board[data-bc-theme="soft-notes"] {
+  background-color: #fcfcf8;
+  background-image: linear-gradient(#e6e9e15c 1px, transparent 1px), linear-gradient(90deg, #e6e9e15c 1px, transparent 1px);
+  background-size: 14px 14px;
+  color: #292e28;
+}
+.bc-theme-mini-board[data-bc-theme="soft-notes"] .bc-theme-mini-caption {
+  color: #78816e;
+  font: 15px "BC Soft Notes Title", cursive;
+}
+.bc-theme-mini-board[data-bc-theme="soft-notes"] svg { stroke: #6b7562; }
+.bc-soft-mini {
+  position: absolute;
+  display: grid;
+  place-content: center;
+  background: var(--bc-soft-color);
+  clip-path: var(--bc-soft-clip);
+  font: 15px "BC Soft Notes Title", cursive;
+}
+.bc-soft-mini.bc-mini-spark { left: 12px; top: 48px; width: 95px; height: 76px; }
+.bc-soft-mini.bc-mini-action { right: 12px; top: 44px; width: 90px; height: 62px; }
+.bc-soft-mini.bc-mini-question { right: 20px; top: 104px; width: 95px; height: 62px; padding-bottom: 12px; }

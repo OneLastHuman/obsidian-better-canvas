@@ -21,6 +21,8 @@ import { CanvasReadonlyController, type CanvasReadonlyOptions } from "./canvas-r
 import { AdvancedCanvasEventBridge } from "./advanced-canvas-events";
 import { mergeCanvasExportData, viewportExportAppearance } from "./canvas-export-data";
 import { prepareViewportSvgExportClone, shouldIncludeViewportSvgNode } from "./canvas-viewport-export";
+import { SKETCH_FONT_CSS } from "./sketch-font";
+import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
 import {
   colorIncidentEdges,
   decorateCanvas,
@@ -2003,6 +2005,8 @@ export default class BetterCanvasFeatures {
     const container = canvas.wrapperEl;
     if (!(container instanceof HTMLElement)) { new Notice("无法获取 Canvas DOM。"); return; }
     const notice = new Notice("正在导出 " + format.toUpperCase() + "…", 0);
+    let softExportClone: HTMLElement | undefined;
+    let exportHost: HTMLElement | undefined;
     try {
       const settings = this.settings();
       const pixelRatio = Math.max(1, Math.min(4, Number(settings.exportPixelRatio) || 2));
@@ -2021,9 +2025,28 @@ export default class BetterCanvasFeatures {
         pixelRatio,
         ...viewportExportAppearance(backgroundColor)
       };
-      const svgContainer = format === "svg" ? prepareViewportSvgExportClone(container) : container;
+      const isSoft = container.dataset.bcTheme === "soft-notes";
+      if (isSoft) {
+        softExportClone = prepareViewportSvgExportClone(container);
+        const rect = container.getBoundingClientRect();
+        // Keep the offscreen offset on an ancestor so computed logical insets
+        // cannot carry it into html-to-image's serialized root.
+        exportHost = container.ownerDocument.createElement("div");
+        exportHost.style.cssText = "position:fixed;left:-100000px;top:0;pointer-events:none";
+        exportHost.setAttribute("aria-hidden", "true");
+        softExportClone.style.position = "relative";
+        softExportClone.style.inset = "0";
+        softExportClone.style.width = rect.width + "px";
+        softExportClone.style.height = rect.height + "px";
+        exportHost.appendChild(softExportClone);
+        container.ownerDocument.body.appendChild(exportHost);
+        exportOptions.fontEmbedCSS = SKETCH_FONT_CSS + SOFT_NOTES_FONT_CSS;
+        exportOptions.width = rect.width;
+        exportOptions.height = rect.height;
+      }
+      const svgContainer = softExportClone ?? (format === "svg" ? prepareViewportSvgExportClone(container) : container);
       const dataUrl = format === "png"
-        ? await toPng(container, exportOptions)
+        ? await toPng(softExportClone ?? container, exportOptions)
         : await toSvg(svgContainer, { ...exportOptions, filter: shouldIncludeViewportSvgNode });
       const filePath = await this.uniquePath(joinVaultPath(folder, baseName + "-export"), format);
       const comma = dataUrl.indexOf(",");
@@ -2051,6 +2074,8 @@ export default class BetterCanvasFeatures {
     } catch (error) {
       notice.hide();
       new Notice("导出失败：" + (error instanceof Error ? error.message : String(error)), 8000);
+    } finally {
+      exportHost?.remove();
     }
   }
 

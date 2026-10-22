@@ -9,3 +9,12 @@ The full license is in `OFL.txt`.
 The font is embedded into `main.js` by `esbuild.config.mjs`; the plugin makes no
 network request to load it. Rebuild the subset only from a font file whose license
 and provenance have been checked.
+
+# Soft Notes title font
+
+`soft-notes-title.woff2` is the full ZCOOL KuaiLe regular font from
+`google/fonts/ofl/zcoolkuaile/ZCOOLKuaiLe-Regular.ttf`, converted to WOFF2 with
+FontTools and renamed to `BC Soft Notes Title`. Copyright 2018 The ZCOOL KuaiLe
+Project Authors. Its SIL Open Font License is in `soft-notes-OFL.txt`.
+The build embeds it in `main.js`; no runtime font requests are made. Soft Notes
+uses this expressive face for headings and the existing `BC Sketch Hand` for body text.

@@ -11,6 +11,8 @@
 
 ## 落地清单（新增一个样式选项）
 
+「柔软便签」的六款主题预设和曲线集中在 `src/soft-notes-style.ts`，通过 `bcTheme: "soft-notes"` 与节点的 `bcSoftNotesPreset` 保存。实时节点使用同源 SVG `objectBoundingBox` 裁剪，缩略图与完整导出复用同一个路径；视口导出须携带裁剪定义及内嵌字体。此主题只裁剪文本节点的容器，不裁剪定位锚点，且始终隐藏卡片描边和阴影。编辑器专用样式放入同源 iframe 的 body，避免被 Obsidian 的 head 同步机制移除。
+
 加选项或数据字段 → 接入解析和 `decorateCanvas` 装饰 → `styles.css` 写预览+渲染两份 → 补测试 → 跑 `lint/typecheck/test/build` + 桌面深浅色实测 → 更新 `README` / [INTEGRATION_MATRIX](INTEGRATION_MATRIX.md)。
 
 ## 一条底线
