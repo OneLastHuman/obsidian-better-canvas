@@ -77,7 +77,7 @@ import { canEmbedExportMedia, estimateDataUrlByteLength, scaleSvgIntrinsicDimens
 import { canvasDataForSelection, canvasDataToFullSvg } from "./full-canvas-export";
 import { extractWikiLinks } from "./canvas-links";
 import { discoverModels } from "./model-discovery";
-import { syncHtmlPreviews } from "./html-preview";
+import { HtmlPreviewManager, syncHtmlPreviews } from "./html-preview";
 import { runLocalCodex } from "./codex-cli";
 import BetterCanvasSettingsTab from "./settings";
 import { normalizeCommandDisplayName } from "./command-names";
@@ -331,6 +331,7 @@ export default class BetterCanvasFeatures {
 
   init(): void {
     this.migrateSettings();
+    new HtmlPreviewManager(this.p).start();
     this.metadataIndexer = new CanvasMetadataIndexer(this.p.app, this.p, () => Boolean(this.settings().canvasMetadataEnabled));
     this.metadataIndexer.start();
     this.pdfPageRenderer = new PinnedPdfPageRenderer(this.p);
@@ -922,6 +923,7 @@ export default class BetterCanvasFeatures {
   }
 
   private refresh(): void {
+    if (this.stopped) return;
     const liveContainers = new Set<HTMLElement>();
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as any;
@@ -944,6 +946,7 @@ export default class BetterCanvasFeatures {
   }
 
   private decorate(canvas: any, saveHistory = true): void {
+    if (this.stopped) return;
     decorateCanvas(canvas, saveHistory);
     const data = readCanvasData(canvas);
     syncHtmlPreviews(canvas, data, this.p.app.vault);
@@ -1223,10 +1226,11 @@ export default class BetterCanvasFeatures {
 
     let queued = false;
     const schedule = () => {
-      if (queued) return;
+      if (this.stopped || queued) return;
       queued = true;
       window.requestAnimationFrame(() => {
         queued = false;
+        if (this.stopped) return;
         const canvas = view?.canvas;
         if (!canvas) return;
         this.decorate(canvas);
