@@ -29,6 +29,7 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run verify:workflow-artifacts
 ```
 
 测试路径、环境阻塞处理、Obsidian 桌面集成验证的定义，以及“通过/失败/未执行”的判定标准，统一以 [docs/TESTING.md](docs/TESTING.md) 为准，不在本文重复维护。

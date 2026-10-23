@@ -1,0 +1,91 @@
+name: Artifact cleanup
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: artifact-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      MAX_ARTIFACT_BYTES: "314572800"
+      MIN_RETENTION_DAYS: "3"
+      KEEP_NEWEST_ARTIFACTS: "10"
+    steps:
+      - name: Delete artifacts over storage budget
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp_dir="$RUNNER_TEMP/artifact-cleanup"
+          mkdir -p "$tmp_dir"
+          : > "$tmp_dir/artifacts.ndjson"
+          page=1
+
+          while :; do
+            response="$tmp_dir/page-$page.json"
+            gh api \
+              --paginate=false \
+              -H "Accept: application/vnd.github+json" \
+              "repos/$REPOSITORY/actions/artifacts?per_page=100&page=$page" \
+              > "$response"
+
+            page_count="$(jq '.artifacts | length' "$response")"
+            if [ "$page_count" -eq 0 ]; then
+              break
+            fi
+
+            jq -c '.artifacts[]' "$response" >> "$tmp_dir/artifacts.ndjson"
+            page=$((page + 1))
+          done
+
+          total_bytes="$(jq -s 'map(.size_in_bytes) | add // 0' "$tmp_dir/artifacts.ndjson")"
+          total_count="$(wc -l < "$tmp_dir/artifacts.ndjson")"
+          echo "Active artifacts: $total_count; bytes: $total_bytes; budget: $MAX_ARTIFACT_BYTES"
+
+          jq -s \
+            --argjson keep_newest "$KEEP_NEWEST_ARTIFACTS" \
+            'sort_by(.created_at) | reverse | .[$keep_newest:]' \
+            "$tmp_dir/artifacts.ndjson" \
+            > "$tmp_dir/candidates.json"
+
+          cutoff_epoch="$(
+            date -u -d "$MIN_RETENTION_DAYS days ago" +%s
+          )"
+          projected_bytes="$total_bytes"
+
+          mapfile -t candidates < <(
+            jq -r '.[] | [.id, .size_in_bytes, .created_at] | @tsv' "$tmp_dir/candidates.json"
+          )
+
+          for candidate in "${candidates[@]}"; do
+            if [ "$projected_bytes" -le "$MAX_ARTIFACT_BYTES" ]; then
+              break
+            fi
+
+            IFS=$'\t' read -r artifact_id size created_at <<< "$candidate"
+            created_epoch="$(date -u -d "$created_at" +%s)"
+            if [ "$created_epoch" -gt "$cutoff_epoch" ]; then
+              continue
+            fi
+
+            gh api -X DELETE \
+              -H "Accept: application/vnd.github+json" \
+              "repos/$REPOSITORY/actions/artifacts/$artifact_id"
+            projected_bytes=$((projected_bytes - size))
+            echo "Deleted artifact $artifact_id ($size bytes); projected bytes: $projected_bytes"
+          done
+
+          if [ "$projected_bytes" -gt "$MAX_ARTIFACT_BYTES" ]; then
+            echo "::warning::Artifact usage remains above budget because newer artifacts are still within the ${MIN_RETENTION_DAYS}-day retention floor."
+          fi
