@@ -163,6 +163,29 @@ describe("floating edge side selection", () => {
     expect(bestFloatingSide(box, { x: 50, y: 200 })).toBe("bottom");
     expect(bestFloatingSide(box, { x: 50, y: -100 })).toBe("top");
   });
+
+  it("merges background floating-side updates into the current history entry", () => {
+    const canvas = makeCanvas({
+      nodes: [
+        { id: "a", type: "text", text: "A", bcAutoResize: true, x: 0, y: 0, width: 80, height: 44 },
+        { id: "b", type: "text", text: "B", x: 360, y: 200, width: 280, height: 140 }
+      ],
+      edges: [{ id: "ab", fromNode: "a", toNode: "b", fromSide: "bottom", toSide: "top", fromFloating: true }]
+    });
+    canvas.history = { current: 0, data: [JSON.parse(JSON.stringify(canvas.data))] };
+    canvas.requestSave = vi.fn();
+    vi.stubGlobal("HTMLElement", class {});
+    vi.stubGlobal("SVGElement", class {});
+    try {
+      decorateCanvas(canvas, false);
+      expect(canvas.data.edges[0].fromSide).toBe("right");
+      expect(canvas.requestSave).toHaveBeenCalledExactlyOnceWith(false);
+      expect(canvas.history.data).toHaveLength(1);
+      expect(canvas.history.data[0].edges[0].fromSide).toBe("right");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("Canvas edge helpers", () => {

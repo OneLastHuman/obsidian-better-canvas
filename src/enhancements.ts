@@ -1,5 +1,6 @@
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
-import { decorateCanvasTheme } from "./canvas-theme";
+import { decorateCanvasTheme, mergeFloatingSidesIntoCurrentHistory, resolveCanvasTheme } from "./canvas-theme";
+import { decorateAutoResizeInsets, measureRenderedNodeLayout } from "./node-rendered-layout";
 import {
   AUTO_RESIZE_LAYOUT,
   calculateTextNodeLayout,
@@ -42,7 +43,7 @@ export function normalizeNodeShape(shape: string): string | undefined {
   return CANONICAL_NODE_SHAPES[shape.trim().toLowerCase()];
 }
 
-export function patchNode(canvas: any, nodeId: string, patch: Record<string, unknown>): boolean {
+export function patchNode(canvas: any, nodeId: string, patch: Record<string, unknown>, saveHistory = true): boolean {
   const data = readCanvasData(canvas);
   let found = false;
   const nodes = data.nodes.map(node => {
@@ -55,7 +56,7 @@ export function patchNode(canvas: any, nodeId: string, patch: Record<string, unk
   if (internal && typeof internal.setData === "function" && typeof internal.getData === "function") {
     try {
       internal.setData({ ...internal.getData(), ...patch });
-      canvas.requestSave?.();
+      canvas.requestSave?.(saveHistory);
       canvas.requestFrame?.();
       return true;
     } catch {
@@ -63,7 +64,7 @@ export function patchNode(canvas: any, nodeId: string, patch: Record<string, unk
     }
   }
   canvas.importData({ ...data, nodes, edges: data.edges });
-  canvas.requestSave?.();
+  canvas.requestSave?.(saveHistory);
   canvas.requestFrame?.();
   return true;
 }
@@ -378,20 +379,33 @@ function textMeasureForNode(canvas: any, nodeId: string): TextMeasure {
 }
 
 /**
- * Fit a text node to its content with the fixed product layout and select the
+ * Fit a text node to its rendered content and select the
  * alignment that matches the result: one line is centered, wrapped text is
  * left-aligned. Empty text keeps the node at its current size.
  */
 export function resizeNodeToText(
   canvas: any,
   nodeId: string,
-  measure?: TextMeasure
+  measure?: TextMeasure,
+  saveHistory = true
 ): boolean {
   const data = readCanvasData(canvas);
   const node = data.nodes.find(item => item.id === nodeId);
   if (!node || node.type !== "text" || typeof node.text !== "string") return false;
 
-  const layout = calculateTextNodeLayout(node.text, measure ?? textMeasureForNode(canvas, nodeId));
+  if (!node.text.trim()) return false;
+  const internal = canvas?.nodes?.get?.(nodeId);
+  const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+  if (internal?.isEditing) return false;
+  if (element?.ownerDocument) {
+    decorateAutoResizeInsets(element, node, resolveCanvasTheme(data));
+  }
+  const rendered = !measure && element?.ownerDocument
+    ? measureRenderedNodeLayout(element, node, resolveCanvasTheme(data)) : null;
+  // A mounted host node must wait for its preview; measuring stale or culled
+  // content would overwrite the last valid size with the plain-text fallback.
+  if (!measure && element?.ownerDocument && !rendered) return false;
+  const layout = rendered ?? calculateTextNodeLayout(node.text, measure ?? textMeasureForNode(canvas, nodeId));
   if (!layout) return false;
 
   const currentAttributes = node.styleAttributes &&
@@ -404,7 +418,7 @@ export function resizeNodeToText(
     ? (node as any).bcTextAlign
     : currentAttributes.textAlign;
 
-  const contentHeight = layout.lines * AUTO_RESIZE_LAYOUT.lineHeight;
+  const contentHeight = rendered?.contentHeight ?? layout.lines * AUTO_RESIZE_LAYOUT.lineHeight;
 
   if (Math.abs(node.width - layout.width) < 1 &&
       Math.abs(node.height - layout.height) < 1 &&
@@ -419,7 +433,7 @@ export function resizeNodeToText(
     height: layout.height,
     bcTextAlign: layout.alignment,
     styleAttributes
-  });
+  }, saveHistory);
   if (patched) refreshTextNodePreview(canvas, nodeId, contentHeight);
   return patched;
 }
@@ -687,7 +701,7 @@ function syncCustomStyleDataAttributes(element: Element | null | undefined, styl
   tracked.__bcCustomStyleAttributeNames = [...next.keys()];
 }
 
-export function decorateCanvas(canvas: any): void {
+export function decorateCanvas(canvas: any, saveHistory = true): void {
   decorateCanvasTheme(canvas);
   let data = readCanvasData(canvas);
 
@@ -712,9 +726,11 @@ export function decorateCanvas(canvas: any): void {
     return { ...edge, fromSide: nextFrom, toSide: nextTo };
   });
   if (floatingSidesChanged) {
+    const previousEdges = data.edges;
     data = { ...data, edges: alignedEdges };
     canvas.importData({ ...data, edges: alignedEdges });
-    canvas.requestSave?.();
+    canvas.requestSave?.(saveHistory);
+    if (!saveHistory) mergeFloatingSidesIntoCurrentHistory(canvas, previousEdges);
     canvas.requestFrame?.();
   }
   for (const nodeData of data.nodes) {
@@ -729,6 +745,7 @@ export function decorateCanvas(canvas: any): void {
     const borderStyle = typeof nodeData.bcBorderStyle === "string" ? nodeData.bcBorderStyle
       : typeof styleAttributes.border === "string" ? styleAttributes.border : "solid";
     element.dataset.bcShape = shape;
+    decorateAutoResizeInsets(element, nodeData, resolveCanvasTheme(data));
     element.dataset.bcBorder = borderStyle;
     element.dataset.bcTextAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left";
