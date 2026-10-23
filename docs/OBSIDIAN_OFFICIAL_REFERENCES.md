@@ -17,17 +17,10 @@
 1. **确认预期行为。** 对照官方帮助文档和 Better Canvas 的功能指南，先明确用户看到的行为与术语。
 2. **确认 API 契约。** 查看 `obsidian-api` 的类型定义和 TSDoc；优先使用公开 API，并检查调用是否受当前支持的 Obsidian 版本约束。
 3. **参考最小实现。** 在 `obsidian-sample-plugin` 中寻找生命周期管理、命令注册、设置页、事件注册等基础模式，再按 Better Canvas 现有模块结构实现。
-4. **验证实际行为。** 运行仓库定义的 `npm run typecheck`、`npm test` 和 `npm run build`；涉及 Canvas DOM、Workspace 状态、主题、导出或内部 API 时，还要按 [测试与验证规范](TESTING.md) 在 Obsidian 桌面环境中验证，并更新 [功能整合矩阵](INTEGRATION_MATRIX.md) 或 [已知限制](KNOWN_LIMITATIONS.md)。
+4. **验证实际行为。** 执行 [标准本地检查](TESTING.md#3-本项目的标准本地检查)。涉及 Canvas DOM、Workspace 状态、主题、导出或内部 API 时，还需按测试规范做桌面验证。结果记录在 [功能整合矩阵](INTEGRATION_MATRIX.md) 或 [已知限制](KNOWN_LIMITATIONS.md)。
 
 ## 使用边界
 
 - 官方 API 类型不等于所有运行时行为都受稳定 API 契约保证。Better Canvas 中依赖内部实现、Canvas DOM 或未公开行为的代码，应明确记录限制并进行针对性回归验证。
 - 示例仓库的目录结构、依赖版本、脚本和发布流程可能与本项目不同。项目的实际命令与流程以本仓库的 `package.json`、[仓库治理规范](REPOSITORY_GOVERNANCE.md)、[测试与验证规范](TESTING.md) 和 [发版流程](RELEASING.md) 为准。
 - 查阅或借鉴上游代码时，先核对目标版本、许可证及版权声明；不要把参考实现未经审查地整段复制进项目。
-
-## 链接
-
-- [Obsidian Sample Plugin](https://github.com/obsidianmd/obsidian-sample-plugin)
-- [Obsidian Help](https://github.com/obsidianmd/obsidian-help)
-- [Obsidian API](https://github.com/obsidianmd/obsidian-api)
-- [Obsidian 插件 API 文档](https://docs.obsidian.md/)

@@ -2,6 +2,9 @@ node_modules/
 *.map
 .DS_Store
 
+# Local copies of the CI install-package output.
+/dist/
+
 # Ephemeral end-to-end acceptance outputs belong in CI artifacts or PR/Issue attachments.
 /docs/e2e-acceptance/
 /test-results/

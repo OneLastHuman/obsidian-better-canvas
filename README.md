@@ -15,7 +15,8 @@
   <a href="#安装">安装</a> ·
   <a href="#选一种适合内容的画布">画布主题</a> ·
   <a href="#从第一张卡片开始">开始使用</a> ·
-  <a href="docs/FEATURE_GUIDE.md">功能指南</a>
+  <a href="docs/FEATURE_GUIDE.md">功能指南</a> ·
+  <a href="docs/README.md">文档索引</a>
 </p>
 
 ![柔软便签主题：围绕读书会，用灵感卡、摘录卡、概念卡、问题卡和行动清单组织想法](docs/screenshots/soft-notes.png)

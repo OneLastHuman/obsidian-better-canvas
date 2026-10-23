@@ -50,13 +50,15 @@ npm install
 npm run build
 ```
 
-构建完成后，将生成的 `main.js` 与仓库中的 `manifest.json`、`styles.css` 一起复制到插件目录。开发时可运行 `npm run dev` 持续进行开发构建。
+构建完成后，将生成的 `main.js` 与仓库中的 `manifest.json`、`styles.css` 一起复制到插件目录。
+
+`npm run dev` 执行一次开发构建。修改源码后需重新运行该命令。
 
 ## 验证与常见问题
 
 - **插件没有出现在列表中：** 确认目录层级没有多嵌套一层，并确保目录内存在三个必需文件。
 - **更新后功能没有变化：** 在社区插件设置中重新加载插件列表，必要时重启 Obsidian。
 - **CI 构建与实际行为不同：** CI 执行类型检查、单元测试和生产构建，但不会启动 Obsidian GUI；Canvas 原生交互、菜单、Portal、PDF 坐标及真实 AI 请求仍需在目标环境验证。
-- **修改源码后准备交付：** 运行 `npm run typecheck`、`npm test` 和 `npm run build`。这些命令通过不代表所有 Obsidian 运行时行为都已验证。
+- **修改源码后准备交付：** 按 [标准本地检查](TESTING.md#3-本项目的标准本地检查) 执行检查。自动化检查通过不代表 Obsidian 运行时行为已验证。
 
 测试层级和验证证据要求以 [测试与验证规范](TESTING.md) 为准。

@@ -9,7 +9,7 @@
 从仓库根目录运行：
 
 ```bash
-python3 -m http.server 4177 --bind 127.0.0.1 --directory docs/examples
+python3 -m http.server 4177 --bind 127.0.0.1 --directory docs/design
 ```
 
 打开 `http://127.0.0.1:4177/rounded-map-theme.prototype.html`。也可以直接用浏览器打开该 HTML 文件。页面自包含，不需要安装依赖或加载远程资源。
