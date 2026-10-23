@@ -20,10 +20,14 @@
 
 ## 2. 项目事实的唯一来源
 
-- README.md：用户可见的功能、安装、配置、已知限制和开发入口。
-- docs/TESTING.md：环境预检、测试层级、项目专项回归清单和证据要求。
-- docs/INTEGRATION_MATRIX.md：功能实现程度、兼容性、尚未覆盖的行为。
-- INTEGRATION_STATUS.md：当前集成/验证状态；只有状态确有变化时才更新。
+- [README.md](../README.md)：项目概览、入门和文档入口。
+- [docs/README.md](README.md)：文档索引、仓库目录与文件归属。
+- [docs/FEATURE_GUIDE.md](FEATURE_GUIDE.md) 及专题指南：操作步骤、安装和配置。
+- [docs/KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)：用户需要了解的限制与风险。
+- [docs/TESTING.md](TESTING.md)：环境预检、测试层级、回归清单和证据要求。
+- [docs/INTEGRATION_MATRIX.md](INTEGRATION_MATRIX.md)：功能实现程度、兼容性和验证覆盖。
+- [INTEGRATION_STATUS.md](../INTEGRATION_STATUS.md)：集成状态提醒；只有状态确有变化时才更新。
+- [docs/AGENT_COORDINATION.md](AGENT_COORDINATION.md)：协作协议；当前任务登记在 Issue #16，日期快照保存在 [docs/archive/](archive/README.md)。
 - GitHub Issue：需求、缺陷、讨论结论和验收条件的工作入口。
 - GitHub Pull Request：改动说明、审查讨论、CI 与测试证据。
 - GitHub Actions：实际执行过的自动化检查及其对应 commit。
@@ -100,6 +104,8 @@ Review 以下改动时，要特别检查整个 diff 及其副作用：.github/wo
 
 ## 7. 文档与功能状态维护
 
+- 文档与资源按 [文档索引](README.md#仓库目录) 的目录分工存放。可用画布放入 `docs/examples/`，设计原型放入 `docs/design/`，历史快照和实现计划放入 `docs/archive/`。
+- 归档记录必须保留原日期和验证边界，并链接当前规范。历史任务中的授权和文件占用不得作为新任务的依据。
 - README.md 面向外部读者，维护项目概览、主要功能分类、快速安装、常用快捷键和重要安全提示。新增功能只有在改变产品定位、主要能力分类或入门流程时，才更新 README 的简短介绍。
 - 已实现功能的具体使用方式和设置说明：更新 docs/FEATURE_GUIDE.md 或对应专题文档。
 - 功能状态、兼容性、缺失能力或验证覆盖发生变化：更新 docs/INTEGRATION_MATRIX.md。

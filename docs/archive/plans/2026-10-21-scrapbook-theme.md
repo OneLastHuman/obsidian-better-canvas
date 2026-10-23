@@ -1,5 +1,7 @@
 # Scrapbook Theme Implementation Plan
 
+> Historical record from 2026-10-21. Task instructions and checkboxes below belong to that implementation. See the [archive index](../README.md) and [current feature matrix](../../INTEGRATION_MATRIX.md).
+
 > **For agentic workers:** Use executing-plans to implement the tasks in order. Track completion below.
 
 **Goal:** Deliver a working, per-Canvas scrapbook theme for immediate Obsidian desktop evaluation.
