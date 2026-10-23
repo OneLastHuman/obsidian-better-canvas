@@ -26,6 +26,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - name: Upload production entrypoint
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: built-main-js
@@ -33,11 +34,13 @@ jobs:
           if-no-files-found: error
           retention-days: 3
       - name: Package installable plugin
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mkdir -p dist/obsidian-better-canvas
           cp main.js manifest.json styles.css dist/obsidian-better-canvas/
           (cd dist && zip -qr obsidian-better-canvas.zip obsidian-better-canvas)
       - name: Upload install package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: obsidian-better-canvas-install

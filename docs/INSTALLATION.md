@@ -28,12 +28,12 @@ Releases 也会提供三个独立文件，可按下方的手动安装方式使�
 
 然后在 **设置 → 社区插件** 中重新加载列表并启用插件。
 
-成功的 `main` 分支 Build workflow 会将生产构建的 `main.js` 更新到仓库根目录，并将 `main.js`、`manifest.json` 和 `styles.css` 同步到 [`release/`](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 目录。Pull Request 构建只负责验证和打包，不会写回安装产物。`release/` 提供主分支最新成功构建，不等同于固定的正式版本；正式版请使用 GitHub Releases。
+成功的 `main` 分支 Build workflow 会将生产构建的 `main.js` 更新到仓库根目录，并将 `main.js`、`manifest.json` 和 `styles.css` 同步到 [`release/`](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 目录。Pull Request 构建只执行验证，不生成安装工件，也不写回安装产物。`release/` 提供主分支最新成功构建，不等同于固定的正式版本；正式版请使用 GitHub Releases。
 
 ## 方式三：安装尚未正式发布的 CI 构建
 
 1. 在 GitHub 仓库打开 **Actions → Build**。
-2. 选择最近一次成功的构建，下载 `obsidian-better-canvas-install` 工件。
+2. 选择最近一次成功的 `main` 分支构建，下载 `obsidian-better-canvas-install` 工件。
 3. 解压工件，再将其中的 `obsidian-better-canvas.zip` 解压到 Vault 的 `.obsidian/plugins/` 目录。
 4. 确认目录结构正确后，在 Obsidian 设置中重新加载插件列表并启用。
 
