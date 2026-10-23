@@ -11,7 +11,7 @@ const softNotesFont = "data:font/woff2;base64," +
 await esbuild.build({
   entryPoints: ["src/main.ts"],
   bundle: true,
-  external: ["obsidian", "node:child_process", "node:os", "node:process"],
+  external: ["obsidian", "node:child_process", "node:os", "node:process", "node:fs", "node:path"],
   format: "cjs",
   target: "es2022",
   outfile: "main.js",

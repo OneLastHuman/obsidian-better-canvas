@@ -14,6 +14,8 @@ describe("Node runtime module resolution", () => {
       if (id === "child_process") return { spawn };
       if (id === "os") return { tmpdir };
       if (id === "process") return { env, platform: "linux" };
+      if (id === "fs") return { promises: {} };
+      if (id === "path") return { join: vi.fn() };
       throw new Error("Unexpected module " + id);
     });
     vi.stubGlobal("window", { require: requireModule });
@@ -22,7 +24,7 @@ describe("Node runtime module resolution", () => {
     expect(modules.childProcess.spawn).toBe(spawn);
     expect(modules.os.tmpdir).toBe(tmpdir);
     expect(modules.process.env).toBe(env);
-    expect(requireModule.mock.calls.map(([id]) => id)).toEqual(["child_process", "os", "process"]);
+    expect(requireModule.mock.calls.map(([id]) => id)).toEqual(["child_process", "os", "process", "fs", "path"]);
   });
 
   it("reports an actionable error when an Obsidian renderer has no Node bridge", async () => {
