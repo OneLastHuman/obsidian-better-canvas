@@ -7,16 +7,8 @@ Releases are created from versioned Git tags. The Release workflow runs the chec
 1. Choose the next semantic version (for example, `0.2.0` for a minor release or `0.1.1` for a patch release).
 2. Set the same version in `package.json` and `manifest.json`.
 3. Add or update the corresponding entry in `versions.json`. Its value must match `manifest.json`'s `minAppVersion`; keep entries for previously released versions.
-4. Run the checks locally:
-
-   ```bash
-   npm install
-   npm run typecheck
-   npm test
-   npm run build
-   ```
-
-5. Commit the version changes and merge them into `main`. Confirm the Build workflow passes on the merged commit.
+4. Run the [standard local checks](TESTING.md#3-本项目的标准本地检查), including lint and metadata validation. Record runtime checks separately as required by that guide.
+5. Submit the version changes through a PR under the [repository governance rules](REPOSITORY_GOVERNANCE.md). After the maintainer merges it into `main`, confirm the Build workflow passes on the merged commit.
 
 ## Publish
 

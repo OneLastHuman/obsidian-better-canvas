@@ -1,5 +1,7 @@
 # Sketch Theme Implementation Plan
 
+> Historical record from 2026-10-22. Task instructions and authorizations below belong to that implementation. See the [archive index](../README.md) and [current feature matrix](../../INTEGRATION_MATRIX.md).
+
 > **Execution record:** Implemented in the existing feature worktree. The user instructed not to use subagents.
 
 **Goal:** Ship the approved hand-drawn Canvas theme and six functional presets.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** TypeScript, Obsidian Canvas, Rough.js 4.6.6, local OFL Chinese handwriting font, Vitest.
 
-**Spec:** `docs/examples/excalidraw-presets.design.md`; visual reference `docs/examples/excalidraw-theme.prototype.html`.
+**Spec:** [Preset design](../../design/excalidraw-presets.design.md); visual reference [HTML prototype](../../design/excalidraw-theme.prototype.html).
 
 ## Global Constraints
 

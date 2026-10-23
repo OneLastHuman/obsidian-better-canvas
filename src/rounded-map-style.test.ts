@@ -21,7 +21,7 @@ function fixture(): CanvasData {
 
 describe("rounded map functional presets", () => {
   it("joins the document wave smoothly to both sides at preview and node sizes", () => {
-    const html = readFileSync(new URL("../docs/examples/rounded-map-theme.prototype.html", import.meta.url), "utf8");
+    const html = readFileSync(new URL("../docs/design/rounded-map-theme.prototype.html", import.meta.url), "utf8");
     const source = html.slice(html.indexOf("    function shapeMarkup("), html.indexOf("    function renderPresetPicker("));
     const prototypePath = (width: number, height: number): string => {
       const markup = runInNewContext(source + `; shapeMarkup({id:"document"}, ${width}, ${height})`, { radius: 33 });

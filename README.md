@@ -15,7 +15,8 @@
   <a href="#安装">安装</a> ·
   <a href="#选一种适合内容的画布">画布主题</a> ·
   <a href="#从第一张卡片开始">开始使用</a> ·
-  <a href="docs/FEATURE_GUIDE.md">功能指南</a>
+  <a href="docs/FEATURE_GUIDE.md">功能指南</a> ·
+  <a href="docs/README.md">文档索引</a>
 </p>
 
 ![柔软便签主题：围绕读书会，用灵感卡、摘录卡、概念卡、问题卡和行动清单组织想法](docs/screenshots/soft-notes.png)
@@ -142,7 +143,7 @@ AI 功能需要单独配置，能力取决于服务和模型。提示词与所�
 - [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/manifest.json)
 - [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/styles.css)
 
-[`release/`](release/) 由成功的主分支 Build workflow 自动同步。主分支构建与正式版的区别、Actions 工件下载和源码构建方法见[安装指南](docs/INSTALLATION.md)。
+[`release/`](release/) 由成功的主分支 Build workflow 自动同步。主分支构建与正式版的区别、源码构建方法见[安装指南](docs/INSTALLATION.md)。
 
 ## 从第一张卡片开始
 
