@@ -80,6 +80,8 @@ import BetterCanvasSettingsTab from "./settings";
 import { normalizeCommandDisplayName } from "./command-names";
 import { joinVaultPath } from "./vault-path";
 import { AIPromptModal } from "./ai-prompt-modal";
+import { resolveAIStatus } from "./onboarding-ai";
+import { resetOnboardingState } from "./onboarding";
 
 interface ProviderProfile {
   id: string;
@@ -330,7 +332,8 @@ export default class BetterCanvasFeatures {
     this.registerCommands();
     this.registerCanvasMenus();
     this.registerMarkdownNodeEmbeds();
-    this.p.addSettingTab(new BetterCanvasSettingsTab(this.p.app, this.p, this));
+    this.p.settingsTab = new BetterCanvasSettingsTab(this.p.app, this.p, this);
+    this.p.addSettingTab(this.p.settingsTab);
     this.p.registerEvent(this.p.app.workspace.on("layout-change", () => this.refresh()));
     this.p.registerEvent(this.p.app.workspace.on("active-leaf-change", () => this.refresh()));
     this.p.registerEvent(this.p.app.metadataCache.on("changed", () => this.refreshAutoEdges()));
@@ -349,7 +352,7 @@ export default class BetterCanvasFeatures {
     this.openAIPrompt(selection);
   }
 
-  private openAIPrompt(selection: AISelectionTarget & { node: CanvasNodeData }, modelOverride?: string): void {
+  private openAIPrompt(selection: AISelectionTarget & { node: CanvasNodeData }, modelOverride?: string, draft = ""): void {
     const { node, canvas, nodeIds } = selection;
     const backend = this.settings().backend;
     const modelLabel = backend === "codex-cli"
@@ -360,11 +363,31 @@ export default class BetterCanvasFeatures {
     const sourceLabel = nodeIds.length > 1 ? `已选 ${nodeIds.length} 个节点` :
       String(node.text || node.file || node.url || "未命名卡片")
         .trim().split(/\r?\n/).find(line => line.trim())?.replace(/^#{1,6}\s+/, "").slice(0, 160) || "未命名卡片";
-    new AIPromptModal(this.p.app, {
+    const modal = new AIPromptModal(this.p.app, {
       sourceLabel,
       modelLabel,
+      aiStatus: resolveAIStatus(this.aiSettings(node, modelOverride)),
+      onOpenSettings: () => this.openAISettingsAndResume(modal, selection, modelOverride),
       onSubmit: value => this.runAI(nodeIds, value, modelOverride, undefined, undefined, canvas)
-    }).open();
+    });
+    modal.setDraft(draft);
+    modal.open();
+  }
+
+  private openAISettingsAndResume(
+    modal: AIPromptModal,
+    selection: AISelectionTarget & { node: CanvasNodeData },
+    modelOverride?: string
+  ): void {
+    const draft = modal.prepareForSettings();
+    const settingsTab = this.p.settingsTab;
+    if (!settingsTab?.openAISection) {
+      new Notice("无法打开 Better Canvas 设置。");
+      return;
+    }
+    settingsTab.openAISection({
+      onReturn: () => this.openAIPrompt(selection, modelOverride, draft)
+    });
   }
 
   generateFlashcardsFromSelection(target?: string | AISelectionTarget): void {
@@ -490,6 +513,11 @@ export default class BetterCanvasFeatures {
   applySettings(): void {
     this.refresh();
     if (this.settings().canvasMetadataEnabled) this.refreshMetadataCache();
+    this.p.scheduleOnboardingCheck?.();
+  }
+
+  resetOnboardingSettings(): any {
+    return resetOnboardingState();
   }
 
   refreshMetadataCache(): void {
