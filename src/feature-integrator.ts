@@ -13,6 +13,7 @@ import {
 import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
+import { isLocalAgentBackend, localAgentDefinition, localAgentConfig, type TextBackend, type LocalAgentConfig } from "./local-agent-settings";
 import { normalizeTemperatureForProtocol, parseProviderParamsJson } from "./provider-params";
 import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
@@ -113,8 +114,11 @@ interface FeatureSettings {
   imageModel: string;
   imageSettingsMigrated: boolean;
   codexBinaryPath: string;
-  backend: "api" | "opencode-acp" | "codex-cli";
+  codexModel: string;
+  backend: TextBackend;
   opencodeBinaryPath: string;
+  opencodeModel: string;
+  localAgents: Record<string, LocalAgentConfig>;
   flashcardOutputMode: "canvas" | "spaced-repetition";
   spacedRepetitionFolder: string;
   spacedRepetitionDeck: string;
@@ -352,11 +356,9 @@ export default class BetterCanvasFeatures {
   private openAIPrompt(selection: AISelectionTarget & { node: CanvasNodeData }, modelOverride?: string): void {
     const { node, canvas, nodeIds } = selection;
     const backend = this.settings().backend;
-    const modelLabel = backend === "codex-cli"
-      ? "Codex CLI · 本地配置"
-      : backend === "opencode-acp"
-        ? "OpenCode · 本地配置"
-        : modelOverride || String(node.bcAIModel || this.currentProvider(node).model);
+    const modelLabel = isLocalAgentBackend(backend)
+      ? localAgentDefinition(backend)!.name + " · " + (localAgentConfig(this.settings(), backend).model || "本地配置")
+      : modelOverride || this.apiNodeModel(node);
     const sourceLabel = nodeIds.length > 1 ? `已选 ${nodeIds.length} 个节点` :
       String(node.text || node.file || node.url || "未命名卡片")
         .trim().split(/\r?\n/).find(line => line.trim())?.replace(/^#{1,6}\s+/, "").slice(0, 160) || "未命名卡片";
@@ -540,6 +542,7 @@ export default class BetterCanvasFeatures {
     if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
     if (typeof s.exportBackgroundColor !== "string") s.exportBackgroundColor = "";
     if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
+    if (typeof s.codexModel !== "string") s.codexModel = "";
     if (!s.imageSettingsMigrated) {
       const legacyProvider = (s.providerProfiles as ProviderProfile[]).find((profile: ProviderProfile) => profile.id === s.activeProviderId)
         ?? (s.providerProfiles as ProviderProfile[])[0];
@@ -565,8 +568,10 @@ export default class BetterCanvasFeatures {
     if (typeof s.imageApiKey !== "string") s.imageApiKey = "";
     if (typeof s.imageModel !== "string" || !s.imageModel.trim()) s.imageModel = "gpt-image-1";
     if (typeof s.imageSettingsMigrated !== "boolean") s.imageSettingsMigrated = true;
-    if (s.backend !== "opencode-acp" && s.backend !== "codex-cli" && s.backend !== "api") s.backend = "api";
+    if (!isLocalAgentBackend(s.backend) && s.backend !== "api") s.backend = "api";
+    if (!s.localAgents || typeof s.localAgents !== "object" || Array.isArray(s.localAgents)) s.localAgents = {};
     if (typeof s.opencodeBinaryPath !== "string") s.opencodeBinaryPath = "opencode";
+    if (typeof s.opencodeModel !== "string") s.opencodeModel = "";
     if (!s.modelCapabilityReports || typeof s.modelCapabilityReports !== "object" || Array.isArray(s.modelCapabilityReports)) s.modelCapabilityReports = {};
     void this.save();
   }
@@ -601,17 +606,28 @@ export default class BetterCanvasFeatures {
     return {
       baseUrl: profile.baseUrl,
       apiKey: profile.apiKey,
-      model: modelOverride || (typeof (node as any)?.bcAIModel === "string" ? String((node as any).bcAIModel) : profile.model),
+      model: isLocalAgentBackend(s.backend)
+        ? localAgentConfig(s, s.backend).model
+        : modelOverride || this.apiNodeModel(node),
       imageModel: profile.imageModel,
       protocol: profile.protocol || "openai",
       systemPrompt: s.systemPrompt || "Answer accurately and preserve uncertainty.",
-      backend: s.backend === "codex-cli" ? "codex-cli" : s.backend === "opencode-acp" ? "opencode-acp" : "api",
+      backend: isLocalAgentBackend(s.backend) ? s.backend : "api",
+      localAgents: s.localAgents,
       opencodeBinaryPath: String(s.opencodeBinaryPath || "opencode"),
+      opencodeModel: String(s.opencodeModel || ""),
       codexBinaryPath: String(s.codexBinaryPath || ""),
+      codexModel: String(s.codexModel || ""),
       temperature: profile.temperature,
       maxOutputTokens: profile.maxOutputTokens ? profile.maxOutputTokens : undefined,
       providerParams: parseProviderParamsJson(String(profile.requestParamsJson || "{}"))
     };
+  }
+
+  private apiNodeModel(node?: CanvasNodeData): string {
+    const override = !isLocalAgentBackend(node?.bcAIProvider) && typeof node?.bcAIModel === "string"
+      ? node.bcAIModel.trim() : "";
+    return override || this.currentProvider(node).model;
   }
 
   private activeCanvasView(): any | null {
@@ -2561,13 +2577,16 @@ export default class BetterCanvasFeatures {
     this.input("设置节点 AI 供应商", choices + "\n\n输入 profile id", value => {
       const profile = (s.providerProfiles as ProviderProfile[]).find(item => item.id === value.trim());
       if (!profile) return new Notice("没有匹配的 profile id。");
-      patchNode(selection.canvas, selection.node.id, { bcAIProvider: profile.id });
+      patchNode(selection.canvas, selection.node.id, {
+        bcAIProvider: profile.id,
+        ...(isLocalAgentBackend(selection.node.bcAIProvider) ? { bcAIModel: undefined } : {})
+      });
       new Notice("节点供应商已设置为 " + profile.name);
     }, String((selection.node as any).bcAIProvider ?? s.activeProviderId));
   }
 
   private chooseModel(node: CanvasNodeData, onChoose: (model: string) => void): void {
-    const current = String((node as any).bcAIModel ?? this.currentProvider(node).model);
+    const current = this.apiNodeModel(node);
     const notice = new Notice("正在从 AI 供应商读取模型列表…", 0);
     void discoverModels(this.aiSettings(node)).then(models => {
       notice.hide();
@@ -2586,7 +2605,10 @@ export default class BetterCanvasFeatures {
     if (!selection) return;
     this.chooseModel(selection.node, model => {
       const value = model.trim();
-      patchNode(selection.canvas, selection.node.id, { bcAIModel: value || undefined });
+      patchNode(selection.canvas, selection.node.id, {
+        bcAIModel: value || undefined,
+        ...(isLocalAgentBackend(selection.node.bcAIProvider) ? { bcAIProvider: this.currentProvider(selection.node).id } : {})
+      });
       new Notice(value ? "节点模型已设置为 " + value : "已恢复供应商默认模型。");
     });
   }
@@ -2650,8 +2672,10 @@ export default class BetterCanvasFeatures {
         context
       ].join("\n");
 
+      const codexConfig = localAgentConfig(this.settings(), "codex-cli");
       const answer = await runLocalCodex(prompt, {
-        binaryPath: String(this.settings().codexBinaryPath ?? ""),
+        binaryPath: codexConfig.binaryPath,
+        model: codexConfig.model,
         signal: controller.signal,
         timeoutMs: 300_000,
         onProgress: message => notice.setMessage(message)
@@ -2677,7 +2701,7 @@ export default class BetterCanvasFeatures {
       (responseNode as any).bcSourceNode = source.id;
       (responseNode as any).bcPrompt = instruction;
       (responseNode as any).bcAIProvider = "codex-cli";
-      (responseNode as any).bcAIModel = "configured-local-codex";
+      (responseNode as any).bcAIModel = codexConfig.model || "configured-local-codex";
       (responseNode as any).bcLocalCLI = true;
       insertCanvasNode(canvas, responseNode, source.id);
 
@@ -2826,8 +2850,8 @@ export default class BetterCanvasFeatures {
         (result as any).bcPrompt = instruction;
         (result as any).bcSourceNode = source.id;
         (result as any).bcSourcePath = file.path;
-        (result as any).bcAIProvider = profile.id;
-        (result as any).bcAIModel = profile.model;
+        (result as any).bcAIProvider = isLocalAgentBackend(settings.backend) ? settings.backend : profile.id;
+        (result as any).bcAIModel = settings.model;
         insertCanvasNode(canvas, result, source.id);
 
         notice.setMessage("正在处理文件夹：" + folder.path + "（" + (index + 1) + " / " + files.length + "）");
@@ -3187,6 +3211,9 @@ export default class BetterCanvasFeatures {
       const fresh = this.aiSelection(selection);
       if (!fresh) return;
       const position = this.aiOutputPosition(fresh.nodes);
+      const generationSettings = this.aiSettings(source, modelOverride);
+      const generationProvider = isLocalAgentBackend(generationSettings.backend)
+        ? generationSettings.backend : this.currentProvider(source).id;
       const placeholder: CanvasNodeData = {
         ...makeTextNode("", position.x, position.y, {
           width: Math.max(300, fresh.node.width),
@@ -3197,14 +3224,14 @@ export default class BetterCanvasFeatures {
         bcPrompt: instruction,
         bcSourceNode: nodeId,
         ...sourceMetadata,
-        bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
-        bcAIProvider: this.currentProvider(source).id
+        bcAIModel: generationSettings.model,
+        bcAIProvider: generationProvider
       };
       responseNodeId = placeholder.id;
       insertCanvasNode(canvas, placeholder, nodeIds);
 
       const answer = await chatCompletionStream(
-        this.aiSettings(source, modelOverride),
+        generationSettings,
         [
           { role: "system", content: this.settings().systemPrompt || "You are a precise assistant. Preserve uncertainty." },
           { role: "user", content }
@@ -3232,8 +3259,8 @@ export default class BetterCanvasFeatures {
         bcPrompt: instruction,
         bcSourceNode: nodeId,
         ...sourceMetadata,
-        bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
-        bcAIProvider: this.currentProvider(source).id
+        bcAIModel: generationSettings.model,
+        bcAIProvider: generationProvider
       });
       notice.hide();
       new Notice(replaced ? "AI 回复已添加为关联节点。" : "新的 AI 回复已生成，但旧回复未能自动移除。");
@@ -3303,7 +3330,8 @@ export default class BetterCanvasFeatures {
     const sourceIds = Array.isArray(node.bcSourceNodes) && node.bcSourceNodes.length &&
       node.bcSourceNodes.every((id: unknown) => typeof id === "string")
       ? node.bcSourceNodes as string[] : [node.bcSourceNode];
-    await this.runAI(sourceIds, node.bcPrompt, typeof node.bcAIModel === "string" ? node.bcAIModel : undefined,
+    const modelOverride = !isLocalAgentBackend(node.bcAIProvider) && typeof node.bcAIModel === "string" ? node.bcAIModel : undefined;
+    await this.runAI(sourceIds, node.bcPrompt, modelOverride,
       node.id, undefined, selection.canvas);
   }
 

@@ -4,6 +4,8 @@ import { decodeBase64Image, detectImageFormat } from "./image-payload";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
 import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from "./provider-params";
 import { emitAIUsageEvent, extractProviderUsage, mergeUsageCounts, type AIUsageTokenCounts } from "./ai-usage-core";
+import { runLocalAgent } from "./local-agent-cli";
+import { isAdditionalAgentBackend, localAgentConfig, type TextBackend, type LocalAgentConfig } from "./local-agent-settings";
 
 export type AIProtocol = "openai" | "anthropic" | "gemini";
 
@@ -20,11 +22,14 @@ export interface AISettings {
   imageModel: string;
   systemPrompt: string;
   /** Text-generation backend; image generation receives separate API settings. */
-  backend?: "api" | "opencode-acp" | "codex-cli";
+  backend?: TextBackend;
+  localAgents?: Record<string, LocalAgentConfig>;
   /** Optional absolute path to the OpenCode CLI; defaults to opencode on PATH. */
   opencodeBinaryPath?: string;
+  opencodeModel?: string;
   /** Optional absolute path to Codex CLI; defaults to codex on PATH. */
   codexBinaryPath?: string;
+  codexModel?: string;
   protocol?: AIProtocol;
   /** Optional sampling temperature; defaults to 0.4. */
   temperature?: number;
@@ -249,6 +254,7 @@ async function completeWithCodex(
   ).join("\n\n");
   return runLocalCodex(prompt, {
     binaryPath: settings.codexBinaryPath,
+    model: settings.codexModel,
     signal,
     timeoutMs: 300_000
   });
@@ -258,11 +264,17 @@ export async function chatCompletion(
   settings: AISettings,
   messages: ChatMessage[]
 ): Promise<string> {
+  if (isAdditionalAgentBackend(settings.backend)) {
+    if (!Platform.isDesktopApp) throw new Error("本地 Agent 仅支持 Obsidian 桌面版。");
+    if (hasUnsupportedACPContent(messages)) throw new Error("本地 Agent 当前仅支持文本任务。图片或文件上下文请切换到模型服务 API。");
+    return runLocalAgent(messages, { backend: settings.backend, ...localAgentConfig(settings, settings.backend) });
+  }
   if (settings.backend === "opencode-acp") {
+    if (!Platform.isDesktopApp) throw new Error("OpenCode ACP 仅支持 Obsidian 桌面版。");
     if (hasUnsupportedACPContent(messages)) {
       throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
     }
-    return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath });
+    return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, model: settings.opencodeModel });
   }
   if (settings.backend === "codex-cli") {
     return completeWithCodex(settings, messages, new AbortController().signal);
@@ -308,11 +320,17 @@ export async function chatCompletionStream(
   signal: AbortSignal,
   onDelta: (delta: string) => void
 ): Promise<string> {
+  if (isAdditionalAgentBackend(settings.backend)) {
+    if (!Platform.isDesktopApp) throw new Error("本地 Agent 仅支持 Obsidian 桌面版。");
+    if (hasUnsupportedACPContent(messages)) throw new Error("本地 Agent 当前仅支持文本任务。图片或文件上下文请切换到模型服务 API。");
+    return runLocalAgent(messages, { backend: settings.backend, ...localAgentConfig(settings, settings.backend), signal, onDelta });
+  }
   if (settings.backend === "opencode-acp") {
+    if (!Platform.isDesktopApp) throw new Error("OpenCode ACP 仅支持 Obsidian 桌面版。");
     if (hasUnsupportedACPContent(messages)) {
       throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
     }
-    return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, signal, onDelta });
+    return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, model: settings.opencodeModel, signal, onDelta });
   }
   if (settings.backend === "codex-cli") {
     const answer = await completeWithCodex(settings, messages, signal);

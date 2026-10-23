@@ -98,7 +98,7 @@ Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法�
 - **继续推敲：** 总结材料、比较观点、寻找遗漏，支持流式回答、停止和重新生成。
 - **辅助学习：** 生成闪卡，或导出 Spaced Repetition 兼容卡组。
 - **处理素材：** 导入网页正文，或用支持相应能力的模型分析 PDF 页面、生成图片。
-- **选择服务：** 支持 OpenAI-compatible、Anthropic 和 Gemini；桌面端也可使用已安装并登录的 Codex CLI 或 OpenCode ACP。
+- **选择服务：** 支持 OpenAI-compatible、Anthropic 和 Gemini；桌面端也可使用已安装并登录的 Codex CLI、OpenCode ACP、Claude Code、Cursor Agent、Gemini CLI、GitHub Copilot CLI、Qwen Coder、Aider 或 IBM Bob。Codex 和 OpenCode 已完成桌面验证；其余 Agent 适配器目前尚未完成真实 CLI 验证。
 - **连接外部工具：** 按需配置 MCP 工具、资源和提示模板。
 
 AI 功能需要单独配置，能力取决于服务和模型。提示词与所需上下文会发送给所配置的服务；本地 CLI 也可能调用远程模型。配置方法见 [AI 与 MCP 指南](docs/AI_SETUP.md)。

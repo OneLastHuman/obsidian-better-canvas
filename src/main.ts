@@ -19,6 +19,7 @@ import NodeMenuUnifier from "./node-menu-unifier";
 import { normalizeNamedPromptProfiles, type NamedPromptProfile } from "./prompt-profiles";
 import { defaultNodeSize } from "./node-defaults";
 import type { ModelCapabilityReport } from "./model-capabilities";
+import type { TextBackend, LocalAgentConfig } from "./local-agent-settings";
 import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
 import { AIUsageModal } from "./ai-usage-modal";
 import {
@@ -38,8 +39,11 @@ interface BetterCanvasSettings {
   model: string;
   imageModel: string;
   systemPrompt: string;
-  backend: "api" | "opencode-acp" | "codex-cli";
+  backend: TextBackend;
   opencodeBinaryPath: string;
+  opencodeModel: string;
+  codexModel: string;
+  localAgents: Record<string, LocalAgentConfig>;
   direction: LayoutDirection;
   gapX: number;
   gapY: number;
@@ -67,6 +71,9 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   systemPrompt: "You are a precise assistant helping the user reason from their Obsidian notes. Preserve uncertainty and do not invent facts.",
   backend: "api",
   opencodeBinaryPath: "opencode",
+  opencodeModel: "",
+  codexModel: "",
+  localAgents: {},
   direction: "LR",
   gapX: 100,
   gapY: 44,
