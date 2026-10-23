@@ -12,15 +12,18 @@ Closes #
 
 ## 验证记录
 
+- [ ] `npm run lint`
+- [ ] `npm run validate:metadata`
 - [ ] `npm run typecheck`
 - [ ] `npm test`
 - [ ] `npm run build`
+- [ ] `npm run verify:workflow-artifacts`（修改 CI、artifact 或相关文档时）
 - [ ] 已检查 `git diff --check`
 
 实际执行结果与测试 commit：
 - 执行过的命令：
 - 对应 commit SHA：
-- 证据链接（GitHub Actions artifact 或 Issue/PR 附件；不要提交临时截图/日志）：
+- 证据链接（优先写 Actions 运行日志或 Issue/PR 附件；不要提交临时截图/日志，也不要为普通 PR 默认上传 artifact）：
 - 未执行或受阻的检查及原因：
 
 ## Obsidian 运行时验证
