@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyScrapbookPreset, resolveCanvasTheme, withCanvasTheme, setCanvasTheme, decorateCanvasTheme } from "./canvas-theme";
+import { applyScrapbookPreset, resolveCanvasTheme, withCanvasTheme, setCanvasTheme, decorateCanvasTheme, mergeAutoResizeIntoCurrentHistory, mergeFloatingSidesIntoCurrentHistory } from "./canvas-theme";
 import type { CanvasData } from "./canvas";
 
 const sample: CanvasData = {
@@ -135,5 +135,212 @@ describe("Canvas themes", () => {
     data = sample;
     decorateCanvasTheme(canvas);
     expect(wrapperEl.dataset.bcTheme).toBeUndefined();
+  });
+});
+
+describe("automatic layout in Canvas style history", () => {
+  function historyCanvas(initialData: CanvasData = sample) {
+    const initial = structuredClone(initialData);
+    initial.nodes[0].bcAutoResize = true;
+    return {
+      data: structuredClone(initial),
+      history: { data: [initial], current: 0 },
+      getData() { return structuredClone(this.data); },
+      requestSave() {},
+      pushHistory(data: CanvasData) {
+        this.history.data.splice(this.history.current + 1, Infinity, structuredClone(data));
+        this.history.current = this.history.data.length - 1;
+      },
+      undo() {
+        this.history.current--;
+        this.data = structuredClone(this.history.data[this.history.current]);
+      },
+      redo() {
+        this.history.current++;
+        this.data = structuredClone(this.history.data[this.history.current]);
+      }
+    };
+  }
+
+  it("undoes two theme changes in two steps after each automatic layout", () => {
+    const canvas = historyCanvas();
+    setCanvasTheme(canvas, "rounded-map");
+    Object.assign(canvas.data.nodes[0], {
+      width: 198, height: 62, bcTextAlign: "center",
+      styleAttributes: { border: "dashed", custom: "keep", textAlign: "center" }
+    });
+    expect(mergeAutoResizeIntoCurrentHistory(canvas, "a")).toBe(true);
+    setCanvasTheme(canvas, "research");
+    Object.assign(canvas.data.nodes[0], {
+      width: 260, height: 120, bcTextAlign: "left",
+      styleAttributes: { border: "dashed", custom: "keep", textAlign: "left" }
+    });
+    expect(mergeAutoResizeIntoCurrentHistory(canvas, "a")).toBe(true);
+
+    expect(canvas.history.data).toHaveLength(3);
+    canvas.undo();
+    expect(resolveCanvasTheme(canvas.data)).toBe("rounded-map");
+    expect(canvas.data.nodes[0]).toMatchObject({ width: 198, height: 62, bcTextAlign: "center" });
+    canvas.undo();
+    expect(resolveCanvasTheme(canvas.data)).toBe("default");
+    canvas.redo();
+    canvas.redo();
+    expect(resolveCanvasTheme(canvas.data)).toBe("research");
+    expect(canvas.data.nodes[0]).toMatchObject({ width: 260, height: 120, bcTextAlign: "left" });
+  });
+
+  it.each(["Keep me", ""])("keeps one theme change to one undo step when native serialization reorders %j", text => {
+    const canvas = historyCanvas();
+    canvas.data.nodes[0].text = text;
+    canvas.history.data[0].nodes[0].text = text;
+    canvas.getData = () => ({
+      ...structuredClone(canvas.data),
+      nodes: canvas.data.nodes.map(({ x, y, width, height, ...content }) => ({
+        ...structuredClone(content), x, y, width, height
+      }))
+    });
+
+    expect(setCanvasTheme(canvas, "rounded-map")).toBe(true);
+    expect(canvas.history.data).toHaveLength(2);
+    expect(canvas.history.current).toBe(1);
+    canvas.undo();
+    expect(resolveCanvasTheme(canvas.data)).toBe("default");
+    expect(canvas.data.nodes[0].text).toBe(text);
+  });
+
+  it.each([
+    ["text", { text: "A pending text edit" }],
+    ["shape", { bcShape: "pill" }],
+    ["style attributes", { styleAttributes: { border: "solid", custom: "keep", textAlign: "center" } }]
+  ])("does not merge a layout based on pending %s into an older undo state", (_name, edit) => {
+    const canvas = historyCanvas();
+    setCanvasTheme(canvas, "rounded-map");
+    const before = structuredClone(canvas.history);
+    Object.assign(canvas.data.nodes[0], edit, { width: 198, height: 62, bcTextAlign: "center" });
+
+    expect(mergeAutoResizeIntoCurrentHistory(canvas, "a")).toBe(false);
+    expect(canvas.history).toEqual(before);
+  });
+
+  it("does not merge a layout into a different theme's undo state", () => {
+    const canvas = historyCanvas();
+    const before = structuredClone(canvas.history);
+    canvas.data.bcTheme = "research";
+    Object.assign(canvas.data.nodes[0], { width: 198, height: 62 });
+
+    expect(mergeAutoResizeIntoCurrentHistory(canvas, "a")).toBe(false);
+    expect(canvas.history).toEqual(before);
+  });
+
+  it("accepts identical style inputs serialized in a different order", () => {
+    const canvas = historyCanvas();
+    Object.assign(canvas.data.nodes[0], {
+      width: 198, height: 62, bcTextAlign: "center",
+      styleAttributes: { custom: "keep", textAlign: "center", border: "dashed" }
+    });
+
+    expect(mergeAutoResizeIntoCurrentHistory(canvas, "a")).toBe(true);
+    expect(canvas.history.data[0].nodes[0]).toMatchObject({
+      width: 198, height: 62, styleAttributes: { border: "dashed", custom: "keep", textAlign: "center" }
+    });
+  });
+
+  it("preserves redo and pending changes outside the resized node", () => {
+    const canvas = historyCanvas();
+    setCanvasTheme(canvas, "rounded-map");
+    setCanvasTheme(canvas, "research");
+    canvas.undo();
+    const previous = canvas.history.data[0];
+    const redo = canvas.history.data[2];
+    canvas.data.custom = { keep: false, pending: true };
+    canvas.data.nodes.push({ id: "pending", type: "text", text: "Not saved yet", x: 0, y: 0, width: 100, height: 100 });
+    Object.assign(canvas.data.nodes[0], {
+      width: 198, height: 62, bcTextAlign: "center",
+      styleAttributes: { border: "dashed", custom: "keep", textAlign: "center" }
+    });
+    let pendingSaveCancelled = false;
+    Object.assign(canvas, { requestPushHistory: { cancel() { pendingSaveCancelled = true; } } });
+
+    expect(mergeAutoResizeIntoCurrentHistory(canvas, "a")).toBe(true);
+    expect(canvas.history.current).toBe(1);
+    expect(canvas.history.data).toHaveLength(3);
+    expect(canvas.history.data[0]).toBe(previous);
+    expect(canvas.history.data[2]).toBe(redo);
+    expect(canvas.history.data[1].custom).toEqual({ keep: true });
+    expect(canvas.history.data[1].nodes).toHaveLength(1);
+    expect(canvas.history.data[1].edges).toEqual(sample.edges);
+    expect(pendingSaveCancelled).toBe(false);
+    expect(canvas.data.nodes).toHaveLength(2);
+    canvas.redo();
+    expect(resolveCanvasTheme(canvas.data)).toBe("research");
+  });
+
+  function floatingHistoryCanvas() {
+    return historyCanvas({
+      custom: { keep: true },
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 0, y: 0, width: 280, height: 140 },
+        { id: "b", type: "text", text: "B", x: 360, y: 200, width: 280, height: 140 }
+      ],
+      edges: [{
+        id: "floating", fromNode: "a", toNode: "b", fromSide: "bottom", toSide: "top",
+        fromFloating: true, toFloating: true, label: "Keep label", custom: { keep: true }
+      }]
+    });
+  }
+
+  it("keeps derived floating sides in the same undo step as automatic node geometry", () => {
+    const canvas = floatingHistoryCanvas();
+    setCanvasTheme(canvas, "rounded-map");
+    Object.assign(canvas.data.nodes[0], {
+      width: 80, height: 44, bcTextAlign: "center", styleAttributes: { textAlign: "center" }
+    });
+    expect(mergeAutoResizeIntoCurrentHistory(canvas, "a")).toBe(true);
+    const beforeEdges = structuredClone(canvas.data.edges);
+    Object.assign(canvas.data.edges[0], { fromSide: "right", toSide: "left" });
+
+    expect(mergeFloatingSidesIntoCurrentHistory(canvas, beforeEdges)).toBe(true);
+    expect(canvas.history.data[1].edges[0]).toEqual({
+      ...beforeEdges[0], fromSide: "right", toSide: "left"
+    });
+    setCanvasTheme(canvas, "research");
+    expect(canvas.history.data).toHaveLength(3);
+    canvas.undo();
+    expect(canvas.data.nodes[0]).toMatchObject({ width: 80, height: 44 });
+    expect(canvas.data.edges[0]).toMatchObject({ fromSide: "right", toSide: "left" });
+    canvas.undo();
+    expect(resolveCanvasTheme(canvas.data)).toBe("default");
+    expect(canvas.data.edges[0]).toMatchObject({ fromSide: "bottom", toSide: "top" });
+  });
+
+  it.each(["before capture", "after capture", "manual side"])("does not merge pending edge changes made %s", phase => {
+    const canvas = floatingHistoryCanvas();
+    if (phase === "manual side") canvas.data.edges[0].toFloating = false;
+    setCanvasTheme(canvas, "rounded-map");
+    const history = structuredClone(canvas.history);
+    if (phase === "before capture") canvas.data.edges[0].label = "Pending label";
+    const beforeEdges = structuredClone(canvas.data.edges);
+    canvas.data.edges[0].fromSide = "right";
+    if (phase === "after capture") canvas.data.edges[0].label = "Pending label";
+    if (phase === "manual side") canvas.data.edges[0].toSide = "left";
+
+    expect(mergeFloatingSidesIntoCurrentHistory(canvas, beforeEdges)).toBe(false);
+    expect(canvas.history).toEqual(history);
+  });
+
+  it.each([
+    ["geometry", { width: 80, height: 44 }],
+    ["content", { text: "Pending endpoint text" }],
+    ["position", { x: 200, y: 300 }]
+  ])("does not merge sides derived from endpoint %s absent from the current undo state", (_name, change) => {
+    const canvas = floatingHistoryCanvas();
+    setCanvasTheme(canvas, "rounded-map");
+    const history = structuredClone(canvas.history);
+    Object.assign(canvas.data.nodes[0], change);
+    const beforeEdges = structuredClone(canvas.data.edges);
+    canvas.data.edges[0].fromSide = "right";
+
+    expect(mergeFloatingSidesIntoCurrentHistory(canvas, beforeEdges)).toBe(false);
+    expect(canvas.history).toEqual(history);
   });
 });

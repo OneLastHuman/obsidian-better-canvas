@@ -13,6 +13,7 @@ import {
 import { toPng, toSvg } from "html-to-image";
 import { AIProtocol, AISettings, chatCompletion, chatCompletionStream, generateImage, ChatMessageContent } from "./ai";
 import { modelCapabilityReportKey, probeModelCapabilities, type ModelCapabilityReport } from "./model-capabilities";
+import { isLocalAgentBackend, localAgentDefinition, localAgentConfig, type TextBackend, type LocalAgentConfig } from "./local-agent-settings";
 import { normalizeTemperatureForProtocol, parseProviderParamsJson } from "./provider-params";
 import { canvasScaleFromLogZoom, isBelowZoomBreakpoint } from "./zoom-breakpoint";
 import { createId, readCanvasData, makeTextNode, insertCanvasNode, removeCanvasNode, CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
@@ -49,6 +50,8 @@ import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 import { applyDefaultNodePreferences, defaultNodeSize, DEFAULT_NODE_HEIGHT } from "./node-defaults";
 import { isCanvasReadOnly } from "./canvas-command-guards";
+import { mergeAutoResizeIntoCurrentHistory, resolveCanvasTheme } from "./canvas-theme";
+import { decorateAutoResizeInsets } from "./node-rendered-layout";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
@@ -80,6 +83,8 @@ import BetterCanvasSettingsTab from "./settings";
 import { normalizeCommandDisplayName } from "./command-names";
 import { joinVaultPath } from "./vault-path";
 import { AIPromptModal } from "./ai-prompt-modal";
+import { resolveAIStatus } from "./onboarding-ai";
+import { resetOnboardingState } from "./onboarding";
 
 interface ProviderProfile {
   id: string;
@@ -113,8 +118,11 @@ interface FeatureSettings {
   imageModel: string;
   imageSettingsMigrated: boolean;
   codexBinaryPath: string;
-  backend: "api" | "opencode-acp" | "codex-cli";
+  codexModel: string;
+  backend: TextBackend;
   opencodeBinaryPath: string;
+  opencodeModel: string;
+  localAgents: Record<string, LocalAgentConfig>;
   flashcardOutputMode: "canvas" | "spaced-repetition";
   spacedRepetitionFolder: string;
   spacedRepetitionDeck: string;
@@ -285,12 +293,28 @@ export interface AISelectionTarget {
   nodeIds: readonly string[];
 }
 
+interface AutoResizeObservation {
+  view: any;
+  canvas: any;
+  container: HTMLElement;
+  observer: MutationObserver;
+  timer: number | null;
+  revision: number;
+  htmlSignature?: string;
+  snapshots: Map<string, { signature: string; preview: Element | null }>;
+}
+
 export default class BetterCanvasFeatures {
   private focusedCanvases = new Map<any, string>();
   private boundContainers = new WeakSet<HTMLElement>();
   private boundRouteContainers = new WeakSet<HTMLElement>();
-  private resizeObservers = new WeakSet<HTMLElement>();
-  private autoResizingNodeIds = new Set<string>();
+  private resizeObservers = new Map<HTMLElement, AutoResizeObservation>();
+  private expectedAutoResizes = new Map<any, Map<string, { width: number; height: number }>>();
+  private expectedImportedResizes = new Map<any, Map<string, { width: number; height: number }>>();
+  private activeAutoResizes = new Map<any, Set<string>>();
+  private draggingCanvases = new Set<any>();
+  private fontDocuments = new Set<Document>();
+  private stopped = false;
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private metadataIndexer: CanvasMetadataIndexer | null = null;
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
@@ -325,12 +349,14 @@ export default class BetterCanvasFeatures {
     this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-resized", (canvas: any, node: any) => {
       this.handleNodeResized(canvas, node);
     }));
+    this.registerAutoResizeEvents();
     this.advancedCanvasEventBridge = new AdvancedCanvasEventBridge(this.p.app, this.p);
     this.advancedCanvasEventBridge.start();
     this.registerCommands();
     this.registerCanvasMenus();
     this.registerMarkdownNodeEmbeds();
-    this.p.addSettingTab(new BetterCanvasSettingsTab(this.p.app, this.p, this));
+    this.p.settingsTab = new BetterCanvasSettingsTab(this.p.app, this.p, this);
+    this.p.addSettingTab(this.p.settingsTab);
     this.p.registerEvent(this.p.app.workspace.on("layout-change", () => this.refresh()));
     this.p.registerEvent(this.p.app.workspace.on("active-leaf-change", () => this.refresh()));
     this.p.registerEvent(this.p.app.metadataCache.on("changed", () => this.refreshAutoEdges()));
@@ -349,22 +375,40 @@ export default class BetterCanvasFeatures {
     this.openAIPrompt(selection);
   }
 
-  private openAIPrompt(selection: AISelectionTarget & { node: CanvasNodeData }, modelOverride?: string): void {
+  private openAIPrompt(selection: AISelectionTarget & { node: CanvasNodeData }, modelOverride?: string, draft = ""): void {
     const { node, canvas, nodeIds } = selection;
     const backend = this.settings().backend;
-    const modelLabel = backend === "codex-cli"
-      ? "Codex CLI · 本地配置"
-      : backend === "opencode-acp"
-        ? "OpenCode · 本地配置"
-        : modelOverride || String(node.bcAIModel || this.currentProvider(node).model);
+    const modelLabel = isLocalAgentBackend(backend)
+      ? localAgentDefinition(backend)!.name + " · " + (localAgentConfig(this.settings(), backend).model || "本地配置")
+      : modelOverride || this.apiNodeModel(node);
     const sourceLabel = nodeIds.length > 1 ? `已选 ${nodeIds.length} 个节点` :
       String(node.text || node.file || node.url || "未命名卡片")
         .trim().split(/\r?\n/).find(line => line.trim())?.replace(/^#{1,6}\s+/, "").slice(0, 160) || "未命名卡片";
-    new AIPromptModal(this.p.app, {
+    const modal = new AIPromptModal(this.p.app, {
       sourceLabel,
       modelLabel,
+      aiStatus: resolveAIStatus(this.aiSettings(node, modelOverride)),
+      onOpenSettings: () => this.openAISettingsAndResume(modal, selection, modelOverride),
       onSubmit: value => this.runAI(nodeIds, value, modelOverride, undefined, undefined, canvas)
-    }).open();
+    });
+    modal.setDraft(draft);
+    modal.open();
+  }
+
+  private openAISettingsAndResume(
+    modal: AIPromptModal,
+    selection: AISelectionTarget & { node: CanvasNodeData },
+    modelOverride?: string
+  ): void {
+    const draft = modal.prepareForSettings();
+    const settingsTab = this.p.settingsTab;
+    if (!settingsTab?.openAISection) {
+      new Notice("无法打开 Better Canvas 设置。");
+      return;
+    }
+    settingsTab.openAISection({
+      onReturn: () => this.openAIPrompt(selection, modelOverride, draft)
+    });
   }
 
   generateFlashcardsFromSelection(target?: string | AISelectionTarget): void {
@@ -426,16 +470,50 @@ export default class BetterCanvasFeatures {
   }
 
   private handleNodeResized(canvas: any, node: any): void {
-    if (!canvas || isCanvasReadOnly(canvas)) return;
+    if (!canvas || this.isResizeReadOnly(canvas)) return;
     const nodeId = typeof node?.id === "string" ? node.id : node?.getData?.()?.id;
     if (typeof nodeId !== "string") return;
-    if (this.autoResizingNodeIds.has(nodeId)) {
-      this.autoResizingNodeIds.delete(nodeId);
-      return;
-    }
+    if (this.activeAutoResizes.get(canvas)?.has(nodeId)) return;
     const currentNode = readCanvasData(canvas).nodes.find(item => item.id === nodeId);
+    const expected = this.expectedAutoResizes.get(canvas)?.get(nodeId);
+    const imported = this.expectedImportedResizes.get(canvas)?.get(nodeId);
+    this.expectedAutoResizes.get(canvas)?.delete(nodeId);
+    this.expectedImportedResizes.get(canvas)?.delete(nodeId);
+    if (currentNode && [expected, imported].some(size => size && size.width === currentNode.width && size.height === currentNode.height)) return;
     if (!currentNode || (currentNode as any).bcAutoResize !== true) return;
     patchNode(canvas, nodeId, { bcAutoResize: false });
+    if (typeof HTMLElement !== "undefined") this.decorate(canvas);
+  }
+
+  private isResizeReadOnly(canvas: any): boolean {
+    return Boolean(canvas?.readonly || canvas?.readOnly || isCanvasReadOnly(canvas));
+  }
+
+  private resizeTextNode(canvas: any, nodeId: string, saveHistory = true): boolean {
+    if (this.isResizeReadOnly(canvas)) return false;
+    const before = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
+    if (!before) return false;
+    const width = before.width;
+    const height = before.height;
+    const active = this.activeAutoResizes.get(canvas) ?? new Set<string>();
+    this.activeAutoResizes.set(canvas, active);
+    active.add(nodeId);
+    try {
+      const resized = resizeNodeToText(canvas, nodeId, undefined, saveHistory);
+      const after = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
+      // A successful no-op also refreshes the preview; it must not mask a later
+      // user resize. The bridge delivers actual geometry changes on a frame.
+      if (resized && after && (after.width !== width || after.height !== height)) {
+        const expected = this.expectedAutoResizes.get(canvas) ?? new Map();
+        expected.set(nodeId, { width: after.width, height: after.height });
+        this.expectedAutoResizes.set(canvas, expected);
+      }
+      if (resized && !saveHistory) mergeAutoResizeIntoCurrentHistory(canvas, nodeId);
+      return resized;
+    } finally {
+      active.delete(nodeId);
+      if (!active.size) this.activeAutoResizes.delete(canvas);
+    }
   }
 
   async probeProviderCapabilities(profileId: string): Promise<ModelCapabilityReport> {
@@ -490,6 +568,11 @@ export default class BetterCanvasFeatures {
   applySettings(): void {
     this.refresh();
     if (this.settings().canvasMetadataEnabled) this.refreshMetadataCache();
+    this.p.scheduleOnboardingCheck?.();
+  }
+
+  resetOnboardingSettings(): any {
+    return resetOnboardingState();
   }
 
   refreshMetadataCache(): void {
@@ -497,6 +580,12 @@ export default class BetterCanvasFeatures {
   }
 
   private cleanup(): void {
+    this.stopped = true;
+    for (const state of this.resizeObservers.values()) this.stopAutoResize(state);
+    this.expectedAutoResizes.clear();
+    this.expectedImportedResizes.clear();
+    this.activeAutoResizes.clear();
+    this.draggingCanvases.clear();
     this.advancedCanvasEventBridge?.stop();
     this.advancedCanvasEventBridge = null;
     for (const active of this.activeGenerations.values()) active.controller.abort();
@@ -540,6 +629,7 @@ export default class BetterCanvasFeatures {
     if (!Number.isFinite(s.exportPixelRatio) || s.exportPixelRatio < 1 || s.exportPixelRatio > 4) s.exportPixelRatio = 2;
     if (typeof s.exportBackgroundColor !== "string") s.exportBackgroundColor = "";
     if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
+    if (typeof s.codexModel !== "string") s.codexModel = "";
     if (!s.imageSettingsMigrated) {
       const legacyProvider = (s.providerProfiles as ProviderProfile[]).find((profile: ProviderProfile) => profile.id === s.activeProviderId)
         ?? (s.providerProfiles as ProviderProfile[])[0];
@@ -565,8 +655,10 @@ export default class BetterCanvasFeatures {
     if (typeof s.imageApiKey !== "string") s.imageApiKey = "";
     if (typeof s.imageModel !== "string" || !s.imageModel.trim()) s.imageModel = "gpt-image-1";
     if (typeof s.imageSettingsMigrated !== "boolean") s.imageSettingsMigrated = true;
-    if (s.backend !== "opencode-acp" && s.backend !== "codex-cli" && s.backend !== "api") s.backend = "api";
+    if (!isLocalAgentBackend(s.backend) && s.backend !== "api") s.backend = "api";
+    if (!s.localAgents || typeof s.localAgents !== "object" || Array.isArray(s.localAgents)) s.localAgents = {};
     if (typeof s.opencodeBinaryPath !== "string") s.opencodeBinaryPath = "opencode";
+    if (typeof s.opencodeModel !== "string") s.opencodeModel = "";
     if (!s.modelCapabilityReports || typeof s.modelCapabilityReports !== "object" || Array.isArray(s.modelCapabilityReports)) s.modelCapabilityReports = {};
     void this.save();
   }
@@ -601,17 +693,28 @@ export default class BetterCanvasFeatures {
     return {
       baseUrl: profile.baseUrl,
       apiKey: profile.apiKey,
-      model: modelOverride || (typeof (node as any)?.bcAIModel === "string" ? String((node as any).bcAIModel) : profile.model),
+      model: isLocalAgentBackend(s.backend)
+        ? localAgentConfig(s, s.backend).model
+        : modelOverride || this.apiNodeModel(node),
       imageModel: profile.imageModel,
       protocol: profile.protocol || "openai",
       systemPrompt: s.systemPrompt || "Answer accurately and preserve uncertainty.",
-      backend: s.backend === "codex-cli" ? "codex-cli" : s.backend === "opencode-acp" ? "opencode-acp" : "api",
+      backend: isLocalAgentBackend(s.backend) ? s.backend : "api",
+      localAgents: s.localAgents,
       opencodeBinaryPath: String(s.opencodeBinaryPath || "opencode"),
+      opencodeModel: String(s.opencodeModel || ""),
       codexBinaryPath: String(s.codexBinaryPath || ""),
+      codexModel: String(s.codexModel || ""),
       temperature: profile.temperature,
       maxOutputTokens: profile.maxOutputTokens ? profile.maxOutputTokens : undefined,
       providerParams: parseProviderParamsJson(String(profile.requestParamsJson || "{}"))
     };
+  }
+
+  private apiNodeModel(node?: CanvasNodeData): string {
+    const override = !isLocalAgentBackend(node?.bcAIProvider) && typeof node?.bcAIModel === "string"
+      ? node.bcAIModel.trim() : "";
+    return override || this.currentProvider(node).model;
   }
 
   private activeCanvasView(): any | null {
@@ -819,9 +922,11 @@ export default class BetterCanvasFeatures {
   }
 
   private refresh(): void {
+    const liveContainers = new Set<HTMLElement>();
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as any;
       if (!view?.canvas) continue;
+      liveContainers.add(view.containerEl);
       this.observeAutoResize(view, view.canvas);
       this.bindMindMapShortcuts(view, view.canvas);
       this.bindCanvasRouteRefresh(view);
@@ -831,11 +936,15 @@ export default class BetterCanvasFeatures {
       this.applySelectionEdgeHighlight(view.canvas);
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
     }
+    for (const state of this.resizeObservers.values()) {
+      if (!liveContainers.has(state.container)) this.stopAutoResize(state);
+    }
+    this.scheduleAutoResize();
     this.refreshReadonly();
   }
 
-  private decorate(canvas: any): void {
-    decorateCanvas(canvas);
+  private decorate(canvas: any, saveHistory = true): void {
+    decorateCanvas(canvas, saveHistory);
     const data = readCanvasData(canvas);
     syncHtmlPreviews(canvas, data, this.p.app.vault);
     for (const item of data.nodes) {
@@ -1089,21 +1198,21 @@ export default class BetterCanvasFeatures {
   private resizeNode(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.autoResizingNodeIds.add(selection.node.id);
-    const resized = resizeNodeToText(selection.canvas, selection.node.id);
+    const resized = this.resizeTextNode(selection.canvas, selection.node.id);
     if (resized) this.decorate(selection.canvas);
     new Notice(resized ? "已调整节点尺寸。" : "仅支持非空文本节点。");
   }
 
   private toggleAutoResize(): void {
     const selection = this.selected();
-    if (!selection) return;
+    if (!selection || this.isResizeReadOnly(selection.canvas)) return;
     const enabled = (selection.node as any).bcAutoResize !== true;
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) {
-      this.autoResizingNodeIds.add(selection.node.id);
-      if (resizeNodeToText(selection.canvas, selection.node.id)) this.decorate(selection.canvas);
+      this.decorate(selection.canvas);
+      this.resizeTextNode(selection.canvas, selection.node.id);
     }
+    this.decorate(selection.canvas);
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
   }
 
@@ -1176,45 +1285,181 @@ export default class BetterCanvasFeatures {
     });
   }
 
-  private observeAutoResize(view: any, canvas: any): void {
+  private registerAutoResizeEvents(): void {
+    const workspace = this.p.app.workspace;
+    for (const name of ["better-canvas:theme-changed", "css-change"]) {
+      this.p.registerEvent(workspace.on(name, () => this.scheduleAutoResize(undefined, true)));
+    }
+    for (const name of ["advanced-canvas:data-loaded:before", "advanced-canvas:data-loaded:after"]) {
+      this.p.registerEvent(workspace.on(name, (canvas: any, incoming?: CanvasData) => {
+        // Undo/redo and preset imports also emit node-resized. Their restored
+        // geometry is not a user dragging a corner and must preserve opt-in.
+        const data = name.endsWith(":after") ? readCanvasData(canvas) : incoming;
+        if (data && Array.isArray(data.nodes)) {
+          this.expectedImportedResizes.set(canvas, new Map(data.nodes
+            .filter(node => Number.isFinite(node.width) && Number.isFinite(node.height))
+            .map(node => [node.id, { width: node.width, height: node.height }])));
+        }
+        if (name.endsWith(":after")) {
+          // Restoring an opted-out node must also clear its old automatic
+          // padding, even though that node will be skipped by the reflow.
+          for (const node of data?.nodes ?? []) {
+            const internal = canvas.nodes?.get?.(node.id);
+            const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+            if (element?.dataset && element?.style) {
+              decorateAutoResizeInsets(element, node, resolveCanvasTheme(data ?? {}));
+            }
+          }
+          this.scheduleAutoResize(canvas);
+        }
+      }));
+    }
+    for (const name of ["advanced-canvas:node-changed",
+      "advanced-canvas:node-text-content-changed", "advanced-canvas:node-rendered"]) {
+      this.p.registerEvent(workspace.on(name, (canvas: any) => this.scheduleAutoResize(canvas)));
+    }
+    this.p.registerEvent(workspace.on("advanced-canvas:node-editing-state-changed", (canvas: any, _node: any, editing: boolean) => {
+      if (!editing) this.scheduleAutoResize(canvas, true);
+    }));
+    this.p.registerEvent(workspace.on("advanced-canvas:readonly-changed", (canvas: any, readonly: boolean) => {
+      if (!readonly) this.scheduleAutoResize(canvas, true);
+    }));
+    this.p.registerEvent(workspace.on("advanced-canvas:dragging-state-changed", (canvas: any, dragging: boolean) => {
+      if (dragging) this.draggingCanvases.add(canvas);
+      else {
+        this.draggingCanvases.delete(canvas);
+        this.scheduleAutoResize(canvas);
+      }
+    }));
+    this.p.registerEvent(workspace.on("advanced-canvas:canvas-view-unloaded:before", (view: any) => {
+      const state = this.resizeObservers.get(view?.containerEl);
+      if (state) this.stopAutoResize(state);
+    }));
+  }
+
+  private watchAutoResizeFonts(doc: Document | undefined): void {
+    if (!doc?.fonts || this.fontDocuments.has(doc)) return;
+    this.fontDocuments.add(doc);
+    const refresh = (): void => this.scheduleAutoResize(undefined, true);
+    doc.fonts.addEventListener("loadingdone", refresh);
+    void doc.fonts.ready?.then(refresh);
+    this.p.register(() => {
+      doc.fonts.removeEventListener("loadingdone", refresh);
+      this.fontDocuments.delete(doc);
+    });
+  }
+
+  private scheduleAutoResize(canvas?: any, invalidate = false): void {
+    if (this.stopped) return;
+    for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
+      const view = leaf.view as any;
+      if (!view?.canvas || (canvas && canvas !== view.canvas)) continue;
+      const state = this.observeAutoResize(view, view.canvas);
+      if (!state) continue;
+      if (invalidate) state.revision++;
+      this.queueAutoResize(state);
+    }
+  }
+
+  private queueAutoResize(state: AutoResizeObservation): void {
+    if (this.stopped || this.resizeObservers.get(state.container) !== state || state.timer !== null) return;
+    state.timer = window.setTimeout(() => {
+      state.timer = null;
+      this.reflowAutoResize(state);
+    }, 220);
+  }
+
+  private autoResizeSnapshot(state: AutoResizeObservation, node: CanvasNodeData, theme: unknown) {
+    const internal = state.canvas.nodes?.get?.(node.id);
+    const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+    return {
+      // Ignore temporary measuring styles and our preview-sizer writes. Native
+      // content mutations and CSS/font events explicitly invalidate this key.
+      signature: JSON.stringify([state.revision, theme, node.text, node.width, node.height,
+        node.bcAutoResize, node.bcShape, node.bcBorderStyle, node.bcTextAlign, node.bcCustomClass,
+        node.bcScrapbookPreset, node.bcSketchPreset, node.bcSoftNotesPreset,
+        node.bcResearchPreset, node.bcResearchIntensity, node.styleAttributes]),
+      preview: element?.querySelector?.(".markdown-preview-view") ?? null
+    };
+  }
+
+  private reflowAutoResize(state: AutoResizeObservation): void {
+    const canvas = state.canvas;
+    if (this.stopped || this.resizeObservers.get(state.container) !== state) return;
+    if (state.view.canvas !== canvas) { this.stopAutoResize(state); return; }
+    if (this.isResizeReadOnly(canvas) || this.draggingCanvases.has(canvas)) return;
+    const data = readCanvasData(canvas);
+    const measured = new Set<string>();
+    let changed = false;
+    for (const node of data.nodes) {
+      if (node.type !== "text" || node.bcAutoResize !== true || !node.text?.trim()) continue;
+      const internal = canvas.nodes?.get?.(node.id);
+      const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+      if (!element || internal?.isEditing || internal?.isResizing ||
+          ["is-dragging", "is-resizing", "is-editing"].some(name => element.classList?.contains(name))) continue;
+      const snapshot = this.autoResizeSnapshot(state, node, data.bcTheme);
+      if (!snapshot.preview) continue;
+      const previous = state.snapshots.get(node.id);
+      if (previous?.signature === snapshot.signature && previous?.preview === snapshot.preview) continue;
+      const before = JSON.stringify([node.width, node.height, node.bcTextAlign, node.styleAttributes]);
+      if (!this.resizeTextNode(canvas, node.id, false)) continue;
+      measured.add(node.id);
+      const after = readCanvasData(canvas).nodes.find(item => item.id === node.id);
+      if (after && before !== JSON.stringify([after.width, after.height, after.bcTextAlign, after.styleAttributes])) changed = true;
+    }
+    if (changed) this.decorate(canvas, false);
+    const current = readCanvasData(canvas);
+    for (const node of current.nodes) {
+      if (measured.has(node.id)) state.snapshots.set(node.id, this.autoResizeSnapshot(state, node, current.bcTheme));
+    }
+    const liveIds = new Set(current.nodes.map(node => node.id));
+    for (const id of state.snapshots.keys()) if (!liveIds.has(id)) state.snapshots.delete(id);
+    for (const id of this.expectedAutoResizes.get(canvas)?.keys() ?? []) {
+      if (!liveIds.has(id)) this.expectedAutoResizes.get(canvas)?.delete(id);
+    }
+    for (const id of this.expectedImportedResizes.get(canvas)?.keys() ?? []) {
+      if (!liveIds.has(id)) this.expectedImportedResizes.get(canvas)?.delete(id);
+    }
+    this.applyZoomBreakpoints(canvas);
+    const htmlSignature = JSON.stringify(current.nodes.map(node => [node.id, node.type, node.text, node.file]));
+    if (!changed && (measured.size > 0 || state.htmlSignature !== htmlSignature)) {
+      syncHtmlPreviews(canvas, current, this.p.app.vault);
+    }
+    state.htmlSignature = htmlSignature;
+  }
+
+  private stopAutoResize(state: AutoResizeObservation): void {
+    state.observer.disconnect();
+    if (state.timer !== null) window.clearTimeout(state.timer);
+    this.resizeObservers.delete(state.container);
+    this.expectedAutoResizes.delete(state.canvas);
+    this.expectedImportedResizes.delete(state.canvas);
+    this.activeAutoResizes.delete(state.canvas);
+    this.draggingCanvases.delete(state.canvas);
+  }
+
+  private observeAutoResize(view: any, canvas: any): AutoResizeObservation | undefined {
     const container = view?.containerEl;
-    if (!(container instanceof HTMLElement) || this.resizeObservers.has(container)) return;
-    this.resizeObservers.add(container);
-    let pending = false;
-    let hasContentChange = false;
+    if (typeof HTMLElement === "undefined" || !(container instanceof HTMLElement)) return;
+    const existing = this.resizeObservers.get(container);
+    if (existing?.canvas === canvas) return existing;
+    if (existing) this.stopAutoResize(existing);
+    const state = { view, canvas, container, timer: null, revision: 0, snapshots: new Map() } as AutoResizeObservation;
     const observer = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         if (mutation.type === "childList" || mutation.type === "characterData") {
-          hasContentChange = true;
-          break;
+          const target = mutation.target.nodeType === 3 ? mutation.target.parentElement : mutation.target as Element;
+          if (target?.closest?.(".markdown-preview-view")) { state.revision++; break; }
         }
       }
-      if (pending) return;
-      pending = true;
-      window.setTimeout(() => {
-        pending = false;
-        const shouldResizeText = hasContentChange;
-        hasContentChange = false;
-        const data = readCanvasData(canvas);
-        let resizedAny = false;
-        if (shouldResizeText) {
-          for (const node of data.nodes) {
-            if (node.type === "text" && (node as any).bcAutoResize === true) {
-              const internal = canvas?.nodes?.get?.(node.id);
-              const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
-              if (element?.classList?.contains("is-dragging")) continue;
-              this.autoResizingNodeIds.add(node.id);
-              if (resizeNodeToText(canvas, node.id)) resizedAny = true;
-            }
-          }
-        }
-        this.applyZoomBreakpoints(canvas);
-        if (resizedAny) this.decorate(canvas);
-        else syncHtmlPreviews(canvas, data);
-      }, 220);
+      this.queueAutoResize(state);
     });
-    observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "transform", "class"] });
-    this.p.register(() => observer.disconnect());
+    state.observer = observer;
+    this.resizeObservers.set(container, state);
+    observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true,
+      attributeFilter: ["style", "transform", "class", "data-bc-theme"] });
+    this.watchAutoResizeFonts(container.ownerDocument);
+    return state;
   }
 
   private flipEdges(): void {
@@ -2561,13 +2806,16 @@ export default class BetterCanvasFeatures {
     this.input("设置节点 AI 供应商", choices + "\n\n输入 profile id", value => {
       const profile = (s.providerProfiles as ProviderProfile[]).find(item => item.id === value.trim());
       if (!profile) return new Notice("没有匹配的 profile id。");
-      patchNode(selection.canvas, selection.node.id, { bcAIProvider: profile.id });
+      patchNode(selection.canvas, selection.node.id, {
+        bcAIProvider: profile.id,
+        ...(isLocalAgentBackend(selection.node.bcAIProvider) ? { bcAIModel: undefined } : {})
+      });
       new Notice("节点供应商已设置为 " + profile.name);
     }, String((selection.node as any).bcAIProvider ?? s.activeProviderId));
   }
 
   private chooseModel(node: CanvasNodeData, onChoose: (model: string) => void): void {
-    const current = String((node as any).bcAIModel ?? this.currentProvider(node).model);
+    const current = this.apiNodeModel(node);
     const notice = new Notice("正在从 AI 供应商读取模型列表…", 0);
     void discoverModels(this.aiSettings(node)).then(models => {
       notice.hide();
@@ -2586,7 +2834,10 @@ export default class BetterCanvasFeatures {
     if (!selection) return;
     this.chooseModel(selection.node, model => {
       const value = model.trim();
-      patchNode(selection.canvas, selection.node.id, { bcAIModel: value || undefined });
+      patchNode(selection.canvas, selection.node.id, {
+        bcAIModel: value || undefined,
+        ...(isLocalAgentBackend(selection.node.bcAIProvider) ? { bcAIProvider: this.currentProvider(selection.node).id } : {})
+      });
       new Notice(value ? "节点模型已设置为 " + value : "已恢复供应商默认模型。");
     });
   }
@@ -2650,8 +2901,10 @@ export default class BetterCanvasFeatures {
         context
       ].join("\n");
 
+      const codexConfig = localAgentConfig(this.settings(), "codex-cli");
       const answer = await runLocalCodex(prompt, {
-        binaryPath: String(this.settings().codexBinaryPath ?? ""),
+        binaryPath: codexConfig.binaryPath,
+        model: codexConfig.model,
         signal: controller.signal,
         timeoutMs: 300_000,
         onProgress: message => notice.setMessage(message)
@@ -2677,7 +2930,7 @@ export default class BetterCanvasFeatures {
       (responseNode as any).bcSourceNode = source.id;
       (responseNode as any).bcPrompt = instruction;
       (responseNode as any).bcAIProvider = "codex-cli";
-      (responseNode as any).bcAIModel = "configured-local-codex";
+      (responseNode as any).bcAIModel = codexConfig.model || "configured-local-codex";
       (responseNode as any).bcLocalCLI = true;
       insertCanvasNode(canvas, responseNode, source.id);
 
@@ -2826,8 +3079,8 @@ export default class BetterCanvasFeatures {
         (result as any).bcPrompt = instruction;
         (result as any).bcSourceNode = source.id;
         (result as any).bcSourcePath = file.path;
-        (result as any).bcAIProvider = profile.id;
-        (result as any).bcAIModel = profile.model;
+        (result as any).bcAIProvider = isLocalAgentBackend(settings.backend) ? settings.backend : profile.id;
+        (result as any).bcAIModel = settings.model;
         insertCanvasNode(canvas, result, source.id);
 
         notice.setMessage("正在处理文件夹：" + folder.path + "（" + (index + 1) + " / " + files.length + "）");
@@ -3187,6 +3440,9 @@ export default class BetterCanvasFeatures {
       const fresh = this.aiSelection(selection);
       if (!fresh) return;
       const position = this.aiOutputPosition(fresh.nodes);
+      const generationSettings = this.aiSettings(source, modelOverride);
+      const generationProvider = isLocalAgentBackend(generationSettings.backend)
+        ? generationSettings.backend : this.currentProvider(source).id;
       const placeholder: CanvasNodeData = {
         ...makeTextNode("", position.x, position.y, {
           width: Math.max(300, fresh.node.width),
@@ -3197,14 +3453,14 @@ export default class BetterCanvasFeatures {
         bcPrompt: instruction,
         bcSourceNode: nodeId,
         ...sourceMetadata,
-        bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
-        bcAIProvider: this.currentProvider(source).id
+        bcAIModel: generationSettings.model,
+        bcAIProvider: generationProvider
       };
       responseNodeId = placeholder.id;
       insertCanvasNode(canvas, placeholder, nodeIds);
 
       const answer = await chatCompletionStream(
-        this.aiSettings(source, modelOverride),
+        generationSettings,
         [
           { role: "system", content: this.settings().systemPrompt || "You are a precise assistant. Preserve uncertainty." },
           { role: "user", content }
@@ -3232,8 +3488,8 @@ export default class BetterCanvasFeatures {
         bcPrompt: instruction,
         bcSourceNode: nodeId,
         ...sourceMetadata,
-        bcAIModel: modelOverride || (source as any).bcAIModel || this.currentProvider(source).model,
-        bcAIProvider: this.currentProvider(source).id
+        bcAIModel: generationSettings.model,
+        bcAIProvider: generationProvider
       });
       notice.hide();
       new Notice(replaced ? "AI 回复已添加为关联节点。" : "新的 AI 回复已生成，但旧回复未能自动移除。");
@@ -3303,7 +3559,8 @@ export default class BetterCanvasFeatures {
     const sourceIds = Array.isArray(node.bcSourceNodes) && node.bcSourceNodes.length &&
       node.bcSourceNodes.every((id: unknown) => typeof id === "string")
       ? node.bcSourceNodes as string[] : [node.bcSourceNode];
-    await this.runAI(sourceIds, node.bcPrompt, typeof node.bcAIModel === "string" ? node.bcAIModel : undefined,
+    const modelOverride = !isLocalAgentBackend(node.bcAIProvider) && typeof node.bcAIModel === "string" ? node.bcAIModel : undefined;
+    await this.runAI(sourceIds, node.bcPrompt, modelOverride,
       node.id, undefined, selection.canvas);
   }
 

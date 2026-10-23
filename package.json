@@ -10,7 +10,8 @@
     "build": "node esbuild.config.mjs production",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "validate:metadata": "node scripts/validate-plugin-metadata.mjs"
+    "validate:metadata": "node scripts/validate-plugin-metadata.mjs",
+    "verify:workflow-artifacts": "node scripts/verify-workflow-artifacts.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

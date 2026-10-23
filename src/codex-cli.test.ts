@@ -40,7 +40,7 @@ const runtime = {
 };
 
 /** Resolves as soon as the CLI process is spawned, so tests never guess at timing. */
-function startRun(options: { binaryPath?: string; signal?: AbortSignal } = {}) {
+function startRun(options: { binaryPath?: string; model?: string; signal?: AbortSignal } = {}) {
   const child = new FakeChild();
   // tsconfig targets ES2022, which predates Promise.withResolvers.
   let onSpawned = () => { /* assigned below */ };
@@ -51,6 +51,7 @@ function startRun(options: { binaryPath?: string; signal?: AbortSignal } = {}) {
   });
   const promise = runLocalCodex("PROMPT", {
     binaryPath: options.binaryPath,
+    model: options.model,
     signal: options.signal ?? new AbortController().signal
   });
   return { child, promise, spawned };
@@ -85,6 +86,27 @@ describe("Local Codex CLI process handling", () => {
     expect(spawn.mock.calls[0][0]).toBe("codex");
     child.emit("close", 0, null);
     await expect(promise).rejects.toThrow(/没有返回可用的助手文本/);
+  });
+
+  it("passes the selected model as one argument without changing sandbox restrictions", async () => {
+    const { child, promise, spawned } = startRun({ model: "  provider/custom-model  " });
+    await spawned;
+    expect(spawn.mock.calls[0][1]).toEqual([
+      "exec", "--json", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only",
+      "--model", "provider/custom-model", "-"
+    ]);
+    child.stdout.write(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "Answer" } }) + "\n");
+    child.emit("close", 0, null);
+    await expect(promise).resolves.toBe("Answer");
+  });
+
+  it("keeps the CLI default when the selected model is blank", async () => {
+    const { child, promise, spawned } = startRun({ model: " \n " });
+    await spawned;
+    expect(spawn.mock.calls[0][1]).not.toContain("--model");
+    child.stdout.write(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "Answer" } }) + "\n");
+    child.emit("close", 0, null);
+    await expect(promise).resolves.toBe("Answer");
   });
 
   it("surfaces a friendly message when the executable is missing", async () => {

@@ -6,7 +6,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [安装与构建指南](INSTALLATION.md) | 正式版、主分支构建、Actions 工件、源码构建与安装排错 |
+| [安装与构建指南](INSTALLATION.md) | 正式版、主分支构建、源码构建与安装排错 |
 | [功能指南](FEATURE_GUIDE.md) | Canvas 编辑、主题、思维导图、PDF、导出与 AI 工作流 |
 | [示例画布](examples/README.md) | 可复制到 Vault 的展示画布、主题样例与配套图片 |
 | [AI 与 MCP 配置指南](AI_SETUP.md) | 模型服务、MCP 传输、本地 OpenCode ACP 与 Codex CLI |
@@ -46,7 +46,7 @@
 | [`src/assets/`](../src/assets/README.md) | 打包字体、来源与许可证 |
 | 根目录 `main.js`、`manifest.json`、`styles.css` | 插件安装入口；`main.js` 是构建产物 |
 | [`release/`](../release/README.md) | 主分支成功构建后自动同步的安装文件 |
-| [`scripts/`](../scripts/) | 元数据检查脚本 |
+| [`scripts/`](../scripts/) | 元数据、工作流工件策略与桌面验证脚本 |
 | [`.github/`](../.github/) | Issue/PR 模板与构建、发布工作流 |
 | [`docs/examples/`](examples/README.md) | 用户示例及示例依赖的图片 |
 | [`docs/design/`](design/README.md) | 设计说明与可打开的原型 |

@@ -3,6 +3,7 @@ import { loadNodeRuntimeModules } from "./node-runtime";
 
 export interface LocalCodexOptions {
   binaryPath?: string;
+  model?: string;
   timeoutMs?: number;
   signal: AbortSignal;
   onProgress?: (message: string) => void;
@@ -37,9 +38,11 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
     "--ephemeral",
     "--skip-git-repo-check",
     "--sandbox",
-    "read-only",
-    "-"
+    "read-only"
   ];
+  const model = options.model?.trim();
+  if (model) args.push("--model", model);
+  args.push("-");
 
   return await new Promise<string>((resolve, reject) => {
     let settled = false;
