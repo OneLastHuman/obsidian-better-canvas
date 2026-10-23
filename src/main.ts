@@ -23,6 +23,20 @@ import type { TextBackend, LocalAgentConfig } from "./local-agent-settings";
 import { AI_USAGE_EVENT, AI_USAGE_HISTORY_LIMIT, appendAIUsageRecord, normalizeAIUsageRecord, type AIUsageRecord } from "./ai-usage-core";
 import { AIUsageModal } from "./ai-usage-modal";
 import {
+  completeWelcome,
+  createExampleCanvas,
+  dismissEmptyTip,
+  existingExampleCanvas,
+  normalizeOnboardingState,
+  openCanvasFile,
+  resetOnboardingState,
+  shouldAutoOpenWelcome,
+  shouldShowEmptyTip,
+  type OnboardingState
+} from "./onboarding";
+import { OnboardingGuideModal, OnboardingWelcomeModal } from "./onboarding-welcome-modal";
+import { dismissEmptyCanvasTip, removeEmptyCanvasTips, shouldOfferEmptyTip, showEmptyCanvasTip } from "./onboarding-empty-tip";
+import {
   CanvasNodeData,
   LayoutDirection,
   descendantsOf,
@@ -61,6 +75,7 @@ interface BetterCanvasSettings {
   modelCapabilityReports: Record<string, ModelCapabilityReport>;
   aiUsageRecords: AIUsageRecord[];
   aiModelPricesJson: string;
+  onboarding: OnboardingState;
 }
 
 const DEFAULT_SETTINGS: BetterCanvasSettings = {
@@ -90,7 +105,13 @@ const DEFAULT_SETTINGS: BetterCanvasSettings = {
   spacedRepetitionDeck: "better-canvas",
   modelCapabilityReports: {},
   aiUsageRecords: [],
-  aiModelPricesJson: "{}"
+  aiModelPricesJson: "{}",
+  onboarding: {
+    welcome: "unseen",
+    emptyTip: "unseen",
+    exampleCanvasPath: "",
+    updatedAt: ""
+  }
 };
 
 function simpleNodeText(node: CanvasNodeData): string {
@@ -257,12 +278,16 @@ class PresentationModal extends Modal {
 
 export default class BetterCanvasPlugin extends Plugin {
   declare settings: BetterCanvasSettings;
+  settingsTab: any = null;
   private boundContainers = new WeakSet<HTMLElement>();
   private readonly editingIframeShortcuts = new EditingIframeShortcutRegistry(
     event => this.handleMindMapEditingShortcut(event)
   );
   private features: BetterCanvasFeatures;
   private nodeMenuUnifier: NodeMenuUnifier;
+  private welcomeModal: OnboardingWelcomeModal | null = null;
+  private onboardingTimer: number | null = null;
+  private unloading = false;
 
   async onload(): Promise<void> {
     // Keep unknown/retired fields inert so upgrading never discards saved user data.
@@ -273,6 +298,7 @@ export default class BetterCanvasPlugin extends Plugin {
     if (typeof this.settings.spacedRepetitionDeck !== "string") this.settings.spacedRepetitionDeck = "better-canvas";
     if (typeof this.settings.aiModelPricesJson !== "string") this.settings.aiModelPricesJson = "{}";
     this.settings.aiUsageRecords = appendAIUsageRecord(this.settings.aiUsageRecords, null, AI_USAGE_HISTORY_LIMIT);
+    this.settings.onboarding = normalizeOnboardingState(this.settings.onboarding);
     const handleAIUsage = (event: Event): void => {
       const record = normalizeAIUsageRecord((event as CustomEvent<unknown>).detail);
       if (!record) return;
@@ -291,12 +317,134 @@ export default class BetterCanvasPlugin extends Plugin {
     new CanvasThemeController(this).start();
     this.register(() => this.editingIframeShortcuts.dispose());
     this.registerEvent(this.app.workspace.on("layout-change", () => this.bindCanvasKeyboard()));
-    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bindCanvasKeyboard()));
-    this.app.workspace.onLayoutReady(() => this.bindCanvasKeyboard());
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
+      this.bindCanvasKeyboard();
+      this.scheduleOnboardingCheck();
+    }));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.scheduleOnboardingCheck()));
+    this.registerEvent((this.app.workspace as any).on("advanced-canvas:node-added", () => this.dismissTipForActiveCanvas()));
+    this.registerEvent((this.app.workspace as any).on("advanced-canvas:data-loaded:after", () => this.scheduleOnboardingCheck(50)));
+    this.app.workspace.onLayoutReady(() => {
+      this.bindCanvasKeyboard();
+      this.scheduleOnboardingCheck();
+    });
+    this.register(() => {
+      this.unloading = true;
+      if (this.onboardingTimer !== null) window.clearTimeout(this.onboardingTimer);
+      this.welcomeModal?.close();
+      removeEmptyCanvasTips();
+    });
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  get onboardingState(): OnboardingState {
+    return normalizeOnboardingState(this.settings.onboarding);
+  }
+
+  async saveOnboardingState(state: OnboardingState): Promise<void> {
+    this.settings.onboarding = normalizeOnboardingState(state);
+    await this.saveSettings();
+  }
+
+  async markEmptyTipDismissed(): Promise<void> {
+    await this.saveOnboardingState(dismissEmptyTip(this.onboardingState));
+  }
+
+  openOnboarding(): void {
+    if (this.welcomeModal) return;
+    const existing = existingExampleCanvas(this.app, this.onboardingState);
+    this.welcomeModal = new OnboardingWelcomeModal(this.app, {
+      hasExample: Boolean(existing),
+      onCreateExample: () => void this.createOnboardingExample(),
+      onOpenExample: () => void this.createOnboardingExample(),
+      onOpenGuide: () => {
+        void this.finishWelcome("completed", this.onboardingState.exampleCanvasPath)
+          .then(() => this.openOnboardingGuide())
+          .catch(error => new Notice("无法记录引导状态：" + (error instanceof Error ? error.message : String(error)), 8000));
+      },
+      onSkip: () => void this.finishWelcome("skipped", this.onboardingState.exampleCanvasPath)
+        .catch(error => new Notice("无法记录引导状态：" + (error instanceof Error ? error.message : String(error)), 8000)),
+      onClosed: () => {
+        this.welcomeModal = null;
+      }
+    });
+    this.welcomeModal.open();
+  }
+
+  private async createOnboardingExample(): Promise<void> {
+    try {
+      const result = await createExampleCanvas(this.app, this.onboardingState);
+      await this.finishWelcome("completed", result.file.path, result.file);
+      new Notice(result.created ? "已创建示例画布。现有文件未被覆盖。" : "已打开本地记录的示例画布。");
+    } catch (error) {
+      new Notice("创建示例画布失败：" + (error instanceof Error ? error.message : String(error)) + "。请检查 Vault 写权限后重试。", 8000);
+    }
+  }
+
+  private async finishWelcome(
+    result: "completed" | "skipped",
+    exampleCanvasPath: string,
+    file?: TFile
+  ): Promise<void> {
+    await this.saveOnboardingState(completeWelcome(this.onboardingState, result, exampleCanvasPath));
+    if (file) await openCanvasFile(this.app, file);
+    this.scheduleOnboardingCheck();
+  }
+
+  private openOnboardingGuide(): void {
+    new OnboardingGuideModal(this.app).open();
+  }
+
+  resetOnboarding(showWelcome = true): void {
+    void this.saveOnboardingState(resetOnboardingState())
+      .then(() => {
+        new Notice("引导状态已重置。");
+        if (showWelcome) this.scheduleOnboardingCheck(0);
+        else if (this.hasCanvasView()) this.scheduleOnboardingCheck(0);
+      })
+      .catch(error => new Notice("重置引导失败：" + (error instanceof Error ? error.message : String(error)), 8000));
+  }
+
+  scheduleOnboardingCheck(delay = 250): void {
+    if (this.unloading) return;
+    if (this.onboardingTimer !== null) window.clearTimeout(this.onboardingTimer);
+    this.onboardingTimer = window.setTimeout(() => {
+      this.onboardingTimer = null;
+      this.checkOnboarding();
+    }, delay);
+  }
+
+  private checkOnboarding(): void {
+    if (shouldAutoOpenWelcome(this.settings)) {
+      this.openOnboarding();
+      return;
+    }
+    if (!shouldOfferEmptyTip(shouldShowEmptyTip(this.settings), this.getCanvas(), this.activeCanvasContainer())) return;
+    const container = this.activeCanvasContainer();
+    if (container) {
+      const shown = showEmptyCanvasTip(container);
+      if (shown) {
+        void this.markEmptyTipDismissed()
+          .catch(error => new Notice("无法记录空画布提示状态：" + (error instanceof Error ? error.message : String(error)), 8000));
+      }
+    }
+  }
+
+  private activeCanvasContainer(): HTMLElement | null {
+    const view = this.app.workspace.activeLeaf?.view as any;
+    return view?.getViewType?.() === "canvas" && view.canvas ? view.containerEl ?? null : null;
+  }
+
+  private hasCanvasView(): boolean {
+    return this.app.workspace.getLeavesOfType("canvas").length > 0;
+  }
+
+  private dismissTipForActiveCanvas(): void {
+    const container = this.activeCanvasContainer();
+    if (container) dismissEmptyCanvasTip(container);
   }
 
   private showAIUsageReport(): void {
@@ -364,6 +512,8 @@ export default class BetterCanvasPlugin extends Plugin {
     this.addCommand({ id: "search-canvas", name: "搜索当前画布", callback: () => this.searchCanvas() });
     this.addCommand({ id: "start-presentation", name: "开始画布演示", callback: () => this.startPresentation() });
     this.addCommand({ id: "select-node-tree", name: "选择所选节点及其子树", callback: () => this.selectNodeTree() });
+    this.addCommand({ id: "open-onboarding", name: "打开首次使用引导", callback: () => this.openOnboarding() });
+    this.addCommand({ id: "reset-onboarding", name: "重置首次使用引导", callback: () => this.resetOnboarding() });
   }
 
   private registerCanvasContextMenu(): void {

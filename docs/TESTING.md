@@ -6,12 +6,13 @@
 
 1. **先检查环境，再选择测试路径。** 不要假定当前环境有 Git、外网、npm registry、浏览器、Obsidian Desktop 或 Obsidian CLI。
 2. **以当前 commit 的完整仓库为测试对象。** 不要把通过 GitHub API 读取的文件片段、手工复制的源码快照或临时 mock 项目称为完整仓库测试。
-3. **证据必须对应 commit。** 报告测试结果时记录测试环境、测试命令、成功/失败状态和被测试的 commit SHA。远程 CI 的成功不能表述为当前沙盒刚刚本地执行成功。测试证据文件不需要提交到 Git 仓库：结论写在对应 PR/Issue，截图和长日志优先保存为 GitHub Actions artifact 或附加到 PR/Issue；仅将可复用的自动化测试 fixture 和产品文档所需截图纳入版本控制。
+3. **证据必须对应 commit，并遵守产物生命周期。** 报告测试结果时记录测试环境、测试命令、成功/失败状态和被测试的 commit SHA。远程 CI 的成功不能表述为当前沙盒刚刚本地执行成功。结论写在对应 PR/Issue；Actions 日志默认就是证据，只有确实需要下载或审查截图、DOM 快照、视频时才附加小型 artifact。截图和长日志也可直接附加到 PR/Issue。仅将可复用的自动化测试 fixture 和产品文档所需截图纳入版本控制。
 4. **没有执行就明确说未执行。** 类型检查通过、单元测试通过、打包成功、浏览器测试通过和 Obsidian 运行时验证是不同结论，不要互相替代。
 5. **优先使用小而真实的测试。** 可直接测试纯函数时，不要先构建整套假 Obsidian；只有需要时才添加 mock、adapter 或浏览器 Harness。
 6. **对文件操作使用专用测试 Vault。** 不要让自动化测试操作用户真实 Vault 或包含私人资料的目录。
 7. **不为通过测试而削弱断言。** 修复行为或测试前置条件；不要仅为了绿灯跳过有意义的测试。
 8. **每次变更后复查 diff。** 不要覆盖或重置用户已有更改；未经明确授权，不要将工作直接提交到 main。
+9. **按用途选择发布通道。** Build workflow 只负责验证，不上传 artifact；`main` 的安装文件由 [`release/`](../release/README.md) 提供；正式安装包只由 GitHub Release 发布。需要临时审查文件时，上传单个用途明确的 artifact，并设置最短可行保留期。
 
 ## 2. 开始任务时的环境预检
 
@@ -55,6 +56,7 @@ npm view vitest version --fetch-retries=0 --fetch-timeout=5000
 - `npm run typecheck`：TypeScript 类型检查。
 - `npm test`：运行 Vitest 单元测试。
 - `npm run build`：生成生产构建。
+- `npm run verify:workflow-artifacts`：检查 Build/Release/Cleanup 工作流是否遵守 artifact 用途、预算、保留期和文档入口约定。
 - `npm run dev`：运行开发构建；当前脚本是一次性 esbuild 构建，不代表持续 watch 模式。
 
 仓库未提供锁文件时不要臆造 `npm ci` 流程；先检查实际文件，再选择 `npm install` 或适用的锁文件安装命令。常规验证顺序：
@@ -66,6 +68,7 @@ npm run validate:metadata
 npm run typecheck
 npm test
 npm run build
+npm run verify:workflow-artifacts
 ```
 
 如果任务触及构建或开发脚本，也要验证相应命令的实际行为。检查构建产物是否存在、体积非零，并确认 `main.js`、`manifest.json` 和 `styles.css` 的部署路径符合 Obsidian 插件要求。
@@ -112,7 +115,7 @@ CI 只能证明 workflow 实际运行过的步骤。读取 Actions 时至少核�
 - 对 DOM/CSS、选择、键盘交互、拖放、模态框和 SVG 渲染做断言，并按需生成截图。
 - 在不同环境使用 DOM 模拟器时，注明其不等价于真实浏览器。
 - 如果 Harness 自己绘制 Canvas，它能验证插件业务逻辑和 Harness UI，但不能证明 Obsidian Canvas 内部渲染、原生拖动或内部 API 兼容。
-- 需要保留失败截图、浏览器控制台与关键 DOM 状态时，将其上传为 GitHub Actions artifact 或附加到对应 PR/Issue；不要把临时截图、运行日志或 run manifest 作为证据文件提交到仓库。
+- 需要保留失败截图、浏览器控制台与关键 DOM 状态时，优先附加到对应 PR/Issue。只有附件无法承载且后续确实需要下载时，才上传一个小型 artifact；默认保留 3 天，单次上传不应包含整套依赖、安装程序或无关的成功日志。不要提交临时截图、运行日志或 run manifest。
 
 ### Tier 4 — 真实 Obsidian CLI / Desktop 集成测试（具备运行环境时）
 
@@ -175,7 +178,7 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 3. 用明确操作触发功能，而非仅在控制台直接调用内部函数。
 4. 检查可观察结果：磁盘上的 Canvas JSON、Markdown/附件文件、界面或 DOM 状态。
 5. 检查 Obsidian 捕获的错误和控制台错误。
-6. 失败时，将必要日志、截图和实际结果保存为 GitHub Actions artifact，或附加到对应 Issue/PR；只有可复现问题必需的最小输入 fixture 才纳入版本控制。不要提交临时截图、运行日志、run manifest 或专门存放验收证据的目录。
+6. 失败时，在 Actions 日志中保留必要命令输出，并将最小截图或实际结果附加到对应 Issue/PR。只有附件无法承载且后续确实需要下载时，才上传一个默认保留 3 天的小型 artifact；单次上传不应包含整套依赖、安装程序或无关的成功日志。只有可复现问题必需的最小输入 fixture 才纳入版本控制。不要提交临时截图、运行日志、run manifest 或专门存放验收证据的目录。
 7. 在报告里明确 PASS / FAIL / BLOCKED，并注明是哪一层测试；不以单元测试通过替代宿主集成测试。
 
 ## 7. 面对环境阻塞时的降级策略

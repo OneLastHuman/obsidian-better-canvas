@@ -22,6 +22,7 @@ vi.mock("obsidian", () => ({
 vi.mock("./ai-prompt-modal", () => ({
   AIPromptModal: class {
     constructor(_app: unknown, options: typeof prompts[number]) { prompts.push(options); }
+    setDraft() {}
     open() {}
   }
 }));
@@ -219,6 +220,19 @@ describe("AI generation from multiple nodes", () => {
       expect.objectContaining({ backend: agent.id, model }), expect.any(Array), expect.any(AbortSignal), expect.any(Function)
     );
     expect(canvas.data.nodes.find(item => item.bcGenerated)).toMatchObject({ bcAIProvider: agent.id, bcAIModel: model });
+  });
+
+  it("checks the source node's provider and model instead of the global profile", () => {
+    const { canvas, plugin, features } = setup();
+    plugin.settings.providerProfiles.push({
+      id: "local", baseUrl: "http://localhost:11434/v1", apiKey: "", model: ""
+    });
+    canvas.data.nodes[0].bcAIProvider = "local";
+    canvas.data.nodes[0].bcAIModel = "node-model";
+    features.askSelectedNode();
+    expect(prompts[0]).toMatchObject({
+      modelLabel: "node-model", aiStatus: { state: "ready", allowsEmptyApiKey: true }
+    });
   });
 
   it("combines selected nodes and deduplicates direct neighbors in one request", async () => {

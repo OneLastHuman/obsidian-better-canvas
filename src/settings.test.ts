@@ -7,6 +7,7 @@ vi.mock("obsidian", () => ({
   Setting: class {},
   setIcon: vi.fn(),
   PluginSettingTab: class {
+    constructor(public app: unknown) {}
     containerEl = { querySelector: () => null };
   }
 }));
@@ -36,6 +37,31 @@ function setup() {
 }
 
 describe("settings draft lifecycle", () => {
+  it("returns to the question only after an explicit click and consumes the callback once", async () => {
+    const { tab } = setup();
+    const onReturn = vi.fn();
+    tab.openAISection({ onReturn });
+    tab.currentSettings().gapX = 190;
+    await tab.markDirty();
+    tab.returnToQuestion();
+    expect(onReturn).not.toHaveBeenCalled();
+    await tab.saveDraftSettings();
+    expect(onReturn).not.toHaveBeenCalled();
+    tab.returnToQuestion();
+    tab.returnToQuestion();
+    tab.hide();
+    expect(onReturn).toHaveBeenCalledOnce();
+  });
+
+  it("closing settings does not automatically reopen the question", () => {
+    const { tab } = setup();
+    const onReturn = vi.fn();
+    tab.openAISection({ onReturn });
+    tab.hide();
+    tab.returnToQuestion();
+    expect(onReturn).not.toHaveBeenCalled();
+  });
+
   it("saves only edited fields and preserves records updated while settings are open", async () => {
     const { live, features, tab } = setup();
     tab.currentSettings().gapX = 180;
