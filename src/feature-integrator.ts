@@ -50,6 +50,8 @@ import { zoomCanvasToFit } from "./canvas-zoom";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 import { applyDefaultNodePreferences, defaultNodeSize, DEFAULT_NODE_HEIGHT } from "./node-defaults";
 import { isCanvasReadOnly } from "./canvas-command-guards";
+import { mergeAutoResizeIntoCurrentHistory, resolveCanvasTheme } from "./canvas-theme";
+import { decorateAutoResizeInsets } from "./node-rendered-layout";
 import { isJsonObject, parseJsonObjectPrompt, promptValidator, resolvePromptSubmission } from "./prompt-input";
 import { dedupeMaterializableCanvasLinks, materializableLinkKey } from "./canvas-link-materializer";
 import { formatSpacedRepetitionDeck, normalizeSpacedRepetitionFolderPath, uniqueSpacedRepetitionPath } from "./spaced-repetition";
@@ -291,12 +293,28 @@ export interface AISelectionTarget {
   nodeIds: readonly string[];
 }
 
+interface AutoResizeObservation {
+  view: any;
+  canvas: any;
+  container: HTMLElement;
+  observer: MutationObserver;
+  timer: number | null;
+  revision: number;
+  htmlSignature?: string;
+  snapshots: Map<string, { signature: string; preview: Element | null }>;
+}
+
 export default class BetterCanvasFeatures {
   private focusedCanvases = new Map<any, string>();
   private boundContainers = new WeakSet<HTMLElement>();
   private boundRouteContainers = new WeakSet<HTMLElement>();
-  private resizeObservers = new WeakSet<HTMLElement>();
-  private autoResizingNodeIds = new Set<string>();
+  private resizeObservers = new Map<HTMLElement, AutoResizeObservation>();
+  private expectedAutoResizes = new Map<any, Map<string, { width: number; height: number }>>();
+  private expectedImportedResizes = new Map<any, Map<string, { width: number; height: number }>>();
+  private activeAutoResizes = new Map<any, Set<string>>();
+  private draggingCanvases = new Set<any>();
+  private fontDocuments = new Set<Document>();
+  private stopped = false;
   private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
   private metadataIndexer: CanvasMetadataIndexer | null = null;
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
@@ -331,6 +349,7 @@ export default class BetterCanvasFeatures {
     this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-resized", (canvas: any, node: any) => {
       this.handleNodeResized(canvas, node);
     }));
+    this.registerAutoResizeEvents();
     this.advancedCanvasEventBridge = new AdvancedCanvasEventBridge(this.p.app, this.p);
     this.advancedCanvasEventBridge.start();
     this.registerCommands();
@@ -451,16 +470,50 @@ export default class BetterCanvasFeatures {
   }
 
   private handleNodeResized(canvas: any, node: any): void {
-    if (!canvas || isCanvasReadOnly(canvas)) return;
+    if (!canvas || this.isResizeReadOnly(canvas)) return;
     const nodeId = typeof node?.id === "string" ? node.id : node?.getData?.()?.id;
     if (typeof nodeId !== "string") return;
-    if (this.autoResizingNodeIds.has(nodeId)) {
-      this.autoResizingNodeIds.delete(nodeId);
-      return;
-    }
+    if (this.activeAutoResizes.get(canvas)?.has(nodeId)) return;
     const currentNode = readCanvasData(canvas).nodes.find(item => item.id === nodeId);
+    const expected = this.expectedAutoResizes.get(canvas)?.get(nodeId);
+    const imported = this.expectedImportedResizes.get(canvas)?.get(nodeId);
+    this.expectedAutoResizes.get(canvas)?.delete(nodeId);
+    this.expectedImportedResizes.get(canvas)?.delete(nodeId);
+    if (currentNode && [expected, imported].some(size => size && size.width === currentNode.width && size.height === currentNode.height)) return;
     if (!currentNode || (currentNode as any).bcAutoResize !== true) return;
     patchNode(canvas, nodeId, { bcAutoResize: false });
+    if (typeof HTMLElement !== "undefined") this.decorate(canvas);
+  }
+
+  private isResizeReadOnly(canvas: any): boolean {
+    return Boolean(canvas?.readonly || canvas?.readOnly || isCanvasReadOnly(canvas));
+  }
+
+  private resizeTextNode(canvas: any, nodeId: string, saveHistory = true): boolean {
+    if (this.isResizeReadOnly(canvas)) return false;
+    const before = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
+    if (!before) return false;
+    const width = before.width;
+    const height = before.height;
+    const active = this.activeAutoResizes.get(canvas) ?? new Set<string>();
+    this.activeAutoResizes.set(canvas, active);
+    active.add(nodeId);
+    try {
+      const resized = resizeNodeToText(canvas, nodeId, undefined, saveHistory);
+      const after = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
+      // A successful no-op also refreshes the preview; it must not mask a later
+      // user resize. The bridge delivers actual geometry changes on a frame.
+      if (resized && after && (after.width !== width || after.height !== height)) {
+        const expected = this.expectedAutoResizes.get(canvas) ?? new Map();
+        expected.set(nodeId, { width: after.width, height: after.height });
+        this.expectedAutoResizes.set(canvas, expected);
+      }
+      if (resized && !saveHistory) mergeAutoResizeIntoCurrentHistory(canvas, nodeId);
+      return resized;
+    } finally {
+      active.delete(nodeId);
+      if (!active.size) this.activeAutoResizes.delete(canvas);
+    }
   }
 
   async probeProviderCapabilities(profileId: string): Promise<ModelCapabilityReport> {
@@ -527,6 +580,12 @@ export default class BetterCanvasFeatures {
   }
 
   private cleanup(): void {
+    this.stopped = true;
+    for (const state of this.resizeObservers.values()) this.stopAutoResize(state);
+    this.expectedAutoResizes.clear();
+    this.expectedImportedResizes.clear();
+    this.activeAutoResizes.clear();
+    this.draggingCanvases.clear();
     this.advancedCanvasEventBridge?.stop();
     this.advancedCanvasEventBridge = null;
     for (const active of this.activeGenerations.values()) active.controller.abort();
@@ -863,9 +922,11 @@ export default class BetterCanvasFeatures {
   }
 
   private refresh(): void {
+    const liveContainers = new Set<HTMLElement>();
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
       const view = leaf.view as any;
       if (!view?.canvas) continue;
+      liveContainers.add(view.containerEl);
       this.observeAutoResize(view, view.canvas);
       this.bindMindMapShortcuts(view, view.canvas);
       this.bindCanvasRouteRefresh(view);
@@ -875,11 +936,15 @@ export default class BetterCanvasFeatures {
       this.applySelectionEdgeHighlight(view.canvas);
       if (view.file) this.syncAutoEdges(view.canvas, view.file);
     }
+    for (const state of this.resizeObservers.values()) {
+      if (!liveContainers.has(state.container)) this.stopAutoResize(state);
+    }
+    this.scheduleAutoResize();
     this.refreshReadonly();
   }
 
-  private decorate(canvas: any): void {
-    decorateCanvas(canvas);
+  private decorate(canvas: any, saveHistory = true): void {
+    decorateCanvas(canvas, saveHistory);
     const data = readCanvasData(canvas);
     syncHtmlPreviews(canvas, data, this.p.app.vault);
     for (const item of data.nodes) {
@@ -1133,21 +1198,21 @@ export default class BetterCanvasFeatures {
   private resizeNode(): void {
     const selection = this.selected();
     if (!selection) return;
-    this.autoResizingNodeIds.add(selection.node.id);
-    const resized = resizeNodeToText(selection.canvas, selection.node.id);
+    const resized = this.resizeTextNode(selection.canvas, selection.node.id);
     if (resized) this.decorate(selection.canvas);
     new Notice(resized ? "已调整节点尺寸。" : "仅支持非空文本节点。");
   }
 
   private toggleAutoResize(): void {
     const selection = this.selected();
-    if (!selection) return;
+    if (!selection || this.isResizeReadOnly(selection.canvas)) return;
     const enabled = (selection.node as any).bcAutoResize !== true;
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) {
-      this.autoResizingNodeIds.add(selection.node.id);
-      if (resizeNodeToText(selection.canvas, selection.node.id)) this.decorate(selection.canvas);
+      this.decorate(selection.canvas);
+      this.resizeTextNode(selection.canvas, selection.node.id);
     }
+    this.decorate(selection.canvas);
     new Notice(enabled ? "此节点已启用自动尺寸。" : "此节点已关闭自动尺寸。");
   }
 
@@ -1220,45 +1285,181 @@ export default class BetterCanvasFeatures {
     });
   }
 
-  private observeAutoResize(view: any, canvas: any): void {
+  private registerAutoResizeEvents(): void {
+    const workspace = this.p.app.workspace;
+    for (const name of ["better-canvas:theme-changed", "css-change"]) {
+      this.p.registerEvent(workspace.on(name, () => this.scheduleAutoResize(undefined, true)));
+    }
+    for (const name of ["advanced-canvas:data-loaded:before", "advanced-canvas:data-loaded:after"]) {
+      this.p.registerEvent(workspace.on(name, (canvas: any, incoming?: CanvasData) => {
+        // Undo/redo and preset imports also emit node-resized. Their restored
+        // geometry is not a user dragging a corner and must preserve opt-in.
+        const data = name.endsWith(":after") ? readCanvasData(canvas) : incoming;
+        if (data && Array.isArray(data.nodes)) {
+          this.expectedImportedResizes.set(canvas, new Map(data.nodes
+            .filter(node => Number.isFinite(node.width) && Number.isFinite(node.height))
+            .map(node => [node.id, { width: node.width, height: node.height }])));
+        }
+        if (name.endsWith(":after")) {
+          // Restoring an opted-out node must also clear its old automatic
+          // padding, even though that node will be skipped by the reflow.
+          for (const node of data?.nodes ?? []) {
+            const internal = canvas.nodes?.get?.(node.id);
+            const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+            if (element?.dataset && element?.style) {
+              decorateAutoResizeInsets(element, node, resolveCanvasTheme(data ?? {}));
+            }
+          }
+          this.scheduleAutoResize(canvas);
+        }
+      }));
+    }
+    for (const name of ["advanced-canvas:node-changed",
+      "advanced-canvas:node-text-content-changed", "advanced-canvas:node-rendered"]) {
+      this.p.registerEvent(workspace.on(name, (canvas: any) => this.scheduleAutoResize(canvas)));
+    }
+    this.p.registerEvent(workspace.on("advanced-canvas:node-editing-state-changed", (canvas: any, _node: any, editing: boolean) => {
+      if (!editing) this.scheduleAutoResize(canvas, true);
+    }));
+    this.p.registerEvent(workspace.on("advanced-canvas:readonly-changed", (canvas: any, readonly: boolean) => {
+      if (!readonly) this.scheduleAutoResize(canvas, true);
+    }));
+    this.p.registerEvent(workspace.on("advanced-canvas:dragging-state-changed", (canvas: any, dragging: boolean) => {
+      if (dragging) this.draggingCanvases.add(canvas);
+      else {
+        this.draggingCanvases.delete(canvas);
+        this.scheduleAutoResize(canvas);
+      }
+    }));
+    this.p.registerEvent(workspace.on("advanced-canvas:canvas-view-unloaded:before", (view: any) => {
+      const state = this.resizeObservers.get(view?.containerEl);
+      if (state) this.stopAutoResize(state);
+    }));
+  }
+
+  private watchAutoResizeFonts(doc: Document | undefined): void {
+    if (!doc?.fonts || this.fontDocuments.has(doc)) return;
+    this.fontDocuments.add(doc);
+    const refresh = (): void => this.scheduleAutoResize(undefined, true);
+    doc.fonts.addEventListener("loadingdone", refresh);
+    void doc.fonts.ready?.then(refresh);
+    this.p.register(() => {
+      doc.fonts.removeEventListener("loadingdone", refresh);
+      this.fontDocuments.delete(doc);
+    });
+  }
+
+  private scheduleAutoResize(canvas?: any, invalidate = false): void {
+    if (this.stopped) return;
+    for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
+      const view = leaf.view as any;
+      if (!view?.canvas || (canvas && canvas !== view.canvas)) continue;
+      const state = this.observeAutoResize(view, view.canvas);
+      if (!state) continue;
+      if (invalidate) state.revision++;
+      this.queueAutoResize(state);
+    }
+  }
+
+  private queueAutoResize(state: AutoResizeObservation): void {
+    if (this.stopped || this.resizeObservers.get(state.container) !== state || state.timer !== null) return;
+    state.timer = window.setTimeout(() => {
+      state.timer = null;
+      this.reflowAutoResize(state);
+    }, 220);
+  }
+
+  private autoResizeSnapshot(state: AutoResizeObservation, node: CanvasNodeData, theme: unknown) {
+    const internal = state.canvas.nodes?.get?.(node.id);
+    const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+    return {
+      // Ignore temporary measuring styles and our preview-sizer writes. Native
+      // content mutations and CSS/font events explicitly invalidate this key.
+      signature: JSON.stringify([state.revision, theme, node.text, node.width, node.height,
+        node.bcAutoResize, node.bcShape, node.bcBorderStyle, node.bcTextAlign, node.bcCustomClass,
+        node.bcScrapbookPreset, node.bcSketchPreset, node.bcSoftNotesPreset,
+        node.bcResearchPreset, node.bcResearchIntensity, node.styleAttributes]),
+      preview: element?.querySelector?.(".markdown-preview-view") ?? null
+    };
+  }
+
+  private reflowAutoResize(state: AutoResizeObservation): void {
+    const canvas = state.canvas;
+    if (this.stopped || this.resizeObservers.get(state.container) !== state) return;
+    if (state.view.canvas !== canvas) { this.stopAutoResize(state); return; }
+    if (this.isResizeReadOnly(canvas) || this.draggingCanvases.has(canvas)) return;
+    const data = readCanvasData(canvas);
+    const measured = new Set<string>();
+    let changed = false;
+    for (const node of data.nodes) {
+      if (node.type !== "text" || node.bcAutoResize !== true || !node.text?.trim()) continue;
+      const internal = canvas.nodes?.get?.(node.id);
+      const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
+      if (!element || internal?.isEditing || internal?.isResizing ||
+          ["is-dragging", "is-resizing", "is-editing"].some(name => element.classList?.contains(name))) continue;
+      const snapshot = this.autoResizeSnapshot(state, node, data.bcTheme);
+      if (!snapshot.preview) continue;
+      const previous = state.snapshots.get(node.id);
+      if (previous?.signature === snapshot.signature && previous?.preview === snapshot.preview) continue;
+      const before = JSON.stringify([node.width, node.height, node.bcTextAlign, node.styleAttributes]);
+      if (!this.resizeTextNode(canvas, node.id, false)) continue;
+      measured.add(node.id);
+      const after = readCanvasData(canvas).nodes.find(item => item.id === node.id);
+      if (after && before !== JSON.stringify([after.width, after.height, after.bcTextAlign, after.styleAttributes])) changed = true;
+    }
+    if (changed) this.decorate(canvas, false);
+    const current = readCanvasData(canvas);
+    for (const node of current.nodes) {
+      if (measured.has(node.id)) state.snapshots.set(node.id, this.autoResizeSnapshot(state, node, current.bcTheme));
+    }
+    const liveIds = new Set(current.nodes.map(node => node.id));
+    for (const id of state.snapshots.keys()) if (!liveIds.has(id)) state.snapshots.delete(id);
+    for (const id of this.expectedAutoResizes.get(canvas)?.keys() ?? []) {
+      if (!liveIds.has(id)) this.expectedAutoResizes.get(canvas)?.delete(id);
+    }
+    for (const id of this.expectedImportedResizes.get(canvas)?.keys() ?? []) {
+      if (!liveIds.has(id)) this.expectedImportedResizes.get(canvas)?.delete(id);
+    }
+    this.applyZoomBreakpoints(canvas);
+    const htmlSignature = JSON.stringify(current.nodes.map(node => [node.id, node.type, node.text, node.file]));
+    if (!changed && (measured.size > 0 || state.htmlSignature !== htmlSignature)) {
+      syncHtmlPreviews(canvas, current, this.p.app.vault);
+    }
+    state.htmlSignature = htmlSignature;
+  }
+
+  private stopAutoResize(state: AutoResizeObservation): void {
+    state.observer.disconnect();
+    if (state.timer !== null) window.clearTimeout(state.timer);
+    this.resizeObservers.delete(state.container);
+    this.expectedAutoResizes.delete(state.canvas);
+    this.expectedImportedResizes.delete(state.canvas);
+    this.activeAutoResizes.delete(state.canvas);
+    this.draggingCanvases.delete(state.canvas);
+  }
+
+  private observeAutoResize(view: any, canvas: any): AutoResizeObservation | undefined {
     const container = view?.containerEl;
-    if (!(container instanceof HTMLElement) || this.resizeObservers.has(container)) return;
-    this.resizeObservers.add(container);
-    let pending = false;
-    let hasContentChange = false;
+    if (typeof HTMLElement === "undefined" || !(container instanceof HTMLElement)) return;
+    const existing = this.resizeObservers.get(container);
+    if (existing?.canvas === canvas) return existing;
+    if (existing) this.stopAutoResize(existing);
+    const state = { view, canvas, container, timer: null, revision: 0, snapshots: new Map() } as AutoResizeObservation;
     const observer = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         if (mutation.type === "childList" || mutation.type === "characterData") {
-          hasContentChange = true;
-          break;
+          const target = mutation.target.nodeType === 3 ? mutation.target.parentElement : mutation.target as Element;
+          if (target?.closest?.(".markdown-preview-view")) { state.revision++; break; }
         }
       }
-      if (pending) return;
-      pending = true;
-      window.setTimeout(() => {
-        pending = false;
-        const shouldResizeText = hasContentChange;
-        hasContentChange = false;
-        const data = readCanvasData(canvas);
-        let resizedAny = false;
-        if (shouldResizeText) {
-          for (const node of data.nodes) {
-            if (node.type === "text" && (node as any).bcAutoResize === true) {
-              const internal = canvas?.nodes?.get?.(node.id);
-              const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
-              if (element?.classList?.contains("is-dragging")) continue;
-              this.autoResizingNodeIds.add(node.id);
-              if (resizeNodeToText(canvas, node.id)) resizedAny = true;
-            }
-          }
-        }
-        this.applyZoomBreakpoints(canvas);
-        if (resizedAny) this.decorate(canvas);
-        else syncHtmlPreviews(canvas, data);
-      }, 220);
+      this.queueAutoResize(state);
     });
-    observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "transform", "class"] });
-    this.p.register(() => observer.disconnect());
+    state.observer = observer;
+    this.resizeObservers.set(container, state);
+    observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true,
+      attributeFilter: ["style", "transform", "class", "data-bc-theme"] });
+    this.watchAutoResizeFonts(container.ownerDocument);
+    return state;
   }
 
   private flipEdges(): void {

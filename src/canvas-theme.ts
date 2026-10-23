@@ -1,4 +1,4 @@
-import { readCanvasData, type CanvasData } from "./canvas";
+import { readCanvasData, type CanvasData, type CanvasNodeData, type CanvasEdgeData } from "./canvas";
 import { clearSketchCanvas, decorateSketchCanvas } from "./sketch-renderer";
 import { clearSoftNotesNode, decorateSoftNotesNode } from "./soft-notes-style";
 import { clearResearchNode, decorateResearchNode } from "./research-style";
@@ -54,11 +54,99 @@ export function applyScrapbookPreset(data: CanvasData, ids: readonly string[], p
   };
 }
 
+function historySignature(data: unknown): string | undefined {
+  return JSON.stringify(data, (_key, value: unknown) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
+      : value);
+}
+
 /** Native importData updates nodes/edges only; the Canvas owns top-level data. */
 export function recordCanvasStyleHistory(canvas: any, data: CanvasData): void {
   canvas.requestPushHistory?.cancel?.();
   const current = canvas.history?.data?.[canvas.history.current];
-  if (!current || JSON.stringify(current) !== JSON.stringify(data)) canvas.pushHistory?.(data);
+  if (!current || historySignature(current) !== historySignature(data)) canvas.pushHistory?.(data);
+}
+
+function autoResizeHistoryInputs(node: CanvasNodeData): string | undefined {
+  const inputs: Record<string, unknown> = { ...node };
+  delete inputs.width;
+  delete inputs.height;
+  delete inputs.bcTextAlign;
+  if (inputs.styleAttributes && typeof inputs.styleAttributes === "object" && !Array.isArray(inputs.styleAttributes)) {
+    const attributes = { ...inputs.styleAttributes as Record<string, unknown> };
+    delete attributes.textAlign;
+    if (Object.keys(attributes).length) inputs.styleAttributes = attributes;
+    else delete inputs.styleAttributes;
+  }
+  return historySignature(inputs);
+}
+
+/**
+ * Merge only derived layout when history still describes its content/style
+ * inputs. Pending user edits keep their own undo boundary and scheduled save.
+ */
+export function mergeAutoResizeIntoCurrentHistory(canvas: any, nodeId: string): boolean {
+  const history = canvas?.history;
+  const current = history?.data?.[history.current] as CanvasData | undefined;
+  const live = readCanvasData(canvas);
+  const node = live.nodes.find(item => item.id === nodeId);
+  const stored = current?.nodes?.find(item => item.id === nodeId);
+  if (!current || !node || !stored || node.type !== "text" || node.bcAutoResize !== true) return false;
+  if (resolveCanvasTheme(current) !== resolveCanvasTheme(live)) return false;
+  if (autoResizeHistoryInputs(node) !== autoResizeHistoryInputs(stored)) return false;
+  const attributes = node.styleAttributes as Record<string, unknown>;
+  const next = {
+    ...stored,
+    width: node.width,
+    height: node.height,
+    bcTextAlign: node.bcTextAlign,
+    styleAttributes: { ...stored.styleAttributes as Record<string, unknown>, textAlign: attributes?.textAlign }
+  };
+  history.data[history.current] = {
+    ...current,
+    nodes: current.nodes.map(item => item.id === nodeId ? next : item)
+  };
+  return true;
+}
+
+/** Merge re-docking caused by automatic layout without creating an undo step. */
+export function mergeFloatingSidesIntoCurrentHistory(canvas: any, beforeEdges: CanvasEdgeData[]): boolean {
+  const history = canvas?.history;
+  const current = history?.data?.[history.current] as CanvasData | undefined;
+  const live = readCanvasData(canvas);
+  if (!current || resolveCanvasTheme(current) !== resolveCanvasTheme(live)) return false;
+  const beforeById = new Map(beforeEdges.map(edge => [edge.id, edge]));
+  const liveById = new Map(live.edges.map(edge => [edge.id, edge]));
+  const liveNodes = new Map(live.nodes.map(node => [node.id, node]));
+  const storedNodes = new Map(current.nodes.map(node => [node.id, node]));
+  let changed = false;
+  const edges = current.edges.map(stored => {
+    const before = beforeById.get(stored.id);
+    const edge = liveById.get(stored.id);
+    if (!before || !edge) return stored;
+    if (historySignature(stored) !== historySignature(before)) return stored;
+    // Sides calculated from pending node edits do not belong to older geometry.
+    if ([before.fromNode, before.toNode].some(id =>
+      !liveNodes.has(id) || !storedNodes.has(id) ||
+      historySignature(liveNodes.get(id)) !== historySignature(storedNodes.get(id)))) return stored;
+    const derived = {
+      ...before,
+      fromSide: before.fromFloating === true ? edge.fromSide : before.fromSide,
+      toSide: before.toFloating === true ? edge.toSide : before.toSide
+    };
+    if (historySignature(derived) !== historySignature(edge)) return stored;
+    const next = {
+      ...stored,
+      fromSide: before.fromFloating === true ? edge.fromSide : stored.fromSide,
+      toSide: before.toFloating === true ? edge.toSide : stored.toSide
+    };
+    if (historySignature(next) === historySignature(stored)) return stored;
+    changed = true;
+    return next;
+  });
+  if (changed) history.data[history.current] = { ...current, edges };
+  return changed;
 }
 
 export function setCanvasTheme(canvas: any, theme: CanvasThemeId): boolean {

@@ -21,6 +21,22 @@
   /* Fully transparent mask, used when a shape defines no outline ring. */
   --bc-ring-off: linear-gradient(transparent, transparent);
 }
+.canvas-node[data-bc-auto-resize="true"] .canvas-node-content .markdown-preview-view > .markdown-preview-sizer {
+  flex: 0 0 auto;
+  margin-block: auto;
+}
+.canvas-node[data-bc-auto-resize="true"] .canvas-node-content .markdown-preview-view::before,
+.canvas-node[data-bc-auto-resize="true"] .canvas-node-content .markdown-preview-view::after {
+  min-height: 8px;
+  max-height: 8px;
+  flex: 0 0 8px;
+}
+.canvas-node[data-bc-auto-resize="true"] .markdown-rendered {
+  overflow-wrap: anywhere;
+}
+.canvas-node[data-bc-auto-resize="true"][data-bc-auto-shape="true"] .canvas-node-content {
+  padding: var(--bc-auto-content-padding) !important;
+}
 
 /* Modern card treatment: a soft tint of the node colour inside a low-contrast
    border, instead of a saturated outline around a plain white card. Better
@@ -1989,7 +2005,7 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   padding: 0;
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .markdown-preview-sizer {
-  min-height: 0 !important;
+  min-height: auto;
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] :is(h1,h2,h3,h4,h5,h6,.cm-header) {
   color: #292e28;
@@ -2389,7 +2405,7 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   padding: 0;
 }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node-content .markdown-preview-sizer {
-  min-height: 0 !important;
+  min-height: auto;
   margin-block: auto;
 }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node-content :is(p, h1, h2, h3) {
