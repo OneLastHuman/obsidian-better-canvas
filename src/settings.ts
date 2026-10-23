@@ -24,9 +24,45 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
   private activeSection = "canvas";
   private expandedSections = new Set<string>();
   private providerModal: Modal | null = null;
+  private onReturnCallback: (() => void) | null = null;
+  private returnButton: HTMLButtonElement | null = null;
+
+  private readonly plugin: any;
 
   constructor(app: App, plugin: any, private features: any) {
     super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  openSection(section: string, callbacks: { onReturn?: () => void } = {}): void {
+    if (["canvas", "interaction", "ai", "files"].includes(section)) this.activeSection = section;
+    this.draftSettings = null;
+    this.baseSettings = null;
+    this.hasUnsavedChanges = false;
+    const settingsApi = (this.app as any).setting;
+    const pluginId = String((this.plugin as any)?.manifest?.id || "");
+    settingsApi?.open?.();
+    if (pluginId) settingsApi?.openTabById?.(pluginId);
+    this.onReturnCallback = callbacks.onReturn ?? null;
+    this.display();
+  }
+
+  hide(): void {
+    this.onReturnCallback = null;
+  }
+
+  /** Open the AI page from the Ask AI panel without rebuilding the settings IA. */
+  openAISection(callbacks: { onReturn?: () => void } = {}): void {
+    this.openSection("ai", callbacks);
+  }
+
+  private returnToQuestion(): void {
+    if (this.isSaving || this.hasUnsavedChanges) return;
+    const callback = this.onReturnCallback;
+    if (!callback) return;
+    this.onReturnCallback = null;
+    (this.app as any).setting?.close?.();
+    callback();
   }
 
   private cloneSettings(settings: any): any {
@@ -51,6 +87,10 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     const pages = this.containerEl.querySelector<HTMLElement>(".bc-settings-pages");
     if (pages) pages.inert = this.isSaving;
     if (this.saveButton) this.saveButton.disabled = !this.hasUnsavedChanges || this.isSaving;
+    if (this.returnButton) {
+      this.returnButton.disabled = this.hasUnsavedChanges || this.isSaving;
+      this.returnButton.title = this.hasUnsavedChanges ? "请先保存或放弃更改。" : "回到刚才的问题";
+    }
     if (this.discardButton) {
       this.discardButton.hidden = !this.hasUnsavedChanges;
       this.discardButton.disabled = this.isSaving;
@@ -147,6 +187,11 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     this.discardButton.addEventListener("click", () => this.discardChanges());
     this.saveButton = actions.createEl("button", { text: "保存更改", cls: "mod-cta", attr: { type: "button" } });
     this.saveButton.addEventListener("click", () => { void this.saveDraftSettings(); });
+    this.returnButton = null;
+    if (this.onReturnCallback) {
+      this.returnButton = actions.createEl("button", { text: "返回提问", attr: { type: "button" } });
+      this.returnButton.addEventListener("click", () => this.returnToQuestion());
+    }
     this.updateSaveStatus();
   }
 
@@ -269,6 +314,13 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     new Setting(readonly).setName("固定视图").setDesc("只读时，锁定拖动画布和缩放。仍可通过命令缩放到全部内容或所选卡片。")
       .addToggle(toggle => toggle.setValue(settings.readOnlyLockPanZoomEnabled === true)
         .onChange(async value => { settings.readOnlyLockPanZoomEnabled = value; await this.markDirty(); }));
+    const guide = this.group(page, "首次使用");
+    new Setting(guide).setName("重新显示引导")
+      .setDesc("重置欢迎入口和空画布提示。不会删除画布或 AI 设置。")
+      .addButton(button => button.setButtonText("重置引导").onClick(async () => {
+        settings.onboarding = this.features.resetOnboardingSettings();
+        await this.markDirty();
+      }));
   }
 
   private renderAISettings(page: HTMLElement): void {
