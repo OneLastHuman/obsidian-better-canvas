@@ -313,6 +313,39 @@ describe("Node auto-resize manual drag-resize override", () => {
   });
 });
 
+describe("HTML preview shutdown integration", () => {
+  it("does not restart previews from a queued Canvas frame after plugin unload", () => {
+    const handlers = new Map<string, () => void>();
+    class Element {
+      addEventListener(name: string, callback: () => void) { handlers.set(name, callback); }
+      removeEventListener(name: string) { handlers.delete(name); }
+    }
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("HTMLElement", Element);
+    vi.stubGlobal("window", {
+      requestAnimationFrame: (callback: FrameRequestCallback) => { frames.push(callback); return frames.length; }
+    });
+    const context = createMockPlugin();
+    const features = new BetterCanvasFeatures(context.plugin);
+    features.init();
+    const canvas = makeCanvas({ nodes: [], edges: [] });
+    vi.spyOn(enhancements, "decorateCanvas").mockImplementation(() => {});
+    const syncHtml = vi.spyOn(htmlPreview, "syncHtmlPreviews").mockImplementation(() => {});
+    vi.spyOn(features as any, "applyZoomBreakpoints").mockImplementation(() => {});
+    vi.spyOn(features as any, "applySelectionEdgeHighlight").mockImplementation(() => {});
+    (features as any).bindCanvasRouteRefresh({ canvas, containerEl: new Element() });
+    handlers.get("wheel")!();
+    expect(frames).toHaveLength(1);
+    context.registeredCleanups.forEach(cleanup => cleanup());
+    context.app.workspace.getLeavesOfType.mockClear();
+    frames.forEach(callback => callback(0));
+    (features as any).decorate(canvas);
+    (features as any).refresh();
+    expect(syncHtml).not.toHaveBeenCalled();
+    expect(context.app.workspace.getLeavesOfType).not.toHaveBeenCalled();
+  });
+});
+
 describe("theme-aware auto-resize coordination", () => {
   function setup() {
     vi.useFakeTimers();
