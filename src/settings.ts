@@ -1,10 +1,13 @@
-import { App, Modal, Notice, PluginSettingTab, Setting, SettingGroup, setIcon } from "obsidian";
+import { App, Modal, Notice, Platform, PluginSettingTab, Setting, SettingGroup, setIcon, type DropdownComponent, type TextComponent } from "obsidian";
 import { normalizeNamedPromptProfiles, removeNamedPromptProfile, upsertNamedPromptProfile } from "./prompt-profiles";
 import { modelCapabilityReportKey, type ModelCapabilityReport } from "./model-capabilities";
 import { normalizeTemperatureForProtocol, parseProviderParamsJson, providerTemperatureLimit, type ProviderRequestProtocol } from "./provider-params";
 import { confirmAndRemoveProviderProfile } from "./provider-profile-actions";
 import { validateNumericRangeInput } from "./numeric-range-validation";
 import { normalizeDefaultNodeTextAlignment } from "./node-defaults";
+import { listCodexModels } from "./codex-models";
+import { listOpenCodeModels } from "./opencode-acp";
+import { LOCAL_AGENTS, localAgentDefinition, localAgentConfig, updateLocalAgentConfig, localModelChoices, type LocalAgentBackend, type LocalModelOption } from "./local-agent-settings";
 
 let numericRangeDescriptionId = 0;
 
@@ -24,6 +27,8 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
   private activeSection = "canvas";
   private expandedSections = new Set<string>();
   private providerModal: Modal | null = null;
+  private localModelCatalogs = new Map<string, LocalModelOption[]>();
+  private localModelRequest: AbortController | null = null;
   private onReturnCallback: (() => void) | null = null;
   private returnButton: HTMLButtonElement | null = null;
 
@@ -48,6 +53,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
   }
 
   hide(): void {
+    this.cancelLocalModelRequest();
     this.onReturnCallback = null;
   }
 
@@ -150,6 +156,7 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
   }
 
   display(): void {
+    this.cancelLocalModelRequest();
     this.currentSettings();
     const root = this.containerEl;
     root.empty();
@@ -193,6 +200,11 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
       this.returnButton.addEventListener("click", () => this.returnToQuestion());
     }
     this.updateSaveStatus();
+  }
+
+  private cancelLocalModelRequest(): void {
+    this.localModelRequest?.abort();
+    this.localModelRequest = null;
   }
 
   private group(page: HTMLElement, title?: string): HTMLElement {
@@ -327,15 +339,15 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     const settings = this.currentSettings();
     const text = this.group(page, "文字生成");
     new Setting(text).setName("使用方式").setDesc("选择你已经在用的模型服务或本地工具。")
-      .addDropdown(dropdown => dropdown.addOption("api", "模型服务 API").addOption("codex-cli", "Codex CLI").addOption("opencode-acp", "OpenCode ACP")
-        .setValue(settings.backend === "codex-cli" || settings.backend === "opencode-acp" ? settings.backend : "api")
-        .onChange(async value => { settings.backend = value; await this.markDirty(); this.display(); }));
-    if (settings.backend === "codex-cli" || settings.backend === "opencode-acp") {
-      const codex = settings.backend === "codex-cli";
-      const key = codex ? "codexBinaryPath" : "opencodeBinaryPath";
-      new Setting(text).setName("程序路径").setDesc("使用本机已安装并登录的工具。留空时自动查找；模型与登录在对应工具中设置。")
-        .addText(input => input.setPlaceholder(codex ? "codex" : "opencode").setValue(String(settings[key] || ""))
-          .onChange(async value => { settings[key] = value.trim(); await this.markDirty(); }));
+      .addDropdown(dropdown => {
+        dropdown.addOption("api", "模型服务 API");
+        for (const agent of LOCAL_AGENTS) dropdown.addOption(agent.id, agent.name);
+        dropdown.setValue(localAgentDefinition(settings.backend) ? settings.backend : "api")
+          .onChange(async value => { settings.backend = value; await this.markDirty(); this.display(); });
+      });
+    const agent = localAgentDefinition(settings.backend);
+    if (agent) {
+      this.renderLocalAgentSettings(text, page, agent.id);
     } else {
       this.renderModelServices(text, settings, page);
     }
@@ -343,6 +355,101 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
     this.renderImageSettings(this.details(page, "images", "图片生成", "单独配置模型服务"));
     this.renderFlashcardSettings(this.details(page, "flashcards", "学习卡片", "生成后的保存方式"));
     this.renderMcpSettings(this.details(page, "mcp", "外部工具", "MCP · 按需连接"));
+  }
+
+  private renderLocalAgentSettings(group: HTMLElement, page: HTMLElement, backend: LocalAgentBackend): void {
+    const settings = this.currentSettings();
+    const agent = localAgentDefinition(backend)!;
+    let dropdown: DropdownComponent;
+    let manualInput: TextComponent | undefined;
+    let resetCatalog = () => {};
+    const catalogKey = () => JSON.stringify([backend, localAgentConfig(settings, backend).binaryPath]);
+    const modelSetting = new Setting(group).setName("模型");
+    modelSetting.settingEl.addClass("bc-local-model-setting");
+    const populate = () => {
+      const selected = localAgentConfig(settings, backend).model;
+      dropdown.selectEl.empty();
+      dropdown.addOption("", "使用工具默认模型");
+      const models = this.localModelCatalogs.get(catalogKey()) ?? agent.models;
+      for (const model of localModelChoices(models, selected)) {
+        dropdown.addOption(model.id, model.name === model.id ? model.id : `${model.name} · ${model.id}`);
+      }
+      dropdown.setValue(selected);
+    };
+    modelSetting
+      .setDesc(agent.supportsModel === false
+        ? "IBM Bob 使用自身配置的模型；当前命令行未提供模型覆盖参数。"
+        : agent.discovery
+          ? "点击「读取模型」从本机工具获取列表。选择后点击「保存更改」生效。"
+          : "列表为常用模型 ID，实际可用性取决于工具和账号。也可展开下方设置手动填写。")
+      .addDropdown(component => {
+        dropdown = component;
+        component.selectEl.addClass("bc-local-model-select");
+        populate();
+        component.setDisabled(!Platform.isDesktopApp || agent.supportsModel === false)
+          .onChange(async value => {
+            updateLocalAgentConfig(settings, backend, { model: value });
+            manualInput?.setValue(value);
+            await this.markDirty();
+          });
+      });
+    if (agent.discovery) {
+      const feedback = modelSetting.descEl.createDiv({ attr: { role: "status", "aria-live": "polite" } });
+      modelSetting.addButton(button => {
+        resetCatalog = () => {
+          this.cancelLocalModelRequest();
+          populate();
+          feedback.setText("");
+          button.setButtonText("读取模型").setDisabled(!Platform.isDesktopApp);
+        };
+        button.setButtonText("读取模型").setDisabled(!Platform.isDesktopApp).onClick(async () => {
+          this.cancelLocalModelRequest();
+          const controller = new AbortController();
+          this.localModelRequest = controller;
+          const key = catalogKey();
+          button.setDisabled(true).setButtonText("正在读取…");
+          feedback.setText("正在读取模型列表…");
+          try {
+            const options = { binaryPath: localAgentConfig(settings, backend).binaryPath, signal: controller.signal, timeoutMs: 15_000 };
+            const models = await (backend === "codex-cli" ? listCodexModels(options) : listOpenCodeModels(options));
+            if (controller.signal.aborted || this.localModelRequest !== controller || key !== catalogKey()) return;
+            this.localModelCatalogs.set(key, models);
+            if (this.localModelCatalogs.size > 8) this.localModelCatalogs.delete(this.localModelCatalogs.keys().next().value!);
+            populate();
+            feedback.setText(models.length ? `已读取 ${models.length} 个模型。列表不代表账号的访问权限。` : "工具没有返回模型。可使用默认模型或手动填写。");
+          } catch (error) {
+            if (controller.signal.aborted || this.localModelRequest !== controller) return;
+            feedback.setText("读取失败：" + (error instanceof Error ? error.message : String(error)));
+          } finally {
+            if (this.localModelRequest === controller) {
+              this.localModelRequest = null;
+              button.setDisabled(false).setButtonText("重新读取");
+            }
+          }
+        });
+      });
+    }
+    new Setting(group).setName("程序路径").setDesc("仅支持桌面版。使用本机已安装并登录的工具，留空时从 PATH 查找。")
+      .addText(input => input.setPlaceholder(agent.binary).setValue(localAgentConfig(settings, backend).binaryPath)
+        .onChange(async value => {
+          updateLocalAgentConfig(settings, backend, { binaryPath: value.trim() });
+          resetCatalog();
+          await this.markDirty();
+        }));
+    if (agent.supportsModel !== false) {
+      const manual = this.details(page, "local-model-" + backend, "手动填写模型", "模型未列出时，填写工具支持的完整模型 ID。留空恢复默认。");
+      new Setting(manual).setName("模型 ID")
+        .setDesc(backend === "opencode-acp" ? "例如 provider/model；必须是 OpenCode 当前会话提供的模型。" : "自定义服务的模型可能不在工具返回的目录中。")
+        .addText(input => {
+          manualInput = input;
+          input.setValue(localAgentConfig(settings, backend).model).setPlaceholder("使用工具默认模型")
+            .onChange(async value => {
+              updateLocalAgentConfig(settings, backend, { model: value.trim() });
+              populate();
+              await this.markDirty();
+            });
+        });
+    }
   }
 
   private renderModelServices(page: HTMLElement, settings: any, section: HTMLElement): void {

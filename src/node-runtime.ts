@@ -2,6 +2,8 @@ export interface NodeRuntimeModules {
   childProcess: any;
   os: any;
   process: any;
+  fs?: any;
+  path?: any;
 }
 
 /**
@@ -23,7 +25,9 @@ export async function loadNodeRuntimeModules(): Promise<NodeRuntimeModules> {
       return {
         childProcess: requireModule.call(rendererWindow, "child_process"),
         os: requireModule.call(rendererWindow, "os"),
-        process: requireModule.call(rendererWindow, "process")
+        process: requireModule.call(rendererWindow, "process"),
+        fs: requireModule.call(rendererWindow, "fs"),
+        path: requireModule.call(rendererWindow, "path")
       };
     } catch (error) {
       throw new Error(
@@ -34,10 +38,12 @@ export async function loadNodeRuntimeModules(): Promise<NodeRuntimeModules> {
   }
 
   // Vitest/Node runtime fallback; browser builds should always use window.require above.
-  const [childProcess, os, processModule] = await Promise.all([
+  const [childProcess, os, processModule, fs, path] = await Promise.all([
     import("node:child_process"),
     import("node:os"),
-    import("node:process")
+    import("node:process"),
+    import("node:fs"),
+    import("node:path")
   ]);
-  return { childProcess, os, process: processModule.default ?? processModule };
+  return { childProcess, os, process: processModule.default ?? processModule, fs, path };
 }
