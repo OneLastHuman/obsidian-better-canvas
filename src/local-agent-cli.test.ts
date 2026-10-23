@@ -409,7 +409,7 @@ describe("Windows launchers", () => {
     await fs.promises.mkdir(path.dirname(entry), { recursive: true });
     await fs.promises.writeFile(entry, "// fixture, never executed");
     await fs.promises.writeFile(path.join(testRoot, "node.exe"), "fixture");
-    await fs.promises.writeFile(path.join(testRoot, "qwen.cmd"), '@ECHO off\n"%_prog%" "%dp0%\\node_modules\\example\\cli.js" %*\n');
+    await fs.promises.writeFile(path.join(testRoot, "qwen.cmd"), '@ECHO off\n"%_prog%" "%dp0%/node_modules/example/cli.js" %*\n');
     const { child, promise, spawned } = startRun("qwen-code", { model: "model & echo BAD" });
     await spawned;
     expect(spawn.mock.calls[0][0]).toBe(path.join(testRoot, "node.exe"));
