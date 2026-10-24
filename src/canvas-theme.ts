@@ -2,7 +2,7 @@ import { readCanvasData, type CanvasData, type CanvasNodeData, type CanvasEdgeDa
 import { clearSketchCanvas, decorateSketchCanvas } from "./sketch-renderer";
 import { clearSoftNotesNode, decorateSoftNotesNode } from "./soft-notes-style";
 import { clearResearchNode, decorateResearchNode } from "./research-style";
-import { clearRoundedMapNode, decorateRoundedMapNode } from "./rounded-map-style";
+import { clearRoundedMapNode, decorateRoundedMapNode, pruneRoundedMapGeometry } from "./rounded-map-style";
 
 export type CanvasThemeId = "default" | "scrapbook" | "sketch" | "rounded-map" | "research" | "soft-notes";
 
@@ -192,4 +192,5 @@ export function decorateCanvasTheme(canvas: any): void {
       delete el.dataset.bcPaperBorder;
     }
   }
+  if (theme === "rounded-map") pruneRoundedMapGeometry(wrapper?.ownerDocument);
 }
