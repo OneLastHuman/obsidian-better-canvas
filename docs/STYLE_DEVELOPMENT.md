@@ -74,10 +74,17 @@ node scripts/verify-theme-text-layout.mjs --vault "Better Canvas Test" --cli "Ob
 
 - 容器的 CSS `clip-path: path(...)`。
 - 定位锚元素的 mask 描边。
+- 选中光环（同一路径按固定像素外扩，不随尺寸缩放）。
 - 预设缩略图。
 - 静态导出。
 
-尺寸变更时重新计算装饰。切换主题或卸载时，移除私有 CSS 变量。路径只改变视觉轮廓，原生矩形交互几何保持不变。
+尺寸变更时重新计算装饰。`decorateRoundedMapNode` 会把节点元素注册到按文档共享的 `ResizeObserver`；原生拖动角点时节点盒子每帧变化，`refreshRoundedMapGeometry` 因此在同一帧内重算裁形、描边、选中光环和文字安全区。不要改回只依赖 `advanced-canvas:node-resized` 等离散事件：这些事件在拖动过程中不触发，会让卡面、描边和光环停在旧尺寸。
+
+`clip-path: path()` 与 mask 的 SVG 都不随元素缩放，路径必须按新尺寸重新生成；描边 SVG 需要 `preserveAspectRatio="none"`，否则尺寸不同步时会等比居中，出现错位双框。切换主题或卸载时，移除私有 CSS 变量并注销观察。
+
+选中光环按官方 `box-shadow: 0 0 0 2px var(--color-accent)` 的语义实现：固定像素间距、跟随轮廓。不要用百分比 `transform: scale()` 代替，那会让间距随节点尺寸变化，且不同形状的斜边与尖角间距不一致。
+
+路径只改变视觉轮廓，原生矩形交互几何保持不变。
 
 设计背景与原型见 [主题设计索引](design/README.md)。
 

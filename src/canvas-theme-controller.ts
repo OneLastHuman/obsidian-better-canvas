@@ -6,7 +6,7 @@ import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
 import { clearSoftNotesNode, ensureSoftNotesGeometry, softNotesClip, softNotesPreset } from "./soft-notes-style";
 import { clearResearchNode, RESEARCH_SERIF } from "./research-style";
 import { decorateCanvasTheme, resolveCanvasTheme, setCanvasTheme, type CanvasThemeId } from "./canvas-theme";
-import { clearRoundedMapNode, roundedMapCss } from "./rounded-map-style";
+import { clearRoundedMapNode, roundedMapCss, stopRoundedMapGeometry } from "./rounded-map-style";
 import { ROUNDED_MAP_PRESETS } from "./node-visual-style";
 
 /**
@@ -366,6 +366,7 @@ export default class CanvasThemeController {
     this.decoratedCanvases.clear();
     document.getElementById?.("bc-soft-geometry")?.remove();
     document.getElementById?.(FONT_STYLE_ID)?.remove();
+    stopRoundedMapGeometry();
   }
 
   private clearDecoration(canvas: any): void {

@@ -2406,13 +2406,14 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded]:is(.is-selected, .is-focused, .is-editing)::before {
   content: "";
   position: absolute;
-  inset: 0;
+  /* Mirrors Obsidian's fixed 2px selection ring instead of a percentage
+     scale, which made the gap grow with the node while it was resized. */
+  inset: calc(-1 * var(--bc-rounded-selection-inset, 10px));
   pointer-events: none;
   background: var(--color-accent);
-  opacity: .65;
-  transform: scale(1.045);
-  mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
-  -webkit-mask: var(--bc-rounded-ring) 0 0 / 100% 100% no-repeat;
+  opacity: .85;
+  mask: var(--bc-rounded-selection) 0 0 / 100% 100% no-repeat;
+  -webkit-mask: var(--bc-rounded-selection) 0 0 / 100% 100% no-repeat;
 }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded] .canvas-node-content {
   box-sizing: border-box;
