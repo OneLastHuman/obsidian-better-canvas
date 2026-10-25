@@ -322,6 +322,11 @@ export default class BetterCanvasFeatures {
   private portalManager: CanvasPortalManager | null = null;
   private advancedCanvasEventBridge: AdvancedCanvasEventBridge | null = null;
   private readonlyController = new CanvasReadonlyController();
+  // Resolved CSS --variable-breakpoint per node element. getComputedStyle
+  // forces a style flush, so a wheel frame must not repeat it for every node.
+  private cssBreakpointCache = new WeakMap<HTMLElement, number>();
+  /** Nodes whose inline border colour this plugin wrote, so clearing only undoes its own write. */
+  private coloredNodeHosts = new WeakSet<HTMLElement>();
   private p: any;
 
   constructor(plugin: any) {
@@ -947,6 +952,9 @@ export default class BetterCanvasFeatures {
 
   private decorate(canvas: any, saveHistory = true): void {
     if (this.stopped) return;
+    // Themes and style edits can change --variable-breakpoint, and decorate
+    // runs after both; zoom frames reuse the resolved values in between.
+    this.cssBreakpointCache = new WeakMap<HTMLElement, number>();
     decorateCanvas(canvas, saveHistory);
     const data = readCanvasData(canvas);
     syncHtmlPreviews(canvas, data, this.p.app.vault);
@@ -955,9 +963,20 @@ export default class BetterCanvasFeatures {
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
       if (!(element instanceof HTMLElement)) continue;
       const host = (element.closest(".canvas-node") as HTMLElement | null) ?? element;
-      if (typeof (item as any).bcNodeColor === "string") host.style.borderColor = String((item as any).bcNodeColor);
-      host.dataset.bcShape = resolveCanvasNodeShape(item as any);
-      host.dataset.bcBorder = resolveCanvasNodeBorder(item as any);
+      // Guard every write: an unchanged value would still invalidate style and
+      // fire the container MutationObserver, which is the expensive part on
+      // large boards where decorate runs after every edit.
+      const nodeColor = typeof (item as any).bcNodeColor === "string" ? String((item as any).bcNodeColor) : "";
+      if (nodeColor) {
+        if (host.style.borderColor !== nodeColor) host.style.borderColor = nodeColor;
+        this.coloredNodeHosts.add(host);
+      } else if (this.coloredNodeHosts.delete(host)) {
+        host.style.borderColor = "";
+      }
+      const shape = resolveCanvasNodeShape(item as any);
+      if (host.dataset.bcShape !== shape) host.dataset.bcShape = shape;
+      const border = resolveCanvasNodeBorder(item as any);
+      if (host.dataset.bcBorder !== border) host.dataset.bcBorder = border;
       const previousClass = host.dataset.bcCustomClass;
       if (previousClass) host.classList.remove("bc-user-" + previousClass);
       const nextClass = typeof (item as any).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item as any).bcCustomClass))
@@ -967,8 +986,10 @@ export default class BetterCanvasFeatures {
 
       // AI actions live in the Canvas node context menu. Remove any toolbar
       // left over from a previous plugin version so it cannot cover node text.
-      host.querySelector(":scope > .bc-card-toolbar")?.remove();
-      host.classList.remove("bc-has-card-toolbar");
+      if (host.classList.contains("bc-has-card-toolbar")) {
+        host.querySelector(":scope > .bc-card-toolbar")?.remove();
+        host.classList.remove("bc-has-card-toolbar");
+      }
     }
     this.applyFocus(canvas);
   }
@@ -1126,15 +1147,24 @@ export default class BetterCanvasFeatures {
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
       if (!(element instanceof HTMLElement)) continue;
       const stored = (nodeData as any).bcZoomBreakpoint;
-      const cssValue = window.getComputedStyle(element).getPropertyValue("--variable-breakpoint").trim();
-      const cssBreakpoint = cssValue ? Number.parseFloat(cssValue) : NaN;
-      const breakpoint = typeof stored === "number" && Number.isFinite(stored) ? stored : cssBreakpoint;
+      const breakpoint = typeof stored === "number" && Number.isFinite(stored)
+        ? stored : this.cssBreakpointOf(element);
       if (!Number.isFinite(breakpoint)) {
-        delete element.dataset.bcBreakpointHidden;
+        if (element.dataset.bcBreakpointHidden !== undefined) delete element.dataset.bcBreakpointHidden;
         continue;
       }
-      element.dataset.bcBreakpointHidden = String(isBelowZoomBreakpoint(scale, breakpoint));
+      const hidden = String(isBelowZoomBreakpoint(scale, breakpoint));
+      if (element.dataset.bcBreakpointHidden !== hidden) element.dataset.bcBreakpointHidden = hidden;
     }
+  }
+
+  private cssBreakpointOf(element: HTMLElement): number {
+    const cached = this.cssBreakpointCache.get(element);
+    if (cached !== undefined) return cached;
+    const value = window.getComputedStyle(element).getPropertyValue("--variable-breakpoint").trim();
+    const breakpoint = value ? Number.parseFloat(value) : NaN;
+    this.cssBreakpointCache.set(element, breakpoint);
+    return breakpoint;
   }
   private setNodeCustomClass(): void {
     const selection = this.selected();
@@ -1224,6 +1254,22 @@ export default class BetterCanvasFeatures {
     if (!(container instanceof HTMLElement) || this.boundRouteContainers.has(container)) return;
     this.boundRouteContainers.add(container);
 
+    // Zooming only moves the viewport transform: node/edge geometry, text and
+    // selection are unchanged, so a wheel frame must not pay for a full
+    // decorate pass (O(nodes + edges) DOM writes, several ms on large boards).
+    // Only the zoom breakpoint visibility depends on the current scale.
+    let zoomQueued = false;
+    const scheduleZoom = () => {
+      if (this.stopped || zoomQueued) return;
+      zoomQueued = true;
+      window.requestAnimationFrame(() => {
+        zoomQueued = false;
+        if (this.stopped) return;
+        const canvas = view?.canvas;
+        if (canvas) this.applyZoomBreakpoints(canvas);
+      });
+    };
+
     let queued = false;
     const schedule = () => {
       if (this.stopped || queued) return;
@@ -1241,12 +1287,12 @@ export default class BetterCanvasFeatures {
     container.addEventListener("pointerup", schedule, true);
     container.addEventListener("pointercancel", schedule, true);
     container.addEventListener("keyup", schedule, true);
-    container.addEventListener("wheel", schedule, { capture: true, passive: true });
+    container.addEventListener("wheel", scheduleZoom, { capture: true, passive: true });
     this.p.register(() => {
       container.removeEventListener("pointerup", schedule, true);
       container.removeEventListener("pointercancel", schedule, true);
       container.removeEventListener("keyup", schedule, true);
-      container.removeEventListener("wheel", schedule, true);
+      container.removeEventListener("wheel", scheduleZoom, true);
       this.boundRouteContainers.delete(container);
     });
   }
