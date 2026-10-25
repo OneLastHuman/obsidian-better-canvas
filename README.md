@@ -25,7 +25,7 @@ Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法�
 
 **画布编辑和主题无需配置 AI。** 内容仍保存在 Vault 的 `.canvas` 文件中。
 
-*截图来自 Windows / Obsidian 1.14.4 的真实界面。示例内容可在[示例画布](docs/examples/readme-showcase/)中取得；采集与验证范围见[截图说明](docs/screenshots/README.md)。*
+*截图来自 Obsidian 1.14.4 的真实界面（多数为 Windows，提问弹窗为 macOS）。示例内容可在[示例画布](docs/examples/readme-showcase/)中取得；采集与验证范围见[截图说明](docs/screenshots/README.md)。*
 
 ## 选一种适合内容的画布
 
