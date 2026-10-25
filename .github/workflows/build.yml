@@ -53,9 +53,9 @@ jobs:
           cp styles.css release/styles.css
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add main.js release/main.js release/manifest.json release/styles.css
+          git add release/main.js release/manifest.json release/styles.css
           if git diff --cached --quiet; then
-            echo "Root bundle and release directory are already up to date."
+            echo "Release directory is already up to date."
             exit 0
           fi
           git commit -m "build: refresh installable plugin bundle"
