@@ -5,6 +5,9 @@ node_modules/
 # Local copies of the CI install-package output.
 /dist/
 
+# Build output. The installable bundle is published to release/ by CI.
+/main.js
+
 # Ephemeral end-to-end acceptance outputs belong in CI artifacts or PR/Issue attachments.
 /docs/e2e-acceptance/
 /test-results/

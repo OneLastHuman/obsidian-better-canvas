@@ -44,7 +44,7 @@
 | --- | --- |
 | [`src/`](../src/) | 插件源码及同目录的单元测试 |
 | [`src/assets/`](../src/assets/README.md) | 打包字体、来源与许可证 |
-| 根目录 `main.js`、`manifest.json`、`styles.css` | 插件安装入口；`main.js` 是构建产物 |
+| 根目录 `manifest.json`、`styles.css` | 插件元数据与样式；`main.js` 是构建产物，不纳入版本控制 |
 | [`release/`](../release/README.md) | 主分支成功构建后自动同步的安装文件 |
 | [`scripts/`](../scripts/) | 元数据、工作流工件策略与桌面验证脚本 |
 | [`.github/`](../.github/) | Issue/PR 模板与构建、发布工作流 |

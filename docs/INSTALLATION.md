@@ -28,7 +28,7 @@ Releases 也会提供三个独立文件，可按下方的手动安装方式使�
 
 然后在 **设置 → 社区插件** 中重新加载列表并启用插件。
 
-成功的 `main` 分支 Build workflow 会将生产构建的 `main.js` 更新到仓库根目录，并将 `main.js`、`manifest.json` 和 `styles.css` 同步到 [`release/`](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 目录。Pull Request 构建只负责验证，不生成安装包 artifact。`release/` 提供主分支最新成功构建，不等同于固定的正式版本；正式版请使用 GitHub Releases。
+成功的 `main` 分支 Build workflow 会将生产构建的 `main.js`、`manifest.json` 和 `styles.css` 同步到 [`release/`](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 目录。`main.js` 是构建产物，不纳入版本控制，只在本地构建后生成。Pull Request 构建只负责验证，不生成安装包 artifact。`release/` 提供主分支最新成功构建，不等同于固定的正式版本；正式版请使用 GitHub Releases。
 
 ## 方式三：从源码构建
 
