@@ -744,15 +744,18 @@ export function decorateCanvas(canvas: any, saveHistory = true): void {
     const shape = storedShape === "rectangle" ? "default" : storedShape === "circle" ? "circle" : storedShape;
     const borderStyle = typeof nodeData.bcBorderStyle === "string" ? nodeData.bcBorderStyle
       : typeof styleAttributes.border === "string" ? styleAttributes.border : "solid";
-    element.dataset.bcShape = shape;
+    // Writing an unchanged value still invalidates style and wakes the
+    // container MutationObserver, so compare before every DOM write.
+    if (element.dataset.bcShape !== shape) element.dataset.bcShape = shape;
     decorateAutoResizeInsets(element, nodeData, resolveCanvasTheme(data));
-    element.dataset.bcBorder = borderStyle;
-    element.dataset.bcTextAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign
+    if (element.dataset.bcBorder !== borderStyle) element.dataset.bcBorder = borderStyle;
+    const textAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left";
-    element.style.textAlign = element.dataset.bcTextAlign ?? "left";
+    if (element.dataset.bcTextAlign !== textAlign) element.dataset.bcTextAlign = textAlign;
+    if (element.style.textAlign !== textAlign) element.style.textAlign = textAlign;
     const contents = element.querySelectorAll<HTMLElement>(".canvas-node-content, .canvas-node-container, .canvas-node-iframe");
     contents.forEach(child => {
-      child.style.textAlign = element.dataset.bcTextAlign ?? "left";
+      if (child.style.textAlign !== textAlign) child.style.textAlign = textAlign;
     });
   }
 
