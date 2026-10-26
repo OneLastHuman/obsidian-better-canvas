@@ -163,4 +163,24 @@ describe("shape border CSS contract", () => {
     expect(declaration(".bc-node-style-preset-preview.shape-diamond", "clip-path")).toBe("var(--bc-shape-outline)");
     expect(declaration(".bc-node-style-preset-preview.shape-diamond::after", "mask-image")).toBe("var(--bc-ring-solid)");
   });
+
+  it("keeps the scrapbook torn selection ring transparent so it cannot cover the card", () => {
+    // Regression guard: the card text was invisible while selected or edited.
+    // Rectangular shapes define no --bc-ring-solid, and the shared ring rule only
+    // hangs mask-image on the polygon selectors above, so a rectangle's ::after
+    // carries no mask. The generic state rules
+    // `.canvas-node[data-bc-shape].is-selected::after` (and .is-focused) then paint
+    // that unmasked pseudo-element with `var(--color-accent)`, which fills the whole
+    // card and hides its text. Declaring `background-color: transparent` here keeps
+    // the ::after a pure outline: the accent border still draws, nothing is covered.
+    const scrapbookTornRing =
+      `.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"]` +
+      `:is([data-bc-shape="default"], [data-bc-shape="square"])` +
+      `:is(.is-selected, .is-focused, .is-editing)::after`;
+
+    expect(rulesFor(scrapbookTornRing).length).toBe(1);
+    expect(declaration(scrapbookTornRing, "background-color")).toBe("transparent");
+    // The ring must still draw: the border is what makes the selection visible.
+    expect(declaration(scrapbookTornRing, "border")).toBe("2px solid #a16d50");
+  });
 });

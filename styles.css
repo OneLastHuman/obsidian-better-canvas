@@ -1429,6 +1429,10 @@
   border: 2px solid #a16d50;
   border-radius: 4px;
   pointer-events: none;
+  /* Rectangular shapes define no --bc-ring-solid, so the shared ring rule's
+     mask-image resolves to none and the accent fill would paint over the whole
+     card, hiding its text. This pseudo-element only draws the selection outline. */
+  background-color: transparent;
 }
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="photo"]:is([data-bc-shape="default"], [data-bc-shape="square"]) .canvas-node-container {
   border-radius: 1px;
