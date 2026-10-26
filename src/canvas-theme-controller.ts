@@ -38,6 +38,10 @@ body { color-scheme: light; --background-primary: #fff8e8; --background-secondar
   --code-background: #eadfc9; --code-normal: #614b3e; --background-modifier-border: #ccbba1;
   --text-selection: #e2c99c; color: #43372f; background: transparent; }
 .markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #43372f; }
+/* CodeMirror paints text nodes inside .cm-content, which the rules above do not reach.
+   This sheet is appended to the iframe body, so it loses to selectors with more
+   specificity in the host CSS; !important is what keeps the ink readable on paper. */
+.cm-content { color: #43372f !important; caret-color: #43372f; }
 `;
 const RESEARCH_EDITOR_CSS = `
 body { color-scheme: light; --background-primary: #fffdf7; --background-secondary: #eeece5;
@@ -298,6 +302,16 @@ export default class CanvasThemeController {
     }
   }
 
+  // `contains()` answers false rather than null, so `??` cannot express "either side is
+  // dark": an iframe body that has not received `theme-dark` yet would mask a dark host.
+  // Read the iframe body first, then fall back to the host body, because Obsidian mirrors
+  // `theme-dark` into controlled iframes on `css-change` and that mirror can lag a frame.
+  private editorAppearance(iframe: HTMLIFrameElement, doc?: Document | null): "dark" | "light" {
+    const iframeDark = doc?.body?.classList?.contains("theme-dark") ?? false;
+    const hostDark = iframe.ownerDocument?.body?.classList?.contains("theme-dark") ?? false;
+    return iframeDark || hostDark ? "dark" : "light";
+  }
+
   private syncEditors(canvas: any, theme: CanvasThemeId): void {
     for (const iframe of canvas.wrapperEl?.querySelectorAll("iframe.canvas-node-iframe, .markdown-embed iframe.embed-iframe.is-controlled") ?? []) {
       try {
@@ -315,8 +329,7 @@ export default class CanvasThemeController {
           research?.remove();
           const style = rounded ?? doc.createElement("style");
           style.id = ROUNDED_EDITOR_STYLE_ID;
-          const dark = canvas.wrapperEl.ownerDocument?.body.classList.contains("theme-dark");
-          const ink = dark ? "#20262d" : "#34372f";
+          const ink = this.editorAppearance(iframe, doc) === "dark" ? "#20262d" : "#34372f";
           const css = `body { color-scheme: light; --text-normal: ${ink}; --text-muted: #515b60; --text-faint: #6c747c; --text-accent: #315b86; --text-accent-hover: #24486b; --background-primary: #e5e7e1; --background-secondary: #d7dbd5; --code-background: #d7dbd5; --code-normal: ${ink}; --text-selection: #a9c3d8; color: ${ink}; background: transparent; }
 .markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: ${ink}; }`;
           if (style.textContent !== css) style.textContent = css;
@@ -340,7 +353,12 @@ export default class CanvasThemeController {
         const anchor = iframe.closest?.("[data-bc-soft-notes]") as HTMLElement | null;
         const preset = anchor?.dataset.bcSoftNotes ?? "";
         const align = anchor?.style.getPropertyValue("--bc-soft-align") ?? "left";
-        const editorKey = theme + ":" + preset + ":" + align;
+        // Theme switching is not the only trigger: `css-change` fires on light/dark
+        // appearance changes too, so the appearance has to be part of the key or the
+        // re-injected sheet keeps the stale look. Same reason rounded-map picks its
+        // ink from `theme-dark` above.
+        const appearance = this.editorAppearance(iframe, doc);
+        const editorKey = theme + ":" + preset + ":" + align + ":" + appearance;
         const previous = doc.getElementById(styleId);
         if (previous?.getAttribute("data-bc-editor-key") === editorKey) continue;
         previous?.remove();

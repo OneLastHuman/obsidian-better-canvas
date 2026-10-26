@@ -1429,6 +1429,13 @@
   border: 2px solid #a16d50;
   border-radius: 4px;
   pointer-events: none;
+  /* Rectangular shapes are not matched by the shared ring rule at all, which
+     only lists the polygon shapes, so their ::after carries no mask. The generic
+     state rules `.canvas-node[data-bc-shape].is-selected::after` (and .is-focused)
+     then paint that unmasked pseudo-element with var(--color-accent), which fills
+     the whole card and hides its text. Declaring a transparent background keeps
+     this pseudo-element a pure outline: the border still draws the selection. */
+  background-color: transparent;
 }
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="photo"]:is([data-bc-shape="default"], [data-bc-shape="square"]) .canvas-node-container {
   border-radius: 1px;
