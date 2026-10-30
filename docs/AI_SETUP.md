@@ -81,7 +81,7 @@ Temperature 的可填范围取决于协议：OpenAI 兼容与 Gemini 是 0 到 2
 桌面版 Obsidian 可在 **AI 助手 → 使用方式** 中选择 **OpenCode ACP**。
 
 1. 安装 OpenCode，并在终端完成登录。
-2. 默认命令为 `opencode acp`。如果 Obsidian 无法找到它，在设置中填写 **程序路径** 的绝对路径。
+2. 程序路径留空时，插件先查系统 PATH；从图形界面启动的 Obsidian 常常读不到终端里的 PATH，因此还会自动检查 Homebrew、npm 全局目录、Bun、Volta、nvm/fnm、`~/.local/bin`、`~/.opencode/bin` 等常见安装位置。仍找不到时，点击 **程序路径** 旁的 **查找** 自动定位并填入，或手动填写绝对路径。
 3. 点击 **读取模型**，在 **模型** 下拉框中选择当前 OpenCode 会话提供的模型，再点击 **保存更改**。选择 **使用工具默认模型** 可恢复 OpenCode 自身配置。
 4. 模型使用完整 ID（通常为 `provider/model`）。手动填写的 ID 也必须是当前 OpenCode 会话提供的模型；模型失效时会报错，不会静默换成默认模型。登录与额度仍由 OpenCode 管理，无需另填文本 API Key。
 
@@ -96,7 +96,7 @@ ACP 通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode，在临
 桌面版 Obsidian 可在 **AI 助手 → 使用方式** 中选择 **Codex CLI** 作为文本后端，也可继续使用命令 **Better Canvas: 使用本地 Codex CLI 分析所选节点**。
 
 1. 安装并登录 Codex CLI。
-2. 在对应使用方式下，将 **程序路径** 留空以使用 PATH 中的 `codex`，或填写可执行文件的绝对路径。
+2. **程序路径** 留空时使用 PATH 中的 `codex`；找不到时自动搜索 Homebrew、npm 全局目录、Bun、Volta、nvm/fnm 等常见安装位置。也可点击 **查找** 自动定位并填入，或手动填写可执行文件的绝对路径。
 3. 点击 **读取模型**，从 **模型** 下拉框中选择模型，然后点击 **保存更改**。选择 **使用工具默认模型** 时，不向 CLI 传递模型覆盖参数。
 4. 自定义服务的模型未出现在列表中时，展开 **手动填写模型**，填写完整模型 ID。模型目录不代表账号或自定义服务实际拥有的访问权限。
 5. 选择 Canvas 节点并运行命令。普通文本生成和专用 Codex 分析命令都会使用此模型。结果会保存为与原节点关联的新节点；任务可通过“停止当前 AI 生成”中断。
@@ -105,9 +105,11 @@ ACP 通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode，在临
 
 模型读取通过本机 `codex app-server` 的 `model/list` 接口完成，不创建对话、不发送笔记。生成时通过 `codex exec --model` 传递所选模型。修改程序路径、离开设置或切换后端会取消正在进行的列表读取。
 
+Windows 上通过 npm 安装的 Codex 会生成 `.cmd` 启动器。插件读取启动器中的 JavaScript 入口并用 `node.exe` 启动，不经过命令行 shell，因此需要 Node.js 在 PATH 或常见安装目录中；原生 `.exe` 安装不受影响。
+
 ## 5. 其他本地 Agent
 
-桌面版在 **AI 助手 → 使用方式** 中也可选择以下 Agent。先安装并在终端完成工具所需的认证，再填写程序路径和模型。插件不会自动安装 CLI，也不要求复制已有 CLI 的密钥。Aider 等工具仍需按自身要求配置模型服务，并非都能使用订阅登录。
+桌面版在 **AI 助手 → 使用方式** 中也可选择以下 Agent。先安装并在终端完成工具所需的认证，再填写程序路径和模型。程序路径留空时同样会自动搜索 PATH 和常见安装目录；也可点击 **查找** 自动定位并填入。插件不会自动安装 CLI，也不要求复制已有 CLI 的密钥。Aider 等工具仍需按自身要求配置模型服务，并非都能使用订阅登录。
 
 | Agent | 默认程序 | 模型选择 |
 | --- | --- | --- |
@@ -125,15 +127,17 @@ ACP 通过 `opencode acp` 和 stdio 上的 ACP JSON-RPC 调用 OpenCode，在临
 
 新增 CLI 后端仅处理文本，在独立临时目录中运行，使用各工具的问答、规划或工具限制参数；不授予自动执行任意命令的权限。支持超时和取消，限制输出大小，只提取助手文本，并在进程成功结束后显示完整回答。工具自身的全局配置、扩展和启动钩子仍可能在启动阶段生效；命令权限限制不等于操作系统沙盒。当前不支持在插件内进行交互式登录、工具审批或接续 CLI 历史对话。工具版本不支持所需参数时会报错；应先在终端更新或检查 CLI。图片生成仍使用独立 API 设置。
 
-Windows 下，新增 CLI 后端支持原生可执行文件，也支持将标准 npm `.cmd` 启动器解析为 `node.exe` 和 JavaScript 入口。任意自定义批处理启动器会被拒绝；可改填原生程序或 JavaScript 入口路径，后者需要 PATH 中有 Node.js。
+Windows 下，本地 Agent 支持原生可执行文件，也支持将标准 npm `.cmd` 启动器解析为 `node.exe` 和 JavaScript 入口；Codex CLI 与新增 Agent 使用同一套解析逻辑，OpenCode 通过系统 shell 运行 `.cmd`。任意自定义批处理启动器会被拒绝；可改填原生程序或 JavaScript 入口路径，后者需要 PATH 中有 Node.js。
 
 接入范围参考 [html-anything 的 Agent 表格与适配层](https://github.com/nexu-io/html-anything/tree/975fb3bcb98f1777781fb4c738902d36e32c8c46/next/src/lib/agents)。沿用“每个 Agent 独立配置、默认模型不传覆盖参数”的交互方式，调用参数按各工具文档核对。该项目的 OpenCode 使用普通 CLI，本插件保留 ACP。
+
+自动查找覆盖三个桌面平台的常见位置：macOS 的 Homebrew 和 `~/Library/pnpm`，Linux 的 `/usr/local/bin`、`/snap/bin`、Linuxbrew 和 Nix，Windows 的 `%APPDATA%\npm`、pnpm、scoop、Chocolatey 和 WinGet；三者都包括 Bun、Volta、mise、nvm/fnm、asdf 和 `~/.local/bin`。装在自定义位置时仍应手动填写路径。
 
 ## 6. 隐私与排错
 
 - API Key 保存在本地 Obsidian 插件设置中。使用 AI 时，提示词、选中的节点内容和所需上下文会发送给所配置的服务。
 - 不要向外部服务发送不应离开本机的笔记、密钥或个人信息；先检查服务商的数据处理政策。API Key 存在本地插件设置中，不要提交到 Git 仓库、Issue 或截图。
 - 模型发现失败时，可手动输入服务商支持的模型名；图片生成要单独确认服务是否支持对应接口。
-- 遇到权限、连接或工具调用问题时，先检查 endpoint、模型名、凭据和服务日志；本地命令不可用时，优先配置可执行文件的绝对路径。
+- 遇到权限、连接或工具调用问题时，先检查 endpoint、模型名、凭据和服务日志；本地命令不可用时，先点击 **程序路径** 旁的 **查找**，仍找不到再填写可执行文件的绝对路径。
 
 各功能的实现程度与尚未完成的兼容性验证见 [功能整合矩阵](INTEGRATION_MATRIX.md)。

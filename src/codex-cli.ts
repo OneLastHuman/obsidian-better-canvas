@@ -1,4 +1,6 @@
 import { parseCodexJsonEvent } from "./codex-cli-events";
+import { resolveAgentBinary } from "./local-agent-discovery";
+import { resolveLaunchCommand } from "./agent-launcher";
 import { loadNodeRuntimeModules } from "./node-runtime";
 
 export interface LocalCodexOptions {
@@ -30,7 +32,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
   const { tmpdir } = runtime.os;
 
   if (options.signal.aborted) throw abortError();
-  const binary = options.binaryPath?.trim() || "codex";
+  const binary = resolveAgentBinary(options.binaryPath, "codex", runtime);
   const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 300_000, 10_000), 900_000);
   const args = [
     "exec",
@@ -44,6 +46,9 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
   if (model) args.push("--model", model);
   args.push("-");
 
+  const launch = await resolveLaunchCommand(binary, args, runtime);
+  if (options.signal.aborted) throw abortError();
+
   return await new Promise<string>((resolve, reject) => {
     let settled = false;
     let stdoutBuffer = "";
@@ -56,7 +61,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
 
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(binary, args, {
+      child = spawn(launch.binary, launch.args, {
         cwd: tmpdir(),
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -105,7 +110,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
 
     child.once("error", (error: Error) => {
       const message = /ENOENT/i.test(error.message)
-        ? "找不到 Codex CLI。请安装并登录 Codex CLI，或在 Better Canvas 设置中填写 codex 可执行文件的完整路径。"
+        ? "找不到 Codex CLI。请安装并登录 Codex CLI，或在 Better Canvas 设置中点击「查找」自动定位，或填写 codex 可执行文件的完整路径。"
         : "无法启动 Codex CLI：" + error.message;
       finish(new Error(message));
     });

@@ -68,8 +68,8 @@ export function resolveAIStatus(settings: OnboardingAISettings): AIStatus {
       backendLabel: label,
       summary: "使用本机配置，尚未验证",
       detail: backend === "codex-cli"
-        ? "将调用 Codex CLI；程序路径留空时使用系统命令。插件未检查安装、登录或模型可用性。"
-        : "将调用 OpenCode ACP；程序路径留空时使用系统命令。插件未检查安装、登录或模型可用性。",
+        ? "将调用 Codex CLI；程序路径留空时使用系统命令，找不到时自动搜索 Homebrew、npm、Bun 等常见安装目录。插件未检查安装、登录或模型可用性。"
+        : "将调用 OpenCode ACP；程序路径留空时使用系统命令，找不到时自动搜索 Homebrew、npm、Bun 等常见安装目录。插件未检查安装、登录或模型可用性。",
       issues: [],
       allowsEmptyApiKey: true,
       settingsSection: "ai"

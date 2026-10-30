@@ -1,7 +1,11 @@
 import { EventEmitter } from "node:events";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runLocalCodex } from "./codex-cli";
+import { clearAgentDiscoveryCache } from "./local-agent-discovery";
 import { loadNodeRuntimeModules } from "./node-runtime";
 
 vi.mock("./node-runtime", () => ({
@@ -60,6 +64,7 @@ function startRun(options: { binaryPath?: string; model?: string; signal?: Abort
 describe("Local Codex CLI process handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearAgentDiscoveryCache();
     vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtime);
   });
 
@@ -84,6 +89,92 @@ describe("Local Codex CLI process handling", () => {
     const { child, promise, spawned } = startRun();
     await spawned;
     expect(spawn.mock.calls[0][0]).toBe("codex");
+    child.emit("close", 0, null);
+    await expect(promise).rejects.toThrow(/没有返回可用的助手文本/);
+  });
+
+  it("uses a discovered install path when the bare command is not on PATH", async () => {
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
+      ...runtime,
+      process: { platform: "linux", env: { PATH: "/usr/bin:/bin" } },
+      fs: {
+        statSync: (file: string) => {
+          if (file === "/opt/homebrew/bin/codex") return { isFile: () => true };
+          throw new Error("ENOENT");
+        }
+      },
+      path
+    });
+    const { child, promise, spawned } = startRun();
+    await spawned;
+    expect(spawn.mock.calls[0][0]).toBe("/opt/homebrew/bin/codex");
+    child.emit("close", 0, null);
+    await expect(promise).rejects.toThrow(/没有返回可用的助手文本/);
+  });
+
+  it("resolves an npm .cmd launcher on Windows without a shell", async () => {
+    const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "better-canvas-codex-"));
+    try {
+      const entry = path.join(root, "node_modules", "example", "cli.js");
+      await fs.promises.mkdir(path.dirname(entry), { recursive: true });
+      await fs.promises.writeFile(entry, "// fixture, never executed");
+      await fs.promises.writeFile(path.join(root, "node.exe"), "fixture");
+      const wrapper = path.join(root, "codex.cmd");
+      await fs.promises.writeFile(wrapper, '@ECHO off\n"%_prog%" "%dp0%/node_modules/example/cli.js" %*\n');
+      vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
+        ...runtime,
+        process: { platform: "win32", env: { Path: root }, execPath: path.join(root, "node.exe") },
+        fs: { promises: fs.promises },
+        path
+      });
+      const { child, promise, spawned } = startRun({ binaryPath: wrapper });
+      await spawned;
+      expect(spawn.mock.calls[0][0]).toBe(path.join(root, "node.exe"));
+      expect(spawn.mock.calls[0][1][0]).toBe(entry);
+      expect(spawn.mock.calls[0][2]).toMatchObject({ shell: false });
+      child.emit("close", 0, null);
+      await expect(promise).rejects.toThrow(/没有返回可用的助手文本/);
+    } finally {
+      await fs.promises.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("finds node.exe outside PATH for a Windows npm launcher", async () => {
+    const wrapper = "C:\\tools\\codex.cmd";
+    const entry = "C:\\tools\\node_modules\\example\\cli.js";
+    const nodePath = "C:\\Users\\tester\\AppData\\Local\\Programs\\nodejs\\node.exe";
+    const files = new Map<string, string>([
+      [wrapper, '@ECHO off\n"%_prog%" "%dp0%/node_modules/example/cli.js" %*\n'],
+      [entry, "// fixture, never executed"],
+      [nodePath, "fixture"]
+    ]);
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
+      ...runtime,
+      os: { tmpdir: () => "C:\\tmp", homedir: () => "C:\\Users\\tester" },
+      process: {
+        platform: "win32",
+        env: { Path: "C:\\tools", LOCALAPPDATA: "C:\\Users\\tester\\AppData\\Local" }
+      },
+      fs: {
+        statSync: (file: string) => {
+          if (files.has(file)) return { isFile: () => true };
+          throw new Error("ENOENT");
+        },
+        readdirSync: () => { throw new Error("ENOENT"); },
+        promises: {
+          stat: async (file: string) => {
+            if (files.has(file)) return { isFile: () => true, size: files.get(file)!.length };
+            throw new Error("ENOENT");
+          },
+          readFile: async (file: string) => files.get(file) ?? ""
+        }
+      },
+      path: path.win32
+    });
+    const { child, promise, spawned } = startRun({ binaryPath: wrapper });
+    await spawned;
+    expect(spawn.mock.calls[0][0]).toBe(nodePath);
+    expect(spawn.mock.calls[0][1][0]).toBe(entry);
     child.emit("close", 0, null);
     await expect(promise).rejects.toThrow(/没有返回可用的助手文本/);
   });

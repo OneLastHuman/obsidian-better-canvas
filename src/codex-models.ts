@@ -1,4 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { resolveLaunchCommand } from "./agent-launcher";
+import { resolveAgentBinary } from "./local-agent-discovery";
 import { loadNodeRuntimeModules } from "./node-runtime";
 
 export interface CodexModelOption {
@@ -39,16 +41,19 @@ export async function listCodexModels(options: CodexModelListOptions = {}): Prom
   if (options.signal?.aborted) throw abortError();
   const runtime = await loadNodeRuntimeModules();
   if (options.signal?.aborted) throw abortError();
-  const binary = options.binaryPath?.trim() || "codex";
+  const binary = resolveAgentBinary(options.binaryPath, "codex", runtime);
   const configuredTimeout = options.timeoutMs ?? 15_000;
   const timeoutMs = Number.isFinite(configuredTimeout)
     ? Math.min(Math.max(configuredTimeout, 1000), 60_000)
     : 15_000;
 
+
+  const launch = await resolveLaunchCommand(binary, ["app-server", "--listen", "stdio://"], runtime);
+  if (options.signal?.aborted) throw abortError();
   return await new Promise<CodexModelOption[]>((resolve, reject) => {
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = runtime.childProcess.spawn(binary, ["app-server", "--listen", "stdio://"], {
+      child = runtime.childProcess.spawn(launch.binary, launch.args, {
         cwd: runtime.os.tmpdir(),
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -173,7 +178,7 @@ export async function listCodexModels(options: CodexModelListOptions = {}): Prom
     });
     child.once("error", (error: Error) => {
       finish(new Error(/ENOENT/i.test(error.message)
-        ? "Codex CLI was not found. Install it or set its executable path in Better Canvas settings."
+        ? "Codex CLI was not found. Install it, use Find in Better Canvas settings to locate it, or set its executable path."
         : "Unable to start Codex app-server: " + error.message));
     });
     child.once("close", (code: number | null) => {

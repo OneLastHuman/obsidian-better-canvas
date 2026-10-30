@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import * as path from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -8,6 +9,7 @@ import {
   runOpenCodeACP,
   textFromACPUpdate
 } from "./opencode-acp";
+import { clearAgentDiscoveryCache } from "./local-agent-discovery";
 import { loadNodeRuntimeModules } from "./node-runtime";
 
 vi.mock("./node-runtime", () => ({
@@ -160,6 +162,7 @@ function prepareAgent(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearAgentDiscoveryCache();
   vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtime);
 });
 
@@ -403,6 +406,27 @@ describe("OpenCode ACP model selection", () => {
     expect(child.messages.some(message => message.method === "session/delete")).toBe(false);
   });
 
+  it("resolves the CLI from a common install directory when PATH misses it", async () => {
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
+      ...runtime,
+      process: { platform: "linux", env: { PATH: "/usr/bin:/bin", HOME: "/home/tester" } },
+      fs: {
+        statSync: (file: string) => {
+          if (file === "/home/tester/.opencode/bin/opencode") return { isFile: () => true };
+          throw new Error("ENOENT");
+        }
+      },
+      path
+    });
+    prepareAgent();
+    await expect(runOpenCodeACP([{ role: "user", content: "Question" }])).resolves.toBe("Answer");
+    expect(spawn).toHaveBeenCalledWith(
+      "/home/tester/.opencode/bin/opencode",
+      ["acp"],
+      expect.objectContaining({ shell: false })
+    );
+  });
+
   it("sets a legacy model before sending the prompt", async () => {
     const child = prepareAgent();
     const onDelta = vi.fn();
@@ -482,6 +506,19 @@ describe("OpenCode ACP process safety", () => {
     });
     await listOpenCodeModels({ binaryPath: "opencode.cmd" });
     expect(spawn).toHaveBeenCalledWith("opencode.cmd", ["acp"], expect.objectContaining({ shell: true }));
+  });
+
+  it("quotes a Windows executable path that contains spaces", async () => {
+    prepareAgent();
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
+      ...runtime, process: { platform: "win32" }
+    });
+    await listOpenCodeModels({ binaryPath: '"C:\\Users\\John Smith\\AppData\\Roaming\\npm\\opencode.cmd"' });
+    expect(spawn).toHaveBeenCalledWith(
+      '"C:\\Users\\John Smith\\AppData\\Roaming\\npm\\opencode.cmd"',
+      ["acp"],
+      expect.objectContaining({ shell: true })
+    );
   });
 
   it("never starts a process when discovery is already cancelled", async () => {

@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { resolveAgentBinary } from "./local-agent-discovery";
 import { loadNodeRuntimeModules } from "./node-runtime";
 
 export interface ACPChatMessage {
@@ -197,13 +198,15 @@ async function withOpenCodeSession<T>(
   const { tmpdir } = runtime.os;
   if (options.signal?.aborted) throw abortError();
 
-  const binary = options.binaryPath?.trim() || "opencode";
+  const binary = resolveAgentBinary(options.binaryPath, "opencode", runtime);
+  // cmd.exe needs the executable quoted when its path contains spaces.
+  const launch = runtime.process.platform === "win32" && /\s/.test(binary) ? '"' + binary + '"' : binary;
   const timeoutMs = Math.min(Math.max(options.timeoutMs ?? 300_000, 10_000), 900_000);
 
   return await new Promise<T>((resolve, reject) => {
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = spawn(binary, ["acp"], {
+      child = spawn(launch, ["acp"], {
         cwd: tmpdir(),
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -368,7 +371,7 @@ async function withOpenCodeSession<T>(
 
     child.once("error", (error: Error) => {
       const hint = /ENOENT/i.test(error.message)
-        ? "找不到 OpenCode CLI。请安装 OpenCode，或在设置中填写 opencode 可执行文件的绝对路径。"
+        ? "找不到 OpenCode CLI。请安装 OpenCode，或在设置中点击「查找」自动定位，或填写 opencode 可执行文件的绝对路径。"
         : "无法启动 OpenCode ACP：" + error.message;
       finish(new Error(hint));
     });

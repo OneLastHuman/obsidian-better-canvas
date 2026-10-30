@@ -108,10 +108,12 @@ const host = vi.hoisted(() => {
 
 vi.mock("obsidian", () => ({ ...host.exports, Platform: host.Platform }));
 vi.mock("./codex-models", () => ({ listCodexModels: vi.fn() }));
+vi.mock("./local-agent-discovery", () => ({ discoverAgentBinary: vi.fn() }));
 vi.mock("./opencode-acp", () => ({ listOpenCodeModels: vi.fn() }));
 
 import { listCodexModels } from "./codex-models";
 import { listOpenCodeModels } from "./opencode-acp";
+import { discoverAgentBinary } from "./local-agent-discovery";
 import BetterCanvasSettingsTab from "./settings";
 
 function deferred<T>() {
@@ -400,5 +402,39 @@ describe("local agent settings model picker", () => {
     expect(tab.details).not.toHaveBeenCalled();
     expect(listCodexModels).not.toHaveBeenCalled();
     expect(listOpenCodeModels).not.toHaveBeenCalled();
+  });
+});
+
+describe("local agent executable discovery", () => {
+  it("fills the executable path from the Find button without saving immediately", async () => {
+    vi.mocked(discoverAgentBinary).mockResolvedValue("/opt/homebrew/bin/codex");
+    const { render, tab, features, live } = setup({ codexBinaryPath: "" });
+    const ui = render("codex-cli");
+    const row = ui.rows.find(item => item.name === "程序路径")!;
+    expect(ui.path.value).toBe("");
+
+    await row.buttons[0].click();
+
+    expect(discoverAgentBinary).toHaveBeenCalledWith("codex");
+    expect(ui.path.value).toBe("/opt/homebrew/bin/codex");
+    expect(tab.currentSettings().codexBinaryPath).toBe("/opt/homebrew/bin/codex");
+    expect(live.codexBinaryPath).toBe("");
+    expect(row.descEl.children[0].text).toContain("已找到");
+    expect(features.save).not.toHaveBeenCalled();
+  });
+
+  it("reports a missing CLI and keeps manual entry available", async () => {
+    vi.mocked(discoverAgentBinary).mockResolvedValue(null);
+    const { render } = setup({ opencodeBinaryPath: "" });
+    const ui = render("opencode-acp");
+    const row = ui.rows.find(item => item.name === "程序路径")!;
+
+    await row.buttons[0].click();
+
+    expect(discoverAgentBinary).toHaveBeenCalledWith("opencode");
+    expect(ui.path.value).toBe("");
+    expect(row.descEl.children[0].text).toContain("没有找到");
+    await ui.path.change("/custom/opencode");
+    expect(ui.path.value).toBe("/custom/opencode");
   });
 });

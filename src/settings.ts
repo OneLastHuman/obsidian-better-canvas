@@ -7,6 +7,7 @@ import { validateNumericRangeInput } from "./numeric-range-validation";
 import { normalizeDefaultNodeTextAlignment } from "./node-defaults";
 import { listCodexModels } from "./codex-models";
 import { listOpenCodeModels } from "./opencode-acp";
+import { discoverAgentBinary } from "./local-agent-discovery";
 import { LOCAL_AGENTS, localAgentDefinition, localAgentConfig, updateLocalAgentConfig, localModelChoices, type LocalAgentBackend, type LocalModelOption } from "./local-agent-settings";
 
 let numericRangeDescriptionId = 0;
@@ -429,13 +430,43 @@ export default class BetterCanvasSettingsTab extends PluginSettingTab {
         });
       });
     }
-    new Setting(group).setName("程序路径").setDesc("仅支持桌面版。使用本机已安装并登录的工具，留空时从 PATH 查找。")
-      .addText(input => input.setPlaceholder(agent.binary).setValue(localAgentConfig(settings, backend).binaryPath)
+    let pathInput: TextComponent | undefined;
+    const pathSetting = new Setting(group).setName("程序路径")
+      .setDesc("仅支持桌面版。留空时先查 PATH，再查 Homebrew、npm、Bun、~/.local/bin、~/.opencode 等常见安装位置。");
+    pathSetting.addText(input => {
+      pathInput = input;
+      input.setPlaceholder(agent.binary).setValue(localAgentConfig(settings, backend).binaryPath)
         .onChange(async value => {
           updateLocalAgentConfig(settings, backend, { binaryPath: value.trim() });
           resetCatalog();
           await this.markDirty();
-        }));
+        });
+    });
+    if (Platform.isDesktopApp) {
+      const pathFeedback = pathSetting.descEl.createDiv({ attr: { role: "status", "aria-live": "polite" } });
+      pathSetting.addButton(button => {
+        button.setButtonText("查找").onClick(async () => {
+          button.setDisabled(true).setButtonText("查找中…");
+          pathFeedback.setText("正在查找 " + agent.binary + "…");
+          try {
+            const found = await discoverAgentBinary(agent.binary);
+            if (found) {
+              pathInput?.setValue(found);
+              updateLocalAgentConfig(settings, backend, { binaryPath: found });
+              resetCatalog();
+              await this.markDirty();
+              pathFeedback.setText("已找到并填入：" + found);
+            } else {
+              pathFeedback.setText("没有找到 " + agent.binary + "。请确认已安装，或手动填写可执行文件的完整路径。");
+            }
+          } catch (error) {
+            pathFeedback.setText("查找失败：" + (error instanceof Error ? error.message : String(error)));
+          } finally {
+            button.setDisabled(false).setButtonText("查找");
+          }
+        });
+      });
+    }
     if (agent.supportsModel !== false) {
       const manual = this.details(page, "local-model-" + backend, "手动填写模型", "模型未列出时，填写工具支持的完整模型 ID。留空恢复默认。");
       new Setting(manual).setName("模型 ID")

@@ -1,6 +1,8 @@
 import type { ChatMessage } from "./ai";
+import { resolveLaunchCommand } from "./agent-launcher";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { loadNodeRuntimeModules, type NodeRuntimeModules } from "./node-runtime";
+import { resolveAgentBinary } from "./local-agent-discovery";
 import type { AdditionalAgentBackend } from "./local-agent-settings";
 
 export type { AdditionalAgentBackend } from "./local-agent-settings";
@@ -293,53 +295,6 @@ async function readAiderAnswer(history: string, runtime: NodeRuntimeModules): Pr
   return answer;
 }
 
-async function executable(
-  binary: string, args: string[], runtime: NodeRuntimeModules
-): Promise<{ binary: string; args: string[] }> {
-  if (runtime.process.platform !== "win32") return { binary, args };
-  const path = runtime.path;
-  const io = runtime.fs.promises;
-  const isFile = async (file: string): Promise<boolean> => {
-    try { return (await io.stat(file)).isFile(); } catch { return false; }
-  };
-  const env = runtime.process.env ?? {};
-  const search = String(env.Path ?? env.PATH ?? "").split(";").filter(Boolean);
-  let resolved = binary;
-  if (!path.isAbsolute(binary) && !/[\\/]/.test(binary)) {
-    for (const directory of search) {
-      const candidates = path.extname(binary) ? [binary] : [binary + ".exe", binary + ".cmd", binary + ".bat"];
-      for (const candidate of candidates) {
-        const fullPath = path.join(directory.replace(/^"|"$/g, ""), candidate);
-        if (await isFile(fullPath)) { resolved = fullPath; break; }
-      }
-      if (resolved !== binary) break;
-    }
-  }
-  if (/\.(cmd|bat)$/i.test(resolved)) {
-    const stat = await io.stat(resolved);
-    if (stat.size > 64_000) throw new Error("The configured Windows launcher is too large to inspect safely.");
-    const wrapper: string = await io.readFile(resolved, "utf8");
-    // Read the npm shim's literal JS target, never execute batch commands or interpolate a prompt into a shell.
-    const target = wrapper.match(/"%dp0%[\\/]((?:node_modules)[\\/][^"\r\n%]+\.(?:c?js|mjs))"/i)?.[1];
-    if (!target || target.split(/[\\/]/).includes("..")) {
-      throw new Error("Unsupported Windows .cmd/.bat launcher. Select the agent's native .exe or JavaScript entry file in settings.");
-    }
-    resolved = path.resolve(path.dirname(resolved), target);
-    if (!await isFile(resolved)) throw new Error("The npm launcher points to a missing JavaScript entry file. Reinstall the CLI.");
-  }
-  if (/\.(?:c?js|mjs)$/i.test(resolved)) {
-    const nodeCandidates = [
-      ...(path.basename(runtime.process.execPath ?? "").toLowerCase() === "node.exe" ? [runtime.process.execPath] : []),
-      ...search.map((directory: string) => path.join(directory.replace(/^"|"$/g, ""), "node.exe"))
-    ];
-    for (const candidate of nodeCandidates) {
-      if (await isFile(candidate)) return { binary: candidate, args: [resolved, ...args] };
-    }
-    throw new Error("This Windows CLI requires node.exe on PATH. Install Node.js or select a native agent executable.");
-  }
-  return { binary: resolved, args };
-}
-
 async function runProcess(
   binary: string,
   args: string[],
@@ -403,7 +358,7 @@ async function runProcess(
 
     child.once("error", (error: Error) => {
       const detail = /ENOENT|EINVAL/i.test(error.message)
-        ? "Cannot start the local CLI. Install and log in to it, or select its executable path in settings."
+        ? "Cannot start the local CLI. Install and log in to it, use Find in Better Canvas settings, or select its executable path."
         : "Cannot start the local CLI: " + error.message;
       finish(failure ?? new Error(detail));
     });
@@ -449,7 +404,8 @@ export async function runLocalAgent(messages: ChatMessage[], options: LocalAgent
   try {
     checkAbort(options.signal);
     const spec = await commandArgs(options.backend, options.model?.trim() ?? "", workspace, prompt, runtime);
-    const command = await executable(options.binaryPath?.trim() || BINARIES[options.backend], spec.args, runtime);
+    const resolved = resolveAgentBinary(options.binaryPath, BINARIES[options.backend], runtime);
+    const command = await resolveLaunchCommand(resolved, spec.args, runtime);
     checkAbort(options.signal);
     const output = await runProcess(command.binary, command.args, workspace, prompt, options, runtime);
     checkAbort(options.signal);
