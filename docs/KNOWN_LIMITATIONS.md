@@ -1,13 +1,13 @@
 # 已知限制与安全注意事项
 
-Better Canvas 仍在持续整合和验证中。功能代码存在不代表它已在所有 Obsidian 版本、主题、桌面端和移动端验证。逐项实现情况及与上游项目的差异请见[功能整合矩阵](INTEGRATION_MATRIX.md)。
+Better Canvas 仍在持续整合和验证中。功能代码存在不代表它已在所有 Obsidian 版本、主题和桌面端配置验证。本插件仅支持 Obsidian 桌面端。逐项实现情况及与上游项目的差异请见[功能整合矩阵](INTEGRATION_MATRIX.md)。
 
 ## 兼容性
 
 - **内部 API 与 DOM：** Portal 文件同步、元数据缓存、内置 Backlinks 侧栏桥接、PDF 单页渲染、特定连线路由、节点样式和键盘快捷键部分依赖 Obsidian 内部接口或 DOM 行为。插件附带的链接浏览器会扫描 Markdown 元数据和其他 Canvas JSON；它不代表已完全接入 Obsidian 全局搜索、关系图和所有元数据缓存行为。Obsidian 更新可能改变这些行为。
 - **复杂 Canvas：** 多父节点、循环关系、嵌套分组以及复杂跨分组/跨 Portal 连线可能无法获得理想布局或路由；建议先在测试 Vault 验证重要工作流。
 - **静态导出：** PNG/SVG 导出会把内容绘制成静态图像，不会执行交互 HTML。嵌入图片和 PDF 页面预览受到资源体积预算限制；复杂 Markdown 和 Obsidian 原生 DOM 并不能保证像素级一致。
-- **移动端及主题：** CI 不会启动 Obsidian 图形界面。触控、缩放、选区、菜单、主题 CSS 和特定 DOM 行为需在目标版本实测。
+- **桌面端及主题：** 本插件仅支持 Obsidian 桌面端。CI 不会启动 Obsidian 图形界面。触控板、缩放、选区、菜单、主题 CSS 和特定 DOM 行为需在目标版本实测。
 
 ## 节点形状与边框
 

@@ -59,10 +59,10 @@ npm view vitest version --fetch-retries=0 --fetch-timeout=5000
 - `npm run verify:workflow-artifacts`：检查 Build/Release/Cleanup 工作流是否遵守 artifact 用途、预算、保留期和文档入口约定。
 - `npm run dev`：运行开发构建；当前脚本是一次性 esbuild 构建，不代表持续 watch 模式。
 
-仓库未提供锁文件时不要臆造 `npm ci` 流程；先检查实际文件，再选择 `npm install` 或适用的锁文件安装命令。常规验证顺序：
+仓库提供 `package-lock.json` 时使用 `npm ci`；若锁文件缺失或与 `package.json` 不一致，先修复锁文件，不要用 `npm install` 掩盖差异。常规验证顺序：
 
 ```bash
-npm install
+npm ci
 npm run lint
 npm run validate:metadata
 npm run typecheck

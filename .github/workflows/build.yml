@@ -19,7 +19,7 @@ jobs:
           node-version: 22
       - name: Validate release metadata
         run: npm run validate:metadata
-      - run: npm install
+      - run: npm ci
       - name: Verify artifact lifecycle policy
         run: npm run verify:workflow-artifacts
       - name: Run ESLint
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - run: npm run build
       - name: Sync installable files
         shell: bash

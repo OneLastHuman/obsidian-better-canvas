@@ -51,7 +51,7 @@ try {
   ];
   for (const [theme, selector] of themes) {
     evaluate(`(async()=>{
-      app.commands.executeCommandById('obsidian-better-canvas:choose-canvas-theme');
+      app.commands.executeCommandById('better-canvas:choose-canvas-theme');
       document.querySelector('[data-theme-choice="${theme}"]').click();
       ${wait}
       return JSON.stringify(true);

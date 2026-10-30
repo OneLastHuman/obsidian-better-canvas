@@ -1,14 +1,18 @@
 # 安装与构建指南
 
-Better Canvas 要求 Obsidian 1.5.0 或更高版本。手动安装时，插件目录必须同时包含 `main.js`、`manifest.json` 和 `styles.css`。
+Better Canvas 仅支持 Obsidian 桌面端，最低要求 1.14.4。手动安装时，插件目录必须同时包含 `main.js`、`manifest.json` 和 `styles.css`。
 
-## 方式一：从 GitHub Releases 安装
+## 方式一：从 Obsidian 社区插件安装
 
-1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)，下载对应版本的 `obsidian-better-canvas.zip`。
-2. 将 ZIP 解压到 Vault 的 `.obsidian/plugins/` 目录。压缩包内已包含 `obsidian-better-canvas/` 文件夹，最终目录应如下：
+插件上架后，在 Obsidian **设置 → 社区插件** 中搜索 **Better Canvas** 并安装。首次发布前，请使用 GitHub Releases 或主分支构建。
+
+## 方式二：从 GitHub Releases 安装
+
+1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)，下载对应版本的 `better-canvas.zip`。
+2. 将 ZIP 解压到 Vault 的 `.obsidian/plugins/` 目录。压缩包内已包含 `better-canvas/` 文件夹，最终目录应如下：
 
    ```text
-   <Vault>/.obsidian/plugins/obsidian-better-canvas/
+   <Vault>/.obsidian/plugins/better-canvas/
    ├── main.js
    ├── manifest.json
    └── styles.css
@@ -18,9 +22,9 @@ Better Canvas 要求 Obsidian 1.5.0 或更高版本。手动安装时，插件�
 
 Releases 也会提供三个独立文件，可按下方的手动安装方式使用。
 
-## 方式二：手动安装 main 分支构建
+## 方式三：手动安装 main 分支构建
 
-将以下文件放入 `<Vault>/.obsidian/plugins/obsidian-better-canvas/`：
+将以下文件放入 `<Vault>/.obsidian/plugins/better-canvas/`：
 
 - [main.js（生产构建）](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/main.js)
 - [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/manifest.json)
@@ -30,14 +34,14 @@ Releases 也会提供三个独立文件，可按下方的手动安装方式使�
 
 成功的 `main` 分支 Build workflow 会将生产构建的 `main.js`、`manifest.json` 和 `styles.css` 同步到 [`release/`](https://github.com/OneLastHuman/obsidian-better-canvas/tree/main/release) 目录。`main.js` 是构建产物，不纳入版本控制，只在本地构建后生成。Pull Request 构建只负责验证，不生成安装包 artifact。`release/` 提供主分支最新成功构建，不等同于固定的正式版本；正式版请使用 GitHub Releases。
 
-## 方式三：从源码构建
+## 方式四：从源码构建
 
 需要安装 Node.js 22 和 npm：
 
 ```bash
 git clone https://github.com/OneLastHuman/obsidian-better-canvas.git
 cd obsidian-better-canvas
-npm install
+npm ci
 npm run build
 ```
 

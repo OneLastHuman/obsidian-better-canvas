@@ -70,7 +70,7 @@ Controller owns font assets/build integration, docs/FEATURE_GUIDE.md, docs/INTEG
 
 ## Execution ledger
 
-- Baseline: `6812307968ed18216243e6ac5e7e80fae087da2b`; prototype files are task work, not discarded.
+- Baseline: `4f99aa61e0d52bf5c2e77693fefaf41e7b4940d4`; prototype files are task work, not discarded.
 - Existing worktree verified by `git worktree list`; use it in place.
 - Interface scan: Task 1 → 2/3 share sketch-style/render helper signatures; dependent tasks wait for core report. Tasks 2/3 own disjoint files. Font interface owned by controller. Task 4 reviews all integration points.
 - User approved design and explicitly requested implementation; proceed without a second design approval.

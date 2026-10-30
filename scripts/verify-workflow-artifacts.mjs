@@ -24,7 +24,7 @@ if (publishSource.includes("download-artifact")) {
 if (!/^      - run: npm run build\r?$/m.test(publishSource)) {
   throw new Error("Main bundle sync must rebuild the production entrypoint.");
 }
-if (!releaseSource.includes("dist/obsidian-better-canvas.zip")) {
+if (!releaseSource.includes("dist/better-canvas.zip")) {
   throw new Error("Release workflow must publish the installable ZIP.");
 }
 

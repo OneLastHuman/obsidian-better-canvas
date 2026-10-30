@@ -13,6 +13,32 @@ async function main() {
 
   const errors = [];
 
+  if (typeof manifest.id !== "string" || !/^[a-z0-9-]+$/.test(manifest.id)) {
+    errors.push("manifest.json id must contain only lowercase letters, digits, and hyphens.");
+  } else if (/obsidian/i.test(manifest.id)) {
+    errors.push('manifest.json id must not contain "obsidian".');
+  }
+
+  if (typeof manifest.name !== "string" || /obsidian|plugin/i.test(manifest.name)) {
+    errors.push('manifest.json name must not contain "Obsidian" or "Plugin".');
+  }
+
+  if (
+    typeof manifest.description !== "string" ||
+    manifest.description.length > 250 ||
+    !manifest.description.endsWith(".")
+  ) {
+    errors.push("manifest.json description must be at most 250 characters and end with a period.");
+  }
+
+  if (typeof manifest.minAppVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(manifest.minAppVersion)) {
+    errors.push("manifest.json minAppVersion must use the x.y.z format.");
+  }
+
+  if (typeof manifest.isDesktopOnly !== "boolean") {
+    errors.push("manifest.json isDesktopOnly must be a boolean.");
+  }
+
   if (packageJson.version !== manifest.version) {
     errors.push(
       `package.json version (${packageJson.version}) does not match manifest.json version (${manifest.version}).`,

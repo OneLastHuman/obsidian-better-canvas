@@ -8,7 +8,7 @@
 | --- | --- |
 | 日期 | 2026-10-23，Asia/Shanghai |
 | 应用 | Windows / Obsidian Desktop 1.14.4，installer 1.14.4 |
-| 插件来源 | `46c8a46183edb249b3486b8e22b1a1de5e7ff1c2` 中的安装构建 |
+| 插件来源 | `cc923322d94bf3f3053a8aec02a7ffe60524d7f2` 中的安装构建 |
 | 部署核对 | 仓库根目录、`release/` 与测试 Vault 的 `main.js` SHA-256 一致 |
 | `main.js` SHA-256 | `c45816ee43003e21dce9151483d6e8e26bb9b336a82fa356f1d2bfc88abf5877` |
 | 外观 | Obsidian 默认主题、浅色外观；画布分别使用插件的 6 种主题 |
@@ -26,7 +26,7 @@
 | --- | --- |
 | 日期 | 2026-10-25，Asia/Shanghai |
 | 应用 | macOS / Obsidian Desktop 1.14.4 |
-| 插件来源 | `e0fdb8f` 的本地构建；测试 Vault、仓库根目录与 `release/` 的 `main.js` SHA-256 一致 |
+| 插件来源 | `d089854` 的本地构建；测试 Vault、仓库根目录与 `release/` 的 `main.js` SHA-256 一致 |
 | `main.js` SHA-256 | `02248fda38ee29538b2a3ca45a030deaf87d19fef0cd4fb533194cba04a439f5` |
 | 外观 | Obsidian 默认主题、浅色外观；画布为纸本研究主题 |
 | 窗口 | 2000 × 1094 CSS 像素，设备像素比 2，左右侧栏收起，画布缩放到 110% |
@@ -41,14 +41,14 @@
 
 | 文件 | 展示内容 | 实际操作 |
 | --- | --- | --- |
-| `theme-picker.png` | 6 种主题的入口、缩略预览与名称 | 打开柔软便签示例，执行 `obsidian-better-canvas:choose-canvas-theme`；核对 6 个选项均完整可见后截图，未切换主题 |
+| `theme-picker.png` | 6 种主题的入口、缩略预览与名称 | 打开柔软便签示例，执行 `better-canvas:choose-canvas-theme`；核对 6 个选项均完整可见后截图，未切换主题 |
 | `soft-notes.png` | 灵感、摘录、概念、问题和行动清单 | 打开柔软便签示例，调整视口，取消选择后截图 |
 | `rounded-map.png` | 起止、步骤、判断、流转、输入与文档形状 | 打开读书会流程示例，显示是 / 否分支和结果卡片 |
 | `research.png` | 材料、引文、批注、观点和待解问题 | 打开纸本研究示例，显示完整的阅读关系 |
 | `sketch.png` | 手绘轮廓、排线、功能预设和旁注 | 打开手绘示例，显示概念到实验的流程 |
 | `scrapbook.png` | 胶带、横线纸、撕边纸、标签与照片框 | 打开拼贴示例，加载本地 `postcard.svg` |
 | `mind-map.png` | 默认外观下的分支结构 | 打开预先编排的 10 节点示例，显示完整结构 |
-| `ai-prompt.png` | 从观点卡发起提问 | 选中 `argument` 节点，执行 `obsidian-better-canvas:ask-ai`，填写提示词后截图，未提交（2026-10-25 重拍） |
+| `ai-prompt.png` | 从观点卡发起提问 | 选中 `argument` 节点，执行 `better-canvas:ask-ai`，填写提示词后截图，未提交（2026-10-25 重拍） |
 
 示例的文字、位置与连线预先写入 `.canvas` 文件。截图展示当前构建的渲染效果，不将示例导入称为通过快捷键创建或自动布局的验证。拼贴插画复用仓库已有的 `docs/examples/scrapbook-postcard.svg`。
 
