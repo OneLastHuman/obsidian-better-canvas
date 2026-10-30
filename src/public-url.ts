@@ -1,17 +1,19 @@
 const BLOCKED_URL_MESSAGE = "为避免意外访问本机或内网地址，不处理 localhost、私有 IP 或 .local 域名。";
 
 function parseIPv4(host: string): [number, number, number, number] | null {
-  const parts = host.split(".");
-  if (parts.length !== 4 || parts.some(part => !/^\d{1,3}$/.test(part))) return null;
-  const octets = parts.map(Number);
-  if (octets.some(part => part < 0 || part > 255)) return null;
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return null;
+  const octets = [Number(match[1]), Number(match[2]), Number(match[3]), Number(match[4])];
+  if (octets.some(part => part > 255)) return null;
   return octets as [number, number, number, number];
 }
 
 function isBlockedIPv4(host: string): boolean {
   const ip = parseIPv4(host);
-  if (!ip) return false;
-  const [a, b, c] = ip;
+  return ip !== null && isBlockedIPv4Octets(ip);
+}
+
+function isBlockedIPv4Octets([a, b, c]: readonly [number, number, number, number]): boolean {
   return a === 0 || a === 10 || a === 127 ||
     (a === 100 && b >= 64 && b <= 127) ||
     (a === 169 && b === 254) ||
@@ -53,10 +55,9 @@ function isBlockedIPv6(host: string): boolean {
 
   // IPv4-mapped IPv6 addresses must be evaluated against the same IPv4 denylist.
   if (words.slice(0, 5).every(word => word === 0) && words[5] === 0xffff) {
-    const v4 = [
+    return isBlockedIPv4Octets([
       words[6] >> 8, words[6] & 0xff, words[7] >> 8, words[7] & 0xff
-    ].join(".");
-    return isBlockedIPv4(v4);
+    ]);
   }
 
   const first = words[0];

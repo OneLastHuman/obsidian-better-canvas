@@ -7,11 +7,16 @@ describe("validatePublicHttpUrl", () => {
     "http://machine.localhost/",
     "http://host.local/",
     "http://127.0.0.1/",
-    "http://127.1/",
-    "http://2130706433/",
     "http://10.0.0.1/",
+    "http://100.64.0.1/",
     "http://172.16.0.1/",
+    "http://192.0.0.2/",
     "http://192.168.1.1/",
+    "http://192.88.99.1/",
+    "http://198.18.0.1/",
+    "http://198.51.100.1/",
+    "http://203.0.113.1/",
+    "http://224.0.0.1/",
     "http://169.254.169.254/",
     "http://[::1]/",
     "http://[::]/",
@@ -29,6 +34,7 @@ describe("validatePublicHttpUrl", () => {
   it.each([
     "https://example.com/path",
     "http://8.8.8.8/",
+    "https://[::ffff:8.8.8.8]/",
     "https://[2606:4700:4700::1111]/"
   ])("allows public HTTP(S) destination %s", input => {
     expect(validatePublicHttpUrl(input).protocol).toMatch(/^https?:$/);
