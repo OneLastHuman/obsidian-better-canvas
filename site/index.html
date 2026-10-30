@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Better Canvas, a place to think in shapes</title>
+  <meta name="description" content="Better Canvas is a desktop Obsidian plugin for canvas themes, mind-map shortcuts, node styling, PDF annotations, optional AI assistance, and PNG, SVG, or JSON Canvas export. Install from GitHub Releases.">
+  <meta name="theme-color" content="#f3eee4">
+  <meta property="og:title" content="Better Canvas, a place to think in shapes">
+  <meta property="og:description" content="Canvas themes, mind-map shortcuts, node styling, PDF annotations, optional AI, and export for Obsidian. Desktop only, Obsidian 1.14.4 or newer.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://onelasthuman.github.io/obsidian-better-canvas/">
+  <meta property="og:image" content="https://onelasthuman.github.io/obsidian-better-canvas/assets/soft-notes.png">
+  <meta property="og:image:alt" content="A soft-notes canvas for a reading circle in Obsidian, with pastel cards connected by arrows.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://onelasthuman.github.io/obsidian-better-canvas/">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#top" aria-label="Better Canvas home">
+        <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
+          <rect x="3" y="7" width="11" height="8" rx="2.5"></rect>
+          <rect x="22" y="21" width="11" height="8" rx="2.5"></rect>
+          <path d="M14 11h5.5A4.5 4.5 0 0 1 24 15.5V21"></path>
+        </svg>
+        <span>Better Canvas</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#themes">Themes</a>
+        <a href="#mapping">Mind maps</a>
+        <a href="#ai">AI</a>
+        <a href="#install">Install</a>
+        <a class="nav-repo" href="https://github.com/OneLastHuman/obsidian-better-canvas">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <p class="kicker">An Obsidian Canvas plugin</p>
+          <h1 id="hero-title">A place to think in shapes.</h1>
+          <p class="lede">Better Canvas adds themes, card-first map making, and reading tools to Obsidian Canvas. Arrange notes spatially, keep every source next to the thought it inspired, and call AI only when you choose to.</p>
+          <div class="actions">
+            <a class="button" href="https://github.com/OneLastHuman/obsidian-better-canvas/releases/latest">Download latest release</a>
+            <a class="text-link" href="#themes">Explore the features</a>
+          </div>
+          <p class="compat">Desktop only. Requires Obsidian 1.14.4 or newer.</p>
+        </div>
+
+        <aside class="hero-note" aria-label="At a glance">
+          <p class="note-label">At a glance</p>
+          <dl>
+            <div>
+              <dt>Six themes</dt>
+              <dd>Chosen per canvas and saved with it</dd>
+            </div>
+            <div>
+              <dt>Optional AI</dt>
+              <dd>Off until you configure a service</dd>
+            </div>
+            <div>
+              <dt>Your vault</dt>
+              <dd>Cards and edges stay in .canvas files</dd>
+            </div>
+          </dl>
+          <p class="note-hand">The canvas is still the canvas. Better Canvas gives it a different voice, and a few more ways to grow.</p>
+        </aside>
+      </div>
+
+      <figure class="hero-plate shell">
+        <div class="plate-frame">
+          <img src="assets/soft-notes.png" alt="A soft-notes canvas for a reading circle: a lilac idea card, a blue quote card, a green theme pill, a yellow action list, and a centered text card, connected by curved arrows." width="2505" height="1292" fetchpriority="high" decoding="async">
+        </div>
+        <figcaption>
+          <span class="caption-title">Soft notes, a reading circle</span>
+          <span class="caption-detail">Idea, excerpt, concept, question, and action cards on one canvas. Real plugin UI in Obsidian 1.14.4; sample content.</span>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="ledger shell" aria-label="Plugin facts">
+      <p class="ledger-intro">Better Canvas works on top of Obsidian's own <code>.canvas</code> files. The editing and theme tools need no account; AI is optional.</p>
+      <dl class="facts">
+        <div>
+          <dt>Host</dt>
+          <dd>Obsidian 1.14.4 or newer</dd>
+        </div>
+        <div>
+          <dt>Platform</dt>
+          <dd>Desktop only</dd>
+        </div>
+        <div>
+          <dt>License</dt>
+          <dd>GPL-3.0-or-later</dd>
+        </div>
+        <div>
+          <dt>Latest verified release</dt>
+          <dd><a href="https://github.com/OneLastHuman/obsidian-better-canvas/releases/tag/0.1.0">0.1.0</a></dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="section themes" id="themes" aria-labelledby="themes-title">
+      <div class="shell section-intro">
+        <p class="rail-label">Canvas themes</p>
+        <h2 id="themes-title">Six ways to set the scene.</h2>
+        <div class="prose">
+          <p>Choose a theme for each canvas from the right-hand rail, then use the node style panel to give individual cards a role. Content, positions, and connections stay where they are. The theme is saved with the canvas.</p>
+          <p class="aside-note">Themes change the look, not the file format. Obsidian still opens the same canvas.</p>
+        </div>
+      </div>
+
+      <div class="shell theme-gallery">
+        <figure class="figure figure-wide">
+          <div class="figure-frame">
+            <img src="assets/rounded-map.png" alt="A gummy-whiteboard flowchart for planning a reading event, using pill, rounded rectangle, diamond, arrow, parallelogram, and document shapes." width="2505" height="1292" loading="lazy" decoding="async">
+          </div>
+          <figcaption><span class="caption-title">Gummy whiteboard</span> A planning flow with a decision, a yes and no branch, and an output card. Sample content; real UI.</figcaption>
+        </figure>
+        <figure class="figure figure-narrow">
+          <div class="figure-frame">
+            <img src="assets/research.png" alt="A paper-study canvas with source material, a quotation, a reading note, a claim, and an open question, connected by labeled arrows." width="2505" height="1292" loading="lazy" decoding="async">
+          </div>
+          <figcaption><span class="caption-title">Paper study</span> Source, quotation, annotation, claim, and follow-up question arranged as a reading spread.</figcaption>
+        </figure>
+      </div>
+
+      <div class="shell theme-roster">
+        <p class="roster-note">The six themes, and what each is good at:</p>
+        <ul>
+          <li><span class="theme-name">Default</span><span class="theme-desc">Obsidian's own canvas, without extra decoration.</span></li>
+          <li><span class="theme-name">Soft notes</span><span class="theme-desc">Curved pastel cards for loose, early thinking.</span></li>
+          <li><span class="theme-name">Paper study</span><span class="theme-desc">Warm paper, serif headings, and print-like presets.</span></li>
+          <li><span class="theme-name">Gummy whiteboard</span><span class="theme-desc">Rounded shapes and strong outlines for process maps.</span></li>
+          <li><span class="theme-name">Sketch board</span><span class="theme-desc">Dotted paper, hand-drawn edges, and margin-note presets.</span></li>
+          <li><span class="theme-name">Collage journal</span><span class="theme-desc">Tape, ruled paper, torn edges, and photo frames.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section mapping" id="mapping" aria-labelledby="mapping-title">
+      <div class="shell section-intro">
+        <p class="rail-label">Mind maps</p>
+        <h2 id="mapping-title">Follow the branch without leaving the keys.</h2>
+        <div class="prose">
+          <p>Cards are the unit of thought. Select one and press a key to keep going. When a branch gets crowded, arrange the selected tree left, right, up, or down. A Markdown note can also seed the map by turning its H1 headings into connected cards.</p>
+        </div>
+      </div>
+
+      <figure class="figure shell mapping-figure">
+        <div class="figure-frame">
+          <img src="assets/mind-map.png" alt="A default-theme mind map with a reading meetup card branching into what to read, who to read with, and what to keep." width="2505" height="1292" loading="lazy" decoding="async">
+        </div>
+        <figcaption><span class="caption-title">A reading meetup, mapped</span> Ten cards in the default theme. The example is arranged for the screenshot; the rendering is the plugin's own.</figcaption>
+      </figure>
+
+      <div class="shell keymap-wrap">
+        <p class="keymap-note">The keys that keep a thought moving:</p>
+        <dl class="keymap">
+          <div>
+            <dt><kbd>Tab</kbd></dt>
+            <dd>Create a child card, when no text is being edited.</dd>
+          </div>
+          <div>
+            <dt><kbd>Enter</kbd></dt>
+            <dd>Create a sibling card, when no text is being edited.</dd>
+          </div>
+          <div>
+            <dt><kbd>Shift</kbd> + <kbd>Tab</kbd></dt>
+            <dd>Create a child card while editing text.</dd>
+          </div>
+          <div>
+            <dt><kbd>Shift</kbd> + <kbd>Enter</kbd></dt>
+            <dd>Create a sibling card while editing text.</dd>
+          </div>
+          <div>
+            <dt><kbd>Alt</kbd> + <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd></dt>
+            <dd>Move the selection to an adjacent card.</dd>
+          </div>
+          <div>
+            <dt><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + arrow</dt>
+            <dd>Create a child card in that direction.</dd>
+          </div>
+        </dl>
+        <p class="keymap-note keymap-footnote">Each shortcut group can be turned off in settings if it collides with another plugin or your own hotkeys.</p>
+      </div>
+    </section>
+
+    <section class="section styling" id="styling" aria-labelledby="styling-title">
+      <div class="shell section-intro">
+        <p class="rail-label">Node styling</p>
+        <h2 id="styling-title">Cards that say what they are.</h2>
+        <div class="prose">
+          <p>Start from a preset, then adjust color, shape, border, and text alignment. Select several cards to apply one style across a group without replacing the words. Connectors get their own controls: color, line style, arrowhead, direction, and direct, square, or A-star routing.</p>
+        </div>
+      </div>
+
+      <div class="shell preset-wrap">
+        <p class="ledger-label">Preset roles, by theme</p>
+        <dl class="preset-ledger">
+          <div>
+            <dt>Default</dt>
+            <dd>Obsidian's native cards. CSS snippets can add reusable node and edge presets.</dd>
+          </div>
+          <div>
+            <dt>Soft notes</dt>
+            <dd>Idea, excerpt, concept, action, question, and free text.</dd>
+          </div>
+          <div>
+            <dt>Paper study</dt>
+            <dd>Source material, key quote, reading note, core claim, open question, and section heading.</dd>
+          </div>
+          <div>
+            <dt>Gummy whiteboard</dt>
+            <dd>Start or topic, step or task, decision, flow or next stage, input or output, and document.</dd>
+          </div>
+          <div>
+            <dt>Sketch board</dt>
+            <dd>Chapter, core concept, action step, decision, margin note, and risk.</dd>
+          </div>
+          <div>
+            <dt>Collage journal</dt>
+            <dd>Tape note, ruled paper, torn paper, photo frame, and label.</dd>
+          </div>
+        </dl>
+        <p class="fine-print">Preset availability differs by theme. Groups keep their own styling, and presets never replace a card's text.</p>
+      </div>
+    </section>
+
+    <section class="section reading" id="reading" aria-labelledby="reading-title">
+      <div class="shell section-intro">
+        <p class="rail-label">PDF annotations</p>
+        <h2 id="reading-title">Keep the page beside the passage.</h2>
+        <div class="prose">
+          <p>Pin a PDF page into a canvas, select text to make a linked excerpt, and draw or highlight on the page. Annotations save with the canvas, so the PDF itself stays as it is.</p>
+        </div>
+      </div>
+
+      <div class="shell reading-grid">
+        <div class="reading-copy">
+          <p>Reading is easier to keep when the source, the quotation, and your own response occupy the same space. Better Canvas keeps all three in the canvas file, including pen marks, highlights, and typed notes.</p>
+          <p>With a vision-capable model configured, you can OCR a single page or a range and save each page's result as its own linked card.</p>
+        </div>
+        <div class="reading-steps">
+          <ol>
+            <li><div><span class="step-name">Pin</span> Put a page from a PDF in your vault onto the canvas.</div></li>
+            <li><div><span class="step-name">Mark</span> Use the pen, highlighter, eraser, and undo tools, or add a typed note.</div></li>
+            <li><div><span class="step-name">Carry it forward</span> Make a linked excerpt card, or run OCR in batches of up to 20 pages.</div></li>
+          </ol>
+          <p class="reading-caveat">Not a replacement for a full PDF editor. Better Canvas does not rewrite the PDF's native highlight objects or manage annotations across an entire document.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section ai" id="ai" aria-labelledby="ai-title">
+      <div class="shell section-intro">
+        <p class="rail-label">Optional AI</p>
+        <h2 id="ai-title">Ask from the canvas, not from a blank chat.</h2>
+        <div class="prose">
+          <p>Select one card or a group and ask a question. The answer arrives as a new card connected to its sources. Responses can stream, stop, and regenerate; flashcards can stay on the canvas or export as a Spaced Repetition deck. Image generation and web import are available when your configured services support them.</p>
+        </div>
+      </div>
+
+      <div class="shell ai-grid">
+        <figure class="figure ai-figure">
+          <div class="figure-frame">
+            <img src="assets/ai-prompt.png" alt="The Ask AI panel over a paper-study canvas. A prompt about evidence gaps and follow-up questions is typed in the field, with the selected claim card visible behind it." width="2505" height="1523" loading="lazy" decoding="async">
+          </div>
+          <figcaption><span class="caption-title">Ask AI, from a selected claim</span> The prompt is typed but not sent. The selected card and its connected context sit behind the panel. Real UI, sample content.</figcaption>
+        </figure>
+
+        <aside class="ai-side" aria-labelledby="ai-disclosure-title">
+          <h3 id="ai-disclosure-title">Before you send anything</h3>
+          <p>AI is off until you configure a service. Use an OpenAI-compatible, Anthropic, or Gemini endpoint, or a desktop CLI such as Codex or Claude Code. Prompts and the context you include are sent to that service, and local CLI modes can still call remote models.</p>
+          <p>Model capabilities vary. Check the service's data policy before sending private notes, PDFs, or file content.</p>
+          <p class="optional-note">Themes, node styling, mapping, PDF annotation, and export do not need AI.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section export" id="export" aria-labelledby="export-title">
+      <div class="shell section-intro">
+        <p class="rail-label">Export</p>
+        <h2 id="export-title">Take the thinking out of the vault.</h2>
+        <div class="prose">
+          <p>Present nodes in order, or export as PNG or SVG. Set the export resolution and background in plugin settings, then choose the whole canvas, the current viewport, or just the selected cards. JSON Canvas is available when another tool needs the raw structure.</p>
+        </div>
+      </div>
+
+      <div class="shell export-grid">
+        <div class="export-formats">
+          <div class="format">
+            <span class="format-name">PNG</span>
+            <p>A raster image for slides, documents, or a quick share.</p>
+          </div>
+          <div class="format">
+            <span class="format-name">SVG</span>
+            <p>Vector output for print and further editing.</p>
+          </div>
+          <div class="format">
+            <span class="format-name">JSON Canvas</span>
+            <p>The portable canvas format, ready for another app.</p>
+          </div>
+        </div>
+        <div class="export-note">
+          <p>Exports are written to the folder set in plugin settings. Static rendering can differ from the editor: interactive HTML does not run, and collage paper textures and tape are not reproduced in full-canvas or selection exports.</p>
+          <p><a class="text-link" href="https://github.com/OneLastHuman/obsidian-better-canvas/blob/main/docs/KNOWN_LIMITATIONS.md">Read the known limitations</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="install" id="install" aria-labelledby="install-title">
+      <div class="shell install-grid">
+        <div class="install-copy">
+          <p class="rail-label">Install</p>
+          <h2 id="install-title">Start with the latest release.</h2>
+          <p class="directory-note">Better Canvas is not yet in the official Obsidian community directory. For now, install it from GitHub Releases.</p>
+          <div class="actions">
+            <a class="button button-light" href="https://github.com/OneLastHuman/obsidian-better-canvas/releases/latest">Open latest release</a>
+            <a class="text-link text-link-light" href="https://github.com/OneLastHuman/obsidian-better-canvas/releases">All releases</a>
+          </div>
+          <p class="install-requirement">Desktop only. Requires Obsidian 1.14.4 or newer.</p>
+        </div>
+
+        <ol class="install-steps">
+          <li>
+            <div><strong>Download the archive</strong> Get <code>better-canvas.zip</code> from the release assets.</div>
+          </li>
+          <li>
+            <div><strong>Unpack it into your vault</strong> Place the <code>better-canvas</code> folder in <code>&lt;Vault&gt;/.obsidian/plugins/</code>. The finished folder should contain these files:
+              <code class="code-block">&lt;Vault&gt;/.obsidian/plugins/better-canvas/<br>├── main.js<br>├── manifest.json<br>└── styles.css</code>
+            </div>
+          </li>
+          <li>
+            <div><strong>Enable the plugin</strong> Reload community plugins in Obsidian settings, then turn on Better Canvas.</div>
+          </li>
+        </ol>
+      </div>
+
+      <div class="shell install-foot">
+        <p>Prefer to build it yourself? Use Node.js 22 and run <code>npm run build</code> in the repository.</p>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas">View the source on GitHub</a>
+      </div>
+    </section>
+
+    <section class="section notes" id="notes" aria-labelledby="notes-title">
+      <div class="shell notes-grid">
+        <div class="notes-copy">
+          <p class="rail-label">Data and access</p>
+          <h2 id="notes-title">What it touches, and when.</h2>
+          <p class="prose">The editing tools work locally. Network activity belongs to features you configure, not to page views or usage tracking.</p>
+        </div>
+        <div class="notes-list">
+          <div class="note-block">
+            <h3>Vault access</h3>
+            <p>Like other Obsidian plugins, Better Canvas has access to the vault. It can read canvas, Markdown, and PDF files to provide its features, and it writes when you edit a canvas, export, create an attachment, or run onboarding. Settings and API credentials live in local plugin data.</p>
+          </div>
+          <div class="note-block">
+            <h3>Clipboard</h3>
+            <p>Clipboard access is limited to writing a node Wikilink when you copy one. The plugin does not read clipboard contents.</p>
+          </div>
+          <div class="note-block">
+            <h3>Network</h3>
+            <p>There are no analytics, telemetry, or ads. Requests can be made for AI prompts, model discovery and probes, MCP servers, web-page import, and external resources loaded by HTML previews. They go to the destinations you configure or open.</p>
+          </div>
+          <div class="note-block">
+            <h3>AI data</h3>
+            <p>Prompts, selected nodes, and related context are sent to your chosen service. Local CLI modes are not guaranteed to be offline. The provider's data policy applies.</p>
+          </div>
+        </div>
+      </div>
+      <div class="shell platform-note">
+        <p>Better Canvas targets Obsidian 1.14.4 on desktop. Some features use Obsidian's internal APIs, so newer versions and third-party themes can behave differently. Keep a backup before trying new workflows on important canvases.</p>
+      </div>
+    </section>
+
+    <section class="chinese-summary" lang="zh-Hans" aria-labelledby="zh-title">
+      <div class="shell chinese-grid">
+        <h2 id="zh-title">中文摘要</h2>
+        <div>
+          <p>Better Canvas 是 Obsidian Canvas 的增强插件。它可以为每张画布选择主题，用 Tab 和 Enter 展开思维导图，调整节点与连线样式，在 PDF 页面旁做批注，按需调用已配置的 AI，并导出 PNG、SVG 或 JSON Canvas。</p>
+          <p>仅支持桌面端，需要 Obsidian 1.14.4 或更高版本。插件尚未上架 Obsidian 官方社区目录，请从 GitHub Releases 安装。以 GPL-3.0-or-later 许可发布。</p>
+          <p>AI 功能默认不启用；使用时会把你提交的提示词与所选节点上下文发送到你配置的服务。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div>
+        <a class="footer-brand" href="#top">Better Canvas</a>
+        <p class="footer-note">Screenshots show the real plugin UI in Obsidian 1.14.4 on desktop. Sample canvases are illustrative. This page loads no external fonts, scripts, or trackers.</p>
+      </div>
+      <nav class="footer-links" aria-label="Project">
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas">Source</a>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas/releases">Releases</a>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas/blob/main/docs/FEATURE_GUIDE.md">Feature guide</a>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas/blob/main/LICENSE">GPL-3.0-or-later</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
