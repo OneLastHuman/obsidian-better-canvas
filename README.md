@@ -7,7 +7,7 @@
 <p align="center">记录灵感 · 梳理流程 · 阅读批注 · 关联 AI</p>
 
 <p align="center">
-  <img alt="最低要求 Obsidian 1.5.0" src="https://img.shields.io/badge/Obsidian-1.5.0%2B-526b59" />
+  <img alt="最低要求 Obsidian 1.14.4" src="https://img.shields.io/badge/Obsidian-1.14.4%2B-526b59" />
   <img alt="License GPL-3.0-or-later" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue" />
 </p>
 
@@ -118,10 +118,14 @@ AI 功能需要单独配置，能力取决于服务和模型。提示词与所�
 
 ## 安装
 
+### 从 Obsidian 社区插件安装
+
+插件上架后，在 Obsidian **设置 → 社区插件** 中搜索 **Better Canvas** 并安装。首次发布前，请使用下方的手动安装方式。
+
 ### 下载正式版
 
 1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)。
-2. 下载 `obsidian-better-canvas.zip`。
+2. 下载 `better-canvas.zip`。
 3. 将压缩包解压到 Vault 的 `.obsidian/plugins/` 目录。
 4. 在 Obsidian **设置 → 社区插件** 中重新加载插件列表。
 5. 启用 **Better Canvas**。
@@ -129,7 +133,7 @@ AI 功能需要单独配置，能力取决于服务和模型。提示词与所�
 插件目录应包含以下文件：
 
 ```text
-<Vault>/.obsidian/plugins/obsidian-better-canvas/
+<Vault>/.obsidian/plugins/better-canvas/
 ├── main.js
 ├── manifest.json
 └── styles.css
@@ -172,8 +176,8 @@ AI 功能需要单独配置，能力取决于服务和模型。提示词与所�
 
 ## 兼容性与数据
 
-- **版本：** 最低要求为 Obsidian 1.5.0。部分功能依赖内部 API；较新主题的实机截图来自 1.14.4，不代表所有版本均已验证。
-- **设备与外观：** 移动端、第三方 Obsidian 主题和复杂画布仍有待验证的行为。非矩形卡片的连线端点、框选与缩放范围仍按原生矩形边界工作。
+- **版本：** 最低要求为 Obsidian 1.14.4。部分功能依赖内部 API；实机验证主要覆盖 1.14.4，不代表所有版本均已验证。
+- **设备与外观：** 本插件仅支持 Obsidian 桌面端。第三方 Obsidian 主题和复杂画布仍有待验证的行为。非矩形卡片的连线端点、框选与缩放范围仍按原生矩形边界工作。
 - **Portal 与 PDF：** Portal 主要支持单层同步。PDF 批注保存在 Canvas 中；完整的原生 PDF 高亮编辑和多页批注管理尚未完成。
 - **AI 与工具：** 使用前确认服务的数据处理政策。MCP 本地 stdio 服务以当前用户权限运行，只应连接可信服务，并在执行前检查工具参数。
 - **HTML 预览：** 使用沙盒 iframe；只预览可信或已检查的代码。
@@ -185,7 +189,7 @@ AI 功能需要单独配置，能力取决于服务和模型。提示词与所�
 需要 Node.js 22 和 npm。在源码目录执行：
 
 ```bash
-npm install
+npm ci
 npm run lint
 npm run validate:metadata
 npm run typecheck

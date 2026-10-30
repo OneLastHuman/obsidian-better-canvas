@@ -56,7 +56,7 @@ Files: `docs/FEATURE_GUIDE.md`, `docs/INTEGRATION_MATRIX.md`.
 
 ## Execution record
 
-- Baseline `ea430a0`; isolated branch `feat/scrapbook-theme`; 63 files / 438 tests pass.
+- Baseline `e105a12`; isolated branch `feat/scrapbook-theme`; 63 files / 438 tests pass.
 - Ruling: inline implementation follows the user's request to implement quickly; no extra design approval round.
 - Ruling: preserve a demo board for user evaluation; delete only disposable verification boards.
 - Ruling: local work only; no GitHub messages or publication without user instruction.
