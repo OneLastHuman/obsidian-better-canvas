@@ -1,3 +1,3 @@
 # Integration status
 
-This repository is being incrementally integrated and validated. Check the latest GitHub Actions Build workflow before treating the current branch as a verified release.
+Better Canvas 0.1.0 is published as a desktop-only GitHub Release. The `main` branch remains the development line; check the latest Build workflow and the release page before treating a build as a verified release.
