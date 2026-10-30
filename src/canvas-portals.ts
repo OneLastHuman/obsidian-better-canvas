@@ -112,10 +112,9 @@ class PortalTextPromptModal extends Modal {
     this.contentEl.empty();
     this.contentEl.createEl("h2", { text: "在 Canvas Portal 中创建文本节点" });
     const input = this.contentEl.createEl("textarea", {
+      cls: "bc-modal-prompt-textarea",
       attr: { rows: "5", placeholder: "输入新节点内容" }
     });
-    input.style.width = "100%";
-    input.style.resize = "vertical";
 
     const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
     const cancel = footer.createEl("button", { text: "取消" });

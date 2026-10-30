@@ -139,10 +139,8 @@ class PromptModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl("h2", { text: this.title });
-    const input = contentEl.createEl("textarea", { attr: { rows: "5", placeholder: this.placeholder } });
+    const input = contentEl.createEl("textarea", { cls: "bc-modal-prompt-textarea", attr: { rows: "5", placeholder: this.placeholder } });
     input.value = this.initialValue;
-    input.style.width = "100%";
-    input.style.resize = "vertical";
     const actions = contentEl.createDiv({ cls: "modal-button-container" });
     const submit = actions.createEl("button", { text: "提交", cls: "mod-cta" });
     submit.onclick = () => {

@@ -517,11 +517,13 @@ export class PdfAnnotationManager {
     // embed container (which also contains the selectable-text panel).
     const pageCanvas = container.querySelector(".bc-pinned-pdf-page") as HTMLCanvasElement | null;
     if (pageCanvas) {
-      svg.style.inset = "auto";
-      svg.style.left = pageCanvas.offsetLeft + "px";
-      svg.style.top = pageCanvas.offsetTop + "px";
-      svg.style.width = pageCanvas.clientWidth + "px";
-      svg.style.height = pageCanvas.clientHeight + "px";
+      svg.classList.add("bc-pdf-annotation-page-aligned");
+      svg.setCssStyles({
+        left: pageCanvas.offsetLeft + "px",
+        top: pageCanvas.offsetTop + "px",
+        width: pageCanvas.clientWidth + "px",
+        height: pageCanvas.clientHeight + "px"
+      });
     }
 
     const tool = typeof nodeData.bcPdfTool === "string" ? nodeData.bcPdfTool : "pen";

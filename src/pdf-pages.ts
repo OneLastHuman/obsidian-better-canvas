@@ -185,20 +185,21 @@ class PinnedPdfPageEmbed extends Component {
       const span = document.createElement("span");
       span.className = "bc-pdf-selectable-text-run";
       span.textContent = text;
-      span.style.left = left + "px";
-      span.style.top = top + "px";
-      span.style.fontSize = fontSize * cssScale + "px";
-      span.style.height = Math.max(fontSize * 1.15 * cssScale, 2) + "px";
-      span.style.width = targetWidth + "px";
-      span.style.transform = "rotate(" + angle + "deg)";
-      span.style.transformOrigin = "top left";
+      span.setCssStyles({
+        left: left + "px",
+        top: top + "px",
+        fontSize: fontSize * cssScale + "px",
+        height: Math.max(fontSize * 1.15 * cssScale, 2) + "px",
+        width: targetWidth + "px",
+        transform: "rotate(" + angle + "deg)"
+      });
 
       if (measure) {
         measure.font = fontSize * cssScale + "px sans-serif";
         const naturalWidth = measure.measureText(text).width;
         if (naturalWidth > 0) {
           const scaleX = Math.max(0.35, Math.min(3, targetWidth / naturalWidth));
-          span.style.transform += " scaleX(" + scaleX + ")";
+          span.setCssStyles({ transform: "rotate(" + angle + "deg) scaleX(" + scaleX + ")" });
         }
       }
 
@@ -240,10 +241,7 @@ class PinnedPdfPageEmbed extends Component {
       const viewport = page.getViewport({ scale: 1.5 });
       target.width = Math.ceil(viewport.width);
       target.height = Math.ceil(viewport.height);
-      target.style.width = "100%";
-      target.style.height = "auto";
-      target.style.display = "block";
-      target.style.background = "white";
+      target.classList.add("bc-pinned-pdf-page-rendered");
       target.dataset.page = String(pageNumber);
 
       const context = target.getContext("2d", { alpha: false });

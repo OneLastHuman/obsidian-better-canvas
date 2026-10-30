@@ -106,8 +106,7 @@ export function ensureSoftNotesGeometry(doc: Document): void {
   svg.setAttribute("width", "0");
   svg.setAttribute("height", "0");
   svg.setAttribute("aria-hidden", "true");
-  svg.style.position = "absolute";
-  svg.style.pointerEvents = "none";
+  svg.classList.add("bc-soft-geometry");
   const defs = doc.createElementNS(svg.namespaceURI, "defs");
   for (const preset of SOFT_NOTES_PRESETS.filter(item => item.path)) {
     const clip = doc.createElementNS(svg.namespaceURI, "clipPath");

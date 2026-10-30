@@ -571,7 +571,10 @@ describe("fixed content-aware auto-resize", () => {
       ],
       edges: []
     });
-    const sizer = { style: { minHeight: "71px", height: "71px" } };
+    const sizer = {
+      style: { minHeight: "71px", height: "71px" } as Record<string, string>,
+      setCssStyles(styles: Record<string, string>) { Object.assign(this.style, styles); }
+    };
     const preview: any = {
       scrollTop: 12,
       querySelector: (selector: string) => selector === ".markdown-preview-sizer" ? sizer : null
@@ -677,7 +680,10 @@ describe("fixed content-aware auto-resize", () => {
       edges: []
     });
 
-    const sizer = { style: { minHeight: "71px", height: "71px" } };
+    const sizer = {
+      style: { minHeight: "71px", height: "71px" } as Record<string, string>,
+      setCssStyles(styles: Record<string, string>) { Object.assign(this.style, styles); }
+    };
     const preview: any = {
       scrollTop: 12,
       querySelector: (selector: string) => selector === ".markdown-preview-sizer" ? sizer : null

@@ -31,6 +31,42 @@ const SOFT_EDITOR_STYLE_ID = "bc-soft-notes-editor";
 const RESEARCH_EDITOR_STYLE_ID = "bc-research-editor";
 const FONT_STYLE_ID = "bc-sketch-font";
 const ROUNDED_EDITOR_STYLE_ID = "bc-rounded-map-editor";
+
+interface AdoptedSheetRecord {
+  sheet: CSSStyleSheet;
+  key: string;
+}
+
+const adoptedSheets = new WeakMap<Document, Map<string, AdoptedSheetRecord>>();
+
+function setAdoptedStylesheet(doc: Document, id: string, css: string, key = css): void {
+  let records = adoptedSheets.get(doc);
+  if (!records) {
+    records = new Map();
+    adoptedSheets.set(doc, records);
+  }
+  const existing = records.get(id);
+  if (existing) {
+    if (existing.key === key) return;
+    existing.sheet.replaceSync(css);
+    existing.key = key;
+    return;
+  }
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(css);
+  doc.adoptedStyleSheets.push(sheet);
+  records.set(id, { sheet, key });
+}
+
+function removeAdoptedStylesheet(doc: Document, id: string): void {
+  const records = adoptedSheets.get(doc);
+  const record = records?.get(id);
+  if (!record) return;
+  const index = doc.adoptedStyleSheets.indexOf(record.sheet);
+  if (index >= 0) doc.adoptedStyleSheets.splice(index, 1);
+  records?.delete(id);
+}
+
 const EDITOR_CSS = `
 body { color-scheme: light; --background-primary: #fff8e8; --background-secondary: #f2e7d2;
   --text-normal: #43372f; --text-muted: #766758; --text-faint: #8c7b68;
@@ -39,7 +75,7 @@ body { color-scheme: light; --background-primary: #fff8e8; --background-secondar
   --text-selection: #e2c99c; color: #43372f; background: transparent; }
 .markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #43372f; }
 /* CodeMirror paints text nodes inside .cm-content, which the rules above do not reach.
-   This sheet is appended to the iframe body, so it loses to selectors with more
+   This sheet is adopted by the iframe document, so it loses to selectors with more
    specificity in the host CSS; !important is what keeps the ink readable on paper. */
 .cm-content { color: #43372f !important; caret-color: #43372f; }
 `;
@@ -79,6 +115,12 @@ body { color-scheme: light; --text-normal: #292e28; --text-muted: #78816e;
 :is(h1,h2,h3,h4,h5,h6,.cm-header) { font-family: "BC Soft Notes Title", cursive !important; font-weight: 400; }
 .cm-header { font-size: ${preset === "free" ? 42 : 28}px; }
 `;
+}
+
+function roundedEditorCss(appearance: "dark" | "light"): string {
+  const ink = appearance === "dark" ? "#20262d" : "#34372f";
+  return `body { color-scheme: light; --text-normal: ${ink}; --text-muted: #515b60; --text-faint: #6c747c; --text-accent: #315b86; --text-accent-hover: #24486b; --background-primary: #e5e7e1; --background-secondary: #d7dbd5; --code-background: #d7dbd5; --code-normal: ${ink}; --text-selection: #a9c3d8; color: ${ink}; background: transparent; }
+.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: ${ink}; }`;
 }
 
 class CanvasThemeModal extends Modal {
@@ -224,20 +266,11 @@ export default class CanvasThemeController {
     this.modal.open();
   }
 
-  /** The font is embedded in main.js; inject it once for Canvas and editor iframes. */
+  /** The font is embedded in main.js; adopt it once for Canvas and editor iframes. */
   private ensureFont(): void {
-    if (!SKETCH_FONT_CSS && !SOFT_NOTES_FONT_CSS) return;
-    const head = (globalThis as any).document?.head;
-    if (!head || typeof document === "undefined") return;
-    const existing = document.getElementById(FONT_STYLE_ID);
-    if (existing) {
-      existing.textContent = SKETCH_FONT_CSS + SOFT_NOTES_FONT_CSS;
-      return;
-    }
-    const style = document.createElement("style");
-    style.id = FONT_STYLE_ID;
-    style.textContent = SKETCH_FONT_CSS + SOFT_NOTES_FONT_CSS;
-    head.appendChild(style);
+    if (!SKETCH_FONT_CSS && !SOFT_NOTES_FONT_CSS || typeof document === "undefined") return;
+    document.getElementById?.(FONT_STYLE_ID)?.remove();
+    setAdoptedStylesheet(document, FONT_STYLE_ID, SKETCH_FONT_CSS + SOFT_NOTES_FONT_CSS);
   }
 
   private schedule(): void {
@@ -315,61 +348,35 @@ export default class CanvasThemeController {
   private syncEditors(canvas: any, theme: CanvasThemeId): void {
     for (const iframe of canvas.wrapperEl?.querySelectorAll("iframe.canvas-node-iframe, .markdown-embed iframe.embed-iframe.is-controlled") ?? []) {
       try {
-        const doc = (iframe as HTMLIFrameElement).contentDocument;
+        const frame = iframe as HTMLIFrameElement;
+        const doc = frame.contentDocument;
         if (!doc?.head) continue;
-        const scrapbook = doc.getElementById(EDITOR_STYLE_ID);
-        const sketch = doc.getElementById(SKETCH_EDITOR_STYLE_ID);
-        const soft = doc.getElementById(SOFT_EDITOR_STYLE_ID);
-        const research = doc.getElementById(RESEARCH_EDITOR_STYLE_ID);
-        const rounded = doc.getElementById(ROUNDED_EDITOR_STYLE_ID);
-        if (theme === "rounded-map") {
-          soft?.remove();
-          scrapbook?.remove();
-          sketch?.remove();
-          research?.remove();
-          const style = rounded ?? doc.createElement("style");
-          style.id = ROUNDED_EDITOR_STYLE_ID;
-          const ink = this.editorAppearance(iframe, doc) === "dark" ? "#20262d" : "#34372f";
-          const css = `body { color-scheme: light; --text-normal: ${ink}; --text-muted: #515b60; --text-faint: #6c747c; --text-accent: #315b86; --text-accent-hover: #24486b; --background-primary: #e5e7e1; --background-secondary: #d7dbd5; --code-background: #d7dbd5; --code-normal: ${ink}; --text-selection: #a9c3d8; color: ${ink}; background: transparent; }
-.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: ${ink}; }`;
-          if (style.textContent !== css) style.textContent = css;
-          if (!rounded) (doc.body ?? doc.head).appendChild(style);
-          continue;
-        }
-        rounded?.remove();
-        if (theme === "default") {
-          scrapbook?.remove();
-          sketch?.remove();
-          soft?.remove();
-          research?.remove();
-          continue;
-        }
-        const styleId = theme === "scrapbook" ? EDITOR_STYLE_ID
-          : theme === "soft-notes" ? SOFT_EDITOR_STYLE_ID : theme === "research" ? RESEARCH_EDITOR_STYLE_ID : SKETCH_EDITOR_STYLE_ID;
-        if (theme !== "scrapbook") scrapbook?.remove();
-        if (theme !== "sketch") sketch?.remove();
-        if (theme !== "soft-notes") soft?.remove();
-        if (theme !== "research") research?.remove();
-        const anchor = iframe.closest?.("[data-bc-soft-notes]") as HTMLElement | null;
+        const anchor = frame.closest?.("[data-bc-soft-notes]") as HTMLElement | null;
         const preset = anchor?.dataset.bcSoftNotes ?? "";
         const align = anchor?.style.getPropertyValue("--bc-soft-align") ?? "left";
         // Theme switching is not the only trigger: `css-change` fires on light/dark
-        // appearance changes too, so the appearance has to be part of the key or the
-        // re-injected sheet keeps the stale look. Same reason rounded-map picks its
-        // ink from `theme-dark` above.
-        const appearance = this.editorAppearance(iframe, doc);
+        // appearance changes too, so the appearance is part of the key or the
+        // adopted sheet keeps the stale look.
+        const appearance = this.editorAppearance(frame, doc);
+        const ids = [EDITOR_STYLE_ID, SKETCH_EDITOR_STYLE_ID, SOFT_EDITOR_STYLE_ID, RESEARCH_EDITOR_STYLE_ID, ROUNDED_EDITOR_STYLE_ID];
+        for (const legacyId of ids) doc.getElementById?.(legacyId)?.remove();
+        if (theme === "default") {
+          for (const id of ids) removeAdoptedStylesheet(doc, id);
+          continue;
+        }
+        const id = theme === "rounded-map" ? ROUNDED_EDITOR_STYLE_ID
+          : theme === "scrapbook" ? EDITOR_STYLE_ID
+            : theme === "soft-notes" ? SOFT_EDITOR_STYLE_ID
+              : theme === "research" ? RESEARCH_EDITOR_STYLE_ID : SKETCH_EDITOR_STYLE_ID;
+        for (const stale of ids) {
+          if (stale !== id) removeAdoptedStylesheet(doc, stale);
+        }
         const editorKey = theme + ":" + preset + ":" + align + ":" + appearance;
-        const previous = doc.getElementById(styleId);
-        if (previous?.getAttribute("data-bc-editor-key") === editorKey) continue;
-        previous?.remove();
-        const style = doc.createElement("style");
-        style.id = styleId;
-        style.setAttribute("data-bc-editor-key", editorKey);
-        style.textContent = theme === "scrapbook" ? EDITOR_CSS
-          : theme === "soft-notes" ? softNotesEditorCss(preset, align) : theme === "research" ? RESEARCH_EDITOR_CSS : sketchEditorCss();
-        // Obsidian mirrors the parent document's head into controlled iframes;
-        // a local head style is removed by that sync. Keep editor-only CSS in body.
-        (doc.body ?? doc.head).appendChild(style);
+        const css = theme === "rounded-map" ? roundedEditorCss(appearance)
+          : theme === "scrapbook" ? EDITOR_CSS
+            : theme === "soft-notes" ? softNotesEditorCss(preset, align)
+              : theme === "research" ? RESEARCH_EDITOR_CSS : sketchEditorCss();
+        setAdoptedStylesheet(doc, id, css, editorKey);
       } catch { /* Remote embeds are not editing surfaces. */ }
     }
   }
@@ -383,7 +390,7 @@ export default class CanvasThemeController {
     this.controls.clear();
     this.decoratedCanvases.clear();
     document.getElementById?.("bc-soft-geometry")?.remove();
-    document.getElementById?.(FONT_STYLE_ID)?.remove();
+    removeAdoptedStylesheet(document, FONT_STYLE_ID);
     stopRoundedMapGeometry();
   }
 

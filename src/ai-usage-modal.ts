@@ -66,10 +66,8 @@ export class AIUsageModal extends Modal {
     root.createEl("p", {
       text: '输入每百万 tokens 的美元费率，按“协议:模型”精确匹配，例如 {"openai:gpt-4o-mini":{"inputPerMillion":0.15,"outputPerMillion":0.6}}。费率由用户填写；不同网关/供应商的价格可能不同。'
     });
-    const textarea = root.createEl("textarea", { attr: { rows: "8", "aria-label": "AI 模型每百万 token 价格 JSON" } });
+    const textarea = root.createEl("textarea", { cls: "bc-modal-prompt-textarea", attr: { rows: "8", "aria-label": "AI 模型每百万 token 价格 JSON" } });
     textarea.value = this.priceJson || "{}";
-    textarea.style.width = "100%";
-    textarea.style.resize = "vertical";
 
     const actions = root.createDiv({ cls: "modal-button-container" });
     const save = actions.createEl("button", { text: "保存费率", cls: "mod-cta" });

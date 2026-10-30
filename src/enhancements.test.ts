@@ -109,6 +109,9 @@ describe("Canvas node decoration", () => {
     class FakeHTMLElement {
       dataset: Record<string, string> = {};
       style: Record<string, string> = {};
+      setCssStyles(styles: Record<string, string>): void {
+        Object.assign(this.style, styles);
+      }
       querySelectorAll(): any[] {
         return [];
       }

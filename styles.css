@@ -11,6 +11,58 @@
   border-radius: var(--radius-m);
   background: var(--background-secondary);
 }
+textarea.bc-modal-prompt-textarea {
+  width: 100%;
+  resize: vertical;
+}
+.bc-export-html-preview-label {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px dashed var(--background-modifier-border);
+  background: transparent;
+  font-size: 12px;
+  opacity: .75;
+}
+.bc-soft-geometry {
+  position: absolute;
+  pointer-events: none;
+}
+.bc-arrow-hidden {
+  display: none;
+}
+.bc-export-host {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  pointer-events: none;
+}
+.bc-soft-export-clone {
+  position: relative;
+  inset: 0;
+}
+.bc-pinned-pdf-page-rendered {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: white;
+}
+.bc-pdf-annotation-overlay.bc-pdf-annotation-page-aligned {
+  inset: auto;
+}
+.bc-media-embed-image {
+  display: block;
+  max-width: 100%;
+  max-height: 28rem;
+  object-fit: contain;
+}
+.bc-media-embed-audio,
+.bc-media-embed-video {
+  max-width: 100%;
+}
+
 /* Better Canvas persisted node/edge enhancements.
 
    Shapes and border styles target .canvas-node-container: Obsidian paints the
@@ -455,6 +507,7 @@
   -webkit-user-select: text;
   cursor: text;
   pointer-events: auto;
+  transform-origin: top left;
 }
 .bc-pdf-selectable-text-run::selection {
   color: transparent;
@@ -622,7 +675,7 @@
     max-width: 144px;
   }
   .bc-settings-root {
-    padding: 24px 16px 48px !important;
+    padding: 24px 16px 48px;
   }
   .bc-settings-root .bc-settings-pages {
     min-width: 0;
@@ -2228,7 +2281,9 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   --bc-research-title-border: 0;
 }
 .canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="argument"] .markdown-rendered strong {
-  text-decoration: underline color-mix(in srgb, var(--bc-research-accent) 28%, transparent) 4px;
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, var(--bc-research-accent) 28%, transparent);
+  text-decoration-thickness: 4px;
   text-underline-offset: 2px;
 }
 .canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="argument"] :is(h1, h2, h3, h4, h5, h6) :is(strong, em, code, a) { color: inherit; }

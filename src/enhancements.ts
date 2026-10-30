@@ -356,8 +356,7 @@ function refreshTextNodePreview(canvas: any, nodeId: string, contentHeight: numb
   if (!preview) return;
   const sizer = preview.querySelector?.(".markdown-preview-sizer") as HTMLElement | null;
   if (sizer) {
-    sizer.style.minHeight = `${Math.max(0, Math.round(contentHeight))}px`;
-    sizer.style.height = "auto";
+    sizer.setCssStyles({ minHeight: `${Math.max(0, Math.round(contentHeight))}px`, height: "auto" });
   }
   preview.scrollTop = 0;
 }
@@ -752,10 +751,10 @@ export function decorateCanvas(canvas: any, saveHistory = true): void {
     const textAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left";
     if (element.dataset.bcTextAlign !== textAlign) element.dataset.bcTextAlign = textAlign;
-    if (element.style.textAlign !== textAlign) element.style.textAlign = textAlign;
+    if (element.style.textAlign !== textAlign) element.setCssStyles({ textAlign });
     const contents = element.querySelectorAll<HTMLElement>(".canvas-node-content, .canvas-node-container, .canvas-node-iframe");
     contents.forEach(child => {
-      if (child.style.textAlign !== textAlign) child.style.textAlign = textAlign;
+      if (child.style.textAlign !== textAlign) child.setCssStyles({ textAlign });
     });
   }
 
@@ -772,9 +771,9 @@ export function decorateCanvas(canvas: any, saveHistory = true): void {
     const styleColor = typeof edgeData.bcColor === "string" ? edgeData.bcColor
       : typeof edgeData.color === "string" && /^#[0-9a-f]{3,8}$/i.test(edgeData.color) ? edgeData.color : "";
     if (path instanceof SVGElement) {
-      if (styleColor) path.style.stroke = styleColor;
-      path.style.strokeDasharray = storedPath === "dashed" ? "8 5"
-        : storedPath === "dotted" ? "2 5" : "";
+      if (styleColor) path.setCssStyles({ stroke: styleColor });
+      path.setCssStyles({ strokeDasharray: storedPath === "dashed" ? "8 5"
+        : storedPath === "dotted" ? "2 5" : "" });
     }
 
     const storedArrow = edgeData.bcArrowStyle
@@ -798,20 +797,19 @@ export function decorateCanvas(canvas: any, saveHistory = true): void {
       const polygon = lineEnd?.el?.querySelector?.("polygon");
       if (!(polygon instanceof SVGElement)) continue;
       if (storedArrow === "none") {
-        polygon.style.display = "none";
+        polygon.classList.add("bc-arrow-hidden");
         continue;
       }
-      polygon.style.display = "";
-      polygon.setAttribute("points", points[storedArrow] ?? points.default);
+      polygon.classList.remove("bc-arrow-hidden");
       if (styleColor) {
-        polygon.style.stroke = styleColor;
+        polygon.setCssStyles({ stroke: styleColor });
       } else {
         polygon.style.removeProperty("stroke");
       }
       if (storedArrow.endsWith("-outline") || storedArrow === "thin-triangle") {
-        polygon.style.fill = "var(--background-primary)";
+        polygon.setCssStyles({ fill: "var(--background-primary)" });
       } else if (styleColor && ["diamond", "circle", "half-triangle", "default"].includes(storedArrow)) {
-        polygon.style.fill = styleColor;
+        polygon.setCssStyles({ fill: styleColor });
       } else {
         polygon.style.removeProperty("fill");
       }

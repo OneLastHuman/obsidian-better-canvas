@@ -106,7 +106,12 @@ describe("viewport SVG export filter", () => {
     };
     const container: any = {
       ownerDocument: {
-        createElement: () => ({ style: {}, className: "", textContent: "" })
+        createElement: () => ({
+          style: {} as Record<string, string>,
+          className: "",
+          textContent: "",
+          setCssStyles(styles: Record<string, string>) { Object.assign(this.style, styles); }
+        })
       },
       cloneNode: vi.fn(() => clone),
       querySelectorAll: (selector: string) => selector === "iframe" ? [sourceFrame] : []
