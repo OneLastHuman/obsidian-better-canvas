@@ -21,13 +21,19 @@ git tag -a 0.2.0 -m "Better Canvas 0.2.0"
 git push origin 0.2.0
 ```
 
-Pushing the tag starts the Release workflow. It verifies that the tag, `package.json`, `manifest.json`, and `versions.json` agree; runs typechecking and tests; builds the production bundle; and creates a GitHub Release.
+Pushing the tag starts the Release workflow. It verifies that the tag, `package.json`, `manifest.json`, and `versions.json` agree; runs typechecking and tests; builds the production bundle; creates provenance attestations for the built release files; and creates a GitHub Release.
 
 Each release includes:
 
 - `better-canvas.zip`, ready to extract into the Vault's `.obsidian/plugins/` directory
 - `main.js`, `manifest.json`, and `styles.css` as separate files
 - `SHA256SUMS` to verify the downloaded assets
+
+The workflow creates GitHub artifact attestations for `main.js`, `manifest.json`, `styles.css`, and `better-canvas.zip`. To verify a downloaded file, install the [GitHub CLI](https://cli.github.com/) and run `gh attestation verify <file> --repo OneLastHuman/obsidian-better-canvas`.
+
+Artifact attestations work in public repositories on GitHub Free, Pro, and Team plans. Private or internal repositories need GitHub Enterprise Cloud, and legacy plans do not support attestations. On plans that only support public repositories, make the repository public before pushing a release tag; otherwise the attestation step fails the workflow.
+
+The Obsidian review recommendation that flags `better-canvas.zip` and `SHA256SUMS` as extra release files is informational: Obsidian only consumes `main.js`, `manifest.json`, and `styles.css` for its plugin installation flow. The ZIP remains useful for manual installation, and `SHA256SUMS` lets manual downloaders check asset integrity, so both remain attached to the GitHub Release.
 
 Tags with a prerelease suffix, such as `0.2.0-beta.1`, are published as GitHub prereleases. Do not move or reuse a published version tag. If a workflow fails, inspect the failed step and rerun it after fixing any release-blocking configuration or code issue.
 

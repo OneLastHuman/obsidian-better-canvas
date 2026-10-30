@@ -138,11 +138,7 @@ export function measureRenderedNodeLayout(
     horizontal += 2;
     vertical += 2;
 
-    sizer.style.setProperty("min-height", "0", "important");
-    sizer.style.setProperty("height", "auto", "important");
-    sizer.style.setProperty("flex", "0 0 auto", "important");
-    sizer.style.setProperty("width", "max-content", "important");
-    sizer.style.setProperty("max-width", "none", "important");
+    sizer.setCssStyles({ minHeight: "0", height: "auto", flex: "0 0 auto", width: "max-content", maxWidth: "none" });
     const scale = element.getBoundingClientRect().width / element.offsetWidth;
     if (!Number.isFinite(scale) || scale <= 0) return null;
     const naturalWidth = Math.ceil(sizer.getBoundingClientRect().width / scale - .01);
@@ -162,7 +158,7 @@ export function measureRenderedNodeLayout(
     } else if (inset && theme === "rounded-map") {
       element.style.setProperty("--bc-rounded-padding", `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`);
     }
-    sizer.style.setProperty("width", "auto", "important");
+    sizer.setCssStyles({ width: "auto" });
     const contentHeight = Math.max(sizer.offsetHeight, sizer.scrollHeight);
     const height = fitContentDimension(contentHeight, AUTO_RESIZE_LAYOUT.minHeight, AUTO_RESIZE_LAYOUT.maxHeight, value => {
       const finalInset = textShapeInsets(theme, node, width, value);

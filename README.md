@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="#english">English</a> ·
   <a href="#安装">安装</a> ·
   <a href="#选一种适合内容的画布">画布主题</a> ·
   <a href="#从第一张卡片开始">开始使用</a> ·
@@ -206,3 +207,73 @@ npm run build
 部分功能方向参考了 [Advanced Canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas)、[Canvas MindMap](https://github.com/Quorafind/Obsidian-Canvas-MindMap) 和 [Obsidian AI Canvas](https://github.com/testy-cool/obsidian-ai-canvas)。
 
 本项目使用 [GPL-3.0-or-later](LICENSE) 许可证。上游来源和第三方资源说明见[致谢文档](docs/ACKNOWLEDGEMENTS.md)。
+
+## English
+
+Better Canvas is an enhancement plugin for [Obsidian](https://obsidian.md) Canvas. It brings visual canvas themes, mind-map workflows, node styling, PDF reading tools, optional AI assistance, and PNG/SVG export together in one plugin. Canvas editing and themes work without any AI configuration, and canvas content stays in your vault's `.canvas` files.
+
+Better Canvas is not yet listed in the official Obsidian community plugin directory. Install it from GitHub Releases using the steps below.
+
+### Key features
+
+- **Canvas themes:** Six visual themes for different kinds of work, including mind maps, planning boards, research notes, and visual collections. Choose a theme per canvas; switching themes keeps existing content and positions, and the choice is saved with the canvas.
+- **Mind-map workflows:** Press `Tab` to create a child node and `Enter` to create a sibling. While editing a node, use `Shift + Tab` and `Shift + Enter` instead. You can also arrange a node tree automatically, split an existing note's first-level headings into nodes, navigate with `Alt + arrow keys`, and focus on one part of the canvas.
+- **Node styling:** Apply presets to one node or a selection, then adjust color, shape, border, fill, and text alignment. Presets change presentation only, not the node text. Connections can be styled with color, line type, arrows, and routing.
+- **PDF annotations:** Keep a PDF page next to your notes, extract text excerpts, and annotate with the pen or highlighter. Annotations are stored in the Canvas. AI OCR can process a page range when a compatible model is configured; this is not a full replacement for Obsidian's native PDF annotation tools.
+- **AI assistance:** Ask a question about selected nodes and their related context, then keep the answer as a new node connected to its source. Depending on the configured service and model, you can also generate flashcards, generate images, import web page text, and analyze PDF pages. AI features require separate configuration and are subject to each provider's capabilities and data policy.
+- **Export:** Use presentation mode to walk through a canvas, export JSON Canvas, or export the whole canvas, the current viewport, or selected nodes as PNG or SVG. Static exports can differ from the editing view; for example, scrapbook paper textures and tape decorations are not reproduced in whole-canvas or selection exports.
+
+Detailed guides are currently written in Chinese: [feature guide](docs/FEATURE_GUIDE.md), [AI and MCP setup](docs/AI_SETUP.md), [known limitations](docs/KNOWN_LIMITATIONS.md), and [installation guide](docs/INSTALLATION.md).
+
+### Installation from GitHub Releases
+
+Requirements: Obsidian 1.14.4 or newer, on desktop Obsidian only.
+
+1. Open [Better Canvas releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases) and download `better-canvas.zip` from the latest release.
+2. Extract `better-canvas.zip` into `<Vault>/.obsidian/plugins/`. The archive contains a `better-canvas/` folder with `main.js`, `manifest.json`, and `styles.css`.
+3. In Obsidian, open **Settings → Community plugins** and reload the plugin list.
+4. Enable **Better Canvas**.
+
+The plugin is desktop-only (`isDesktopOnly` is set in the manifest) and does not run on Obsidian mobile. Some features depend on Obsidian internal APIs, and real-device testing has focused on Obsidian 1.14.4 rather than every supported version.
+
+To try features from the current source before they reach a release, copy `main.js`, `manifest.json`, and `styles.css` from the repository's [`release/`](release/) folder into the same plugin folder, then reload the plugin. That folder is updated automatically by successful builds on the main branch.
+
+### AI and network access
+
+AI is optional. Canvas editing, themes, node styling, and mind-map tools work without an AI service and do not send node text to one.
+
+When you submit an AI request, the selected node content and the related context needed for that request are sent to the service you configured. Supported API types are OpenAI-compatible, Anthropic, and Gemini. On desktop, you can also configure a locally installed CLI agent such as Codex CLI, OpenCode ACP, Claude Code, Cursor Agent, Gemini CLI, GitHub Copilot CLI, Qwen Coder, Aider, or IBM Bob. Those CLIs use their own model configuration and may call remote services, so local execution is not guaranteed to be offline.
+
+Network requests also occur when you import web page content or use a remote MCP server. A local MCP stdio server runs as a child process with your operating-system user permissions; it can potentially access files and network resources available to that account. Connect only MCP servers you trust, review tool arguments before execution, and review each AI provider's data policy before sending private content.
+
+### Vault and clipboard permissions
+
+Better Canvas works inside your vault through Obsidian's Vault API. It does not ask for operating-system file permissions directly.
+
+| Access | When it is used |
+| --- | --- |
+| Vault read/write | Reading and updating Canvas content, PDF annotations stored in the Canvas, linked notes and files, and writing plugin-created content. This includes AI answer and image nodes, imported material, flashcards, exports, and the optional onboarding sample canvas. The onboarding sample is written to `Better Canvas/快速入门.canvas` only when you choose to create it, and an existing file is never overwritten. |
+| Clipboard (write) | The copy-node-link command writes the selected node's Obsidian wikilink to the system clipboard. If clipboard access is unavailable, the plugin opens a manual-copy dialog instead. |
+| Network | Requests to the AI service or MCP server you configure, and web imports you start. Local CLI agents may also contact their configured model services. |
+| Local processes (desktop) | Only when you configure a local CLI agent or a local MCP stdio server. |
+
+PDF annotations are saved in the `.canvas` file. Portal nodes currently support mainly one-level synchronization. Non-rectangular nodes still use Canvas's native rectangular bounds for connection endpoints, selection, and zoom.
+
+### Development
+
+Development requires Node.js 22 and npm. From the repository root:
+
+```bash
+npm ci
+npm run lint
+npm run validate:metadata
+npm run typecheck
+npm test
+npm run build
+```
+
+### License
+
+Better Canvas is licensed under [GPL-3.0-or-later](LICENSE). See the [acknowledgements](docs/ACKNOWLEDGEMENTS.md) for upstream inspiration and third-party resources.
+
+[Back to top](#better-canvas)

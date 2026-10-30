@@ -159,11 +159,10 @@ class FeaturePromptModal extends Modal {
     this.contentEl.empty();
     this.contentEl.createEl("h2", { text: this.titleText });
     const input = this.contentEl.createEl("textarea", {
+      cls: "bc-modal-prompt-textarea",
       attr: { rows: "5", placeholder: this.placeholderText }
     });
     input.value = this.initialValue;
-    input.style.width = "100%";
-    input.style.resize = "vertical";
     const error = this.contentEl.createDiv({ cls: "bc-prompt-error" });
     error.hide();
     const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
@@ -971,7 +970,7 @@ export default class BetterCanvasFeatures {
         if (host.style.borderColor !== nodeColor) host.style.borderColor = nodeColor;
         this.coloredNodeHosts.add(host);
       } else if (this.coloredNodeHosts.delete(host)) {
-        host.style.borderColor = "";
+        host.style.removeProperty("border-color");
       }
       const shape = resolveCanvasNodeShape(item as any);
       if (host.dataset.bcShape !== shape) host.dataset.bcShape = shape;
@@ -2332,12 +2331,10 @@ export default class BetterCanvasFeatures {
         // Keep the offscreen offset on an ancestor so computed logical insets
         // cannot carry it into html-to-image's serialized root.
         exportHost = container.ownerDocument.createElement("div");
-        exportHost.style.cssText = "position:fixed;left:-100000px;top:0;pointer-events:none";
+        exportHost.classList.add("bc-export-host");
         exportHost.setAttribute("aria-hidden", "true");
-        softExportClone.style.position = "relative";
-        softExportClone.style.inset = "0";
-        softExportClone.style.width = rect.width + "px";
-        softExportClone.style.height = rect.height + "px";
+        softExportClone.classList.add("bc-soft-export-clone");
+        softExportClone.setCssStyles({ width: rect.width + "px", height: rect.height + "px" });
         exportHost.appendChild(softExportClone);
         container.ownerDocument.body.appendChild(exportHost);
         exportOptions.fontEmbedCSS = SKETCH_FONT_CSS + SOFT_NOTES_FONT_CSS;
@@ -4344,17 +4341,14 @@ export default class BetterCanvasFeatures {
                 const image = preview.createEl("img", {
                   attr: { src: this.p.app.vault.getResourcePath(embeddedFile), alt: embeddedFile.basename, loading: "lazy" }
                 });
-                image.style.display = "block";
-                image.style.maxWidth = "100%";
-                image.style.maxHeight = "28rem";
-                image.style.objectFit = "contain";
+                image.classList.add("bc-media-embed-image");
               } else if (["mp3", "wav", "m4a", "ogg", "flac", "mp4", "webm", "mov"].includes(ext)) {
                 const isVideo = ["mp4", "webm", "mov"].includes(ext);
                 const media = document.createElement(isVideo ? "video" : "audio");
                 media.controls = true;
                 media.preload = "none";
                 media.src = this.p.app.vault.getResourcePath(embeddedFile);
-                media.style.maxWidth = "100%";
+                media.classList.add(isVideo ? "bc-media-embed-video" : "bc-media-embed-audio");
                 preview.appendChild(media);
               } else {
                 const anchor = preview.createEl("a", { text: embeddedFile.path, href: "#" });

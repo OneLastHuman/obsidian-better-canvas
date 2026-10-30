@@ -53,17 +53,8 @@ export function prepareViewportSvgExportClone(container: HTMLElement): HTMLEleme
     label.className = "bc-export-html-preview-label";
     label.textContent = "[HTML preview omitted from export]";
     const rect = source?.getBoundingClientRect?.();
-    if (rect && rect.width > 0) label.style.width = rect.width + "px";
-    if (rect && rect.height > 0) label.style.height = rect.height + "px";
-    label.style.boxSizing = "border-box";
-    label.style.display = "flex";
-    label.style.alignItems = "center";
-    label.style.justifyContent = "center";
-    label.style.overflow = "hidden";
-    label.style.border = "1px dashed var(--background-modifier-border)";
-    label.style.background = "transparent";
-    label.style.fontSize = "12px";
-    label.style.opacity = "0.75";
+    if (rect && rect.width > 0) label.setCssStyles({ width: rect.width + "px" });
+    if (rect && rect.height > 0) label.setCssStyles({ height: rect.height + "px" });
     frame.replaceWith(label);
   });
 
