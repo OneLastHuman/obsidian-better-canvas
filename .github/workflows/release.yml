@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "[0-9]*"
 
 permissions:
   contents: write
@@ -25,7 +25,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Verify release tag and plugin versions
         env:
@@ -38,10 +38,10 @@ jobs:
           const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
           const versions = JSON.parse(fs.readFileSync("versions.json", "utf8"));
           const tag = process.env.RELEASE_TAG;
-          const tagVersion = tag.startsWith("v") ? tag.slice(1) : "";
+          const tagVersion = tag;
 
           if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(tagVersion)) {
-            throw new Error(`Invalid release tag "${tag}". Expected vMAJOR.MINOR.PATCH, optionally with a prerelease suffix.`);
+            throw new Error(`Invalid release tag "${tag}". Expected MAJOR.MINOR.PATCH without a "v" prefix, optionally with a prerelease suffix.`);
           }
           if (packageJson.version !== manifest.version) {
             throw new Error(`package.json version (${packageJson.version}) does not match manifest.json version (${manifest.version}).`);
@@ -76,16 +76,16 @@ jobs:
           test -s manifest.json
           test -s styles.css
 
-          mkdir -p dist/obsidian-better-canvas
-          cp main.js manifest.json styles.css dist/obsidian-better-canvas/
-          (cd dist && zip -qr obsidian-better-canvas.zip obsidian-better-canvas)
+          mkdir -p dist/better-canvas
+          cp main.js manifest.json styles.css dist/better-canvas/
+          (cd dist && zip -qr better-canvas.zip better-canvas)
           (
             cd dist
             sha256sum \
-              obsidian-better-canvas.zip \
-              obsidian-better-canvas/main.js \
-              obsidian-better-canvas/manifest.json \
-              obsidian-better-canvas/styles.css \
+              better-canvas.zip \
+              better-canvas/main.js \
+              better-canvas/manifest.json \
+              better-canvas/styles.css \
               > SHA256SUMS
           )
 
@@ -97,8 +97,8 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true
           files: |
-            dist/obsidian-better-canvas.zip
-            dist/obsidian-better-canvas/main.js
-            dist/obsidian-better-canvas/manifest.json
-            dist/obsidian-better-canvas/styles.css
+            dist/better-canvas.zip
+            dist/better-canvas/main.js
+            dist/better-canvas/manifest.json
+            dist/better-canvas/styles.css
             dist/SHA256SUMS
