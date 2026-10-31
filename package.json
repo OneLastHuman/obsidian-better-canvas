@@ -1,6 +1,6 @@
 {
   "name": "better-canvas",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Canvas enhancements, mind-map workflows, and AI assistance for Obsidian",
   "main": "main.js",
