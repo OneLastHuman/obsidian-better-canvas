@@ -1,7 +1,7 @@
 {
   "id": "better-canvas",
   "name": "Better Canvas",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "1.14.4",
   "description": "Canvas enhancements, mind-map workflows, and configurable AI assistance in one plugin.",
   "author": "OneLastHuman",
