@@ -121,7 +121,7 @@ AI 功能需要单独配置，能力取决于服务和模型。提示词与所�
 
 ### 从 Obsidian 社区插件安装
 
-插件上架后，在 Obsidian **设置 → 社区插件** 中搜索 **Better Canvas** 并安装。首次发布前，请使用下方的手动安装方式。
+插件已上架 [Obsidian 官方社区目录](https://community.obsidian.md/plugins/better-canvas)。在 Obsidian **设置 → 社区插件** 中搜索 **Better Canvas** 并安装；也可以使用下方的手动安装方式。
 
 ### 下载正式版
 
@@ -212,7 +212,7 @@ npm run build
 
 Better Canvas is an enhancement plugin for [Obsidian](https://obsidian.md) Canvas. It brings visual canvas themes, mind-map workflows, node styling, PDF reading tools, optional AI assistance, and PNG/SVG export together in one plugin. Canvas editing and themes work without any AI configuration, and canvas content stays in your vault's `.canvas` files.
 
-Better Canvas is not yet listed in the official Obsidian community plugin directory. Install it from GitHub Releases using the steps below.
+Better Canvas is available in the [official Obsidian community plugin directory](https://community.obsidian.md/plugins/better-canvas). You can also install it from GitHub Releases using the steps below.
 
 ### Key features
 
