@@ -1,137 +1,137 @@
 <h1 align="center">Better Canvas</h1>
 
 <p align="center">
-  <strong>在 Obsidian 里，把想法整理成图。</strong>
+  <strong>Turn scattered ideas into a map, inside Obsidian.</strong>
 </p>
 
-<p align="center">记录灵感 · 梳理流程 · 阅读批注 · 关联 AI</p>
+<p align="center">Capture ideas · Map workflows · Annotate reading · Connect AI</p>
 
 <p align="center">
-  <img alt="最低要求 Obsidian 1.14.4" src="https://img.shields.io/badge/Obsidian-1.14.4%2B-526b59" />
+  <img alt="Requires Obsidian 1.14.4+" src="https://img.shields.io/badge/Obsidian-1.14.4%2B-526b59" />
   <img alt="License GPL-3.0-or-later" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue" />
 </p>
 
 <p align="center">
-  <a href="#english">English</a> ·
-  <a href="#安装">安装</a> ·
-  <a href="#选一种适合内容的画布">画布主题</a> ·
-  <a href="#从第一张卡片开始">开始使用</a> ·
-  <a href="docs/FEATURE_GUIDE.md">功能指南</a> ·
-  <a href="docs/README.md">文档索引</a>
+  <a href="README.zh.md"><strong>中文</strong></a> ·
+  <a href="#installation">Install</a> ·
+  <a href="#choose-a-canvas-theme-that-fits-your-content">Canvas themes</a> ·
+  <a href="#start-with-your-first-card">Getting started</a> ·
+  <a href="docs/FEATURE_GUIDE.md">Feature guide</a> ·
+  <a href="docs/README.md">Documentation index</a>
 </p>
 
-![柔软便签主题：围绕读书会，用灵感卡、摘录卡、概念卡、问题卡和行动清单组织想法](docs/screenshots/soft-notes.png)
+![Soft Notes theme: organizing reading-club ideas with inspiration cards, excerpt cards, concept cards, question cards, and an action checklist](docs/screenshots/soft-notes.png)
 
-Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法，用连线表达关系，再把内容整理成思维导图、流程图或阅读工作台。需要继续分析时，可以向 AI 提问，并把回答留在来源旁边。
+Better Canvas is an enhancement plugin for Obsidian Canvas. Collect loose ideas on cards, express relationships with connections, then shape the content into a mind map, flowchart, or reading workspace. When you need to keep analyzing, ask AI and keep the answer next to its source.
 
-**画布编辑和主题无需配置 AI。** 内容仍保存在 Vault 的 `.canvas` 文件中。
+**Canvas editing and themes need no AI configuration.** Content stays in your vault's `.canvas` files.
 
-*截图来自 Obsidian 1.14.4 的真实界面（多数为 Windows，提问弹窗为 macOS）。示例内容可在[示例画布](docs/examples/readme-showcase/)中取得；采集与验证范围见[截图说明](docs/screenshots/README.md)。*
+*Screenshots come from the real Obsidian 1.14.4 interface (mostly Windows; the question dialog is macOS). The example content is available in the [sample canvases](docs/examples/readme-showcase/); capture and verification scope are documented in the [screenshot notes](docs/screenshots/README.md).*
 
-## 选一种适合内容的画布
+## Choose a canvas theme that fits your content
 
-每张画布可以单独选择主题。点击画布右侧的 **画布主题**，再从 **节点样式** 中选用配套预设。切换主题保留已有内容和位置，主题选择随画布保存。
+Each canvas can choose its own theme. Click **Canvas theme** on the right side of the canvas, then pick a matching preset under **Node style**. Switching themes keeps existing content and positions, and the theme choice is saved with the canvas.
 
 <p align="center">
-  <img src="docs/screenshots/theme-picker.png" alt="画布主题选择器：同时展示默认、拼贴手账、手绘白板、软糖白板、纸本研究和柔软便签 6 个入口" width="640" />
+  <img src="docs/screenshots/theme-picker.png" alt="Canvas theme picker showing six entries: Default, Scrapbook, Hand-drawn Whiteboard, Gummy Whiteboard, Paper Research, and Soft Notes" width="640" />
 </p>
 
-首图使用 **柔软便签**：用浅彩曲线区分灵感、摘录、概念、行动和问题。自由文字适合放标题，行动卡可以直接使用 Markdown 任务清单。
+The hero image uses **Soft Notes**: light colored curves distinguish inspiration, excerpts, concepts, actions, and questions. Free text works well for headings, and action cards can use Markdown task lists directly.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>软糖白板 · 规划流程</h3>
-      <p>用胶囊表示起止，用菱形提出判断，用文档卡收束结果。</p>
-      <a href="docs/screenshots/rounded-map.png"><img src="docs/screenshots/rounded-map.png" alt="软糖白板：读书会筹备流程，包含人数判断、是与否分支、报名输入和讨论纪要" width="100%" /></a>
+      <h3>Gummy Whiteboard · Plan a process</h3>
+      <p>Use capsules for start and end, diamonds for decisions, and document cards to collect results.</p>
+      <a href="docs/screenshots/rounded-map.png"><img src="docs/screenshots/rounded-map.png" alt="Gummy Whiteboard: a reading-club preparation flow with an attendee-count decision, yes/no branches, a sign-up input, and discussion notes" width="100%" /></a>
     </td>
     <td width="50%" valign="top">
-      <h3>纸本研究 · 从材料到观点</h3>
-      <p>把原文、重点引文、阅读批注和自己的观点放在一起。</p>
-      <a href="docs/screenshots/research.png"><img src="docs/screenshots/research.png" alt="纸本研究：阅读材料连接到摘录和观点，旁边保留批注与待解问题" width="100%" /></a>
+      <h3>Paper Research · From sources to arguments</h3>
+      <p>Keep the original text, key quotations, reading annotations, and your own arguments side by side.</p>
+      <a href="docs/screenshots/research.png"><img src="docs/screenshots/research.png" alt="Paper Research: reading material connected to excerpts and arguments, with annotations and open questions kept nearby" width="100%" /></a>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>手绘白板 · 推敲一个想法</h3>
-      <p>用手绘轮廓、排线和旁注，表达概念、步骤与待确认事项。</p>
-      <a href="docs/screenshots/sketch.png"><img src="docs/screenshots/sketch.png" alt="手绘白板：从讨论问题到小实验，展示概念、行动、判断、旁注和风险提醒" width="100%" /></a>
+      <h3>Hand-drawn Whiteboard · Think through an idea</h3>
+      <p>Use hand-drawn outlines, hatching, and margin notes to express concepts, steps, and open questions.</p>
+      <a href="docs/screenshots/sketch.png"><img src="docs/screenshots/sketch.png" alt="Hand-drawn Whiteboard: from a discussion question to a small experiment, showing concepts, actions, a decision, margin notes, and a risk reminder" width="100%" /></a>
     </td>
     <td width="50%" valign="top">
-      <h3>拼贴手账 · 收藏阅读片刻</h3>
-      <p>把图片、摘录和清单放进胶带便签、横线纸与照片框。</p>
-      <a href="docs/screenshots/scrapbook.png"><img src="docs/screenshots/scrapbook.png" alt="拼贴手账：围绕一张山景插画，排列阅读灵感、摘录、清单与后续想法" width="100%" /></a>
+      <h3>Scrapbook · Keep a reading moment</h3>
+      <p>Place images, excerpts, and lists on tape-backed notes, ruled paper, and photo frames.</p>
+      <a href="docs/screenshots/scrapbook.png"><img src="docs/screenshots/scrapbook.png" alt="Scrapbook: around a mountain landscape illustration, reading inspiration, excerpts, a checklist, and follow-up ideas" width="100%" /></a>
     </td>
   </tr>
 </table>
 
-喜欢 Obsidian 原有外观，可以继续使用 **默认** 主题。共 6 种主题，适合不同的内容和表达方式。点击图片可查看大图。
+If you like Obsidian's original look, keep using the **Default** theme. There are six themes in total, suited to different kinds of content and expression. Click an image to view it full size.
 
-## 一边输入，一边展开思路
+## Follow your ideas as you type
 
-选中卡片后，按 `Tab` 创建子节点，按 `Enter` 创建同级节点。编辑文字时，改用 `Shift + Tab` 和 `Shift + Enter`，可以继续扩展当前想法。
+With cards selected, press `Tab` to create a child node and `Enter` to create a sibling. While editing text, use `Shift + Tab` and `Shift + Enter` instead to keep expanding the current idea.
 
-![默认主题下的思维导图：从读什么、和谁读、留下什么三个方向展开读书会计划](docs/screenshots/mind-map.png)
+![Mind map in the Default theme: a reading-club plan branching into what to read, who to read with, and what to leave behind](docs/screenshots/mind-map.png)
 
-- **整理结构：** 运行“自动整理思维导图”，按左、右、上、下方向布局。
-- **减少手动调整：** 新建文本卡片默认随内容调整尺寸；手动拖动角点后停止自动调整。
-- **从笔记开始：** 将 Markdown 文件的一级标题拆成节点，再继续补充。
-- **沿着关系浏览：** 用 `Alt + 方向键` 选择相邻卡片，或用焦点模式突出当前内容。
+- **Shape the structure:** Run **Auto-arrange mind map** to lay nodes out to the left, right, top, and bottom.
+- **Make fewer manual adjustments:** New text cards resize to fit their content by default; after you drag a corner manually, auto-sizing stops.
+- **Start from a note:** Split a Markdown file's first-level headings into nodes, then keep adding to them.
+- **Browse by relationship:** Use `Alt + arrow keys` to select adjacent cards, or focus mode to highlight the current content.
 
-### 让卡片表达不同的意思
+### Give cards different meanings
 
-选中一个或多个节点，点击画布右侧的 **节点样式** 调色板按钮。
+Select one or more nodes, then click the **Node style** palette button on the right side of the canvas.
 
-- 先选组合预设，再按需调整颜色、形状和边框。
-- 文字可以靠左、居中或靠右显示。
-- 多选卡片可以批量应用样式；预设不替换正文。
-- 连线可以设置颜色、线型、箭头和路径，说明卡片之间的关系。
+- Pick a combination preset first, then adjust color, shape, and border as needed.
+- Text can be aligned left, center, or right.
+- Apply styles to multiple selected cards at once; presets do not replace the body text.
+- Connections can be given color, line type, arrows, and routing to describe relationships between cards.
 
-各主题提供的选项不同。例如，柔软便签保持无边框，纸本研究提供纸面色彩浓度。详细操作见[节点样式指南](docs/FEATURE_GUIDE.md#节点样式面板与默认尺寸)。
+Options differ by theme. For example, Soft Notes stays borderless, and Paper Research offers paper color intensity. See the [node styling guide](docs/FEATURE_GUIDE.md#节点样式面板与默认尺寸) for details.
 
-## 沿着笔记继续问 AI
+## Keep asking AI alongside your notes
 
-选中节点，通过右键菜单或命令面板打开 **向 AI 提问所选节点**。插件将所选节点及关联上下文交给配置的服务，并把回答保存为连接到来源的新节点。
+Select a node and open **Ask AI about selected nodes** from the context menu or command palette. The plugin sends the selected nodes and related context to the configured service, then saves the answer as a new node connected to its source.
 
-![选中纸本研究中的观点卡后，打开向 AI 提问弹窗，输入寻找证据缺口与后续问题的提示词](docs/screenshots/ai-prompt.png)
+![After selecting an argument card in Paper Research, the Ask AI dialog opens with a prompt for finding evidence gaps and follow-up questions](docs/screenshots/ai-prompt.png)
 
-*图中展示提问入口，未提交请求，也未生成模型回答。*
+*The image shows the entry point only; no request was submitted and no model answer was generated.*
 
-- **继续推敲：** 总结材料、比较观点、寻找遗漏，支持流式回答、停止和重新生成。
-- **辅助学习：** 生成闪卡，或导出 Spaced Repetition 兼容卡组。
-- **处理素材：** 导入网页正文，或用支持相应能力的模型分析 PDF 页面、生成图片。
-- **选择服务：** 支持 OpenAI-compatible、Anthropic 和 Gemini；桌面端也可使用已安装并登录的 Codex CLI、OpenCode ACP、Claude Code、Cursor Agent、Gemini CLI、GitHub Copilot CLI、Qwen Coder、Aider 或 IBM Bob。Codex 和 OpenCode 的模型读取与转发已有 mock 测试；全部本地 Agent 的完整桌面模型选择流程和真实 CLI 生成仍待验证。
-- **连接外部工具：** 按需配置 MCP 工具、资源和提示模板。
+- **Keep refining:** Summarize sources, compare viewpoints, and look for gaps, with streaming answers, stop, and regenerate.
+- **Support learning:** Generate flashcards, or export a Spaced Repetition-compatible deck.
+- **Work with source material:** Import web page text, or use a model with the relevant capability to analyze PDF pages and generate images.
+- **Choose a service:** Supports OpenAI-compatible, Anthropic, and Gemini. On desktop you can also use installed and signed-in Codex CLI, OpenCode ACP, Claude Code, Cursor Agent, Gemini CLI, GitHub Copilot CLI, Qwen Coder, Aider, or IBM Bob. Model discovery and forwarding for Codex and OpenCode are covered by mock tests; the full desktop model-selection flow and real CLI generation for all local agents still need verification.
+- **Connect external tools:** Configure MCP tools, resources, and prompt templates as needed.
 
-AI 功能需要单独配置，能力取决于服务和模型。提示词与所需上下文会发送给所配置的服务；本地 CLI 也可能调用远程模型。配置方法见 [AI 与 MCP 指南](docs/AI_SETUP.md)。
+AI features are optional, may connect to paid providers, and require separate configuration; capabilities depend on the service and model. Prompts and the context they need are sent to the configured service; local CLI agents may also call remote models. Importing web page text or using a remote MCP server makes network requests. A local MCP stdio server runs as a child process with your operating-system user permissions; connect only services you trust and check tool arguments before execution. Review each provider's data-handling policy before sending private content. See the [AI and MCP setup guide](docs/AI_SETUP.md).
 
-## 整理之后，继续使用
+## Keep using the canvas after organizing
 
-| 想完成的事 | 可以使用的功能 |
+| What you want to do | Feature |
 | --- | --- |
-| 收起暂时不看的内容 | 分组与折叠、焦点模式 |
-| 把大画布拆成几个主题 | 将选区封装为新 Canvas；用 Portal 引用另一张画布 |
-| 让笔记与画布互相连接 | 节点链接、Canvas 链接与反向链接浏览 |
-| 边读 PDF 边记录 | 固定页面、提取摘录、画笔与高亮；按页码范围识别文字（AI OCR） |
-| 向别人说明思路 | 演示模式；导出全画布、当前视口或选区的 PNG / SVG |
+| Put away content you are not using right now | Groups and collapsing, focus mode |
+| Split a large canvas into topics | Wrap a selection into a new Canvas; reference another canvas with a Portal |
+| Connect notes and canvases | Node links, Canvas links, and backlink browsing |
+| Take notes while reading a PDF | Pin pages, extract excerpts, pen and highlighter; recognize text by page range (AI OCR) |
+| Explain your thinking to others | Presentation mode; export JSON Canvas, or the whole canvas, current viewport, or selection as PNG / SVG |
 
-主题的静态导出效果可能与编辑界面不同。拼贴手账的纸纹和胶带等装饰暂不在全画布、选区静态导出中还原。详细范围见[功能指南](docs/FEATURE_GUIDE.md)和[已知限制](docs/KNOWN_LIMITATIONS.md)。
+The static export of a theme may look different from the editing view. Scrapbook paper textures and tape decorations are not currently reproduced in whole-canvas or selection static exports. See the [feature guide](docs/FEATURE_GUIDE.md) and [known limitations](docs/KNOWN_LIMITATIONS.md) for the exact scope.
 
-## 安装
+## Installation
 
-### 从 Obsidian 社区插件安装
+### Install from the Obsidian community directory
 
-插件已上架 [Obsidian 官方社区目录](https://community.obsidian.md/plugins/better-canvas)。在 Obsidian **设置 → 社区插件** 中搜索 **Better Canvas** 并安装；也可以使用下方的手动安装方式。
+Better Canvas is listed in the [official Obsidian community directory](https://community.obsidian.md/plugins/better-canvas). In Obsidian, open **Settings → Community plugins**, search for **Better Canvas**, and install it. You can also use the manual installation below.
 
-### 下载正式版
+### Download a release
 
-1. 打开 [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases)。
-2. 下载 `better-canvas.zip`。
-3. 将压缩包解压到 Vault 的 `.obsidian/plugins/` 目录。
-4. 在 Obsidian **设置 → 社区插件** 中重新加载插件列表。
-5. 启用 **Better Canvas**。
+1. Open [GitHub Releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases).
+2. Download `better-canvas.zip`.
+3. Extract the archive into your vault's `.obsidian/plugins/` directory.
+4. In Obsidian, open **Settings → Community plugins** and reload the plugin list.
+5. Enable **Better Canvas**.
 
-插件目录应包含以下文件：
+The plugin folder should contain the following files:
 
 ```text
 <Vault>/.obsidian/plugins/better-canvas/
@@ -140,126 +140,63 @@ AI 功能需要单独配置，能力取决于服务和模型。提示词与所�
 └── styles.css
 ```
 
-### 体验主分支构建
+### Try the main-branch build
 
-本页介绍当前源码中的功能，正式版可能尚未包含全部更新。要体验主分支构建，将以下 3 个文件放入上述插件目录，再重新加载插件：
+This page describes features in the current source, and a release may not include every update yet. To try the main-branch build, place the following 3 files in the plugin folder above and reload the plugin:
 
 - [main.js](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/main.js)
 - [manifest.json](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/manifest.json)
 - [styles.css](https://raw.githubusercontent.com/OneLastHuman/obsidian-better-canvas/main/release/styles.css)
 
-[`release/`](release/) 由成功的主分支 Build workflow 自动同步。主分支构建与正式版的区别、源码构建方法见[安装指南](docs/INSTALLATION.md)。
+[`release/`](release/) is synchronized automatically by successful Build workflows on the main branch. For the difference between main-branch builds and releases, and for building from source, see the [installation guide](docs/INSTALLATION.md).
 
-## 从第一张卡片开始
+## Start with your first card
 
-首次启用插件时会出现一次欢迎入口。可以创建一张内置示例画布，或打开内置快速入门；关闭或选择「暂不设置」后不会在每次启动时重复弹出。之后可从命令面板运行 **打开首次使用引导**。示例画布写入 `Better Canvas/快速入门.canvas`；同名文件已占用时自动使用编号名称，不覆盖现有文件。首个空画布还会显示一次可关闭的快捷创建提示。
+On first enable, a one-time welcome entry appears. You can create a built-in sample canvas or open the built-in quick start; after you close it or choose the skip option, it will not appear again on every launch. Later, run **Open onboarding** from the command palette. The sample canvas is written to `Better Canvas/快速入门.canvas`; if that name is already taken, a numbered name is used and existing files are never overwritten. The first empty canvas also shows a dismissible quick-create hint once.
 
-1. 新建或打开一个 Obsidian Canvas。
-2. 点击右侧 **画布主题**，选择适合内容的主题。
-3. 添加文本卡片，写下一个想法。
-4. 选中卡片，在 **节点样式** 中选择预设。
-5. 按 `Tab` 添加子节点，继续展开。
+1. Create or open an Obsidian Canvas.
+2. Click **Canvas theme** on the right and choose a theme that fits the content.
+3. Add a text card and write down an idea.
+4. Select the card and choose a preset under **Node style**.
+5. Press `Tab` to add a child node and keep expanding.
 
-也可以把[示例画布](docs/examples/readme-showcase/)复制到 Vault，直接编辑截图中的内容。
+You can also copy the [sample canvases](docs/examples/readme-showcase/) into your vault and edit the content shown in the screenshots directly.
 
-插件设置分为 **画布、操作、AI 助手、文件** 4 类。可以设置布局间距、快捷键、模型服务和导出选项。修改后点击 **保存更改** 生效，或点击 **放弃更改** 恢复已保存设置。
+Plugin settings are grouped into 4 categories: **Canvas, Actions, AI assistant, Files**. You can configure layout spacing, shortcuts, model services, and export options. Click **Save changes** to apply them, or **Discard changes** to restore the saved settings.
 
-### 常用快捷键
+### Keyboard shortcuts
 
-| 快捷键 | 操作 |
+| Shortcut | Action |
 | --- | --- |
-| `Tab` / `Enter` | 未编辑文字时，创建子节点 / 同级节点 |
-| `Shift + Tab` / `Shift + Enter` | 编辑文字时，创建子节点 / 同级节点 |
-| `Alt + ↑ / ↓ / ← / →` | 选择空间位置相邻的节点 |
-| `Ctrl/Cmd + Shift + 方向键` | 按指定方向创建子节点 |
+| `Tab` / `Enter` | While not editing text: create a child / sibling node |
+| `Shift + Tab` / `Shift + Enter` | While editing text: create a child / sibling node |
+| `Alt + ↑ / ↓ / ← / →` | Select the node adjacent in that direction |
+| `Ctrl/Cmd + Shift + arrow keys` | Create a child node in the specified direction |
 
-快捷键可在 **设置 → Better Canvas → 操作** 中按组关闭。
+Shortcuts can be turned off by group in **Settings → Better Canvas → Actions**.
 
-## 兼容性与数据
+## Compatibility and data
 
-- **版本：** 最低要求为 Obsidian 1.14.4。部分功能依赖内部 API；实机验证主要覆盖 1.14.4，不代表所有版本均已验证。
-- **设备与外观：** 本插件仅支持 Obsidian 桌面端。第三方 Obsidian 主题和复杂画布仍有待验证的行为。非矩形卡片的连线端点、框选与缩放范围仍按原生矩形边界工作。
-- **Portal 与 PDF：** Portal 主要支持单层同步。PDF 批注保存在 Canvas 中；完整的原生 PDF 高亮编辑和多页批注管理尚未完成。
-- **AI 与工具：** 使用前确认服务的数据处理政策。MCP 本地 stdio 服务以当前用户权限运行，只应连接可信服务，并在执行前检查工具参数。
-- **HTML 预览：** 使用沙盒 iframe；只预览可信或已检查的代码。
-
-逐项实现与验证状态见[功能整合矩阵](docs/INTEGRATION_MATRIX.md)。配置、限制、自定义样式与其他专题见[文档索引](docs/README.md)。
-
-## 开发
-
-需要 Node.js 22 和 npm。在源码目录执行：
-
-```bash
-npm ci
-npm run lint
-npm run validate:metadata
-npm run typecheck
-npm test
-npm run build
-```
-
-将生成的 `main.js` 与 `manifest.json`、`styles.css` 复制到插件目录。`npm run dev` 用于开发构建。
-
-测试分层和桌面验证要求见[测试规范](docs/TESTING.md)，提交与审查约定见[仓库治理](docs/REPOSITORY_GOVERNANCE.md)，版本发布见[发版流程](docs/RELEASING.md)。
-
-## 致谢与许可证
-
-部分功能方向参考了 [Advanced Canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas)、[Canvas MindMap](https://github.com/Quorafind/Obsidian-Canvas-MindMap) 和 [Obsidian AI Canvas](https://github.com/testy-cool/obsidian-ai-canvas)。
-
-本项目使用 [GPL-3.0-or-later](LICENSE) 许可证。上游来源和第三方资源说明见[致谢文档](docs/ACKNOWLEDGEMENTS.md)。
-
-## English
-
-Better Canvas is an enhancement plugin for [Obsidian](https://obsidian.md) Canvas. It brings visual canvas themes, mind-map workflows, node styling, PDF reading tools, optional AI assistance, and PNG/SVG export together in one plugin. Canvas editing and themes work without any AI configuration, and canvas content stays in your vault's `.canvas` files.
-
-Better Canvas is available in the [official Obsidian community plugin directory](https://community.obsidian.md/plugins/better-canvas). You can also install it from GitHub Releases using the steps below.
-
-### Key features
-
-- **Canvas themes:** Six visual themes for different kinds of work, including mind maps, planning boards, research notes, and visual collections. Choose a theme per canvas; switching themes keeps existing content and positions, and the choice is saved with the canvas.
-- **Mind-map workflows:** Press `Tab` to create a child node and `Enter` to create a sibling. While editing a node, use `Shift + Tab` and `Shift + Enter` instead. You can also arrange a node tree automatically, split an existing note's first-level headings into nodes, navigate with `Alt + arrow keys`, and focus on one part of the canvas.
-- **Node styling:** Apply presets to one node or a selection, then adjust color, shape, border, fill, and text alignment. Presets change presentation only, not the node text. Connections can be styled with color, line type, arrows, and routing.
-- **PDF annotations:** Keep a PDF page next to your notes, extract text excerpts, and annotate with the pen or highlighter. Annotations are stored in the Canvas. AI OCR can process a page range when a compatible model is configured; this is not a full replacement for Obsidian's native PDF annotation tools.
-- **AI assistance:** Ask a question about selected nodes and their related context, then keep the answer as a new node connected to its source. Depending on the configured service and model, you can also generate flashcards, generate images, import web page text, and analyze PDF pages. AI features require separate configuration and are subject to each provider's capabilities and data policy.
-- **Export:** Use presentation mode to walk through a canvas, export JSON Canvas, or export the whole canvas, the current viewport, or selected nodes as PNG or SVG. Static exports can differ from the editing view; for example, scrapbook paper textures and tape decorations are not reproduced in whole-canvas or selection exports.
-
-Detailed guides are currently written in Chinese: [feature guide](docs/FEATURE_GUIDE.md), [AI and MCP setup](docs/AI_SETUP.md), [known limitations](docs/KNOWN_LIMITATIONS.md), and [installation guide](docs/INSTALLATION.md).
-
-### Installation from GitHub Releases
-
-Requirements: Obsidian 1.14.4 or newer, on desktop Obsidian only.
-
-1. Open [Better Canvas releases](https://github.com/OneLastHuman/obsidian-better-canvas/releases) and download `better-canvas.zip` from the latest release.
-2. Extract `better-canvas.zip` into `<Vault>/.obsidian/plugins/`. The archive contains a `better-canvas/` folder with `main.js`, `manifest.json`, and `styles.css`.
-3. In Obsidian, open **Settings → Community plugins** and reload the plugin list.
-4. Enable **Better Canvas**.
-
-The plugin is desktop-only (`isDesktopOnly` is set in the manifest) and does not run on Obsidian mobile. Some features depend on Obsidian internal APIs, and real-device testing has focused on Obsidian 1.14.4 rather than every supported version.
-
-To try features from the current source before they reach a release, copy `main.js`, `manifest.json`, and `styles.css` from the repository's [`release/`](release/) folder into the same plugin folder, then reload the plugin. That folder is updated automatically by successful builds on the main branch.
-
-### AI and network access
-
-AI is optional. Canvas editing, themes, node styling, and mind-map tools work without an AI service and do not send node text to one.
-
-When you submit an AI request, the selected node content and the related context needed for that request are sent to the service you configured. Supported API types are OpenAI-compatible, Anthropic, and Gemini. On desktop, you can also configure a locally installed CLI agent such as Codex CLI, OpenCode ACP, Claude Code, Cursor Agent, Gemini CLI, GitHub Copilot CLI, Qwen Coder, Aider, or IBM Bob. Those CLIs use their own model configuration and may call remote services, so local execution is not guaranteed to be offline.
-
-Network requests also occur when you import web page content or use a remote MCP server. A local MCP stdio server runs as a child process with your operating-system user permissions; it can potentially access files and network resources available to that account. Connect only MCP servers you trust, review tool arguments before execution, and review each AI provider's data policy before sending private content.
+- **Version:** Requires Obsidian 1.14.4 or newer. Some features depend on internal APIs; real-device verification mainly covers 1.14.4 and does not mean every version has been verified.
+- **Devices and appearance:** This plugin supports desktop Obsidian only. Behavior with third-party Obsidian themes and complex canvases still needs verification. For non-rectangular cards, connection endpoints, selection, and zoom still follow the native rectangular bounds.
+- **Portal and PDF:** Portal mainly supports one-level synchronization. PDF annotations are saved in the Canvas; full native PDF highlight editing and multi-page annotation management are not complete yet.
+- **AI and tools:** Check the service's data-handling policy before use. Local MCP stdio servers run with the current user's permissions; connect only trusted services and check tool arguments before execution.
+- **HTML preview:** Uses a sandboxed iframe; preview only trusted or reviewed code.
 
 ### Vault and clipboard permissions
 
-Better Canvas works inside your vault through Obsidian's Vault API. It does not ask for operating-system file permissions directly.
+Better Canvas works inside your vault through Obsidian's Vault API. It does not request operating-system file permissions directly.
 
 | Access | When it is used |
 | --- | --- |
-| Vault read/write | Reading and updating Canvas content, PDF annotations stored in the Canvas, linked notes and files, and writing plugin-created content. This includes AI answer and image nodes, imported material, flashcards, exports, and the optional onboarding sample canvas. The onboarding sample is written to `Better Canvas/快速入门.canvas` only when you choose to create it, and an existing file is never overwritten. |
+| Vault read/write | Reading and updating canvas content, PDF annotations stored in the Canvas, linked notes and files, and writing plugin-created content. This includes AI answer and image nodes, imported material, flashcards, exports, and the optional onboarding sample canvas. The onboarding sample is written to `Better Canvas/快速入门.canvas` only when you choose to create it, and an existing file is never overwritten. |
 | Clipboard (write) | The copy-node-link command writes the selected node's Obsidian wikilink to the system clipboard. If clipboard access is unavailable, the plugin opens a manual-copy dialog instead. |
 | Network | Requests to the AI service or MCP server you configure, and web imports you start. Local CLI agents may also contact their configured model services. |
 | Local processes (desktop) | Only when you configure a local CLI agent or a local MCP stdio server. |
 
-PDF annotations are saved in the `.canvas` file. Portal nodes currently support mainly one-level synchronization. Non-rectangular nodes still use Canvas's native rectangular bounds for connection endpoints, selection, and zoom.
+Implementation and verification status for each item is tracked in the [feature integration matrix](docs/INTEGRATION_MATRIX.md). Configuration, limitations, custom styles, and other topics are listed in the [documentation index](docs/README.md).
 
-### Development
+## Development
 
 Development requires Node.js 22 and npm. From the repository root:
 
@@ -272,8 +209,14 @@ npm test
 npm run build
 ```
 
-### License
+Copy the generated `main.js`, `manifest.json`, and `styles.css` into the plugin folder. `npm run dev` starts a development build.
 
-Better Canvas is licensed under [GPL-3.0-or-later](LICENSE). See the [acknowledgements](docs/ACKNOWLEDGEMENTS.md) for upstream inspiration and third-party resources.
+See the [testing guide](docs/TESTING.md) for test layers and desktop verification requirements, [repository governance](docs/REPOSITORY_GOVERNANCE.md) for contribution and review conventions, and the [release process](docs/RELEASING.md) for version releases.
+
+## Acknowledgements and license
+
+Some feature directions were inspired by [Advanced Canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas), [Canvas MindMap](https://github.com/Quorafind/Obsidian-Canvas-MindMap), and [Obsidian AI Canvas](https://github.com/testy-cool/obsidian-ai-canvas).
+
+Better Canvas is licensed under [GPL-3.0-or-later](LICENSE). Upstream sources and third-party resources are documented in the [acknowledgements](docs/ACKNOWLEDGEMENTS.md).
 
 [Back to top](#better-canvas)

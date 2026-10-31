@@ -14,6 +14,9 @@
   <meta property="og:image:alt" content="A soft-notes canvas for a reading circle in Obsidian, with pastel cards connected by arrows.">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="canonical" href="https://onelasthuman.github.io/obsidian-better-canvas/">
+  <link rel="alternate" hreflang="en" href="https://onelasthuman.github.io/obsidian-better-canvas/">
+  <link rel="alternate" hreflang="zh-Hans" href="https://onelasthuman.github.io/obsidian-better-canvas/zh/">
+  <link rel="alternate" hreflang="x-default" href="https://onelasthuman.github.io/obsidian-better-canvas/">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -36,6 +39,7 @@
         <a href="#ai">AI</a>
         <a href="#install">Install</a>
         <a class="nav-repo" href="https://github.com/OneLastHuman/obsidian-better-canvas">GitHub</a>
+        <a class="lang-switch" href="zh/" hreflang="zh-Hans" lang="zh-Hans">中文</a>
       </nav>
     </div>
   </header>
@@ -279,7 +283,7 @@
         <aside class="ai-side" aria-labelledby="ai-disclosure-title">
           <h3 id="ai-disclosure-title">Before you send anything</h3>
           <p>AI is off until you configure a service. Use an OpenAI-compatible, Anthropic, or Gemini endpoint, or a desktop CLI such as Codex or Claude Code. Prompts and the context you include are sent to that service, and local CLI modes can still call remote models.</p>
-          <p>Model capabilities vary. Check the service's data policy before sending private notes, PDFs, or file content.</p>
+          <p>These services may charge for usage, and model capabilities vary. Check the service's data policy before sending private notes, PDFs, or file content.</p>
           <p class="optional-note">Themes, node styling, mapping, PDF annotation, and export do not need AI.</p>
         </aside>
       </div>
@@ -378,17 +382,6 @@
       </div>
       <div class="shell platform-note">
         <p>Better Canvas targets Obsidian 1.14.4 on desktop. Some features use Obsidian's internal APIs, so newer versions and third-party themes can behave differently. Keep a backup before trying new workflows on important canvases.</p>
-      </div>
-    </section>
-
-    <section class="chinese-summary" lang="zh-Hans" aria-labelledby="zh-title">
-      <div class="shell chinese-grid">
-        <h2 id="zh-title">中文摘要</h2>
-        <div>
-          <p>Better Canvas 是 Obsidian Canvas 的增强插件。它可以为每张画布选择主题，用 Tab 和 Enter 展开思维导图，调整节点与连线样式，在 PDF 页面旁做批注，按需调用已配置的 AI，并导出 PNG、SVG 或 JSON Canvas。</p>
-          <p>仅支持桌面端，需要 Obsidian 1.14.4 或更高版本。插件已上架 <a href="https://community.obsidian.md/plugins/better-canvas">Obsidian 官方社区目录</a>，也可以从 GitHub Releases 安装。以 GPL-3.0-or-later 许可发布。</p>
-          <p>AI 功能默认不启用；使用时会把你提交的提示词与所选节点上下文发送到你配置的服务。</p>
-        </div>
       </div>
     </section>
   </main>
