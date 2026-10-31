@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Better Canvas，用形状思考的地方</title>
+  <meta name="description" content="Better Canvas 是 Obsidian Canvas 的桌面端增强插件，提供画布主题、思维导图快捷键、节点样式、PDF 批注、可选 AI，以及 PNG、SVG 与 JSON Canvas 导出。可从 GitHub Releases 或 Obsidian 官方社区目录安装。">
+  <meta name="theme-color" content="#f3eee4">
+  <meta property="og:title" content="Better Canvas，用形状思考的地方">
+  <meta property="og:description" content="为 Obsidian 提供画布主题、思维导图快捷键、节点样式、PDF 批注、可选 AI 与导出。仅支持桌面端，需要 Obsidian 1.14.4 或更高版本。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://onelasthuman.github.io/obsidian-better-canvas/zh/">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:image" content="https://onelasthuman.github.io/obsidian-better-canvas/assets/soft-notes.png">
+  <meta property="og:image:alt" content="柔和笔记主题的读书会画布：淡紫色想法卡片、蓝色引文卡片、绿色主题胶囊、黄色行动清单和居中的文本卡片。">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://onelasthuman.github.io/obsidian-better-canvas/zh/">
+  <link rel="alternate" hreflang="en" href="https://onelasthuman.github.io/obsidian-better-canvas/">
+  <link rel="alternate" hreflang="zh-Hans" href="https://onelasthuman.github.io/obsidian-better-canvas/zh/">
+  <link rel="alternate" hreflang="x-default" href="https://onelasthuman.github.io/obsidian-better-canvas/">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#top" aria-label="Better Canvas 首页">
+        <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
+          <rect x="3" y="7" width="11" height="8" rx="2.5"></rect>
+          <rect x="22" y="21" width="11" height="8" rx="2.5"></rect>
+          <path d="M14 11h5.5A4.5 4.5 0 0 1 24 15.5V21"></path>
+        </svg>
+        <span>Better Canvas</span>
+      </a>
+      <nav class="site-nav" aria-label="主导航">
+        <a href="#themes">主题</a>
+        <a href="#mapping">思维导图</a>
+        <a href="#ai">AI</a>
+        <a href="#install">安装</a>
+        <a class="nav-repo" href="https://github.com/OneLastHuman/obsidian-better-canvas">GitHub</a>
+        <a class="lang-switch" href="../" hreflang="en" lang="en">EN</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <p class="kicker">一款 Obsidian Canvas 插件</p>
+          <h1 id="hero-title">用形状思考的地方。</h1>
+          <p class="lede">Better Canvas 为 Obsidian Canvas 带来主题、以卡片为先的导图方式和阅读工具。把笔记按空间排开，让每条来源都留在它启发的想法旁边；只有你主动选择时，才会调用 AI。</p>
+          <div class="actions">
+            <a class="button" href="https://github.com/OneLastHuman/obsidian-better-canvas/releases/latest">下载最新版本</a>
+            <a class="text-link" href="#themes">浏览功能</a>
+          </div>
+          <p class="compat">仅支持桌面端。需要 Obsidian 1.14.4 或更高版本。</p>
+        </div>
+
+        <aside class="hero-note" aria-label="一览">
+          <p class="note-label">一览</p>
+          <dl>
+            <div>
+              <dt>六款主题</dt>
+              <dd>按画布选择，并随画布保存</dd>
+            </div>
+            <div>
+              <dt>可选 AI</dt>
+              <dd>未配置服务时保持关闭</dd>
+            </div>
+            <div>
+              <dt>你的仓库</dt>
+              <dd>卡片与连线仍保存在 .canvas 文件中</dd>
+            </div>
+          </dl>
+          <p class="note-hand">画布依然是画布。Better Canvas 只是换了一种语气，并多给几条生长的路径。</p>
+        </aside>
+      </div>
+
+      <figure class="hero-plate shell">
+        <div class="plate-frame">
+          <img src="../assets/soft-notes.png" alt="柔和笔记主题的读书会画布：淡紫色想法卡片、蓝色引文卡片、绿色主题胶囊、黄色行动清单和居中的文本卡片，由曲线箭头连接。" width="2505" height="1292" fetchpriority="high" decoding="async">
+        </div>
+        <figcaption>
+          <span class="caption-title">柔和笔记：一场读书会</span>
+          <span class="caption-detail">想法、摘录、概念、问题与行动卡片同处一张画布。Obsidian 1.14.4 中的真实插件界面；内容为示例。</span>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="ledger shell" aria-label="插件信息">
+      <p class="ledger-intro">Better Canvas 基于 Obsidian 自带的 <code>.canvas</code> 文件工作。编辑与主题工具无需账号；AI 为可选项。</p>
+      <dl class="facts">
+        <div>
+          <dt>宿主</dt>
+          <dd>Obsidian 1.14.4 或更高版本</dd>
+        </div>
+        <div>
+          <dt>平台</dt>
+          <dd>仅桌面端</dd>
+        </div>
+        <div>
+          <dt>许可</dt>
+          <dd>GPL-3.0-or-later</dd>
+        </div>
+        <div>
+          <dt>最新验证版本</dt>
+          <dd><a href="https://github.com/OneLastHuman/obsidian-better-canvas/releases/tag/0.1.1">0.1.1</a></dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="section themes" id="themes" aria-labelledby="themes-title">
+      <div class="shell section-intro">
+        <p class="rail-label">画布主题</p>
+        <h2 id="themes-title">六种布置场景的方式。</h2>
+        <div class="prose">
+          <p>从右侧栏为每张画布选择主题，再用节点样式面板给单张卡片一个角色。内容、位置与连接保持不变，主题随画布一起保存。</p>
+          <p class="aside-note">主题改变的是外观，不是文件格式。Obsidian 打开的仍是同一张画布。</p>
+        </div>
+      </div>
+
+      <div class="shell theme-gallery">
+        <figure class="figure figure-wide">
+          <div class="figure-frame">
+            <img src="../assets/rounded-map.png" alt="软糖白板主题的流程图，用于筹划一场读书活动，包含胶囊、圆角矩形、菱形、箭头、平行四边形和文档形状。" width="2505" height="1292" loading="lazy" decoding="async">
+          </div>
+          <figcaption><span class="caption-title">软糖白板</span> 一条带有判断、是/否分支和输出卡片的筹划流程。内容为示例；界面来自真实插件。</figcaption>
+        </figure>
+        <figure class="figure figure-narrow">
+          <div class="figure-frame">
+            <img src="../assets/research.png" alt="论文研读主题的画布，包含来源材料、引文、阅读笔记、主张和一个开放问题，由带标签的箭头连接。" width="2505" height="1292" loading="lazy" decoding="async">
+          </div>
+          <figcaption><span class="caption-title">论文研读</span> 来源、引文、批注、主张与后续问题，排成一份阅读跨页。</figcaption>
+        </figure>
+      </div>
+
+      <div class="shell theme-roster">
+        <p class="roster-note">六款主题，以及各自擅长的事：</p>
+        <ul>
+          <li><span class="theme-name">默认</span><span class="theme-desc">Obsidian 原生画布，不加额外装饰。</span></li>
+          <li><span class="theme-name">柔和笔记</span><span class="theme-desc">弯曲的柔和色卡片，适合松散、早期的思考。</span></li>
+          <li><span class="theme-name">论文研读</span><span class="theme-desc">暖色纸张、衬线标题和接近印刷品的预设。</span></li>
+          <li><span class="theme-name">软糖白板</span><span class="theme-desc">圆润形状与强轮廓，适合流程地图。</span></li>
+          <li><span class="theme-name">手绘板</span><span class="theme-desc">点阵纸、手绘连线，以及页边注预设。</span></li>
+          <li><span class="theme-name">拼贴手账</span><span class="theme-desc">胶带、横线纸、撕纸边缘和照片框。</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section mapping" id="mapping" aria-labelledby="mapping-title">
+      <div class="shell section-intro">
+        <p class="rail-label">思维导图</p>
+        <h2 id="mapping-title">沿着分支走，手不离键。</h2>
+        <div class="prose">
+          <p>卡片是思考的单位。选中一张，按一个键继续。分支变挤时，可以把选中的树向左、右、上、下重新排布。Markdown 笔记也能作种：把它的 H1 标题变成相连的卡片。</p>
+        </div>
+      </div>
+
+      <figure class="figure shell mapping-figure">
+        <div class="figure-frame">
+          <img src="../assets/mind-map.png" alt="默认主题的思维导图，一张读书聚会卡片分出读什么、和谁读、留下什么三条分支。" width="2505" height="1292" loading="lazy" decoding="async">
+        </div>
+        <figcaption><span class="caption-title">一场读书会，画成图</span> 默认主题中的十张卡片。示例为截图做过排布；渲染来自插件本身。</figcaption>
+      </figure>
+
+      <div class="shell keymap-wrap">
+        <p class="keymap-note">让思路继续向前的按键：</p>
+        <dl class="keymap">
+          <div>
+            <dt><kbd>Tab</kbd></dt>
+            <dd>未在编辑文字时，创建子卡片。</dd>
+          </div>
+          <div>
+            <dt><kbd>Enter</kbd></dt>
+            <dd>未在编辑文字时，创建同级卡片。</dd>
+          </div>
+          <div>
+            <dt><kbd>Shift</kbd> + <kbd>Tab</kbd></dt>
+            <dd>在编辑文字时创建子卡片。</dd>
+          </div>
+          <div>
+            <dt><kbd>Shift</kbd> + <kbd>Enter</kbd></dt>
+            <dd>在编辑文字时创建同级卡片。</dd>
+          </div>
+          <div>
+            <dt><kbd>Alt</kbd> + <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd></dt>
+            <dd>将选择移到相邻卡片。</dd>
+          </div>
+          <div>
+            <dt><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + 方向键</dt>
+            <dd>在该方向创建子卡片。</dd>
+          </div>
+        </dl>
+        <p class="keymap-note keymap-footnote">如果某组快捷键与其他插件或你自己的热键冲突，可以在设置中单独关闭。</p>
+      </div>
+    </section>
+
+    <section class="section styling" id="styling" aria-labelledby="styling-title">
+      <div class="shell section-intro">
+        <p class="rail-label">节点样式</p>
+        <h2 id="styling-title">让卡片表明自己是什么。</h2>
+        <div class="prose">
+          <p>从预设开始，再调整颜色、形状、边框和文字对齐。选中多张卡片，可以整组套用一种样式，而不替换文字。连线有独立控件：颜色、线型、箭头、方向，以及直线、直角或 A* 寻路。</p>
+        </div>
+      </div>
+
+      <div class="shell preset-wrap">
+        <p class="ledger-label">各主题的预设角色</p>
+        <dl class="preset-ledger">
+          <div>
+            <dt>默认</dt>
+            <dd>Obsidian 原生卡片。CSS 片段可添加可复用的节点与连线预设。</dd>
+          </div>
+          <div>
+            <dt>柔和笔记</dt>
+            <dd>想法、摘录、概念、行动、问题与自由文本。</dd>
+          </div>
+          <div>
+            <dt>论文研读</dt>
+            <dd>来源材料、关键引文、阅读笔记、核心主张、开放问题与章节标题。</dd>
+          </div>
+          <div>
+            <dt>软糖白板</dt>
+            <dd>起点或主题、步骤或任务、判断、流程或下一阶段、输入或输出，以及文档。</dd>
+          </div>
+          <div>
+            <dt>手绘板</dt>
+            <dd>章节、核心概念、行动步骤、判断、页边注与风险。</dd>
+          </div>
+          <div>
+            <dt>拼贴手账</dt>
+            <dd>胶带便签、横线纸、撕纸、照片框与标签。</dd>
+          </div>
+        </dl>
+        <p class="fine-print">预设因主题而异。分组保留自己的样式，预设不会替换卡片文字。</p>
+      </div>
+    </section>
+
+    <section class="section reading" id="reading" aria-labelledby="reading-title">
+      <div class="shell section-intro">
+        <p class="rail-label">PDF 批注</p>
+        <h2 id="reading-title">让页面留在段落旁边。</h2>
+        <div class="prose">
+          <p>把 PDF 页面钉进画布，选中文字生成带链接的摘录，在页面上书写或高亮。批注随画布保存，PDF 本身保持原样。</p>
+        </div>
+      </div>
+
+      <div class="shell reading-grid">
+        <div class="reading-copy">
+          <p>当来源、引文和你自己的回应占据同一空间时，阅读更容易留存。Better Canvas 把三者都保留在画布文件中，包括笔迹、高亮和键入的笔记。</p>
+          <p>配置支持视觉的模型后，你可以 OCR 单页或一个页面范围，并把每页结果保存为各自相连的卡片。</p>
+        </div>
+        <div class="reading-steps">
+          <ol>
+            <li><div><span class="step-name">固定</span> 把仓库里的一页 PDF 放到画布上。</div></li>
+            <li><div><span class="step-name">标记</span> 使用钢笔、荧光笔、橡皮和撤销工具，或添加键入的笔记。</div></li>
+            <li><div><span class="step-name">继续推进</span> 制作带链接的摘录卡片，或以最多 20 页为一批运行 OCR。</div></li>
+          </ol>
+          <p class="reading-caveat">它不是完整 PDF 编辑器的替代品。Better Canvas 不会改写 PDF 原生的高亮对象，也不管理整份文档的批注。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section ai" id="ai" aria-labelledby="ai-title">
+      <div class="shell section-intro">
+        <p class="rail-label">可选 AI</p>
+        <h2 id="ai-title">从画布发问，而不是从空白聊天框开始。</h2>
+        <div class="prose">
+          <p>选中一张卡片或一组卡片，提出问题。答案会作为新卡片出现，并与来源相连。回答可以流式输出、停止和重新生成；闪卡可以留在画布上，也可以导出为间隔重复牌组。当你配置的服务支持时，还可以生成图片和导入网页。</p>
+        </div>
+      </div>
+
+      <div class="shell ai-grid">
+        <figure class="figure ai-figure">
+          <div class="figure-frame">
+            <img src="../assets/ai-prompt.png" alt="论文研读画布上方的“向 AI 提问”面板。输入框中写着关于证据缺口和后续问题的问题，背后可见选中的主张卡片。" width="2505" height="1523" loading="lazy" decoding="async">
+          </div>
+          <figcaption><span class="caption-title">从一张选中的主张发问</span> 提示词已键入但尚未发送。选中的卡片及其相连上下文位于面板之后。真实界面，内容为示例。</figcaption>
+        </figure>
+
+        <aside class="ai-side" aria-labelledby="ai-disclosure-title">
+          <h3 id="ai-disclosure-title">发送之前</h3>
+          <p>在配置服务之前，AI 保持关闭。你可以使用 OpenAI 兼容、Anthropic 或 Gemini 端点，也可以使用 Codex、Claude Code 之类的桌面 CLI。提示词和你附带的上下文会发送到该服务；本地 CLI 模式仍可能调用远程模型。</p>
+          <p>这些服务可能按用量收费，模型能力也各不相同。发送私密笔记、PDF 或文件内容前，请查看服务方的数据政策。</p>
+          <p class="optional-note">主题、节点样式、导图、PDF 批注和导出都不需要 AI。</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section export" id="export" aria-labelledby="export-title">
+      <div class="shell section-intro">
+        <p class="rail-label">导出</p>
+        <h2 id="export-title">把思考带出仓库。</h2>
+        <div class="prose">
+          <p>按顺序演示节点，或导出为 PNG、SVG。在插件设置里设定导出分辨率与背景，再选择整张画布、当前视口或仅选中的卡片。其他工具需要原始结构时，可用 JSON Canvas。</p>
+        </div>
+      </div>
+
+      <div class="shell export-grid">
+        <div class="export-formats">
+          <div class="format">
+            <span class="format-name">PNG</span>
+            <p>用于幻灯片、文档或快速分享的位图。</p>
+          </div>
+          <div class="format">
+            <span class="format-name">SVG</span>
+            <p>用于印刷和继续编辑的矢量输出。</p>
+          </div>
+          <div class="format">
+            <span class="format-name">JSON Canvas</span>
+            <p>可移植的画布格式，供其他应用使用。</p>
+          </div>
+        </div>
+        <div class="export-note">
+          <p>导出文件写入插件设置中的文件夹。静态渲染可能与编辑器不同：交互式 HTML 不会运行，拼贴纸张纹理和胶带也不会出现在整张画布或选区导出中。</p>
+          <p><a class="text-link" href="https://github.com/OneLastHuman/obsidian-better-canvas/blob/main/docs/KNOWN_LIMITATIONS.md">阅读已知限制</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="install" id="install" aria-labelledby="install-title">
+      <div class="shell install-grid">
+        <div class="install-copy">
+          <p class="rail-label">安装</p>
+          <h2 id="install-title">从最新版本开始。</h2>
+          <p class="directory-note">Better Canvas 已上架 <a href="https://community.obsidian.md/plugins/better-canvas">Obsidian 官方社区目录</a>，也可以从 GitHub Releases 安装。</p>
+          <div class="actions">
+            <a class="button button-light" href="https://github.com/OneLastHuman/obsidian-better-canvas/releases/latest">打开最新版本</a>
+            <a class="text-link text-link-light" href="https://github.com/OneLastHuman/obsidian-better-canvas/releases">全部版本</a>
+          </div>
+          <p class="install-requirement">仅支持桌面端。需要 Obsidian 1.14.4 或更高版本。</p>
+        </div>
+
+        <ol class="install-steps">
+          <li>
+            <div><strong>下载压缩包</strong> 从发布资源中获取 <code>better-canvas.zip</code>。</div>
+          </li>
+          <li>
+            <div><strong>解压到你的仓库</strong> 把 <code>better-canvas</code> 文件夹放进 <code>&lt;Vault&gt;/.obsidian/plugins/</code>。完成后的文件夹应包含这些文件：
+              <code class="code-block">&lt;Vault&gt;/.obsidian/plugins/better-canvas/<br>├── main.js<br>├── manifest.json<br>└── styles.css</code>
+            </div>
+          </li>
+          <li>
+            <div><strong>启用插件</strong> 在 Obsidian 设置中重新加载社区插件，然后打开 Better Canvas。</div>
+          </li>
+        </ol>
+      </div>
+
+      <div class="shell install-foot">
+        <p>更想自己构建？使用 Node.js 22，在仓库中运行 <code>npm run build</code>。</p>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas">在 GitHub 查看源码</a>
+      </div>
+    </section>
+
+    <section class="section notes" id="notes" aria-labelledby="notes-title">
+      <div class="shell notes-grid">
+        <div class="notes-copy">
+          <p class="rail-label">数据与访问</p>
+          <h2 id="notes-title">会接触什么，何时接触。</h2>
+          <p class="prose">编辑工具在本地工作。网络活动只属于你配置的功能，与页面浏览或使用统计无关。</p>
+        </div>
+        <div class="notes-list">
+          <div class="note-block">
+            <h3>仓库访问</h3>
+            <p>与其他 Obsidian 插件一样，Better Canvas 可以访问仓库。它能读取画布、Markdown 和 PDF 文件以提供功能，并在你编辑画布、导出、创建附件或运行引导时写入。设置与 API 凭据保存在本地插件数据中。</p>
+          </div>
+          <div class="note-block">
+            <h3>剪贴板</h3>
+            <p>剪贴板访问仅限于在你复制节点 Wikilink 时写入它。插件不会读取剪贴板内容。</p>
+          </div>
+          <div class="note-block">
+            <h3>网络</h3>
+            <p>没有分析、遥测或广告。请求可能用于 AI 提示词、模型发现与探测、MCP 服务器、网页导入，以及 HTML 预览加载的外部资源。它们会发送到你配置或打开的目的地。</p>
+          </div>
+          <div class="note-block">
+            <h3>AI 数据</h3>
+            <p>提示词、选中的节点和相关上下文会发送到你选择的服务。本地 CLI 模式不保证离线。服务方的数据政策适用。</p>
+          </div>
+        </div>
+      </div>
+      <div class="shell platform-note">
+        <p>Better Canvas 面向桌面端 Obsidian 1.14.4。部分功能使用 Obsidian 内部 API，因此较新版本和第三方主题可能有不同表现。在重要画布上尝试新流程前，请先备份。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div>
+        <a class="footer-brand" href="#top">Better Canvas</a>
+        <p class="footer-note">截图展示 Obsidian 1.14.4 桌面端的真实插件界面。示例画布仅作说明。本页不加载外部字体、脚本或跟踪器。</p>
+      </div>
+      <nav class="footer-links" aria-label="项目">
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas">源码</a>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas/releases">版本发布</a>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas/blob/main/docs/FEATURE_GUIDE.md">功能指南</a>
+        <a href="https://github.com/OneLastHuman/obsidian-better-canvas/blob/main/LICENSE">GPL-3.0-or-later</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

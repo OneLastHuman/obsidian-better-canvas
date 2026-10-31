@@ -40,6 +40,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+html[lang="zh-Hans"] body {
+  font-family: var(--cjk);
+  line-height: 1.8;
+}
+
+html[lang="zh-Hans"] h1,
+html[lang="zh-Hans"] h2,
+html[lang="zh-Hans"] h3 {
+  line-height: 1.15;
+}
+
 h1,
 h2,
 h3,
@@ -197,6 +208,18 @@ code {
 .site-nav .nav-repo {
   color: var(--green-deep);
   border-bottom-color: var(--rule-dark);
+}
+
+.site-nav .lang-switch {
+  padding: 0.2rem 0.5rem;
+  color: var(--green-deep);
+  border: 1px solid var(--rule-dark);
+}
+
+.site-nav .lang-switch:hover {
+  color: var(--paper-bright);
+  background: var(--green-deep);
+  border-color: var(--green-deep);
 }
 
 .hero {
@@ -1088,7 +1111,6 @@ kbd {
   line-height: 1.68;
 }
 
-
 .platform-note {
   max-width: 82ch;
   margin-top: clamp(2.5rem, 4vw, 4rem);
@@ -1098,40 +1120,6 @@ kbd {
   font-family: var(--sans);
   font-size: 0.73rem;
   line-height: 1.65;
-}
-
-.chinese-summary {
-  padding: clamp(3rem, 6vw, 4.5rem) 0;
-  border-top: 1px solid var(--rule);
-  background: var(--paper-deep);
-}
-
-.chinese-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr);
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-items: start;
-}
-
-.chinese-summary h2 {
-  color: var(--ink);
-  font-family: var(--cjk);
-  font-size: 1.35rem;
-  font-weight: 400;
-  line-height: 1.5;
-  letter-spacing: 0.02em;
-}
-
-.chinese-summary p {
-  max-width: 72ch;
-  color: var(--ink-soft);
-  font-family: var(--cjk);
-  font-size: 0.94rem;
-  line-height: 1.95;
-}
-
-.chinese-summary p + p {
-  margin-top: 0.35rem;
 }
 
 .site-footer {
@@ -1253,11 +1241,6 @@ kbd {
 
   .notes-list {
     max-width: 52rem;
-  }
-
-  .chinese-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
   }
 }
 
@@ -1407,9 +1390,6 @@ kbd {
     padding: 0.65rem 0.7rem;
   }
 
-  .chinese-summary p {
-    font-size: 0.9rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
