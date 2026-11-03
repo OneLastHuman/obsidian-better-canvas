@@ -1,4 +1,5 @@
 import { loadPdfJs, TFile } from "obsidian";
+import { t } from "./i18n";
 
 export interface PdfPageContext {
   pageNumber: number;
@@ -58,7 +59,8 @@ async function getPageContext(app: any, file: TFile, pageNumber: number, include
   const task = (async () => {
     const pdf = await getPdfDocument(app, file);
     if (pageNumber < 1 || pageNumber > pdf.numPages) {
-      throw new Error("PDF 页面编号超出范围：" + pageNumber + " / " + pdf.numPages);
+      throw new Error(t("PDF page number out of range: " + pageNumber + " / " + pdf.numPages,
+        "PDF 页面编号超出范围：" + pageNumber + " / " + pdf.numPages));
     }
     const page = await pdf.getPage(pageNumber);
     const content = await page.getTextContent();

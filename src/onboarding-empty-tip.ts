@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { t } from "./i18n";
 
 export interface EmptyCanvasTipOptions {
   onDismiss?: () => void;
@@ -23,22 +24,23 @@ export function showEmptyCanvasTip(container: HTMLElement, options: EmptyCanvasT
 
   const tip = canvas.createDiv({
     cls: TIP_CLASS,
-    attr: { role: "note", "aria-label": "空画布提示" }
+    attr: { role: "note", "aria-label": t("Empty Canvas tip", "空画布提示") }
   });
   const icon = tip.createSpan({ cls: "bc-onboarding-empty-tip-icon", attr: { "aria-hidden": "true" } });
   setIcon(icon, "lightbulb");
   const body = tip.createDiv({ cls: "bc-onboarding-empty-tip-body" });
-  body.createEl("strong", { text: "从这里开始" });
-  body.createEl("p", { text: "在空白处双击创建卡片。右侧工具栏提供画布主题和节点样式。" });
+  body.createEl("strong", { text: t("Start here", "从这里开始") });
+  body.createEl("p", { text: t("Double-click empty space to create a card. The toolbar on the right offers Canvas themes and node styles.",
+    "在空白处双击创建卡片。右侧工具栏提供画布主题和节点样式。") });
   const shortcut = body.createDiv({ cls: "bc-onboarding-empty-tip-shortcut" });
-  shortcut.createSpan({ text: "选中卡片后按" });
+  shortcut.createSpan({ text: t("With a card selected, press", "选中卡片后按") });
   shortcut.createEl("kbd", { text: "Tab" });
-  shortcut.createSpan({ text: "或" });
+  shortcut.createSpan({ text: t("or", "或") });
   shortcut.createEl("kbd", { text: "Enter" });
-  shortcut.createSpan({ text: "创建" });
+  shortcut.createSpan({ text: t("to create", "创建") });
   const close = tip.createEl("button", {
     cls: "bc-onboarding-empty-tip-close",
-    attr: { type: "button", "aria-label": "关闭空画布提示", title: "关闭提示" }
+    attr: { type: "button", "aria-label": t("Close empty Canvas tip", "关闭空画布提示"), title: t("Dismiss tip", "关闭提示") }
   });
   setIcon(close, "x");
   close.addEventListener("click", event => {

@@ -8,6 +8,7 @@ import { clearResearchNode, RESEARCH_SERIF } from "./research-style";
 import { decorateCanvasTheme, resolveCanvasTheme, setCanvasTheme, type CanvasThemeId } from "./canvas-theme";
 import { clearRoundedMapNode, roundedMapCss, stopRoundedMapGeometry } from "./rounded-map-style";
 import { ROUNDED_MAP_PRESETS } from "./node-visual-style";
+import { t } from "./i18n";
 
 /**
  * Mirrors Obsidian's native control markup (a `div.canvas-control-item`) rather
@@ -130,17 +131,17 @@ class CanvasThemeModal extends Modal {
 
   onOpen(): void {
     this.modalEl.addClass("bc-theme-modal");
-    this.titleEl.setText("画布主题");
-    this.contentEl.createEl("p", { cls: "bc-theme-intro", text: "为这一张画布，挑一种质感。" });
+    this.titleEl.setText(t("Canvas theme", "画布主题"));
+    this.contentEl.createEl("p", { cls: "bc-theme-intro", text: t("Pick a feel for this Canvas.", "为这一张画布，挑一种质感。") });
     const choices = this.contentEl.createDiv({ cls: "bc-theme-choices" });
     const current = resolveCanvasTheme(readCanvasData(this.canvas));
     const themes: Array<{ id: CanvasThemeId; title: string; detail: string }> = [
-      { id: "default", title: "默认", detail: "跟随 Obsidian · 清晰简洁" },
-      { id: "scrapbook", title: "拼贴手账", detail: "暖纸 · 胶带 · 收藏灵感" },
-      { id: "sketch", title: "手绘白板", detail: "白纸 · 手绘线 · 功能预设" },
-      { id: "rounded-map", title: "软糖白板", detail: "大圆角 · 粗描边 · 六种功能形状" },
-      { id: "research", title: "纸本研究", detail: "资料 · 引文 · 严谨编排" },
-      { id: "soft-notes", title: "柔软便签", detail: "浅粉彩 · 柔软曲线 · 自由文字" }
+      { id: "default", title: t("Default", "默认"), detail: t("Follows Obsidian · clean and simple", "跟随 Obsidian · 清晰简洁") },
+      { id: "scrapbook", title: t("Scrapbook", "拼贴手账"), detail: t("Warm paper · tape · collected inspiration", "暖纸 · 胶带 · 收藏灵感") },
+      { id: "sketch", title: t("Hand-drawn Whiteboard", "手绘白板"), detail: t("White paper · hand-drawn lines · presets", "白纸 · 手绘线 · 功能预设") },
+      { id: "rounded-map", title: t("Gummy Whiteboard", "软糖白板"), detail: t("Large radii · thick strokes · six functional shapes", "大圆角 · 粗描边 · 六种功能形状") },
+      { id: "research", title: t("Paper Research", "纸本研究"), detail: t("Sources · citations · careful layout", "资料 · 引文 · 严谨编排") },
+      { id: "soft-notes", title: t("Soft Notes", "柔软便签"), detail: t("Soft pastels · gentle curves · free text", "浅粉彩 · 柔软曲线 · 自由文字") }
     ];
     for (const theme of themes) {
       const button = choices.createEl("button", { cls: "bc-theme-choice" });
@@ -152,12 +153,12 @@ class CanvasThemeModal extends Modal {
       board.setAttribute("aria-hidden", "true");
       board.createSpan({
         cls: "bc-theme-mini-caption",
-        text: theme.id === "scrapbook" ? "little things, kept."
-          : theme.id === "sketch" ? "think in ink."
-          : theme.id === "rounded-map" ? "connect the ideas."
-          : theme.id === "research" ? "让资料开始对话"
-          : theme.id === "soft-notes" ? "让想法自由生长"
-            : "A space to think."
+        text: theme.id === "scrapbook" ? t("little things, kept.", "把小事留存下来。")
+          : theme.id === "sketch" ? t("think in ink.", "用墨水思考。")
+          : theme.id === "rounded-map" ? t("connect the ideas.", "把想法连起来。")
+          : theme.id === "research" ? t("Let the sources start a conversation.", "让资料开始对话")
+          : theme.id === "soft-notes" ? t("Let ideas grow freely.", "让想法自由生长")
+            : t("A space to think.", "一个思考的空间。")
       });
       // createElementNS is necessary for SVG in Obsidian's HTML helpers.
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -170,7 +171,7 @@ class CanvasThemeModal extends Modal {
       board.appendChild(svg);
       if (theme.id === "soft-notes") {
         ensureSoftNotesGeometry(document);
-        for (const [kind, text] of [["spark", "灵感"], ["action", "慢慢做"], ["question", "还想试试"]]) {
+        for (const [kind, text] of [["spark", t("Inspiration", "灵感")], ["action", t("Take it slow", "慢慢做")], ["question", t("Want to try more", "还想试试")]]) {
           const preset = softNotesPreset(kind);
           const sample = board.createSpan({ cls: "bc-soft-mini bc-mini-" + kind, text });
           sample.style.setProperty("--bc-soft-clip", softNotesClip(preset));
@@ -184,7 +185,7 @@ class CanvasThemeModal extends Modal {
           sample.createSpan({ text: preset.sample });
         }
       } else if (theme.id === "sketch") {
-        for (const [kind, text] of [["concept", "想法"], ["action", "下一步"], ["risk", "待确认"]]) {
+        for (const [kind, text] of [["concept", t("Idea", "想法")], ["action", t("Next step", "下一步")], ["risk", t("To confirm", "待确认")]]) {
           const sample = board.createSpan({ cls: "bc-sketch-mini bc-mini-" + kind, text });
           sample.dataset.bcSketchPreview = kind;
         }
@@ -194,18 +195,18 @@ class CanvasThemeModal extends Modal {
           sample.dataset.bcResearchPreset = kind;
         }
       } else {
-        for (const [kind, text] of [["tape", "灵感"], ["lined", "记录"], ["label", "收藏"]]) {
+        for (const [kind, text] of [["tape", t("Inspiration", "灵感")], ["lined", t("Note", "记录")], ["label", t("Saved", "收藏")]]) {
           const paper = board.createSpan({ cls: "bc-paper-preview bc-mini-" + kind, text });
           paper.dataset.bcPaper = kind;
         }
       }
       const label = button.createDiv({ cls: "bc-theme-choice-label" });
       label.createEl("strong", { text: theme.title });
-      if (current === theme.id) label.createSpan({ cls: "bc-theme-current", text: "使用中" });
+      if (current === theme.id) label.createSpan({ cls: "bc-theme-current", text: t("In use", "使用中") });
       button.createDiv({ cls: "bc-theme-choice-detail", text: theme.detail });
       button.addEventListener("click", () => {
         if (this.canvas?.readonly || this.canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-          new Notice("当前 Canvas 处于只读模式，无法切换主题。");
+          new Notice(t("This Canvas is in read-only mode; themes cannot be switched.", "当前 Canvas 处于只读模式，无法切换主题。"));
           return;
         }
         setCanvasTheme(this.canvas, theme.id);
@@ -213,7 +214,7 @@ class CanvasThemeModal extends Modal {
         this.close();
       });
     }
-    this.contentEl.createEl("p", { cls: "bc-theme-footnote", text: "主题随画布保存。选择主题后，在「节点样式」中应用对应的功能预设。" });
+    this.contentEl.createEl("p", { cls: "bc-theme-footnote", text: t("The theme is saved with the Canvas. After choosing a theme, apply the matching presets in “Node style”.", "主题随画布保存。选择主题后，在「节点样式」中应用对应的功能预设。") });
   }
 
   onClose(): void {
@@ -245,7 +246,7 @@ export default class CanvasThemeController {
       if (target instanceof HTMLIFrameElement && target.closest(".canvas-wrapper")) this.schedule();
     }, true);
     this.plugin.addCommand({
-      id: "choose-canvas-theme", name: "切换当前画布主题",
+      id: "choose-canvas-theme", name: t("Switch Canvas theme", "切换当前画布主题"),
       checkCallback: (checking: boolean) => {
         const view = workspace.activeLeaf?.view;
         if (view?.getViewType?.() !== "canvas" || !view.canvas) return false;
@@ -320,8 +321,8 @@ export default class CanvasThemeController {
         this.controls.set(canvas, group);
       }
       const control = group.firstElementChild as HTMLElement;
-      const themeName = theme === "scrapbook" ? "拼贴手账" : theme === "sketch" ? "手绘白板" : theme === "rounded-map" ? "软糖白板" : theme === "research" ? "纸本研究" : theme === "soft-notes" ? "柔软便签" : "默认";
-      control.setAttribute("aria-label", "画布主题 · " + themeName);
+      const themeName = theme === "scrapbook" ? t("Scrapbook", "拼贴手账") : theme === "sketch" ? t("Hand-drawn Whiteboard", "手绘白板") : theme === "rounded-map" ? t("Gummy Whiteboard", "软糖白板") : theme === "research" ? t("Paper Research", "纸本研究") : theme === "soft-notes" ? t("Soft Notes", "柔软便签") : t("Default", "默认");
+      control.setAttribute("aria-label", t("Canvas theme · ", "画布主题 · ") + themeName);
     }
     for (const [canvas, group] of this.controls) {
       if (live.has(canvas)) continue;

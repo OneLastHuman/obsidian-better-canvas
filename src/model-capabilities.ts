@@ -1,4 +1,5 @@
 import type { AISettings, ChatMessage } from "./ai";
+import { t } from "./i18n";
 
 export type CapabilityRequestStatus = "accepted" | "failed" | "not-run";
 
@@ -35,7 +36,7 @@ export function modelCapabilityReportKey(
 function errorDetail(error: unknown, apiKey: string): string {
   let message = error instanceof Error ? error.message : String(error);
   if (apiKey) message = message.split(apiKey).join("[redacted]");
-  return message.replace(/[\r\n\t]+/g, " ").slice(0, 240) || "请求失败。";
+  return message.replace(/[\r\n\t]+/g, " ").slice(0, 240) || t("Request failed.", "请求失败。");
 }
 
 function checked(status: CapabilityRequestStatus, startedAt: number, detail?: string): CapabilityCheck {
@@ -69,7 +70,7 @@ export async function probeModelCapabilities(
     testedAt: now().toISOString(),
     text: { status: "not-run" },
     imageInput: { status: "not-run" },
-    note: "探测仅验证文本请求与图片输入请求是否返回可用文本；不会验证图片生成、PDF、视频/YouTube、URL context 或 search grounding。"
+    note: t("The probe only checks whether text and image-input requests return usable text; it does not verify image generation, PDF, video/YouTube, URL context, or search grounding.", "探测仅验证文本请求与图片输入请求是否返回可用文本；不会验证图片生成、PDF、视频/YouTube、URL context 或 search grounding。")
   };
   const apiSettings: AISettings = { ...settings, protocol, backend: "api" };
 
@@ -87,10 +88,10 @@ export async function probeModelCapabilities(
   try {
     const output = await complete(apiSettings, textMessages);
     if (typeof output !== "string" || !output.trim()) {
-      report.text = checked("failed", textStart, "接口返回成功，但没有可用文本输出。");
+      report.text = checked("failed", textStart, t("The endpoint returned success but no usable text output.", "接口返回成功，但没有可用文本输出。"));
       return report;
     }
-    report.text = checked("accepted", textStart, "文本请求返回了可用内容。");
+    report.text = checked("accepted", textStart, t("The text request returned usable content.", "文本请求返回了可用内容。"));
   } catch (error) {
     report.text = checked("failed", textStart, errorDetail(error, settings.apiKey));
     return report;
@@ -115,12 +116,12 @@ export async function probeModelCapabilities(
   try {
     const output = await complete(apiSettings, visionMessages);
     if (typeof output !== "string" || !output.trim()) {
-      report.imageInput = checked("failed", visionStart, "图片输入请求返回成功，但没有可用文本输出。");
+      report.imageInput = checked("failed", visionStart, t("The image-input request returned success but no usable text output.", "图片输入请求返回成功，但没有可用文本输出。"));
     } else {
       report.imageInput = checked(
         "accepted",
         visionStart,
-        "含图片的请求返回了文本；这不能证明模型确实读取了图片内容。"
+        t("The request with an image returned text; this does not prove the model actually read the image content.", "含图片的请求返回了文本；这不能证明模型确实读取了图片内容。")
       );
     }
   } catch (error) {

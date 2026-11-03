@@ -1,0 +1,102 @@
+{
+  "bcTheme": "scrapbook",
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 430,
+      "y": 0,
+      "width": 480,
+      "height": 130,
+      "text": "# A weekend for reading\n\nOne book · one cup of tea · a few new questions",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "label",
+      "color": "#8ba4ad"
+    },
+    {
+      "id": "idea",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 310,
+      "text": "## This week's idea\n\nHold the reading circle by the window.\n\nEveryone brings a book they are reading\nand starts from a line they love.",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "tape",
+      "color": "#bd9455"
+    },
+    {
+      "id": "list",
+      "type": "text",
+      "x": 0,
+      "y": 395,
+      "width": 320,
+      "height": 260,
+      "text": "## Take-along list\n\n- [x] One short book\n- [x] Pencil and sticky notes\n- [ ] One excerpt to share",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "lined",
+      "color": "#91a17c"
+    },
+    {
+      "id": "quote",
+      "type": "text",
+      "x": 1030,
+      "y": 0,
+      "width": 320,
+      "height": 300,
+      "text": "## Today's excerpt\n\nRead a little slower,\nleave some room\nfor your own questions.\n\n*Sample note*",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "torn",
+      "color": "#bf826c"
+    },
+    {
+      "id": "later",
+      "type": "text",
+      "x": 1030,
+      "y": 420,
+      "width": 320,
+      "height": 235,
+      "text": "## Leave for next time\n\nSwap a reading list.\nFollow someone else's question\nback into your own book.",
+      "bcAutoResize": false,
+      "bcScrapbookPreset": "tape",
+      "color": "#a194b0"
+    },
+    {
+      "id": "photo",
+      "type": "file",
+      "file": "Better Canvas Showcase/postcard.svg",
+      "x": 420,
+      "y": 240,
+      "width": 500,
+      "height": 375,
+      "bcScrapbookPreset": "photo",
+      "bcAutoResize": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "idea-title",
+      "fromNode": "idea",
+      "toNode": "title",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "photo-quote",
+      "fromNode": "photo",
+      "toNode": "quote",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "photo-later",
+      "fromNode": "photo",
+      "toNode": "later",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    }
+  ]
+}

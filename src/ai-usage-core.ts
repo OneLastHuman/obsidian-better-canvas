@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type AIUsageProtocol = "openai" | "anthropic" | "gemini";
 
 export interface AIUsageTokenCounts {
@@ -155,28 +157,28 @@ export function parseAIModelPriceTable(json: string): AIModelPriceTable {
   try {
     parsed = JSON.parse(json || "{}");
   } catch {
-    throw new Error("价格 JSON 格式无效。");
+    throw new Error(t("The price JSON is invalid.", "价格 JSON 格式无效。"));
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("价格配置必须是 JSON 对象。");
+    throw new Error(t("Price configuration must be a JSON object.", "价格配置必须是 JSON 对象。"));
   }
   const entries = Object.entries(parsed as Record<string, unknown>);
-  if (entries.length > 200) throw new Error("价格配置最多支持 200 个模型。");
+  if (entries.length > 200) throw new Error(t("Price configuration supports at most 200 models.", "价格配置最多支持 200 个模型。"));
   const result: AIModelPriceTable = {};
   for (const [rawKey, rawValue] of entries) {
     const key = rawKey.trim();
     if (!/^(openai|anthropic|gemini):.+$/.test(key)) {
-      throw new Error(`模型价格键“${key}”格式错误，应为 protocol:model。`);
+      throw new Error(t(`Model price key "${key}" is invalid; expected protocol:model.`, `模型价格键“${key}”格式错误，应为 protocol:model。`));
     }
     if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
-      throw new Error(`模型“${key}”的价格必须是对象。`);
+      throw new Error(t(`The price for model "${key}" must be an object.`, `模型“${key}”的价格必须是对象。`));
     }
     const price = rawValue as Record<string, unknown>;
     const input = price.inputPerMillion;
     const output = price.outputPerMillion;
     if (typeof input !== "number" || !Number.isFinite(input) || input < 0
         || typeof output !== "number" || !Number.isFinite(output) || output < 0) {
-      throw new Error(`模型“${key}”必须设置非负数 inputPerMillion 和 outputPerMillion。`);
+      throw new Error(t(`Model "${key}" must set non-negative inputPerMillion and outputPerMillion.`, `模型“${key}”必须设置非负数 inputPerMillion 和 outputPerMillion。`));
     }
     result[key] = { inputPerMillion: input, outputPerMillion: output };
   }

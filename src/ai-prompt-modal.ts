@@ -1,5 +1,6 @@
 import { App, Modal, Platform, setIcon } from "obsidian";
 import type { AIStatus } from "./onboarding-ai";
+import { t } from "./i18n";
 
 interface AIPromptOptions {
   sourceLabel: string;
@@ -10,9 +11,9 @@ interface AIPromptOptions {
 }
 
 const STARTERS = [
-  { label: "提炼要点", prompt: "请提炼这些笔记的核心要点，并保留重要细节。" },
-  { label: "深入解释", prompt: "请解释这些笔记中的关键概念，并用具体例子帮助我理解。" },
-  { label: "继续探索", prompt: "基于这些笔记，有哪些值得继续探索的问题？请给出下一步建议。" }
+  { label: t("Key points", "提炼要点"), prompt: t("Extract the key points of these notes and keep the important details.", "请提炼这些笔记的核心要点，并保留重要细节。") },
+  { label: t("Explain deeper", "深入解释"), prompt: t("Explain the key concepts in these notes and help me understand them with concrete examples.", "请解释这些笔记中的关键概念，并用具体例子帮助我理解。") },
+  { label: t("Explore next", "继续探索"), prompt: t("Based on these notes, which questions are worth exploring next? Suggest next steps.", "基于这些笔记，有哪些值得继续探索的问题？请给出下一步建议。") }
 ];
 
 export class AIPromptModal extends Modal {
@@ -40,7 +41,7 @@ export class AIPromptModal extends Modal {
   onOpen(): void {
     this.modalEl.addClass("bc-ai-prompt");
     this.modalEl.toggleClass("bc-ai-prompt-unconfigured", this.status?.state === "missing");
-    this.setTitle("问 AI");
+    this.setTitle(t("Ask AI", "问 AI"));
     this.contentEl.empty();
     this.status = this.options.aiStatus;
     this.submitted = false;
@@ -49,10 +50,10 @@ export class AIPromptModal extends Modal {
     setIcon(mark, "sparkles");
     this.titleEl.prepend(mark);
 
-    const contextLabel = `${this.options.sourceLabel} · 含相邻节点`;
+    const contextLabel = t(`${this.options.sourceLabel} · includes neighboring nodes`, `${this.options.sourceLabel} · 含相邻节点`);
     const context = this.contentEl.createDiv({
       cls: "bc-ai-prompt-context",
-      attr: { title: `以「${this.options.sourceLabel}」和直接相连的节点作为上下文` }
+      attr: { title: t(`Use "${this.options.sourceLabel}" and its directly connected nodes as context`, `以「${this.options.sourceLabel}」和直接相连的节点作为上下文`) }
     });
     setIcon(context.createSpan({ cls: "bc-ai-prompt-context-icon", attr: { "aria-hidden": "true" } }), "file-text");
     context.createSpan({ cls: "bc-ai-prompt-source-name", text: contextLabel });
@@ -60,7 +61,7 @@ export class AIPromptModal extends Modal {
     const composer = this.contentEl.createDiv({ cls: "bc-ai-prompt-composer" });
     const input = composer.createEl("textarea", {
       cls: "bc-ai-prompt-input",
-      attr: { rows: "5", placeholder: "有什么想问的？", "aria-label": "你的问题" }
+      attr: { rows: "5", placeholder: t("What would you like to ask?", "有什么想问的？"), "aria-label": t("Your question", "你的问题") }
     });
     this.inputEl = input;
     input.value = this.draft;
@@ -69,7 +70,7 @@ export class AIPromptModal extends Modal {
     const shortcutLabel = Platform.isMacOS ? "⌘ ↵" : "Ctrl ↵";
     const submit = toolbar.createEl("button", {
       cls: "mod-cta bc-ai-prompt-send",
-      attr: { type: "button", "aria-label": "发送", title: `发送 · ${shortcutLabel}；回答将添加为关联卡片` }
+      attr: { type: "button", "aria-label": t("Send", "发送"), title: t(`Send · ${shortcutLabel}; the answer is added as a linked card`, `发送 · ${shortcutLabel}；回答将添加为关联卡片`) }
     });
     setIcon(submit, "arrow-up");
     submit.disabled = !input.value.trim();
@@ -100,7 +101,7 @@ export class AIPromptModal extends Modal {
     this.renderStatus();
 
     const footer = this.contentEl.createDiv({ cls: "bc-ai-prompt-footer" });
-    const starters = footer.createDiv({ cls: "bc-ai-prompt-starters", attr: { "aria-label": "快捷提问" } });
+    const starters = footer.createDiv({ cls: "bc-ai-prompt-starters", attr: { "aria-label": t("Quick prompts", "快捷提问") } });
     for (const starter of STARTERS) {
       const button = starters.createEl("button", { cls: "bc-ai-prompt-starter", text: starter.label, attr: { type: "button" } });
       button.addEventListener("click", () => {
@@ -112,7 +113,7 @@ export class AIPromptModal extends Modal {
         input.setSelectionRange(input.value.length, input.value.length);
       });
     }
-    footer.createSpan({ cls: "bc-ai-prompt-shortcut", text: `${shortcutLabel} 发送` });
+    footer.createSpan({ cls: "bc-ai-prompt-shortcut", text: t(`${shortcutLabel} to send`, `${shortcutLabel} 发送`) });
     input.focus();
   }
 
@@ -132,7 +133,7 @@ export class AIPromptModal extends Modal {
     if (this.options.onOpenSettings) {
       const action = body.createEl("button", {
         cls: "bc-ai-prompt-settings-link",
-        text: "去 AI 设置",
+        text: t("Open AI settings", "去 AI 设置"),
         attr: { type: "button" }
       });
       action.addEventListener("click", () => {

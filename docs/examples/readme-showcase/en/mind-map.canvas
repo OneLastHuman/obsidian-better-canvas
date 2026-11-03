@@ -1,0 +1,183 @@
+{
+  "bcTheme": "default",
+  "nodes": [
+    {
+      "id": "root",
+      "type": "text",
+      "x": 0,
+      "y": 230,
+      "width": 270,
+      "height": 150,
+      "text": "## A reading circle\n\nTurn an idea into a plan you can run",
+      "bcAutoResize": false,
+      "color": "#65b9a7"
+    },
+    {
+      "id": "reading",
+      "type": "text",
+      "x": 400,
+      "y": 0,
+      "width": 245,
+      "height": 100,
+      "text": "## What to read",
+      "bcAutoResize": false,
+      "color": "#e8b75a"
+    },
+    {
+      "id": "people",
+      "type": "text",
+      "x": 400,
+      "y": 260,
+      "width": 245,
+      "height": 100,
+      "text": "## Who to read with",
+      "bcAutoResize": false,
+      "color": "#72b4e8"
+    },
+    {
+      "id": "record",
+      "type": "text",
+      "x": 400,
+      "y": 520,
+      "width": 245,
+      "height": 100,
+      "text": "## What to keep",
+      "bcAutoResize": false,
+      "color": "#78b58c"
+    },
+    {
+      "id": "book",
+      "type": "text",
+      "x": 800,
+      "y": -45,
+      "width": 340,
+      "height": 85,
+      "text": "Pick one short book",
+      "bcAutoResize": false
+    },
+    {
+      "id": "topic",
+      "type": "text",
+      "x": 800,
+      "y": 80,
+      "width": 340,
+      "height": 85,
+      "text": "Prepare one open question",
+      "bcAutoResize": false
+    },
+    {
+      "id": "invite",
+      "type": "text",
+      "x": 800,
+      "y": 215,
+      "width": 340,
+      "height": 85,
+      "text": "Invite six friends",
+      "bcAutoResize": false
+    },
+    {
+      "id": "share",
+      "type": "text",
+      "x": 800,
+      "y": 340,
+      "width": 340,
+      "height": 85,
+      "text": "Each shares one excerpt",
+      "bcAutoResize": false
+    },
+    {
+      "id": "notes",
+      "type": "text",
+      "x": 800,
+      "y": 475,
+      "width": 340,
+      "height": 85,
+      "text": "Write up the discussion",
+      "bcAutoResize": false
+    },
+    {
+      "id": "next",
+      "type": "text",
+      "x": 800,
+      "y": 600,
+      "width": 340,
+      "height": 85,
+      "text": "Leave with a next reading list",
+      "bcAutoResize": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "root-reading",
+      "fromNode": "root",
+      "toNode": "reading",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "root-people",
+      "fromNode": "root",
+      "toNode": "people",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "root-record",
+      "fromNode": "root",
+      "toNode": "record",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "reading-book",
+      "fromNode": "reading",
+      "toNode": "book",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "reading-topic",
+      "fromNode": "reading",
+      "toNode": "topic",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "people-invite",
+      "fromNode": "people",
+      "toNode": "invite",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "people-share",
+      "fromNode": "people",
+      "toNode": "share",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "record-notes",
+      "fromNode": "record",
+      "toNode": "notes",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "record-next",
+      "fromNode": "record",
+      "toNode": "next",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    }
+  ]
+}

@@ -1,12 +1,13 @@
 import { App, Modal, Notice } from "obsidian";
 import { estimateAIUsageCost, parseAIModelPriceTable, type AIModelPriceTable, type AIUsageRecord } from "./ai-usage-core";
+import { t } from "./i18n";
 
 function formatNumber(value: number | null): string {
   return value === null ? "—" : new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
 }
 
 function formatCost(value: number | null): string {
-  if (value === null) return "未计费";
+  if (value === null) return t("Not billed", "未计费");
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 6 }).format(value);
 }
 
@@ -24,9 +25,9 @@ export class AIUsageModal extends Modal {
   onOpen(): void {
     const root = this.contentEl;
     root.empty();
-    root.createEl("h2", { text: "AI 用量与成本" });
+    root.createEl("h2", { text: t("AI usage and cost", "AI 用量与成本") });
     root.createEl("p", {
-      text: "仅记录成功完成的 API 文本请求及服务端返回的 token 用量，不保存提示词、响应正文、API Key 或请求 URL。OpenCode ACP 本地请求和图像生成暂不纳入统计。费用为按下方费率计算的估算值。"
+      text: t("Only successfully completed API text requests and the token usage reported by the service are recorded. Prompts, response bodies, API keys, and request URLs are not saved. Local OpenCode ACP requests and image generation are not counted yet. Costs are estimates based on the rates below.", "仅记录成功完成的 API 文本请求及服务端返回的 token 用量，不保存提示词、响应正文、API Key 或请求 URL。OpenCode ACP 本地请求和图像生成暂不纳入统计。费用为按下方费率计算的估算值。")
     });
 
     let prices: AIModelPriceTable = {};
@@ -40,14 +41,18 @@ export class AIUsageModal extends Modal {
     const pricedCount = priced.filter(value => value !== null).length;
     const input = this.history.reduce((sum, record) => sum + (record.inputTokens ?? 0), 0);
     const output = this.history.reduce((sum, record) => sum + (record.outputTokens ?? 0), 0);
+    const noEstimate = t("no estimate available", "暂无可估算费用");
     root.createEl("p", {
-      text: `请求 ${this.history.length} 次 · 输入 ${formatNumber(input)} tokens · 输出 ${formatNumber(output)} tokens · 可计价 ${pricedCount} 次 · 已知费率估算合计 ${pricedCount > 0 ? formatCost(cost) : "暂无可估算费用"}`
+      text: t(
+        `Requests: ${this.history.length} · Input: ${formatNumber(input)} tokens · Output: ${formatNumber(output)} tokens · Priced: ${pricedCount} · Estimated total at known rates: ${pricedCount > 0 ? formatCost(cost) : noEstimate}`,
+        `请求 ${this.history.length} 次 · 输入 ${formatNumber(input)} tokens · 输出 ${formatNumber(output)} tokens · 可计价 ${pricedCount} 次 · 已知费率估算合计 ${pricedCount > 0 ? formatCost(cost) : noEstimate}`
+      )
     });
-    root.createEl("p", { text: "未返回 token 用量或未配置费率的请求仍计入请求数，但不计入估算总价。" });
+    root.createEl("p", { text: t("Requests without token usage or configured rates still count toward the request total but are excluded from the estimated cost.", "未返回 token 用量或未配置费率的请求仍计入请求数，但不计入估算总价。") });
 
     const table = root.createEl("table");
     const head = table.createEl("thead").createEl("tr");
-    ["时间", "协议 / 模型", "输入", "输出", "估算费用"].forEach(label => head.createEl("th", { text: label }));
+    [t("Time", "时间"), t("Protocol / model", "协议 / 模型"), t("Input", "输入"), t("Output", "输出"), t("Estimated cost", "估算费用")].forEach(label => head.createEl("th", { text: label }));
     const body = table.createEl("tbody");
     for (let index = 0; index < Math.min(100, this.history.length); index++) {
       const record = this.history[index];
@@ -59,33 +64,33 @@ export class AIUsageModal extends Modal {
       row.createEl("td", { text: formatCost(priced[index] ?? null) });
     }
     if (this.history.length === 0) {
-      body.createEl("tr").createEl("td", { text: "暂无记录。", attr: { colspan: "5" } });
+      body.createEl("tr").createEl("td", { text: t("No records yet.", "暂无记录。"), attr: { colspan: "5" } });
     }
 
-    root.createEl("h3", { text: "模型费率配置" });
+    root.createEl("h3", { text: t("Model rate configuration", "模型费率配置") });
     root.createEl("p", {
-      text: '输入每百万 tokens 的美元费率，按“协议:模型”精确匹配，例如 {"openai:gpt-4o-mini":{"inputPerMillion":0.15,"outputPerMillion":0.6}}。费率由用户填写；不同网关/供应商的价格可能不同。'
+      text: t('USD rates per million tokens, matched exactly by "protocol:model", for example {"openai:gpt-4o-mini":{"inputPerMillion":0.15,"outputPerMillion":0.6}}. Rates are user-supplied; prices may differ between gateways and providers.', '输入每百万 tokens 的美元费率，按“协议:模型”精确匹配，例如 {"openai:gpt-4o-mini":{"inputPerMillion":0.15,"outputPerMillion":0.6}}。费率由用户填写；不同网关/供应商的价格可能不同。')
     });
-    const textarea = root.createEl("textarea", { cls: "bc-modal-prompt-textarea", attr: { rows: "8", "aria-label": "AI 模型每百万 token 价格 JSON" } });
+    const textarea = root.createEl("textarea", { cls: "bc-modal-prompt-textarea", attr: { rows: "8", "aria-label": t("AI model price JSON per million tokens", "AI 模型每百万 token 价格 JSON") } });
     textarea.value = this.priceJson || "{}";
 
     const actions = root.createDiv({ cls: "modal-button-container" });
-    const save = actions.createEl("button", { text: "保存费率", cls: "mod-cta" });
+    const save = actions.createEl("button", { text: t("Save rates", "保存费率"), cls: "mod-cta" });
     save.addEventListener("click", async () => {
       try {
         parseAIModelPriceTable(textarea.value);
         await this.onSavePrices(textarea.value);
         this.close();
-        new Notice("已保存 AI 模型费率。");
+        new Notice(t("Saved AI model rates.", "已保存 AI 模型费率。"));
       } catch (error) {
-        new Notice(error instanceof Error ? error.message : "保存费率失败。");
+        new Notice(error instanceof Error ? error.message : t("Failed to save rates.", "保存费率失败。"));
       }
     });
-    const clear = actions.createEl("button", { text: "清空用量历史" });
+    const clear = actions.createEl("button", { text: t("Clear usage history", "清空用量历史") });
     clear.addEventListener("click", async () => {
       await this.onClearHistory();
       this.close();
-      new Notice("已清空 AI 用量历史。");
+      new Notice(t("Cleared AI usage history.", "已清空 AI 用量历史。"));
     });
   }
 

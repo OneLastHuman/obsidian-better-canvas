@@ -30,6 +30,7 @@ import {
   ROUNDED_MAP_PRESETS,
   type NodeVisualStylePatch
 } from "./node-visual-style";
+import { t } from "./i18n";
 
 /**
  * Node style entry point.
@@ -284,7 +285,7 @@ export default class NodeMenuUnifier {
     button.className = "canvas-control-item bc-node-style-control-item";
     button.setAttribute("role", "button");
     button.setAttribute("tabindex", "0");
-    button.setAttribute("aria-label", "节点样式");
+    button.setAttribute("aria-label", t("Node style", "节点样式"));
     button.setAttribute("data-tooltip-position", "left");
     setIcon(button, "palette");
     if (!button.querySelector("svg")) {
@@ -302,7 +303,7 @@ export default class NodeMenuUnifier {
       // selection made only of edges (or a mixed selection) still cannot be
       // styled as nodes.
       if (selected.length > 0 && !nodeIds) {
-        new Notice("请先选择一个或多个节点（不能包含连线），再打开节点样式。");
+        new Notice(t("Select one or more nodes (not connections) before opening node style.", "请先选择一个或多个节点（不能包含连线），再打开节点样式。"));
         return;
       }
       if (this.activePanel?.canvas === canvas) {
@@ -362,7 +363,7 @@ export default class NodeMenuUnifier {
     const currentIds = new Set(currentData.nodes.map(node => node.id));
     if (nodeIds.some(id => !currentIds.has(id))) {
       this.dismissPanel();
-      new Notice("部分选中节点已不存在，样式面板已关闭。");
+      new Notice(t("Some selected nodes no longer exist; the style panel was closed.", "部分选中节点已不存在，样式面板已关闭。"));
       return;
     }
     if (nodeIds.join("\u0000") !== active.nodeIds.join("\u0000")) {
@@ -377,14 +378,14 @@ export default class NodeMenuUnifier {
     const currentData = readCanvasData(canvas);
     const availableIds = new Set(currentData.nodes.map(node => node.id));
     if (targetIds.some(id => !availableIds.has(id))) {
-      new Notice("目标节点已不存在，样式面板已关闭。");
+      new Notice(t("The target nodes no longer exist; the style panel was closed.", "目标节点已不存在，样式面板已关闭。"));
       return;
     }
 
     const surface = document.createElement("aside");
     surface.className = "bc-node-style-panel";
     surface.setAttribute("role", "dialog");
-    surface.setAttribute("aria-label", "节点样式");
+    surface.setAttribute("aria-label", t("Node style", "节点样式"));
     document.body.appendChild(surface);
 
     const active: ActivePanel = {
@@ -479,7 +480,7 @@ export default class NodeMenuUnifier {
     const { canvas } = active;
     const center = position ?? canvas.posCenter?.();
     if (!center || !Number.isFinite(center.x) || !Number.isFinite(center.y)) {
-      new Notice("无法确定画布位置，未创建卡片。");
+      new Notice(t("Could not determine the Canvas position; no card was created.", "无法确定画布位置，未创建卡片。"));
       return;
     }
     const before = readCanvasData(canvas);
@@ -501,7 +502,7 @@ export default class NodeMenuUnifier {
       decorateCanvasTheme(canvas);
       this.renderStylePanel();
     } catch (error) {
-      new Notice(error instanceof Error ? error.message : "创建预设卡片失败。");
+      new Notice(error instanceof Error ? error.message : t("Could not create the preset card.", "创建预设卡片失败。"));
     }
   }
 
@@ -568,21 +569,21 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      new Notice(t("This Canvas is in read-only mode; node styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改节点样式。"));
       return;
     }
 
     const current = readCanvasData(canvas);
     const currentIds = new Set(current.nodes.map(node => node.id));
     if (nodeIds.some(id => !currentIds.has(id))) {
-      new Notice("部分选中节点已不存在，未应用样式。");
+      new Notice(t("Some selected nodes no longer exist; no style was applied.", "部分选中节点已不存在，未应用样式。"));
       this.dismissPanel();
       return;
     }
 
     const result = applyNodeVisualStyle(current, nodeIds, patch);
     if (result.updated !== nodeIds.length) {
-      new Notice("无法更新全部选中节点，未应用样式。");
+      new Notice(t("Could not update every selected node; no style was applied.", "无法更新全部选中节点，未应用样式。"));
       return;
     }
 
@@ -598,7 +599,7 @@ export default class NodeMenuUnifier {
       decorateCanvas(canvas);
       if (soft) decorateCanvasTheme(canvas);
     } catch (error) {
-      new Notice(error instanceof Error ? error.message : "应用节点样式失败。");
+      new Notice(error instanceof Error ? error.message : t("Could not apply the node style.", "应用节点样式失败。"));
       return;
     }
 
@@ -610,7 +611,7 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      new Notice(t("This Canvas is in read-only mode; node styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改节点样式。"));
       return;
     }
     const data = readCanvasData(canvas);
@@ -633,7 +634,7 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      new Notice(t("This Canvas is in read-only mode; node styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改节点样式。"));
       return;
     }
     const data = readCanvasData(canvas);
@@ -643,7 +644,7 @@ export default class NodeMenuUnifier {
     }
     const result = applySketchPresetToData(data, nodeIds, presetId);
     if (result.updated === 0) {
-      new Notice("分组节点不应用功能预设。");
+      new Notice(t("Presets are not applied to group nodes.", "分组节点不应用功能预设。"));
       return;
     }
     recordCanvasStyleHistory(canvas, data);
@@ -661,7 +662,7 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      new Notice(t("This Canvas is in read-only mode; node styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改节点样式。"));
       return;
     }
     const data = readCanvasData(canvas);
@@ -685,7 +686,7 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      new Notice(t("This Canvas is in read-only mode; node styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改节点样式。"));
       return;
     }
     const data = readCanvasData(canvas);
@@ -710,7 +711,7 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      new Notice(t("This Canvas is in read-only mode; node styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改节点样式。"));
       return;
     }
     const data = readCanvasData(canvas);
@@ -735,7 +736,7 @@ export default class NodeMenuUnifier {
     if (!active) return;
     const { canvas, nodeIds } = active;
     if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改节点样式。");
+      new Notice(t("This Canvas is in read-only mode; node styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改节点样式。"));
       return;
     }
     const data = readCanvasData(canvas);
@@ -756,7 +757,7 @@ export default class NodeMenuUnifier {
       decorateCanvas(canvas);
       decorateCanvasTheme(canvas);
     } catch (error) {
-      new Notice(error instanceof Error ? error.message : "应用纸本样式失败。");
+      new Notice(error instanceof Error ? error.message : t("Could not apply the paper style.", "应用纸本样式失败。"));
       return;
     }
     this.renderStylePanel("research-" + value);
@@ -769,7 +770,7 @@ export default class NodeMenuUnifier {
     const nodes = active.nodeIds.map(id => data.nodes.find(node => node.id === id));
     if (nodes.some(node => !node)) {
       this.dismissPanel();
-      new Notice("目标节点已不存在，样式面板已关闭。");
+      new Notice(t("The target nodes no longer exist; the style panel was closed.", "目标节点已不存在，样式面板已关闭。"));
       return;
     }
     const nodeStyles = nodes.map(node => styleOf(node as CanvasNodeData));
@@ -783,20 +784,20 @@ export default class NodeMenuUnifier {
     header.className = "bc-node-style-header";
     const heading = document.createElement("strong");
     heading.className = "bc-node-style-title";
-    heading.textContent = "节点样式";
+    heading.textContent = t("Node style", "节点样式");
     header.appendChild(heading);
     if (!hasSelection) {
       const count = document.createElement("span");
       count.className = "bc-node-style-selection-count";
-      count.textContent = "未选择节点";
+      count.textContent = t("No nodes selected", "未选择节点");
       header.appendChild(count);
     } else if (active.nodeIds.length > 1) {
       const count = document.createElement("span");
       count.className = "bc-node-style-selection-count";
-      count.textContent = active.nodeIds.length + " 个节点" + (hasMixedStyles ? " · 部分样式不同" : "");
+      count.textContent = t(`${active.nodeIds.length} node${active.nodeIds.length === 1 ? "" : "s"}`, `${active.nodeIds.length} 个节点`) + (hasMixedStyles ? t(" · Some styles differ", " · 部分样式不同") : "");
       header.appendChild(count);
     }
-    addButton(header, "关闭", "bc-node-style-close", () => this.dismissPanel(), "x");
+    addButton(header, t("Close", "关闭"), "bc-node-style-close", () => this.dismissPanel(), "x");
     surface.appendChild(header);
 
     const body = document.createElement("div");
@@ -805,8 +806,8 @@ export default class NodeMenuUnifier {
     const hint = document.createElement("p");
     hint.className = "bc-node-style-preset-hint";
     hint.textContent = hasSelection
-      ? "点击预设应用到选区；拖入画布新建卡片。"
-      : "点击在视口中心新建，或拖入画布指定位置。";
+      ? t("Click a preset to apply it to the selection; drag it onto the Canvas to create a card.", "点击预设应用到选区；拖入画布新建卡片。")
+      : t("Click to create in the center of the viewport, or drag onto the Canvas to choose a position.", "点击在视口中心新建，或拖入画布指定位置。");
     body.appendChild(hint);
 
     const addSection = (label: string): HTMLElement => {
@@ -831,7 +832,7 @@ export default class NodeMenuUnifier {
       const applicable = nodes.filter(node => node?.type !== "group") as CanvasNodeData[];
       const presets = document.createElement("div");
       presets.className = "bc-research-presets";
-      addSection("纸本研究 · 功能预设").appendChild(presets);
+      addSection(t("Paper Research · Presets", "纸本研究 · 功能预设")).appendChild(presets);
       for (const preset of RESEARCH_PRESETS) {
         const state = optionState(applicable.filter(node => researchPreset(node.bcResearchPreset).id === preset.id).length, applicable.length);
         const button = this.addPresetButton(presets, "", optionClass("bc-research-preset", state),
@@ -839,7 +840,7 @@ export default class NodeMenuUnifier {
           (data, ids) => applyResearchPreset(data, ids, preset.id).data, applicable.length > 0);
         button.dataset.styleOption = "research-" + preset.id;
         button.title = preset.label + " · " + preset.detail;
-        button.setAttribute("aria-label", preset.label + "：" + preset.detail);
+        button.setAttribute("aria-label", t(preset.label + ": " + preset.detail, preset.label + "：" + preset.detail));
         button.setAttribute("aria-pressed", state);
         const preview = document.createElement("span");
         preview.className = "bc-research-preview";
@@ -850,7 +851,7 @@ export default class NodeMenuUnifier {
       }
       const intensities = document.createElement("div");
       intensities.className = "bc-research-intensities";
-      addSection("纸面色彩浓度").appendChild(intensities);
+      addSection(t("Paper tint intensity", "纸面色彩浓度")).appendChild(intensities);
       for (const intensity of RESEARCH_INTENSITIES) {
         const state = optionState(applicable.filter(node => researchIntensity(node.bcResearchIntensity) === intensity.value).length, applicable.length);
         const button = addButton(intensities, intensity.label, optionClass("bc-research-intensity", state), () => this.applyResearch(intensity.value));
@@ -862,7 +863,7 @@ export default class NodeMenuUnifier {
     if (isScrapbook) {
       const papers = document.createElement("div");
       papers.className = "bc-paper-presets";
-      addSection("拼贴手账 · 纸片").appendChild(papers);
+      addSection(t("Scrapbook · Paper", "拼贴手账 · 纸片")).appendChild(papers);
       for (const preset of SCRAPBOOK_PRESETS) {
         const applicable = nodes.filter(node => node?.type !== "group");
         const state = applicable.length ? optionState(
@@ -885,7 +886,7 @@ export default class NodeMenuUnifier {
       }
     }
     if (isSketch) {
-      const presetSection = addSection("功能预设");
+      const presetSection = addSection(t("Presets", "功能预设"));
       const presets = document.createElement("div");
       presets.className = "bc-sketch-presets";
       presetSection.appendChild(presets);
@@ -901,7 +902,7 @@ export default class NodeMenuUnifier {
         );
         button.dataset.styleOption = "sketch-" + preset.id;
         button.title = preset.label + " · " + preset.use;
-        button.setAttribute("aria-label", preset.label + "：" + preset.use);
+        button.setAttribute("aria-label", t(preset.label + ": " + preset.use, preset.label + "：" + preset.use));
         button.setAttribute("aria-pressed", state);
         const preview = document.createElement("span");
         preview.className = "bc-sketch-preset-preview shape-" + preset.style.shape +
@@ -916,7 +917,7 @@ export default class NodeMenuUnifier {
         button.appendChild(label);
       }
 
-      const fillSection = addSection("填充");
+      const fillSection = addSection(t("Fill", "填充"));
       const fills = document.createElement("div");
       fills.className = "bc-sketch-fills";
       fillSection.appendChild(fills);
@@ -942,7 +943,7 @@ export default class NodeMenuUnifier {
     if (isSoft) {
       const presets = document.createElement("div");
       presets.className = "bc-soft-presets";
-      addSection("柔软便签 · 功能预设").appendChild(presets);
+      addSection(t("Soft Notes · Presets", "柔软便签 · 功能预设")).appendChild(presets);
       const applicable = nodes.filter((node): node is CanvasNodeData => node?.type === "text");
       for (const preset of SOFT_NOTES_PRESETS) {
         const state = optionState(applicable.filter(node => {
@@ -976,13 +977,13 @@ export default class NodeMenuUnifier {
       }
       const hint = document.createElement("p");
       hint.className = "bc-soft-hint";
-      hint.textContent = "应用到选中的文本节点；保留正文。所有预设均无边框。";
+      hint.textContent = t("Applies to selected text nodes and keeps the body text. No preset adds a border.", "应用到选中的文本节点；保留正文。所有预设均无边框。");
       body.appendChild(hint);
     }
     if (isRounded) {
       const presets = document.createElement("div");
       presets.className = "bc-rounded-presets";
-      addSection("软糖白板 · 功能预设").appendChild(presets);
+      addSection(t("Gummy Whiteboard · Presets", "软糖白板 · 功能预设")).appendChild(presets);
       const applicable = nodes.filter(node => node?.type !== "group").map(node => styleOf(node as CanvasNodeData));
       for (const preset of ROUNDED_MAP_PRESETS) {
         const state = stateForStyles(applicable, style => matchesPreset(style, preset));
@@ -1005,7 +1006,7 @@ export default class NodeMenuUnifier {
       }
     }
     if (!isScrapbook && !isSketch && !isRounded && !isResearch && !isSoft) {
-    const presetSection = addSection("预设");
+    const presetSection = addSection(t("Presets", "预设"));
     const presets = document.createElement("div");
     presets.className = "bc-node-style-presets";
     presetSection.appendChild(presets);
@@ -1019,8 +1020,8 @@ export default class NodeMenuUnifier {
         (data, ids) => applyNodeVisualStyle(data, ids, preset.style).data, hasSelection
       );
       button.dataset.styleOption = "preset-" + preset.id;
-      button.title = preset.label + "预设";
-      button.setAttribute("aria-label", preset.label + "预设");
+      button.title = t(preset.label + " preset", preset.label + "预设");
+      button.setAttribute("aria-label", t(preset.label + " preset", preset.label + "预设"));
       button.setAttribute("aria-pressed", state);
 
       const preview = document.createElement("span");
@@ -1036,7 +1037,7 @@ export default class NodeMenuUnifier {
     }
     }
 
-    const colorSection = addSection("颜色");
+    const colorSection = addSection(t("Color", "颜色"));
     const colors = document.createElement("div");
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
@@ -1061,7 +1062,7 @@ export default class NodeMenuUnifier {
     }
 
     if (!isSoft) {
-    const shapeSection = addSection("形状");
+    const shapeSection = addSection(t("Shape", "形状"));
     const shapes = document.createElement("div");
     shapes.className = "bc-node-style-shapes";
     shapeSection.appendChild(shapes);
@@ -1093,7 +1094,7 @@ export default class NodeMenuUnifier {
       button.appendChild(preview);
     }
 
-    const borderSection = addSection("边框");
+    const borderSection = addSection(t("Border", "边框"));
     const borders = document.createElement("div");
     borders.className = "bc-node-style-borders";
     borderSection.appendChild(borders);
@@ -1112,7 +1113,7 @@ export default class NodeMenuUnifier {
     }
     }
 
-    const alignSection = addSection("文本对齐");
+    const alignSection = addSection(t("Text align", "文本对齐"));
     const alignments = document.createElement("div");
     alignments.className = "bc-node-style-alignments";
     alignSection.appendChild(alignments);

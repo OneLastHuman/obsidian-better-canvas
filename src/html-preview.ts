@@ -1,4 +1,5 @@
 import type { CanvasData, CanvasNodeData } from "./canvas";
+import { t } from "./i18n";
 
 export interface HtmlPreviewBlock {
   source: string;
@@ -68,7 +69,7 @@ function renderControls(element: HTMLElement, source: string, file = false, erro
   const button = doc.createElement("button");
   button.type = "button";
   button.className = "bc-html-preview-toggle";
-  button.title = "在沙盒中预览 HTML";
+  button.title = t("Preview HTML in a sandbox", "在沙盒中预览 HTML");
   let frame: HTMLIFrameElement | undefined;
   const message = doc.createElement("div");
   message.className = "bc-html-preview-error";
@@ -82,7 +83,7 @@ function renderControls(element: HTMLElement, source: string, file = false, erro
     if (visible && !frame && !error) {
       frame = doc.createElement("iframe");
       frame.className = "bc-html-preview-frame";
-      frame.title = "HTML 预览";
+      frame.title = t("HTML preview", "HTML 预览");
       // Never grant same-origin, forms, popups, downloads or top navigation.
       frame.setAttribute("sandbox", "allow-scripts");
       frame.setAttribute("referrerpolicy", "no-referrer");
@@ -93,7 +94,7 @@ function renderControls(element: HTMLElement, source: string, file = false, erro
       frame = undefined;
     }
     message.hidden = !visible;
-    button.textContent = visible ? "隐藏预览" : "HTML 预览";
+    button.textContent = visible ? t("Hide preview", "隐藏预览") : t("HTML preview", "HTML 预览");
     button.setAttribute("aria-expanded", String(visible));
   };
   button.addEventListener("pointerdown", event => event.stopPropagation());
@@ -169,13 +170,13 @@ export function syncHtmlPreviews(canvas: any, data?: CanvasData, vault?: any): v
     if (!file || typeof file.extension !== "string" || typeof vault?.cachedRead !== "function") {
       state.reads.delete(path);
       state.pending.delete(node.id);
-      fail("无法读取 HTML 文件。请确认文件仍在仓库中。");
+      fail(t("Could not read the HTML file. Make sure it is still in the vault.", "无法读取 HTML 文件。请确认文件仍在仓库中。"));
       continue;
     }
     if (html && file.stat?.size > MAX_HTML_PREVIEW_LENGTH * 4) {
       state.reads.delete(path);
       state.pending.delete(node.id);
-      fail("HTML 文件过大，预览最多支持 200,000 个字符。");
+      fail(t("The HTML file is too large; previews support at most 200,000 characters.", "HTML 文件过大，预览最多支持 200,000 个字符。"));
       continue;
     }
 
@@ -204,11 +205,11 @@ export function syncHtmlPreviews(canvas: any, data?: CanvasData, vault?: any): v
       const current = currentNode();
       if (!current) return;
       if (!html) syncHtmlPreviewNode(canvas, { ...current, type: "text", text });
-      else if (text.length > MAX_HTML_PREVIEW_LENGTH) fail("HTML 文件过大，预览最多支持 200,000 个字符。");
-      else if (!text.trim()) fail("HTML 文件为空。");
+      else if (text.length > MAX_HTML_PREVIEW_LENGTH) fail(t("The HTML file is too large; previews support at most 200,000 characters.", "HTML 文件过大，预览最多支持 200,000 个字符。"));
+      else if (!text.trim()) fail(t("The HTML file is empty.", "HTML 文件为空。"));
       else renderControls(element, text, true);
     }).catch(() => {
-      if (currentNode()) fail("无法读取 HTML 文件。请检查文件后重新打开画布。");
+      if (currentNode()) fail(t("Could not read the HTML file. Check it and reopen the Canvas.", "无法读取 HTML 文件。请检查文件后重新打开画布。"));
     });
   }
   for (const path of state.reads.keys()) if (!livePaths.has(path)) state.reads.delete(path);

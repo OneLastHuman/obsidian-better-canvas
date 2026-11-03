@@ -9,6 +9,7 @@ import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
 import { researchColor, researchFill, researchPreset, RESEARCH_SERIF } from "./research-style";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 import { roundedMapInsets, roundedMapPath, ROUNDED_MAP_INK, ROUNDED_MAP_PAPER, ROUNDED_MAP_STROKE } from "./rounded-map-style";
+import { t } from "./i18n";
 
 export interface FullCanvasSvg {
   svg: string;
@@ -656,7 +657,7 @@ export function canvasDataToFullSvg(data: CanvasData, options: FullCanvasSvgOpti
   const width = Math.max(1, Math.ceil(maxX - minX + margin * 2));
   const height = Math.max(1, Math.ceil(maxY - minY + margin * 2));
   if (width > 50_000 || height > 50_000 || width * height > 500_000_000) {
-    throw new Error("Canvas 内容边界过大，无法安全导出；请先缩小或拆分画布。");
+    throw new Error(t("The Canvas bounds are too large to export safely; shrink or split the Canvas first.", "Canvas 内容边界过大，无法安全导出；请先缩小或拆分画布。"));
   }
 
   const translatedNodes = nodes.map(node => ({ ...node, x: number(node.x) - minX + margin, y: number(node.y) - minY + margin }));

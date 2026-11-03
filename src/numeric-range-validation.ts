@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface NumericRangeInputTarget {
   setAttribute(name: string, value: string): void;
   removeAttribute(name: string): void;
@@ -39,8 +41,10 @@ export function validateNumericRangeInput(
 
   if (!valid) {
     input.setAttribute("aria-invalid", "true");
-    feedback.textContent = "请输入 " + min + "–" + max + " 范围内的"
-      + (options.integer ? "整数" : "数值") + "；当前值尚未保存。";
+    feedback.textContent = t(
+      "Enter a" + (options.integer ? "n integer" : " value") + " between " + min + " and " + max + "; the current value has not been saved.",
+      "请输入 " + min + "–" + max + " 范围内的" + (options.integer ? "整数" : "数值") + "；当前值尚未保存。"
+    );
     feedback.hidden = false;
     return null;
   }

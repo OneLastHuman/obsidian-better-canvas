@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { CanvasData, CanvasNodeData } from "./canvas";
 import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
 
@@ -28,45 +29,45 @@ export interface SketchPreset {
  */
 export const SKETCH_PRESETS: readonly SketchPreset[] = [
   {
-    id: "heading", label: "章节标题", use: "组织阅读顺序", sample: "项目启动",
+    id: "heading", label: t("Section heading", "章节标题"), use: t("Organize the reading order", "组织阅读顺序"), sample: t("Kick-off", "项目启动"),
     style: { shape: "square", fill: "none", color: "#d9b64a", border: "invisible", align: "left", fontSize: 30 }
   },
   {
-    id: "concept", label: "核心概念", use: "聚焦讨论对象", sample: "用户需求",
+    id: "concept", label: t("Core concept", "核心概念"), use: t("Focus the discussion", "聚焦讨论对象"), sample: t("User needs", "用户需求"),
     style: { shape: "ellipse", fill: "hachure", color: "#719cf4", border: "solid", align: "center", fontSize: 24 }
   },
   {
-    id: "action", label: "行动步骤", use: "表达具体动作", sample: "访谈用户",
+    id: "action", label: t("Action step", "行动步骤"), use: t("Name a concrete action", "表达具体动作"), sample: t("Interview users", "访谈用户"),
     style: { shape: "square", fill: "hachure", color: "#78b58c", border: "solid", align: "center", fontSize: 24 }
   },
   {
-    id: "decision", label: "判断分支", use: "提出分支条件", sample: "验证通过？",
+    id: "decision", label: t("Decision branch", "判断分支"), use: t("State the branch condition", "提出分支条件"), sample: t("Validated?", "验证通过？"),
     style: { shape: "diamond", fill: "solid", color: "#e8b75a", border: "solid", align: "center", fontSize: 22 }
   },
   {
-    id: "annotation", label: "旁注说明", use: "补充背景信息", sample: "补充说明",
+    id: "annotation", label: t("Side note", "旁注说明"), use: t("Add background", "补充背景信息"), sample: t("For context", "补充说明"),
     style: { shape: "square", fill: "none", color: "#89919d", border: "invisible", align: "left", fontSize: 20 }
   },
   {
-    id: "risk", label: "风险提醒", use: "标记待确认事项", sample: "需要确认",
+    id: "risk", label: t("Risk flag", "风险提醒"), use: t("Mark items to confirm", "标记待确认事项"), sample: t("Needs confirmation", "需要确认"),
     style: { shape: "square", fill: "cross-hatch", color: "#e8798f", border: "dashed", align: "left", fontSize: 24 }
   }
 ] as const;
 
 export const SKETCH_COLORS = [
-  { id: "blue", label: "雾蓝", value: "#719cf4" },
-  { id: "green", label: "浅绿", value: "#78b58c" },
-  { id: "amber", label: "浅黄", value: "#e8b75a" },
-  { id: "rose", label: "浅粉", value: "#e8798f" },
-  { id: "teal", label: "青绿", value: "#65b9a7" },
-  { id: "slate", label: "石板灰", value: "#89919d" }
+  { id: "blue", label: t("Misty blue", "雾蓝"), value: "#719cf4" },
+  { id: "green", label: t("Light green", "浅绿"), value: "#78b58c" },
+  { id: "amber", label: t("Light yellow", "浅黄"), value: "#e8b75a" },
+  { id: "rose", label: t("Light pink", "浅粉"), value: "#e8798f" },
+  { id: "teal", label: t("Teal green", "青绿"), value: "#65b9a7" },
+  { id: "slate", label: t("Slate", "石板灰"), value: "#89919d" }
 ] as const;
 
 export const SKETCH_FILLS: ReadonlyArray<{ id: SketchFill; label: string }> = [
-  { id: "none", label: "留白" },
-  { id: "solid", label: "淡彩" },
-  { id: "hachure", label: "排线" },
-  { id: "cross-hatch", label: "交叉排线" }
+  { id: "none", label: t("None", "留白") },
+  { id: "solid", label: t("Solid", "淡彩") },
+  { id: "hachure", label: t("Hachure", "排线") },
+  { id: "cross-hatch", label: t("Cross-hatch", "交叉排线") }
 ];
 
 export interface ResolvedSketchStyle {

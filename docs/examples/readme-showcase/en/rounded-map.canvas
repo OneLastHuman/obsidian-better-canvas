@@ -1,0 +1,196 @@
+{
+  "bcTheme": "rounded-map",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "text",
+      "x": 0,
+      "y": 90,
+      "width": 230,
+      "height": 110,
+      "text": "## Plan a reading circle",
+      "bcAutoResize": false,
+      "color": "#f3dc83",
+      "bcShape": "pill",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "pill",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "plan",
+      "type": "text",
+      "x": 320,
+      "y": 65,
+      "width": 255,
+      "height": 155,
+      "text": "## Pick a topic\n\nOne book · one question",
+      "bcAutoResize": false,
+      "color": "#c8dff3",
+      "bcShape": "default",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "check",
+      "type": "text",
+      "x": 690,
+      "y": 15,
+      "width": 260,
+      "height": 250,
+      "text": "Enough\npeople?",
+      "bcAutoResize": false,
+      "color": "#f8dec1",
+      "bcShape": "diamond",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "diamond",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "next",
+      "type": "text",
+      "x": 1060,
+      "y": 85,
+      "width": 260,
+      "height": 140,
+      "text": "Start the discussion",
+      "bcAutoResize": false,
+      "color": "#d9e7b5",
+      "bcShape": "right-arrow",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "right-arrow",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "input",
+      "type": "text",
+      "x": 0,
+      "y": 420,
+      "width": 245,
+      "height": 145,
+      "text": "Collect sign-ups\n\nEveryone brings one excerpt",
+      "bcAutoResize": false,
+      "color": "#c5e4dd",
+      "bcShape": "parallelogram",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "parallelogram",
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "adjust",
+      "type": "text",
+      "x": 350,
+      "y": 415,
+      "width": 255,
+      "height": 180,
+      "text": "## Adjust the format\n\nNarrow the scope, invite again",
+      "bcAutoResize": false,
+      "color": "#c8dff3",
+      "bcShape": "default",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "border": "solid",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "output",
+      "type": "text",
+      "x": 1050,
+      "y": 365,
+      "width": 280,
+      "height": 235,
+      "text": "## Keep a write-up\n\n- What we agreed on\n- What is still open\n- What to read next",
+      "bcAutoResize": false,
+      "color": "#fffef8",
+      "bcShape": "document",
+      "bcBorderStyle": "solid",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "document",
+        "border": "solid",
+        "textAlign": "left"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "start-plan",
+      "fromNode": "start",
+      "toNode": "plan",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "plan-check",
+      "fromNode": "plan",
+      "toNode": "check",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "check-next",
+      "fromNode": "check",
+      "toNode": "next",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "yes"
+    },
+    {
+      "id": "check-adjust",
+      "fromNode": "check",
+      "toNode": "adjust",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "no"
+    },
+    {
+      "id": "input-adjust",
+      "fromNode": "input",
+      "toNode": "adjust",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "adjust-check",
+      "fromNode": "adjust",
+      "toNode": "check",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "next-output",
+      "fromNode": "next",
+      "toNode": "output",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "toEnd": "arrow"
+    }
+  ]
+}

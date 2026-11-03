@@ -1,6 +1,6 @@
 # README 示例画布
 
-这组画布对应 [Better Canvas 首页](../../../README.md)的产品截图。内容围绕读书会与阅读笔记编写，适合直接编辑和试用主题。
+这组中文画布对应[中文 README](../../../README.zh.md)的产品截图。英文 README 使用 [en/](en/README.md) 中的英文示例。
 
 ## 打开示例
 

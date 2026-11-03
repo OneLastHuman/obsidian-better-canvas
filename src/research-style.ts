@@ -1,25 +1,26 @@
+import { t } from "./i18n";
 import type { CanvasData, CanvasNodeData } from "./canvas";
 
 export const RESEARCH_COLORS = [
-  { id: "clay", label: "陶土红", value: "#a84e34" },
-  { id: "gold", label: "麦穗黄", value: "#b48a28" },
-  { id: "blue", label: "雾蓝", value: "#416879" },
-  { id: "olive", label: "橄榄绿", value: "#63734a" },
-  { id: "rose", label: "莓果灰", value: "#9a5662" }
+  { id: "clay", label: t("Terracotta", "陶土红"), value: "#a84e34" },
+  { id: "gold", label: t("Wheat gold", "麦穗黄"), value: "#b48a28" },
+  { id: "blue", label: t("Misty blue", "雾蓝"), value: "#416879" },
+  { id: "olive", label: t("Olive green", "橄榄绿"), value: "#63734a" },
+  { id: "rose", label: t("Berry gray", "莓果灰"), value: "#9a5662" }
 ] as const;
 
 export const RESEARCH_PRESETS = [
-  { id: "source", label: "文献资料", detail: "装订色边、内框与标题分隔线", color: "#a84e34", shape: "square", border: "solid" },
-  { id: "quote", label: "重点引文", detail: "暖黄纸面、引用衬底与底部强调线", color: "#b48a28", shape: "square", border: "solid" },
-  { id: "annotation", label: "阅读批注", detail: "雾蓝横线纸与左侧页边线", color: "#416879", shape: "square", border: "solid" },
-  { id: "argument", label: "核心观点", detail: "深色标题带与正文重点强调", color: "#63734a", shape: "square", border: "solid" },
-  { id: "question", label: "待解问题", detail: "圆角虚线框与标题分隔线", color: "#63734a", shape: "default", border: "dashed" },
-  { id: "section", label: "章节标题", detail: "开放版式、顶端横线与标题色带", color: "#416879", shape: "square", border: "invisible" }
+  { id: "source", label: t("Source", "文献资料"), detail: t("Bound color edge, inner frame, and title rule", "装订色边、内框与标题分隔线"), color: "#a84e34", shape: "square", border: "solid" },
+  { id: "quote", label: t("Key quote", "重点引文"), detail: t("Warm yellow paper, quote backing, and a bottom accent line", "暖黄纸面、引用衬底与底部强调线"), color: "#b48a28", shape: "square", border: "solid" },
+  { id: "annotation", label: t("Margin note", "阅读批注"), detail: t("Misty blue ruled paper with a left margin line", "雾蓝横线纸与左侧页边线"), color: "#416879", shape: "square", border: "solid" },
+  { id: "argument", label: t("Main argument", "核心观点"), detail: t("Dark title band with body emphasis", "深色标题带与正文重点强调"), color: "#63734a", shape: "square", border: "solid" },
+  { id: "question", label: t("Open question", "待解问题"), detail: t("Rounded dashed frame with a title rule", "圆角虚线框与标题分隔线"), color: "#63734a", shape: "default", border: "dashed" },
+  { id: "section", label: t("Section heading", "章节标题"), detail: t("Open layout, top rule, and title band", "开放版式、顶端横线与标题色带"), color: "#416879", shape: "square", border: "invisible" }
 ] as const;
 
 export type ResearchPreset = (typeof RESEARCH_PRESETS)[number];
 export const RESEARCH_INTENSITIES = [
-  { value: 15, label: "柔和" }, { value: 26, label: "标准" }, { value: 40, label: "浓郁" }
+  { value: 15, label: t("Soft", "柔和") }, { value: 26, label: t("Standard", "标准") }, { value: 40, label: t("Rich", "浓郁") }
 ] as const;
 export const RESEARCH_SERIF = '"Songti SC", "Noto Serif CJK SC", "STSong", "SimSun", serif';
 

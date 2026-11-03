@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface NodeRuntimeModules {
   childProcess: any;
   os: any;
@@ -18,7 +20,7 @@ export async function loadNodeRuntimeModules(): Promise<NodeRuntimeModules> {
     const requireModule = rendererWindow.require;
     if (typeof requireModule !== "function") {
       throw new Error(
-        "当前 Obsidian 渲染环境无法访问本机 Node.js 子进程模块。请使用 MCP Streamable HTTP 或 SSE，或更新到提供 CommonJS 桥接的 Obsidian 桌面版本。"
+        t("This Obsidian renderer cannot access local Node.js child process modules. Use MCP Streamable HTTP or SSE, or update to an Obsidian desktop version that provides the CommonJS bridge.", "当前 Obsidian 渲染环境无法访问本机 Node.js 子进程模块。请使用 MCP Streamable HTTP 或 SSE，或更新到提供 CommonJS 桥接的 Obsidian 桌面版本。")
       );
     }
     try {
@@ -31,7 +33,7 @@ export async function loadNodeRuntimeModules(): Promise<NodeRuntimeModules> {
       };
     } catch (error) {
       throw new Error(
-        "无法从 Obsidian 桌面运行时加载本机进程模块：" +
+        t("Could not load local process modules from the Obsidian desktop runtime: ", "无法从 Obsidian 桌面运行时加载本机进程模块：") +
         (error instanceof Error ? error.message : String(error))
       );
     }

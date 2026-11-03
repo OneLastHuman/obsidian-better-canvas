@@ -1,4 +1,5 @@
 import { Component, loadPdfJs, TFile } from "obsidian";
+import { t } from "./i18n";
 
 const PINNED_MARKER = "pinned=true";
 const PDF_CACHE = new Map<string, Promise<any>>();
@@ -59,34 +60,34 @@ class PinnedPdfPageEmbed extends Component {
     container.classList.add("bc-pinned-pdf-embed-container");
     const canvas = document.createElement("canvas");
     canvas.className = "bc-pinned-pdf-page";
-    canvas.setAttribute("aria-label", "Pinned PDF page");
+    canvas.setAttribute("aria-label", t("Pinned PDF page", "固定的 PDF 页面"));
     container.appendChild(canvas);
     this.canvas = canvas;
 
     // A transparent selectable text layer sits directly over the rendered page.
     const textLayer = document.createElement("div");
     textLayer.className = "bc-pdf-text-layer";
-    textLayer.setAttribute("aria-label", "Selectable PDF text overlay");
+    textLayer.setAttribute("aria-label", t("Selectable PDF text overlay", "可选择的 PDF 文本层"));
     container.appendChild(textLayer);
     this.textLayerEl = textLayer;
 
     const details = document.createElement("details");
     details.className = "bc-pdf-text-selection";
     const summary = document.createElement("summary");
-    summary.textContent = "PDF 文本（选择文字后可创建摘录节点）";
+    summary.textContent = t("PDF text (select text to create an excerpt node)", "PDF 文本（选择文字后可创建摘录节点）");
     details.appendChild(summary);
     const textContent = document.createElement("div");
     textContent.className = "bc-pdf-selectable-text";
-    textContent.textContent = "正在提取页面文本…";
+    textContent.textContent = t("Extracting page text…", "正在提取页面文本…");
     details.appendChild(textContent);
     const excerptButton = document.createElement("button");
     excerptButton.type = "button";
     excerptButton.className = "bc-pdf-create-excerpt";
-    excerptButton.textContent = "从选中文字创建摘录节点";
+    excerptButton.textContent = t("Create excerpt node from selection", "从选中文字创建摘录节点");
     const highlightButton = document.createElement("button");
     highlightButton.type = "button";
     highlightButton.className = "bc-pdf-highlight-selection";
-    highlightButton.textContent = "持久化高亮页面上的选中文字";
+    highlightButton.textContent = t("Highlight the selected text on the page", "持久化高亮页面上的选中文字");
 
     const prepareButton = (button: HTMLButtonElement, action: "excerpt" | "highlight") => {
       button.addEventListener("pointerdown", event => event.stopPropagation());
@@ -232,7 +233,8 @@ class PinnedPdfPageEmbed extends Component {
       if (this.cancelled || !this.canvas) return;
       if (pageNumber > pdf.numPages) {
         target.dataset.error = "true";
-        target.title = "PDF contains only " + pdf.numPages + " pages; requested page " + pageNumber + ".";
+        target.title = t("PDF contains only " + pdf.numPages + " pages; requested page " + pageNumber + ".",
+          "PDF 只有 " + pdf.numPages + " 页，无法打开第 " + pageNumber + " 页。");
         return;
       }
 
@@ -264,13 +266,13 @@ class PinnedPdfPageEmbed extends Component {
           .replace(/\s+/g, " ")
           .trim();
         if (this.textContentEl) {
-          this.textContentEl.textContent = selectableText || "此页没有可提取的文本。扫描版页面需要 OCR 后才能选择文字。";
+          this.textContentEl.textContent = selectableText || t("No extractable text on this page. Scanned pages need OCR before text can be selected.", "此页没有可提取的文本。扫描版页面需要 OCR 后才能选择文字。");
           this.textContentEl.dataset.extracted = String(Boolean(selectableText));
         }
         if (this.excerptButton) this.excerptButton.disabled = !selectableText;
         if (this.highlightButton) this.highlightButton.disabled = !selectableText;
       } catch (error) {
-        if (this.textContentEl) this.textContentEl.textContent = "无法提取页面文本；如果这是扫描件，请先进行 OCR。";
+        if (this.textContentEl) this.textContentEl.textContent = t("Couldn't extract page text; if this is a scanned page, run OCR first.", "无法提取页面文本；如果这是扫描件，请先进行 OCR。");
         if (this.excerptButton) this.excerptButton.disabled = true;
         if (this.highlightButton) this.highlightButton.disabled = true;
         console.warn("Better Canvas PDF text extraction failed:", this.file.path, error);
@@ -285,7 +287,7 @@ class PinnedPdfPageEmbed extends Component {
       if (container && !container.querySelector(".bc-pinned-pdf-error")) {
         const message = document.createElement("div");
         message.className = "bc-pinned-pdf-error";
-        message.textContent = "PDF 页面加载失败。请打开开发者控制台查看详情。";
+        message.textContent = t("Failed to load the PDF page. Open the developer console for details.", "PDF 页面加载失败。请打开开发者控制台查看详情。");
         container.appendChild(message);
       }
       console.error("Better Canvas pinned PDF page render failed:", this.file.path, error);

@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import { validatePublicHttpUrl } from "./public-url";
+import { t } from "./i18n";
 
 export interface RetrievedPage {
   url: string;
@@ -39,7 +40,8 @@ function htmlToText(html: string): { title: string; text: string } {
 async function fetchText(url: string): Promise<string> {
   const response = await requestUrl({ url, method: "GET", throw: false, headers: { "User-Agent": "Mozilla/5.0 BetterCanvas/0.1" } });
   if (response.status < 200 || response.status >= 300) {
-    throw new Error("网页读取失败（HTTP " + response.status + "）。部分网站会阻止插件读取内容。");
+    throw new Error(t("Failed to read the web page (HTTP " + response.status + "). Some sites block plugin access.",
+      "网页读取失败（HTTP " + response.status + "）。部分网站会阻止插件读取内容。"));
   }
   return response.text;
 }
@@ -48,6 +50,6 @@ export async function retrieveWebpage(rawUrl: string): Promise<RetrievedPage> {
   const url = validatePublicHttpUrl(rawUrl);
   const source = await fetchText(url.toString());
   const extracted = htmlToText(source);
-  if (!extracted.text) throw new Error("网页没有可提取的正文文本。");
+  if (!extracted.text) throw new Error(t("The web page has no extractable body text.", "网页没有可提取的正文文本。"));
   return { url: url.toString(), title: extracted.title || url.hostname, text: extracted.text, kind: "webpage" };
 }

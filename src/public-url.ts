@@ -1,4 +1,7 @@
-const BLOCKED_URL_MESSAGE = "为避免意外访问本机或内网地址，不处理 localhost、私有 IP 或 .local 域名。";
+import { t } from "./i18n";
+
+const BLOCKED_URL_MESSAGE = t("To avoid accidentally reaching this machine or a local network, localhost, private IPs, and .local domains are not fetched.",
+  "为避免意外访问本机或内网地址，不处理 localhost、私有 IP 或 .local 域名。");
 
 function parseIPv4(host: string): [number, number, number, number] | null {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
@@ -76,10 +79,10 @@ export function validatePublicHttpUrl(raw: string): URL {
   try {
     url = new URL(raw);
   } catch {
-    throw new Error("请输入完整的网页 URL。");
+    throw new Error(t("Enter a complete web page URL.", "请输入完整的网页 URL。"));
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("只支持 http 和 https URL。");
+    throw new Error(t("Only http and https URLs are supported.", "只支持 http 和 https URL。"));
   }
   const host = url.hostname.toLowerCase();
   if (

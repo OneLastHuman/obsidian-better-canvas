@@ -20,11 +20,13 @@
   <a href="docs/README.md">文档索引</a>
 </p>
 
-![柔软便签主题：围绕读书会，用灵感卡、摘录卡、概念卡、问题卡和行动清单组织想法](docs/screenshots/soft-notes.png)
+![柔软便签主题：围绕读书会，用灵感卡、摘录卡、概念卡、问题卡和行动清单组织想法](docs/screenshots/zh/soft-notes.png)
 
 Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法，用连线表达关系，再把内容整理成思维导图、流程图或阅读工作台。需要继续分析时，可以向 AI 提问，并把回答留在来源旁边。
 
 **画布编辑和主题无需配置 AI。** 内容仍保存在 Vault 的 `.canvas` 文件中。
+
+插件界面跟随 Obsidian 语言：默认英文，Obsidian 使用中文时显示中文。
 
 *截图来自 Obsidian 1.14.4 的真实界面（多数为 Windows，提问弹窗为 macOS）。示例内容可在[示例画布](docs/examples/readme-showcase/)中取得；采集与验证范围见[截图说明](docs/screenshots/README.md)。*
 
@@ -33,7 +35,7 @@ Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法�
 每张画布可以单独选择主题。点击画布右侧的 **画布主题**，再从 **节点样式** 中选用配套预设。切换主题保留已有内容和位置，主题选择随画布保存。
 
 <p align="center">
-  <img src="docs/screenshots/theme-picker.png" alt="画布主题选择器：同时展示默认、拼贴手账、手绘白板、软糖白板、纸本研究和柔软便签 6 个入口" width="640" />
+  <img src="docs/screenshots/zh/theme-picker.png" alt="画布主题选择器：同时展示默认、拼贴手账、手绘白板、软糖白板、纸本研究和柔软便签 6 个入口" width="640" />
 </p>
 
 首图使用 **柔软便签**：用浅彩曲线区分灵感、摘录、概念、行动和问题。自由文字适合放标题，行动卡可以直接使用 Markdown 任务清单。
@@ -43,24 +45,24 @@ Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法�
     <td width="50%" valign="top">
       <h3>软糖白板 · 规划流程</h3>
       <p>用胶囊表示起止，用菱形提出判断，用文档卡收束结果。</p>
-      <a href="docs/screenshots/rounded-map.png"><img src="docs/screenshots/rounded-map.png" alt="软糖白板：读书会筹备流程，包含人数判断、是与否分支、报名输入和讨论纪要" width="100%" /></a>
+      <a href="docs/screenshots/zh/rounded-map.png"><img src="docs/screenshots/zh/rounded-map.png" alt="软糖白板：读书会筹备流程，包含人数判断、是与否分支、报名输入和讨论纪要" width="100%" /></a>
     </td>
     <td width="50%" valign="top">
       <h3>纸本研究 · 从材料到观点</h3>
       <p>把原文、重点引文、阅读批注和自己的观点放在一起。</p>
-      <a href="docs/screenshots/research.png"><img src="docs/screenshots/research.png" alt="纸本研究：阅读材料连接到摘录和观点，旁边保留批注与待解问题" width="100%" /></a>
+      <a href="docs/screenshots/zh/research.png"><img src="docs/screenshots/zh/research.png" alt="纸本研究：阅读材料连接到摘录和观点，旁边保留批注与待解问题" width="100%" /></a>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>手绘白板 · 推敲一个想法</h3>
       <p>用手绘轮廓、排线和旁注，表达概念、步骤与待确认事项。</p>
-      <a href="docs/screenshots/sketch.png"><img src="docs/screenshots/sketch.png" alt="手绘白板：从讨论问题到小实验，展示概念、行动、判断、旁注和风险提醒" width="100%" /></a>
+      <a href="docs/screenshots/zh/sketch.png"><img src="docs/screenshots/zh/sketch.png" alt="手绘白板：从讨论问题到小实验，展示概念、行动、判断、旁注和风险提醒" width="100%" /></a>
     </td>
     <td width="50%" valign="top">
       <h3>拼贴手账 · 收藏阅读片刻</h3>
       <p>把图片、摘录和清单放进胶带便签、横线纸与照片框。</p>
-      <a href="docs/screenshots/scrapbook.png"><img src="docs/screenshots/scrapbook.png" alt="拼贴手账：围绕一张山景插画，排列阅读灵感、摘录、清单与后续想法" width="100%" /></a>
+      <a href="docs/screenshots/zh/scrapbook.png"><img src="docs/screenshots/zh/scrapbook.png" alt="拼贴手账：围绕一张山景插画，排列阅读灵感、摘录、清单与后续想法" width="100%" /></a>
     </td>
   </tr>
 </table>
@@ -71,7 +73,7 @@ Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法�
 
 选中卡片后，按 `Tab` 创建子节点，按 `Enter` 创建同级节点。编辑文字时，改用 `Shift + Tab` 和 `Shift + Enter`，可以继续扩展当前想法。
 
-![默认主题下的思维导图：从读什么、和谁读、留下什么三个方向展开读书会计划](docs/screenshots/mind-map.png)
+![默认主题下的思维导图：从读什么、和谁读、留下什么三个方向展开读书会计划](docs/screenshots/zh/mind-map.png)
 
 - **整理结构：** 运行“自动整理思维导图”，按左、右、上、下方向布局。
 - **减少手动调整：** 新建文本卡片默认随内容调整尺寸；手动拖动角点后停止自动调整。
@@ -93,7 +95,7 @@ Better Canvas 是 Obsidian Canvas 的增强插件。用卡片收集零散想法�
 
 选中节点，通过右键菜单或命令面板打开 **向 AI 提问所选节点**。插件将所选节点及关联上下文交给配置的服务，并把回答保存为连接到来源的新节点。
 
-![选中纸本研究中的观点卡后，打开向 AI 提问弹窗，输入寻找证据缺口与后续问题的提示词](docs/screenshots/ai-prompt.png)
+![选中纸本研究中的观点卡后，打开向 AI 提问弹窗，输入寻找证据缺口与后续问题的提示词](docs/screenshots/zh/ai-prompt.png)
 
 *图中展示提问入口，未提交请求，也未生成模型回答。*
 

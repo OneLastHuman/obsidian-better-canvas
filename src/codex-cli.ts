@@ -2,6 +2,7 @@ import { parseCodexJsonEvent } from "./codex-cli-events";
 import { resolveAgentBinary } from "./local-agent-discovery";
 import { resolveLaunchCommand } from "./agent-launcher";
 import { loadNodeRuntimeModules } from "./node-runtime";
+import { t } from "./i18n";
 
 export interface LocalCodexOptions {
   binaryPath?: string;
@@ -105,13 +106,13 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
     options.signal.addEventListener("abort", onAbort, { once: true });
     timeout = setTimeout(() => {
       terminate();
-      finish(new Error("Local Codex timed out after " + Math.round(timeoutMs / 1000) + " seconds."));
+      finish(new Error(t("Local Codex timed out after " + Math.round(timeoutMs / 1000) + " seconds.", "本地 Codex 在 " + Math.round(timeoutMs / 1000) + " 秒后超时。")));
     }, timeoutMs);
 
     child.once("error", (error: Error) => {
       const message = /ENOENT/i.test(error.message)
-        ? "找不到 Codex CLI。请安装并登录 Codex CLI，或在 Better Canvas 设置中点击「查找」自动定位，或填写 codex 可执行文件的完整路径。"
-        : "无法启动 Codex CLI：" + error.message;
+        ? t("Codex CLI was not found. Install and sign in to Codex CLI, then use Find in Better Canvas settings to locate it, or enter the full path to the codex executable.", "找不到 Codex CLI。请安装并登录 Codex CLI，或在 Better Canvas 设置中点击「查找」自动定位，或填写 codex 可执行文件的完整路径。")
+        : t("Could not start Codex CLI: ", "无法启动 Codex CLI：") + error.message;
       finish(new Error(message));
     });
 
@@ -120,7 +121,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       stdoutBuffer += chunk;
       if (stdoutBuffer.length > 1_000_000) {
         terminate();
-        finish(new Error("Codex CLI 输出超过 1 MB，已终止以保护内存。"));
+        finish(new Error(t("Codex CLI output exceeded 1 MB; stopped to protect memory.", "Codex CLI 输出超过 1 MB，已终止以保护内存。")));
         return;
       }
       const lines = stdoutBuffer.split(/\r?\n/);
@@ -144,7 +145,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       if (event.textDelta) streamedText += event.textDelta;
       if (event.finalText !== undefined) finalText = event.finalText;
       if (event.textDelta || event.finalText !== undefined) {
-        options.onProgress?.("Codex 正在生成回复…");
+        options.onProgress?.(t("Codex is generating a reply…", "Codex 正在生成回复…"));
       }
     };
 
@@ -158,29 +159,29 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       if (settled) return;
 
       if (fatalEvent) {
-        finish(new Error("Codex 执行失败：" + fatalEvent + (stderrTail ? "\n" + stderrTail.trim() : "")));
+        finish(new Error(t("Codex run failed: ", "Codex 执行失败：") + fatalEvent + (stderrTail ? "\n" + stderrTail.trim() : "")));
         return;
       }
       if (code !== 0) {
         const detail = stderrTail.trim();
         finish(new Error(
-          "Codex CLI 退出，状态码 " + String(code) +
-          (signalName ? "（signal " + signalName + "）" : "") +
-          (detail ? "：" + detail.slice(-3000) : "。请确认 Codex 已安装且已完成登录。")
+          t("Codex CLI exited with code " + String(code), "Codex CLI 退出，状态码 " + String(code)) +
+          (signalName ? t(" (signal " + signalName + ")", "（signal " + signalName + "）") : "") +
+          (detail ? t(": " + detail.slice(-3000), "：" + detail.slice(-3000)) : t(". Make sure Codex is installed and signed in.", "。请确认 Codex 已安装且已完成登录。"))
         ));
         return;
       }
 
       const answer = finalText.trim() || streamedText.trim();
       if (!answer) {
-        finish(new Error("Codex CLI 已结束，但没有返回可用的助手文本。"));
+        finish(new Error(t("Codex CLI finished without returning usable assistant text.", "Codex CLI 已结束，但没有返回可用的助手文本。")));
         return;
       }
       finish(undefined, answer);
     });
 
     child.stdin!.once("error", (error: Error) => {
-      if (!settled) finish(new Error("无法向 Codex CLI 发送提示词：" + error.message));
+      if (!settled) finish(new Error(t("Could not send the prompt to Codex CLI: ", "无法向 Codex CLI 发送提示词：") + error.message));
     });
     child.stdin!.end(prompt + "\n");
   });

@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type NodeAIContextActionId = "ask" | "image" | "flashcards" | "regenerate";
 
 export interface NodeAIContextMenuAction {
@@ -7,14 +9,14 @@ export interface NodeAIContextMenuAction {
 }
 
 const BASE_ACTIONS: NodeAIContextMenuAction[] = [
-  { id: "ask", title: "问 AI", icon: "sparkles" },
-  { id: "image", title: "生成图片", icon: "image" },
-  { id: "flashcards", title: "生成闪卡", icon: "graduation-cap" }
+  { id: "ask", title: t("Ask AI", "问 AI"), icon: "sparkles" },
+  { id: "image", title: t("Generate image", "生成图片"), icon: "image" },
+  { id: "flashcards", title: t("Generate flashcards", "生成闪卡"), icon: "graduation-cap" }
 ];
 
 const REGENERATE_ACTION: NodeAIContextMenuAction = {
   id: "regenerate",
-  title: "重生成",
+  title: t("Regenerate", "重生成"),
   icon: "refresh-cw"
 };
 

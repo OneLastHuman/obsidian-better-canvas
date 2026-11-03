@@ -1,6 +1,7 @@
 import { App, ItemView, Modal, Notice, TFile } from "obsidian";
 import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
 import { findContainingPortal, findContainingPortalForGroup } from "./portal-adoption";
+import { t } from "./i18n";
 
 const PORTAL_PREFIX = "bcportal||";
 const PORTAL_DELIMITER = "||";
@@ -51,7 +52,7 @@ function isCanvasFileNode(node: any): node is CanvasNodeData {
 function parseCanvasJson(raw: string): CanvasData {
   const value = JSON.parse(raw || "{}");
   if (!value || typeof value !== "object" || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
-    throw new Error("文件不是有效的 JSON Canvas：需要 nodes 和 edges 数组。");
+    throw new Error(t("The file is not valid JSON Canvas: it needs nodes and edges arrays.", "文件不是有效的 JSON Canvas：需要 nodes 和 edges 数组。"));
   }
   return value as CanvasData;
 }
@@ -110,20 +111,20 @@ class PortalTextPromptModal extends Modal {
 
   onOpen(): void {
     this.contentEl.empty();
-    this.contentEl.createEl("h2", { text: "在 Canvas Portal 中创建文本节点" });
+    this.contentEl.createEl("h2", { text: t("Create a text node in a Canvas Portal", "在 Canvas Portal 中创建文本节点") });
     const input = this.contentEl.createEl("textarea", {
       cls: "bc-modal-prompt-textarea",
-      attr: { rows: "5", placeholder: "输入新节点内容" }
+      attr: { rows: "5", placeholder: t("Enter the new node content", "输入新节点内容") }
     });
 
     const footer = this.contentEl.createDiv({ cls: "modal-button-container" });
-    const cancel = footer.createEl("button", { text: "取消" });
+    const cancel = footer.createEl("button", { text: t("Cancel", "取消") });
     cancel.onclick = () => this.close();
-    const submit = footer.createEl("button", { text: "创建节点", cls: "mod-cta" });
+    const submit = footer.createEl("button", { text: t("Create node", "创建节点"), cls: "mod-cta" });
     submit.onclick = () => {
       const value = input.value.trim();
       if (!value) {
-        new Notice("请输入节点内容。");
+        new Notice(t("Enter node content.", "请输入节点内容。"));
         return;
       }
       this.close();
@@ -163,19 +164,19 @@ export class CanvasPortalManager {
   start(): void {
     this.plugin.addCommand({
       id: "bc-toggle-canvas-portal",
-      name: "Better Canvas: 打开/关闭所选 Canvas Portal",
+      name: "Better Canvas: " + t("Toggle the selected Canvas Portal", "打开/关闭所选 Canvas Portal"),
       callback: () => this.togglePortalForNode()
     });
     this.plugin.addCommand({
       id: "bc-create-text-node-in-portal",
-      name: "Better Canvas: 在所选 Portal 中创建文本节点",
+      name: "Better Canvas: " + t("Create a text node in the selected Portal", "在所选 Portal 中创建文本节点"),
       callback: () => this.promptForTextNodeInPortal()
     });
     this.plugin.registerEvent(this.plugin.app.workspace.on("canvas:node-menu", (menu: any, node: any) => {
       const nodeData = node?.getData?.() ?? node;
       if (!menu?.addItem || !isCanvasFileNode(nodeData) || nodeData.portal !== true) return;
       menu.addItem((item: any) => item
-        .setTitle("在 Portal 源画布中创建文本节点")
+        .setTitle(t("Create a text node in the Portal source canvas", "在 Portal 源画布中创建文本节点"))
         .setIcon("plus")
         .onClick(() => this.promptForTextNodeInPortal(String(node?.id ?? nodeData.id))));
     }));
@@ -695,7 +696,7 @@ export class CanvasPortalManager {
       canvas.requestFrame?.();
       this.lastNodeIds.set(view.containerEl, new Set(newNodes.map((node: CanvasNodeData) => node.id)));
       await this.refreshView(view, true);
-      new Notice("已将 " + adoptedMap.size + " 个新节点加入对应 Canvas Portal。");
+      new Notice(t("Added new nodes to their Canvas Portals: " + adoptedMap.size, "已将 " + adoptedMap.size + " 个新节点加入对应 Canvas Portal。"));
     } finally {
       this.adoptionInFlight.delete(view);
     }
@@ -783,23 +784,23 @@ export class CanvasPortalManager {
     const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
     const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
     if (!canvas || !view) {
-      new Notice("请先打开包含 Canvas Portal 的画布。");
+      new Notice(t("Open a Canvas that contains a Canvas Portal first.", "请先打开包含 Canvas Portal 的画布。"));
       return;
     }
 
     const selection = canvas.selection;
     const selectedId = portalNodeId ?? (selection?.size === 1 ? selection.values().next().value?.id : undefined);
     if (typeof selectedId !== "string") {
-      new Notice("请只选择一个指向 .canvas 文件的节点。");
+      new Notice(t("Select a single node that points to a .canvas file.", "请只选择一个指向 .canvas 文件的节点。"));
       return;
     }
     const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
     if (!isCanvasFileNode(portalNode)) {
-      new Notice("所选节点不是 Canvas 文件节点。");
+      new Notice(t("The selected node is not a Canvas file node.", "所选节点不是 Canvas 文件节点。"));
       return;
     }
     if (portalNode.portal !== true) {
-      new Notice("请先打开 Canvas Portal。");
+      new Notice(t("Open the Canvas Portal first.", "请先打开 Canvas Portal。"));
       return;
     }
 
@@ -812,41 +813,41 @@ export class CanvasPortalManager {
     const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
     const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
     if (!canvas || !view) {
-      new Notice("请先打开包含 Canvas Portal 的画布。");
+      new Notice(t("Open a Canvas that contains a Canvas Portal first.", "请先打开包含 Canvas Portal 的画布。"));
       return;
     }
     if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式。");
+      new Notice(t("This Canvas is in read-only mode.", "当前 Canvas 处于只读模式。"));
       return;
     }
 
     const selection = canvas.selection;
     const selectedId = portalNodeId ?? (selection?.size === 1 ? selection.values().next().value?.id : undefined);
     if (typeof selectedId !== "string") {
-      new Notice("请只选择一个指向 .canvas 文件的节点。");
+      new Notice(t("Select a single node that points to a .canvas file.", "请只选择一个指向 .canvas 文件的节点。"));
       return;
     }
 
     const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
     if (!isCanvasFileNode(portalNode)) {
-      new Notice("所选节点不是 Canvas 文件节点。");
+      new Notice(t("The selected node is not a Canvas file node.", "所选节点不是 Canvas 文件节点。"));
       return;
     }
     if (view.file?.path === portalNode.file) {
-      new Notice("不能向当前画布自身的 Portal 写入节点。");
+      new Notice(t("Cannot write nodes into a Portal of the current canvas itself.", "不能向当前画布自身的 Portal 写入节点。"));
       return;
     }
 
     const content = text.trim();
     if (!content) return;
     if (content.length > 20000) {
-      new Notice("节点内容最多 20,000 个字符。");
+      new Notice(t("Node content is limited to 20,000 characters.", "节点内容最多 20,000 个字符。"));
       return;
     }
 
     const file = this.plugin.app.vault.getAbstractFileByPath(portalNode.file);
     if (!(file instanceof TFile) || file.extension.toLowerCase() !== "canvas") {
-      new Notice("找不到 Portal 对应的 Canvas 文件。");
+      new Notice(t("Could not find the Canvas file for this Portal.", "找不到 Portal 对应的 Canvas 文件。"));
       return;
     }
 
@@ -907,9 +908,9 @@ export class CanvasPortalManager {
         canvas.selectOnly?.(mirrored);
         canvas.zoomToSelection?.();
       }
-      new Notice("已在 Portal 源画布中创建节点，并刷新 Portal。");
+      new Notice(t("Created the node in the Portal source canvas and refreshed the Portal.", "已在 Portal 源画布中创建节点，并刷新 Portal。"));
     } catch (error) {
-      new Notice("无法在 Portal 中创建节点：" + (error instanceof Error ? error.message : String(error)), 8000);
+      new Notice(t("Could not create the node in the Portal: ", "无法在 Portal 中创建节点：") + (error instanceof Error ? error.message : String(error)), 8000);
     }
   }
 
@@ -966,26 +967,26 @@ export class CanvasPortalManager {
     const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
     const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
     if (!canvas) {
-      new Notice("请先打开 Canvas。");
+      new Notice(t("Open a Canvas first.", "请先打开 Canvas。"));
       return;
     }
     if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式。");
+      new Notice(t("This Canvas is in read-only mode.", "当前 Canvas 处于只读模式。"));
       return;
     }
     const selection = canvas.selection;
     const selectedId = nodeId ?? (selection?.size === 1 ? selection.values().next().value?.id : undefined);
     if (typeof selectedId !== "string") {
-      new Notice("请只选择一个指向 .canvas 文件的节点。");
+      new Notice(t("Select a single node that points to a .canvas file.", "请只选择一个指向 .canvas 文件的节点。"));
       return;
     }
     const node = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
     if (!isCanvasFileNode(node)) {
-      new Notice("所选节点不是 Canvas 文件节点。");
+      new Notice(t("The selected node is not a Canvas file node.", "所选节点不是 Canvas 文件节点。"));
       return;
     }
     if (view?.file?.path === node.file) {
-      new Notice("不能将当前画布作为它自身的 Portal。");
+      new Notice(t("A canvas cannot be its own Portal.", "不能将当前画布作为它自身的 Portal。"));
       return;
     }
 
@@ -1001,7 +1002,7 @@ export class CanvasPortalManager {
         this.portalRefreshInProgress.delete(view);
       }
       if (!mirrorsRemoved) {
-        new Notice("无法移除 Canvas Portal 的镜像节点；Portal 保持打开状态。", 8000);
+        new Notice(t("Could not remove the Canvas Portal mirrors; the Portal stays open.", "无法移除 Canvas Portal 的镜像节点；Portal 保持打开状态。"), 8000);
         return;
       }
     }
@@ -1011,7 +1012,7 @@ export class CanvasPortalManager {
     if (nextOpen) {
       const target = this.plugin.app.vault.getAbstractFileByPath(node.file);
       if (!(target instanceof TFile) || target.extension.toLowerCase() !== "canvas") {
-        new Notice("找不到 Portal 对应的 Canvas 文件。");
+        new Notice(t("Could not find the Canvas file for this Portal.", "找不到 Portal 对应的 Canvas 文件。"));
         return;
       }
     }
@@ -1027,6 +1028,6 @@ export class CanvasPortalManager {
     canvas.requestSave?.();
     canvas.requestFrame?.();
     void this.refreshView(view, true);
-    new Notice(nextOpen ? "Portal 已打开。" : "Portal 已关闭。");
+    new Notice(nextOpen ? t("Portal opened.", "Portal 已打开。") : t("Portal closed.", "Portal 已关闭。"));
   }
 }

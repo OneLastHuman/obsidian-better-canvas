@@ -3,6 +3,7 @@ import { insertCanvasNode, makeTextNode, readCanvasData } from "./canvas";
 import { patchNode } from "./enhancements";
 import { strokeTouchesEraser } from "./pdf-annotation-geometry";
 import { buildPdfAnnotationMarkdown } from "./pdf-annotation-export";
+import { t } from "./i18n";
 
 interface PdfPoint {
   x: number;
@@ -65,42 +66,42 @@ export class PdfAnnotationManager {
   start(): void {
     this.plugin.addCommand({
       id: "bc-toggle-pdf-annotation",
-      name: "Better Canvas: 切换固定 PDF 页面批注模式",
+      name: t("Better Canvas: Toggle pinned PDF annotation mode", "Better Canvas: 切换固定 PDF 页面批注模式"),
       callback: () => this.toggleForSelection()
     });
     this.plugin.addCommand({
       id: "bc-enable-pdf-pen",
-      name: "Better Canvas: PDF 红笔批注",
+      name: t("Better Canvas: PDF red pen annotation", "Better Canvas: PDF 红笔批注"),
       callback: () => this.setToolForSelection("pen", "#e53935", 5)
     });
     this.plugin.addCommand({
       id: "bc-enable-pdf-blue-pen",
-      name: "Better Canvas: PDF 蓝笔批注",
+      name: t("Better Canvas: PDF blue pen annotation", "Better Canvas: PDF 蓝笔批注"),
       callback: () => this.setToolForSelection("pen", "#1e88e5", 5)
     });
     this.plugin.addCommand({
       id: "bc-enable-pdf-highlighter",
-      name: "Better Canvas: PDF 黄色荧光笔",
+      name: t("Better Canvas: PDF yellow highlighter", "Better Canvas: PDF 黄色荧光笔"),
       callback: () => this.setToolForSelection("highlighter", "#ffeb3b", 16)
     });
     this.plugin.addCommand({
       id: "bc-enable-pdf-eraser",
-      name: "Better Canvas: PDF 批注橡皮擦",
+      name: t("Better Canvas: PDF annotation eraser", "Better Canvas: PDF 批注橡皮擦"),
       callback: () => this.setToolForSelection("eraser", "#ffffff", 22)
     });
     this.plugin.addCommand({
       id: "bc-undo-pdf-annotation",
-      name: "Better Canvas: 撤销最后一笔 PDF 批注",
+      name: t("Better Canvas: Undo last PDF annotation", "Better Canvas: 撤销最后一笔 PDF 批注"),
       callback: () => this.undoForSelection()
     });
     this.plugin.addCommand({
       id: "bc-clear-pdf-annotations",
-      name: "Better Canvas: 清除所选 PDF 页面的批注",
+      name: t("Better Canvas: Clear annotations on selected PDF pages", "Better Canvas: 清除所选 PDF 页面的批注"),
       callback: () => this.clearForSelection()
     });
     this.plugin.addCommand({
       id: "bc-export-pdf-annotation-bundle",
-      name: "Better Canvas: 导出当前 Canvas 的 PDF 批注为 Markdown",
+      name: t("Better Canvas: Export PDF annotations of current Canvas to Markdown", "Better Canvas: 导出当前 Canvas 的 PDF 批注为 Markdown"),
       callback: () => { void this.exportAnnotationsForActiveCanvas(); }
     });
     this.plugin.registerEvent(this.plugin.app.workspace.on("layout-change", () => this.scheduleRefresh()));
@@ -126,7 +127,7 @@ export class PdfAnnotationManager {
   private async exportAnnotationsForActiveCanvas(): Promise<void> {
     const canvas = this.activeCanvas();
     if (!canvas) {
-      new Notice("请先打开要导出批注的 Canvas。");
+      new Notice(t("Open the Canvas whose annotations you want to export first.", "请先打开要导出批注的 Canvas。"));
       return;
     }
 
@@ -134,7 +135,7 @@ export class PdfAnnotationManager {
     const sourcePath = typeof view?.file?.path === "string" ? view.file.path : "";
     const bundle = buildPdfAnnotationMarkdown(readCanvasData(canvas).nodes, sourcePath);
     if (!bundle) {
-      new Notice("当前 Canvas 没有可导出的固定 PDF 页面批注。");
+      new Notice(t("This Canvas has no pinned PDF page annotations to export.", "当前 Canvas 没有可导出的固定 PDF 页面批注。"));
       return;
     }
 
@@ -154,12 +155,20 @@ export class PdfAnnotationManager {
         suffix++;
       }
       await vault.create(path, bundle.markdown);
-      new Notice("已导出 " + bundle.pageCount + " 个 PDF 页面、" +
-        bundle.highlightCount + " 处文字高亮和 " + bundle.strokeCount +
-        " 笔手绘批注：" + path + (bundle.truncated ? "（部分数据达到安全上限，详见导出文件）" : ""));
+      new Notice(t(
+        "Exported PDF pages: " + bundle.pageCount + ", text highlights: " + bundle.highlightCount +
+          ", freehand strokes: " + bundle.strokeCount + ". File: " + path +
+          (bundle.truncated ? " (some data hit safety limits; see the exported file)" : ""),
+        "已导出 " + bundle.pageCount + " 个 PDF 页面、" +
+          bundle.highlightCount + " 处文字高亮和 " + bundle.strokeCount +
+          " 笔手绘批注：" + path + (bundle.truncated ? "（部分数据达到安全上限，详见导出文件）" : "")
+      ));
     } catch (error) {
       console.error("Better Canvas PDF annotation export failed:", error);
-      new Notice("PDF 批注导出失败：" + (error instanceof Error ? error.message : String(error)));
+      new Notice(t(
+        `PDF annotation export failed: ${error instanceof Error ? error.message : String(error)}`,
+        `PDF 批注导出失败：${error instanceof Error ? error.message : String(error)}`
+      ));
     }
   }
 
@@ -167,13 +176,13 @@ export class PdfAnnotationManager {
     const canvas = this.activeCanvas();
     const selection = canvas?.selection;
     if (!canvas || !selection || selection.size !== 1) {
-      new Notice("请在 Canvas 中只选择一个固定 PDF 页面节点。");
+      new Notice(t("Select exactly one pinned PDF page node in the Canvas.", "请在 Canvas 中只选择一个固定 PDF 页面节点。"));
       return null;
     }
     const selected = selection.values().next().value;
     const node = readCanvasData(canvas).nodes.find((item: any) => item.id === selected?.id);
     if (!isPinnedPdf(node)) {
-      new Notice("请先创建固定 PDF 页面节点（拆分 PDF 页面或创建分页批注工作区）。");
+      new Notice(t("Create a pinned PDF page node first (split the PDF into pages or create a paged annotation workspace).", "请先创建固定 PDF 页面节点（拆分 PDF 页面或创建分页批注工作区）。"));
       return null;
     }
     return { canvas, node };
@@ -191,8 +200,8 @@ export class PdfAnnotationManager {
     });
     this.refresh();
     new Notice(next
-      ? "PDF 批注模式已开启。可直接在页面上拖动鼠标/触控笔绘制。再次运行命令退出。"
-      : "PDF 批注模式已关闭。");
+      ? t("PDF annotation mode on. Drag with the mouse or stylus on the page to draw. Run the command again to exit.", "PDF 批注模式已开启。可直接在页面上拖动鼠标/触控笔绘制。再次运行命令退出。")
+      : t("PDF annotation mode off.", "PDF 批注模式已关闭。"));
   }
 
   private setToolForSelection(tool: "pen" | "highlighter" | "eraser", color: string, width: number): void {
@@ -205,8 +214,13 @@ export class PdfAnnotationManager {
       bcPdfWidth: width
     });
     this.refresh();
-    const labels = { pen: "红/蓝笔", highlighter: "黄色荧光笔", eraser: "橡皮擦" };
-    new Notice("PDF " + labels[tool] + "已启用；拖动鼠标或触控笔进行操作。");
+    const labels = {
+      pen: t("pen", "红/蓝笔"),
+      highlighter: t("highlighter", "黄色荧光笔"),
+      eraser: t("eraser", "橡皮擦")
+    };
+    new Notice(t("PDF " + labels[tool] + " tool enabled; drag the mouse or stylus to draw.",
+      "PDF " + labels[tool] + "已启用；拖动鼠标或触控笔进行操作。"));
   }
 
   private undoForSelection(): void {
@@ -219,17 +233,17 @@ export class PdfAnnotationManager {
     const lastStroke = strokes[strokes.length - 1];
     const lastHighlight = highlights[highlights.length - 1];
     if (!lastStroke && !lastHighlight) {
-      new Notice("所选 PDF 页面没有可撤销的批注。");
+      new Notice(t("The selected PDF page has no annotations to undo.", "所选 PDF 页面没有可撤销的批注。"));
       return;
     }
     const undoHighlight = Boolean(lastHighlight) &&
       (!lastStroke || (lastHighlight?.createdAt ?? 0) > (lastStroke?.createdAt ?? 0));
     if (undoHighlight) {
       patchNode(selected.canvas, selected.node.id, { bcPdfTextHighlights: highlights.slice(0, -1) });
-      new Notice("已撤销最后一处文字高亮。");
+      new Notice(t("Undid the last text highlight.", "已撤销最后一处文字高亮。"));
     } else {
       patchNode(selected.canvas, selected.node.id, { bcPdfStrokes: strokes.slice(0, -1) });
-      new Notice("已撤销最后一笔手绘批注。");
+      new Notice(t("Undid the last freehand stroke.", "已撤销最后一笔手绘批注。"));
     }
     this.refresh();
   }
@@ -243,7 +257,7 @@ export class PdfAnnotationManager {
       bcPdfAnnotating: false
     });
     this.refresh();
-    new Notice("已清除所选 PDF 页面的手绘批注与文字高亮。");
+    new Notice(t("Cleared all freehand strokes and text highlights from the selected PDF page.", "已清除所选 PDF 页面的手绘批注与文字高亮。"));
   }
 
   private scheduleRefresh(): void {
@@ -293,16 +307,16 @@ export class PdfAnnotationManager {
       toolbar = document.createElement("div");
       toolbar.className = "bc-pdf-annotation-toolbar";
       toolbar.setAttribute("role", "toolbar");
-      toolbar.setAttribute("aria-label", "PDF 页面批注工具");
+      toolbar.setAttribute("aria-label", t("PDF page annotation tools", "PDF 页面批注工具"));
 
       const actions = [
-        { id: "toggle", label: "批注", title: "开启或关闭页面手绘批注" },
-        { id: "pen-red", label: "红笔", title: "使用红笔绘制" },
-        { id: "pen-blue", label: "蓝笔", title: "使用蓝笔绘制" },
-        { id: "highlighter", label: "荧光", title: "使用黄色荧光笔" },
-        { id: "eraser", label: "橡皮", title: "擦除触及的手绘批注" },
-        { id: "undo", label: "撤销", title: "撤销最近一处笔迹或文字高亮" },
-        { id: "clear", label: "清空", title: "清除此 PDF 页面的全部批注" }
+        { id: "toggle", label: t("Annotate", "批注"), title: t("Turn freehand page annotation on or off", "开启或关闭页面手绘批注") },
+        { id: "pen-red", label: t("Red pen", "红笔"), title: t("Draw with the red pen", "使用红笔绘制") },
+        { id: "pen-blue", label: t("Blue pen", "蓝笔"), title: t("Draw with the blue pen", "使用蓝笔绘制") },
+        { id: "highlighter", label: t("Highlight", "荧光"), title: t("Draw with the yellow highlighter", "使用黄色荧光笔") },
+        { id: "eraser", label: t("Eraser", "橡皮"), title: t("Erase freehand annotations it touches", "擦除触及的手绘批注") },
+        { id: "undo", label: t("Undo", "撤销"), title: t("Undo the most recent stroke or text highlight", "撤销最近一处笔迹或文字高亮") },
+        { id: "clear", label: t("Clear", "清空"), title: t("Remove all annotations from this PDF page", "清除此 PDF 页面的全部批注") }
       ];
 
       for (const action of actions) {
@@ -357,7 +371,7 @@ export class PdfAnnotationManager {
 
   private handleToolbarAction(canvas: any, nodeId: string, action: string): void {
     if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，不能修改 PDF 批注。");
+      new Notice(t("This Canvas is in read-only mode; PDF annotations can't be changed.", "当前 Canvas 处于只读模式，不能修改 PDF 批注。"));
       return;
     }
     const current = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeId) as any;
@@ -396,7 +410,7 @@ export class PdfAnnotationManager {
       }
     } else if (action === "clear") {
       if (typeof window.confirm === "function" &&
-          !window.confirm("清除此 PDF 页面的所有手绘批注与文字高亮？此操作无法撤销。")) return;
+          !window.confirm(t("Remove all freehand annotations and text highlights from this PDF page? This can't be undone.", "清除此 PDF 页面的所有手绘批注与文字高亮？此操作无法撤销。"))) return;
       patchNode(canvas, nodeId, {
         bcPdfStrokes: [],
         bcPdfTextHighlights: [],
@@ -422,18 +436,18 @@ export class PdfAnnotationManager {
         const action = custom.detail?.action === "highlight" ? "highlight" : "excerpt";
         if (!selectedText) {
           new Notice(action === "highlight"
-            ? "请先在 PDF 页面上选择文字，再点击持久化高亮。"
-            : "请先在 PDF 文本面板或页面上选择一段文字，再点击创建摘录。");
+            ? t("Select text on the PDF page first, then click to save a highlight.", "请先在 PDF 页面上选择文字，再点击持久化高亮。")
+            : t("Select a passage in the PDF text panel or on the page first, then click to create an excerpt.", "请先在 PDF 文本面板或页面上选择一段文字，再点击创建摘录。"));
           return;
         }
         if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
-          new Notice("当前 Canvas 处于只读模式，不能添加 PDF 批注。");
+          new Notice(t("This Canvas is in read-only mode; PDF annotations can't be added.", "当前 Canvas 处于只读模式，不能添加 PDF 批注。"));
           return;
         }
         const latest = readCanvasData(canvas);
         const source = latest.nodes.find((node: any) => node.id === nodeData.id);
         if (!source) {
-          new Notice("找不到 PDF 页面节点，无法创建批注。");
+          new Notice(t("PDF page node not found; can't create the annotation.", "找不到 PDF 页面节点，无法创建批注。"));
           return;
         }
 
@@ -457,7 +471,7 @@ export class PdfAnnotationManager {
             })
             .filter((rect: PdfRect) => rect.width > 0 && rect.height > 0);
           if (!rects.length) {
-            new Notice("没有取得页面上的文字选区位置。请在 PDF 页面文字层上选择文字；文本面板中的纯文本选择只能创建摘录。");
+            new Notice(t("Couldn't read the selection position on the page. Select text on the PDF page's text layer; plain text selections in the text panel can only create excerpts.", "没有取得页面上的文字选区位置。请在 PDF 页面文字层上选择文字；文本面板中的纯文本选择只能创建摘录。"));
             return;
           }
 
@@ -473,13 +487,15 @@ export class PdfAnnotationManager {
           });
           patchNode(canvas, source.id, { bcPdfTextHighlights: highlights });
           this.refresh();
-          new Notice("已在 Canvas 中保存文字高亮；它会随 .canvas 文件保存，但不会修改 PDF 原文件。");
+          new Notice(t("Saved the text highlight to the Canvas. It is stored with the .canvas file and does not modify the original PDF.", "已在 Canvas 中保存文字高亮；它会随 .canvas 文件保存，但不会修改 PDF 原文件。"));
           return;
         }
 
         const excerptIndex = latest.nodes.filter((node: any) => node.bcPdfExcerptSource === source.id).length;
         const quoted = selectedText.slice(0, 10000).split(/\r?\n/).map(line => "> " + line).join("\n");
-        const body = "PDF 摘录\n\n" + quoted + (selectedText.length > 10000 ? "\n\n（摘录已截断至 10,000 个字符）" : "") + "\n\n批注：";
+        const body = t("PDF excerpt", "PDF 摘录") + "\n\n" + quoted +
+          (selectedText.length > 10000 ? "\n\n" + t("(Excerpt truncated to 10,000 characters)", "（摘录已截断至 10,000 个字符）") : "") +
+          "\n\n" + t("Notes:", "批注：");
         const note = makeTextNode(
           body,
           source.x + source.width + 70,
@@ -488,7 +504,7 @@ export class PdfAnnotationManager {
         );
         (note as any).bcPdfExcerptSource = source.id;
         insertCanvasNode(canvas, note, source.id);
-        new Notice("已创建 PDF 文本摘录节点，并连接到对应页面。");
+        new Notice(t("Created a PDF text excerpt node and connected it to its page.", "已创建 PDF 文本摘录节点，并连接到对应页面。"));
       };
       container.addEventListener("better-canvas-pdf-selection", onCreateExcerpt as EventListener);
       this.plugin.register(() => container.removeEventListener("better-canvas-pdf-selection", onCreateExcerpt as EventListener));
@@ -508,7 +524,7 @@ export class PdfAnnotationManager {
       svg.classList.add("bc-pdf-annotation-overlay");
       svg.setAttribute("viewBox", "0 0 1000 1000");
       svg.setAttribute("preserveAspectRatio", "none");
-      svg.setAttribute("aria-label", "PDF page annotations");
+      svg.setAttribute("aria-label", t("PDF page annotations", "PDF 页面批注"));
       container.appendChild(svg);
       this.installPointerHandlers(canvas, nodeData.id, svg);
     }
@@ -559,7 +575,7 @@ export class PdfAnnotationManager {
         rect.setAttribute("fill-opacity", String(Math.max(0.05, Math.min(0.9, highlight.opacity ?? 0.36))));
         rect.setAttribute("rx", "2");
         if (highlight.text) {
-          rect.setAttribute("aria-label", "PDF text highlight: " + highlight.text.slice(0, 120));
+          rect.setAttribute("aria-label", t("PDF text highlight: " + highlight.text.slice(0, 120), "PDF 文字高亮：" + highlight.text.slice(0, 120)));
           const title = makeSvgElement("title");
           title.textContent = highlight.text;
           rect.appendChild(title);

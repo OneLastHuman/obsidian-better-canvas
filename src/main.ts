@@ -1,12 +1,14 @@
 import {
   App,
   ItemView,
+  getLanguage,
   Modal,
   Notice,
   Plugin,
   SuggestModal,
   TFile
 } from "obsidian";
+import { setLanguage, t } from "./i18n";
 import BetterCanvasFeatures from "./feature-integrator";
 import { getMindMapEditingCreationShortcut, isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { EditingIframeShortcutRegistry } from "./canvas-editing-shortcuts";
@@ -118,7 +120,7 @@ function simpleNodeText(node: CanvasNodeData): string {
   if (typeof node.text === "string" && node.text.trim()) return node.text;
   if (typeof node.file === "string") return node.file;
   if (typeof node.url === "string") return node.url;
-  return `[${node.type} node]`;
+  return t(`[${node.type} node]`, `[${node.type} 节点]`);
 }
 
 class PromptModal extends Modal {
@@ -142,7 +144,7 @@ class PromptModal extends Modal {
     const input = contentEl.createEl("textarea", { cls: "bc-modal-prompt-textarea", attr: { rows: "5", placeholder: this.placeholder } });
     input.value = this.initialValue;
     const actions = contentEl.createDiv({ cls: "modal-button-container" });
-    const submit = actions.createEl("button", { text: "提交", cls: "mod-cta" });
+    const submit = actions.createEl("button", { text: t("Submit", "提交"), cls: "mod-cta" });
     submit.onclick = () => {
       const value = input.value.trim();
       this.close();
@@ -169,7 +171,7 @@ class CustomStylePresetModal extends SuggestModal<CustomStyleChoice> {
     private readonly onChoose: (choice: CustomStyleChoice) => void
   ) {
     super(app);
-    this.setPlaceholder("选择 CSS 自定义样式及其值");
+    this.setPlaceholder(t("Choose a custom CSS style and its value", "选择 CSS 自定义样式及其值"));
   }
 
   getSuggestions(query: string): CustomStyleChoice[] {
@@ -189,8 +191,8 @@ class CustomStylePresetModal extends SuggestModal<CustomStyleChoice> {
       text: choice.definition.label + " — " + choice.option.label
     });
     element.createEl("small", {
-      text: (choice.definition.kind === "node" ? "节点" : "连线") + " · " +
-        choice.definition.key + " = " + (choice.option.value === null ? "null（重置）" : choice.option.value)
+      text: (choice.definition.kind === "node" ? t("Node", "节点") : t("Connection", "连线")) + " · " +
+        choice.definition.key + " = " + (choice.option.value === null ? t("null (reset)", "null（重置）") : choice.option.value)
     });
   }
 
@@ -246,21 +248,21 @@ class PresentationModal extends Modal {
   private renderSlide(): void {
     this.contentEl.empty();
     if (this.slides.length === 0) {
-      this.contentEl.createEl("p", { text: "当前画布没有可展示的节点。" });
+      this.contentEl.createEl("p", { text: t("This Canvas has no nodes to present.", "当前画布没有可展示的节点。") });
       return;
     }
     const slide = this.slides[this.index];
-    this.contentEl.createEl("h2", { text: slide.title || `节点 ${this.index + 1}` });
+    this.contentEl.createEl("h2", { text: slide.title || t(`Node ${this.index + 1}`, `节点 ${this.index + 1}`) });
     this.contentEl.createEl("div", { cls: "better-canvas-slide", text: slide.body });
-    this.contentEl.createEl("p", { text: `${this.index + 1} / ${this.slides.length} · ←/→ 或 PageUp/PageDown 翻页 · Esc 退出` });
+    this.contentEl.createEl("p", { text: t(`${this.index + 1} / ${this.slides.length} · ←/→ or PageUp/PageDown to change slides · Esc to exit`, `${this.index + 1} / ${this.slides.length} · ←/→ 或 PageUp/PageDown 翻页 · Esc 退出`) });
     const actions = this.contentEl.createDiv({ cls: "modal-button-container" });
-    const previous = actions.createEl("button", { text: "上一张" });
+    const previous = actions.createEl("button", { text: t("Previous", "上一张") });
     previous.disabled = this.index === 0;
     previous.onclick = () => {
       this.index = Math.max(0, this.index - 1);
       this.renderSlide();
     };
-    const next = actions.createEl("button", { text: "下一张", cls: "mod-cta" });
+    const next = actions.createEl("button", { text: t("Next", "下一张"), cls: "mod-cta" });
     next.disabled = this.index >= this.slides.length - 1;
     next.onclick = () => {
       this.index = Math.min(this.slides.length - 1, this.index + 1);
@@ -289,6 +291,7 @@ export default class BetterCanvasPlugin extends Plugin {
 
   async onload(): Promise<void> {
     // Keep unknown/retired fields inert so upgrading never discards saved user data.
+    setLanguage(getLanguage());
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
     this.settings.systemPromptProfiles = normalizeNamedPromptProfiles(this.settings.systemPromptProfiles);
     if (this.settings.flashcardOutputMode !== "spaced-repetition") this.settings.flashcardOutputMode = "canvas";
@@ -301,7 +304,7 @@ export default class BetterCanvasPlugin extends Plugin {
       const record = normalizeAIUsageRecord((event as CustomEvent<unknown>).detail);
       if (!record) return;
       this.settings.aiUsageRecords = appendAIUsageRecord(this.settings.aiUsageRecords, record, AI_USAGE_HISTORY_LIMIT);
-      void this.saveSettings().catch(error => new Notice(error instanceof Error ? error.message : "保存 AI 用量记录失败。"));
+      void this.saveSettings().catch(error => new Notice(error instanceof Error ? error.message : t("Could not save the AI usage record.", "保存 AI 用量记录失败。")));
     };
     window.addEventListener(AI_USAGE_EVENT, handleAIUsage);
     this.register(() => window.removeEventListener(AI_USAGE_EVENT, handleAIUsage));
@@ -361,10 +364,10 @@ export default class BetterCanvasPlugin extends Plugin {
       onOpenGuide: () => {
         void this.finishWelcome("completed", this.onboardingState.exampleCanvasPath)
           .then(() => this.openOnboardingGuide())
-          .catch(error => new Notice("无法记录引导状态：" + (error instanceof Error ? error.message : String(error)), 8000));
+          .catch(error => new Notice(t("Could not save the onboarding state: ", "无法记录引导状态：") + (error instanceof Error ? error.message : String(error)), 8000));
       },
       onSkip: () => void this.finishWelcome("skipped", this.onboardingState.exampleCanvasPath)
-        .catch(error => new Notice("无法记录引导状态：" + (error instanceof Error ? error.message : String(error)), 8000)),
+        .catch(error => new Notice(t("Could not save the onboarding state: ", "无法记录引导状态：") + (error instanceof Error ? error.message : String(error)), 8000)),
       onClosed: () => {
         this.welcomeModal = null;
       }
@@ -376,9 +379,9 @@ export default class BetterCanvasPlugin extends Plugin {
     try {
       const result = await createExampleCanvas(this.app, this.onboardingState);
       await this.finishWelcome("completed", result.file.path, result.file);
-      new Notice(result.created ? "已创建示例画布。现有文件未被覆盖。" : "已打开本地记录的示例画布。");
+      new Notice(result.created ? t("Example Canvas created. Existing files were not overwritten.", "已创建示例画布。现有文件未被覆盖。") : t("Opened the example Canvas recorded locally.", "已打开本地记录的示例画布。"));
     } catch (error) {
-      new Notice("创建示例画布失败：" + (error instanceof Error ? error.message : String(error)) + "。请检查 Vault 写权限后重试。", 8000);
+      new Notice(t("Could not create the example Canvas: ", "创建示例画布失败：") + (error instanceof Error ? error.message : String(error)) + t(". Check vault write permissions and try again.", "。请检查 Vault 写权限后重试。"), 8000);
     }
   }
 
@@ -399,11 +402,11 @@ export default class BetterCanvasPlugin extends Plugin {
   resetOnboarding(showWelcome = true): void {
     void this.saveOnboardingState(resetOnboardingState())
       .then(() => {
-        new Notice("引导状态已重置。");
+        new Notice(t("Onboarding state reset.", "引导状态已重置。"));
         if (showWelcome) this.scheduleOnboardingCheck(0);
         else if (this.hasCanvasView()) this.scheduleOnboardingCheck(0);
       })
-      .catch(error => new Notice("重置引导失败：" + (error instanceof Error ? error.message : String(error)), 8000));
+      .catch(error => new Notice(t("Could not reset onboarding: ", "重置引导失败：") + (error instanceof Error ? error.message : String(error)), 8000));
   }
 
   scheduleOnboardingCheck(delay = 250): void {
@@ -426,7 +429,7 @@ export default class BetterCanvasPlugin extends Plugin {
       const shown = showEmptyCanvasTip(container);
       if (shown) {
         void this.markEmptyTipDismissed()
-          .catch(error => new Notice("无法记录空画布提示状态：" + (error instanceof Error ? error.message : String(error)), 8000));
+          .catch(error => new Notice(t("Could not save the empty Canvas tip state: ", "无法记录空画布提示状态：") + (error instanceof Error ? error.message : String(error)), 8000));
       }
     }
   }
@@ -480,38 +483,38 @@ export default class BetterCanvasPlugin extends Plugin {
 
   private selectedOrNotice(canvas = this.getCanvas()): { canvas: any; node: CanvasNodeData } | null {
     if (!canvas) {
-      new Notice("请先打开一个 Obsidian Canvas。");
+      new Notice(t("Open an Obsidian Canvas first.", "请先打开一个 Obsidian Canvas。"));
       return null;
     }
     if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式。请先运行“切换 Canvas 只读模式”解除锁定。");
+      new Notice(t("This Canvas is in read-only mode. Run “Toggle Canvas read-only mode” to unlock it.", "当前 Canvas 处于只读模式。请先运行“切换 Canvas 只读模式”解除锁定。"));
       return null;
     }
     const node = this.getSelectedRecord(canvas);
     if (!node) {
-      new Notice("请在画布中只选择一个节点。");
+      new Notice(t("Select a single node on the Canvas.", "请在画布中只选择一个节点。"));
       return null;
     }
     return { canvas, node };
   }
 
   private registerCommands(): void {
-    this.addCommand({ id: "create-child-node", name: "创建子节点", callback: () => this.createChildNode() });
-    this.addCommand({ id: "create-sibling-node", name: "创建同级节点", callback: () => this.createSiblingNode() });
-    this.addCommand({ id: "create-floating-node", name: "创建游离节点", callback: () => this.createFloatingNode() });
-    this.addCommand({ id: "auto-layout-tree", name: "自动整理思维导图", callback: () => this.autoLayout() });
-    this.addCommand({ id: "split-heading-into-mindmap", name: "将所选 Markdown 文件的 H1 拆为思维导图", callback: () => void this.splitHeadingsIntoMindMap() });
-    this.addCommand({ id: "ask-ai", name: "向 AI 提问所选节点", callback: () => this.features.askSelectedNode() });
-    this.addCommand({ id: "ai-usage-report", name: "查看 AI 用量与成本", callback: () => this.showAIUsageReport() });
-    this.addCommand({ id: "generate-flashcards", name: "从所选节点生成复习闪卡", callback: () => this.features.generateFlashcardsFromSelection() });
-    this.addCommand({ id: "generate-image", name: "根据所选节点生成图片", callback: () => this.features.generateImageFromSelection() });
-    this.addCommand({ id: "add-web-link", name: "在画布中添加网页链接卡片", callback: () => this.addWebLink() });
-    this.addCommand({ id: "apply-css-style-preset", name: "应用 CSS 自定义样式预设", callback: () => { void this.applyCustomStylePreset(); } });
-    this.addCommand({ id: "search-canvas", name: "搜索当前画布", callback: () => this.searchCanvas() });
-    this.addCommand({ id: "start-presentation", name: "开始画布演示", callback: () => this.startPresentation() });
-    this.addCommand({ id: "select-node-tree", name: "选择所选节点及其子树", callback: () => this.selectNodeTree() });
-    this.addCommand({ id: "open-onboarding", name: "打开首次使用引导", callback: () => this.openOnboarding() });
-    this.addCommand({ id: "reset-onboarding", name: "重置首次使用引导", callback: () => this.resetOnboarding() });
+    this.addCommand({ id: "create-child-node", name: t("Create child node", "创建子节点"), callback: () => this.createChildNode() });
+    this.addCommand({ id: "create-sibling-node", name: t("Create sibling node", "创建同级节点"), callback: () => this.createSiblingNode() });
+    this.addCommand({ id: "create-floating-node", name: t("Create floating node", "创建游离节点"), callback: () => this.createFloatingNode() });
+    this.addCommand({ id: "auto-layout-tree", name: t("Auto-arrange mind map", "自动整理思维导图"), callback: () => this.autoLayout() });
+    this.addCommand({ id: "split-heading-into-mindmap", name: t("Split H1 headings of the selected Markdown file into a mind map", "将所选 Markdown 文件的 H1 拆为思维导图"), callback: () => void this.splitHeadingsIntoMindMap() });
+    this.addCommand({ id: "ask-ai", name: t("Ask AI about the selected node", "向 AI 提问所选节点"), callback: () => this.features.askSelectedNode() });
+    this.addCommand({ id: "ai-usage-report", name: t("View AI usage and cost", "查看 AI 用量与成本"), callback: () => this.showAIUsageReport() });
+    this.addCommand({ id: "generate-flashcards", name: t("Generate review flashcards from selected nodes", "从所选节点生成复习闪卡"), callback: () => this.features.generateFlashcardsFromSelection() });
+    this.addCommand({ id: "generate-image", name: t("Generate an image from selected nodes", "根据所选节点生成图片"), callback: () => this.features.generateImageFromSelection() });
+    this.addCommand({ id: "add-web-link", name: t("Add a web link card to the Canvas", "在画布中添加网页链接卡片"), callback: () => this.addWebLink() });
+    this.addCommand({ id: "apply-css-style-preset", name: t("Apply custom CSS style preset", "应用 CSS 自定义样式预设"), callback: () => { void this.applyCustomStylePreset(); } });
+    this.addCommand({ id: "search-canvas", name: t("Search the current Canvas", "搜索当前画布"), callback: () => this.searchCanvas() });
+    this.addCommand({ id: "start-presentation", name: t("Start Canvas presentation", "开始画布演示"), callback: () => this.startPresentation() });
+    this.addCommand({ id: "select-node-tree", name: t("Select node and its subtree", "选择所选节点及其子树"), callback: () => this.selectNodeTree() });
+    this.addCommand({ id: "open-onboarding", name: t("Open onboarding guide", "打开首次使用引导"), callback: () => this.openOnboarding() });
+    this.addCommand({ id: "reset-onboarding", name: t("Reset onboarding guide", "重置首次使用引导"), callback: () => this.resetOnboarding() });
   }
 
   private registerCanvasContextMenu(): void {
@@ -540,7 +543,7 @@ export default class BetterCanvasPlugin extends Plugin {
         }
       });
 
-      menu.addItem((item: any) => item.setTitle("整理").setIcon("git-branch").onClick(() => {
+      menu.addItem((item: any) => item.setTitle(t("Arrange", "整理")).setIcon("git-branch").onClick(() => {
         this.selectNode(this.getCanvas(), nodeId);
         this.autoLayout();
       }));
@@ -600,11 +603,11 @@ export default class BetterCanvasPlugin extends Plugin {
   private async applyCustomStylePreset(): Promise<void> {
     const canvas = this.getCanvas();
     if (!canvas) {
-      new Notice("请先打开一个 Obsidian Canvas。");
+      new Notice(t("Open an Obsidian Canvas first.", "请先打开一个 Obsidian Canvas。"));
       return;
     }
     if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式，无法更改样式。");
+      new Notice(t("This Canvas is in read-only mode; styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改样式。"));
       return;
     }
 
@@ -618,12 +621,12 @@ export default class BetterCanvasPlugin extends Plugin {
     const edgeIds = currentData.edges.filter(edge => selectedSet.has(edge.id)).map(edge => edge.id);
 
     if (nodeIds.length > 0 && edgeIds.length > 0) {
-      new Notice("请只选择节点或只选择连线，再应用 CSS 自定义样式。");
+      new Notice(t("Select only nodes or only connections before applying a custom CSS style.", "请只选择节点或只选择连线，再应用 CSS 自定义样式。"));
       return;
     }
     const kind: CustomStyleKind | null = nodeIds.length > 0 ? "node" : edgeIds.length > 0 ? "edge" : null;
     if (!kind) {
-      new Notice("请先选择一个或多个节点，或选择一个或多个连线。");
+      new Notice(t("Select one or more nodes, or one or more connections.", "请先选择一个或多个节点，或选择一个或多个连线。"));
       return;
     }
     const targetIds = kind === "node" ? nodeIds : edgeIds;
@@ -632,32 +635,35 @@ export default class BetterCanvasPlugin extends Plugin {
       definition.options.map(option => ({ definition, option }))
     );
     if (choices.length === 0) {
-      new Notice("未找到可用的" + (kind === "node" ? "节点" : "连线") +
-        "样式预设。请在已启用的 CSS snippet 中添加 @advanced-canvas-" + kind + "-style 配置。");
+      new Notice(t(`No usable ${kind === "node" ? "node" : "connection"} style presets. Add an @advanced-canvas-${kind}-style block to an enabled CSS snippet.`,
+        `未找到可用的${kind === "node" ? "节点" : "连线"}样式预设。请在已启用的 CSS snippet 中添加 @advanced-canvas-${kind}-style 配置。`));
       return;
     }
 
     new CustomStylePresetModal(this.app, choices, choice => {
       if (this.getCanvas() !== canvas) {
-        new Notice("当前画布已切换；未应用样式。请在目标画布重新运行命令。");
+        new Notice(t("The active Canvas changed; no style was applied. Run the command again on the target Canvas.", "当前画布已切换；未应用样式。请在目标画布重新运行命令。"));
         return;
       }
       if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
-        new Notice("当前 Canvas 处于只读模式，无法更改样式。");
+        new Notice(t("This Canvas is in read-only mode; styles cannot be changed.", "当前 Canvas 处于只读模式，无法更改样式。"));
         return;
       }
       const latestData = readCanvasData(canvas);
       const result = applyCustomStyleChoice(latestData, targetIds, choice.definition, choice.option.value);
       if (result.updated === 0) {
-        new Notice("所选节点或连线已不存在，未应用样式。");
+        new Notice(t("The selected nodes or connections no longer exist; no style was applied.", "所选节点或连线已不存在，未应用样式。"));
         return;
       }
       canvas.importData(result.data);
       canvas.requestSave?.();
       canvas.requestFrame?.();
       decorateCanvas(canvas);
-      new Notice("已将“" + choice.definition.label + " / " + choice.option.label + "”应用到 " +
-        result.updated + " 个" + (kind === "node" ? "节点" : "连线") + "。");
+      new Notice(kind === "node"
+        ? t(`Applied “${choice.definition.label} / ${choice.option.label}” to ${result.updated} node${result.updated === 1 ? "" : "s"}.`,
+          `已将“${choice.definition.label} / ${choice.option.label}”应用到 ${result.updated} 个节点。`)
+        : t(`Applied “${choice.definition.label} / ${choice.option.label}” to ${result.updated} connection${result.updated === 1 ? "" : "s"}.`,
+          `已将“${choice.definition.label} / ${choice.option.label}”应用到 ${result.updated} 个连线。`));
     }).open();
   }
 
@@ -777,7 +783,7 @@ export default class BetterCanvasPlugin extends Plugin {
     const data = readCanvasData(canvas);
     const incoming = data.edges.find(edge => edge.toNode === node.id);
     if (!incoming) {
-      new Notice("所选节点没有父节点；请使用“创建子节点”或先连接到一个父节点。");
+      new Notice(t("The selected node has no parent; use “Create child node” or connect it to a parent first.", "所选节点没有父节点；请使用“创建子节点”或先连接到一个父节点。"));
       return;
     }
     const siblings = data.edges.filter(edge => edge.fromNode === incoming.fromNode)
@@ -816,7 +822,7 @@ export default class BetterCanvasPlugin extends Plugin {
     const selected = this.selectedOrNotice();
     if (!selected) return;
     const count = layoutTree(selected.canvas, selected.node.id, this.settings.direction, this.settings.gapX, this.settings.gapY);
-    new Notice(count > 0 ? `已整理 ${count} 个节点。` : "没有找到可整理的节点。");
+    new Notice(count > 0 ? t(`Arranged nodes: ${count}.`, `已整理 ${count} 个节点。`) : t("No nodes to arrange.", "没有找到可整理的节点。"));
   }
 
   private async splitHeadingsIntoMindMap(): Promise<void> {
@@ -824,17 +830,17 @@ export default class BetterCanvasPlugin extends Plugin {
     if (!selected) return;
     const { canvas, node } = selected;
     if (node.type !== "file" || !node.file) {
-      new Notice("请先选择一个 Markdown 文件节点。");
+      new Notice(t("Select a Markdown file node first.", "请先选择一个 Markdown 文件节点。"));
       return;
     }
     const file = this.app.vault.getAbstractFileByPath(node.file);
     if (!(file instanceof TFile) || file.extension !== "md") {
-      new Notice("所选节点不是可读取的 Markdown 文件。");
+      new Notice(t("The selected node is not a readable Markdown file.", "所选节点不是可读取的 Markdown 文件。"));
       return;
     }
     const headings = (this.app.metadataCache.getFileCache(file)?.headings ?? []).filter(heading => heading.level === 1);
     if (headings.length === 0) {
-      new Notice("该文件没有 H1 标题。");
+      new Notice(t("This file has no H1 headings.", "该文件没有 H1 标题。"));
       return;
     }
     headings.forEach((heading, index) => {
@@ -844,30 +850,30 @@ export default class BetterCanvasPlugin extends Plugin {
         this.defaultSize());
       insertCanvasNode(canvas, child, node.id);
     });
-    new Notice(`已从“${file.basename}”创建 ${headings.length} 个标题节点。`);
+    new Notice(t(`Created heading nodes from "${file.basename}": ${headings.length}.`, `已从“${file.basename}”创建 ${headings.length} 个标题节点。`));
   }
 
   private addWebLink(): void {
     const canvas = this.getCanvas();
     if (!canvas) {
-      new Notice("请先打开一个 Obsidian Canvas。");
+      new Notice(t("Open an Obsidian Canvas first.", "请先打开一个 Obsidian Canvas。"));
       return;
     }
     if (canvas.wrapperEl?.classList?.contains("bc-readonly")) {
-      new Notice("当前 Canvas 处于只读模式。请先解除只读模式再添加节点。");
+      new Notice(t("This Canvas is in read-only mode. Leave read-only mode before adding nodes.", "当前 Canvas 处于只读模式。请先解除只读模式再添加节点。"));
       return;
     }
     const selected = this.getSelectedRecord(canvas);
-    new PromptModal(this.app, "添加网页链接卡片", "输入完整的 http:// 或 https:// URL", value => {
+    new PromptModal(this.app, t("Add web link card", "添加网页链接卡片"), t("Enter a full http:// or https:// URL", "输入完整的 http:// 或 https:// URL"), value => {
       let url: URL;
       try {
         url = new URL(value);
       } catch {
-        new Notice("URL 格式不正确。");
+        new Notice(t("Invalid URL.", "URL 格式不正确。"));
         return;
       }
       if (url.protocol !== "http:" && url.protocol !== "https:") {
-        new Notice("仅支持 http 和 https 链接。");
+        new Notice(t("Only http and https links are supported.", "仅支持 http 和 https 链接。"));
         return;
       }
       const node: CanvasNodeData = {
@@ -886,21 +892,21 @@ export default class BetterCanvasPlugin extends Plugin {
   private searchCanvas(): void {
     const canvas = this.getCanvas();
     if (!canvas) {
-      new Notice("请先打开一个 Obsidian Canvas。");
+      new Notice(t("Open an Obsidian Canvas first.", "请先打开一个 Obsidian Canvas。"));
       return;
     }
-    new PromptModal(this.app, "搜索当前画布", "输入要查找的文本", query => {
+    new PromptModal(this.app, t("Search the current Canvas", "搜索当前画布"), t("Enter the text to find", "输入要查找的文本"), query => {
       const needle = query.toLocaleLowerCase();
       const result = readCanvasData(canvas).nodes.find(node =>
         [node.text, node.file, node.url, node.type]
           .some(value => typeof value === "string" && value.toLocaleLowerCase().includes(needle))
       );
       if (!result) {
-        new Notice("当前画布中没有匹配的节点。");
+        new Notice(t("No matching nodes in this Canvas.", "当前画布中没有匹配的节点。"));
         return;
       }
       this.selectNode(canvas, result.id);
-      new Notice("已选择第一个匹配节点。");
+      new Notice(t("Selected the first matching node.", "已选择第一个匹配节点。"));
     }).open();
   }
 
@@ -915,13 +921,13 @@ export default class BetterCanvasPlugin extends Plugin {
       if (internal) canvas.select?.(internal);
     }
     canvas.zoomToSelection?.();
-    new Notice(`已选择 ${ids.length} 个节点。`);
+    new Notice(t(`Selected nodes: ${ids.length}.`, `已选择 ${ids.length} 个节点。`));
   }
 
   private startPresentation(): void {
     const canvas = this.getCanvas();
     if (!canvas) {
-      new Notice("请先打开一个 Obsidian Canvas。");
+      new Notice(t("Open an Obsidian Canvas first.", "请先打开一个 Obsidian Canvas。"));
       return;
     }
     const data = readCanvasData(canvas);

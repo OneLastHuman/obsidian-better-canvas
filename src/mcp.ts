@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import { normalizeMcpToolResult, RemoteMcpResult } from "./mcp-result";
+import { t } from "./i18n";
 import {
   collectMcpCatalogPages,
   formatMcpPromptResult,
@@ -63,9 +64,9 @@ async function rpc(
   const body = parseResponse(response);
   if (response.status < 200 || response.status >= 300) {
     const detail = body?.error?.message ?? body?.message ?? response.text;
-    throw new Error("MCP 请求失败（HTTP " + response.status + "）" + (detail ? ": " + detail : ""));
+    throw new Error(t("MCP request failed (HTTP " + response.status + ")", "MCP 请求失败（HTTP " + response.status + "）") + (detail ? ": " + detail : ""));
   }
-  if (body?.error) throw new Error("MCP 错误: " + (body.error.message ?? JSON.stringify(body.error)));
+  if (body?.error) throw new Error(t("MCP error: ", "MCP 错误: ") + (body.error.message ?? JSON.stringify(body.error)));
   return { body: body?.result ?? body, sessionId: response.headers?.["mcp-session-id"] ?? sessionId };
 }
 
@@ -80,11 +81,11 @@ async function initialize(endpoint: string, apiKey: string): Promise<{ sessionId
 }
 
 export async function listRemoteTools(endpoint: string, apiKey: string): Promise<RemoteMcpTool[]> {
-  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
+  if (!endpoint.trim()) throw new Error(t("Set the MCP Streamable HTTP endpoint in settings first.", "请先在设置中填写 MCP Streamable HTTP endpoint。"));
   const init = await initialize(endpoint, apiKey);
   const result = await rpc(endpoint, apiKey, "tools/list", {}, init.sessionId);
   const tools = result.body?.tools;
-  if (!Array.isArray(tools)) throw new Error("MCP 服务没有返回 tools 数组。");
+  if (!Array.isArray(tools)) throw new Error(t("The MCP server did not return a tools array.", "MCP 服务没有返回 tools 数组。"));
   return tools.filter((tool: any) => typeof tool?.name === "string").map((tool: any) => ({
     name: tool.name,
     description: typeof tool.description === "string" ? tool.description : "",
@@ -98,15 +99,15 @@ export async function callRemoteTool(
   name: string,
   args: Record<string, unknown>
 ): Promise<RemoteMcpResult> {
-  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
-  if (!name.trim()) throw new Error("MCP tool 名称不能为空。");
+  if (!endpoint.trim()) throw new Error(t("Set the MCP Streamable HTTP endpoint in settings first.", "请先在设置中填写 MCP Streamable HTTP endpoint。"));
+  if (!name.trim()) throw new Error(t("MCP tool name cannot be empty.", "MCP tool 名称不能为空。"));
   const init = await initialize(endpoint, apiKey);
   const result = await rpc(endpoint, apiKey, "tools/call", {
     name: name.trim(),
     arguments: args
   }, init.sessionId);
   const value = result.body;
-  if (value?.isError) throw new Error("MCP 工具执行失败: " + JSON.stringify(value.content ?? value));
+  if (value?.isError) throw new Error(t("MCP tool call failed: ", "MCP 工具执行失败: ") + JSON.stringify(value.content ?? value));
   return normalizeMcpToolResult(value);
 }
 
@@ -118,7 +119,7 @@ async function remoteCatalog<T>(
   normalizePage: (value: unknown) => { items: T[]; nextCursor?: string },
   keyOf: (item: T) => string
 ): Promise<T[]> {
-  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
+  if (!endpoint.trim()) throw new Error(t("Set the MCP Streamable HTTP endpoint in settings first.", "请先在设置中填写 MCP Streamable HTTP endpoint。"));
   const init = await initialize(endpoint, apiKey);
   let sessionId = init.sessionId;
   return await collectMcpCatalogPages(async cursor => {
@@ -133,8 +134,8 @@ export async function listRemoteResources(endpoint: string, apiKey: string): Pro
 }
 
 export async function readRemoteResource(endpoint: string, apiKey: string, uri: string): Promise<RemoteMcpResult> {
-  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
-  if (!uri.trim()) throw new Error("MCP resource URI 不能为空。");
+  if (!endpoint.trim()) throw new Error(t("Set the MCP Streamable HTTP endpoint in settings first.", "请先在设置中填写 MCP Streamable HTTP endpoint。"));
+  if (!uri.trim()) throw new Error(t("MCP resource URI cannot be empty.", "MCP resource URI 不能为空。"));
   const init = await initialize(endpoint, apiKey);
   const response = await rpc(endpoint, apiKey, "resources/read", { uri: uri.trim() }, init.sessionId);
   return formatMcpResourceRead(uri.trim(), response.body);
@@ -150,8 +151,8 @@ export async function getRemotePrompt(
   name: string,
   args: Record<string, string>
 ): Promise<RemoteMcpResult> {
-  if (!endpoint.trim()) throw new Error("请先在设置中填写 MCP Streamable HTTP endpoint。");
-  if (!name.trim()) throw new Error("MCP prompt 名称不能为空。");
+  if (!endpoint.trim()) throw new Error(t("Set the MCP Streamable HTTP endpoint in settings first.", "请先在设置中填写 MCP Streamable HTTP endpoint。"));
+  if (!name.trim()) throw new Error(t("MCP prompt name cannot be empty.", "MCP prompt 名称不能为空。"));
   const init = await initialize(endpoint, apiKey);
   const response = await rpc(endpoint, apiKey, "prompts/get", {
     name: name.trim(),

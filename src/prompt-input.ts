@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 /**
  * Pure logic behind the prompt modal (`FeaturePromptModal`): the decision of
  * whether a submit should close the modal, and the JSON validation used by the
@@ -30,7 +32,7 @@ export function resolvePromptSubmission(value: string, options: PromptSubmission
  */
 export function promptValidator(
   check: (value: string) => unknown,
-  fallbackMessage = "输入的 JSON 无效。请检查后重试。"
+  fallbackMessage = t("The JSON you entered is invalid. Check it and try again.", "输入的 JSON 无效。请检查后重试。")
 ): (value: string) => string | null {
   return value => {
     try {
@@ -52,10 +54,10 @@ export function parseJsonObjectPrompt(raw: string, label: string): Record<string
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(label + " JSON 无效。请检查后重试。");
+    throw new Error(t(`${label} is not valid JSON. Check it and try again.`, `${label} JSON 无效。请检查后重试。`));
   }
   if (!isJsonObject(parsed)) {
-    throw new Error("输入必须是 JSON 对象，例如 {}。");
+    throw new Error(t("The input must be a JSON object, for example {}.", "输入必须是 JSON 对象，例如 {}。"));
   }
   return parsed;
 }

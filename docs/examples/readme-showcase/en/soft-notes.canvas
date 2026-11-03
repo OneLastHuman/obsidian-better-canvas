@@ -1,0 +1,166 @@
+{
+  "bcTheme": "soft-notes",
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 480,
+      "y": 295,
+      "width": 420,
+      "height": 240,
+      "text": "# Put the ideas together\n\nWeekend reading circle · one thought",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "free",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "spark",
+      "type": "text",
+      "x": 20,
+      "y": 0,
+      "width": 370,
+      "height": 285,
+      "text": "## One thought\n\nUse a small reading circle\nto trade the worlds we each read.",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "spark",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#efd4f7"
+    },
+    {
+      "id": "excerpt",
+      "type": "text",
+      "x": 480,
+      "y": -40,
+      "width": 360,
+      "height": 295,
+      "text": "## Keep one line\n\nLeave the questions that come up\nbeside the page.\n\n*Reading note · sample*",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "excerpt",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#bce7f7"
+    },
+    {
+      "id": "concept",
+      "type": "text",
+      "x": 990,
+      "y": 40,
+      "width": 350,
+      "height": 305,
+      "text": "## This week's theme\n\nHow does reading become action?",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "concept",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "center",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "center"
+      },
+      "color": "#d0f3ad"
+    },
+    {
+      "id": "question",
+      "type": "text",
+      "x": 20,
+      "y": 430,
+      "width": 375,
+      "height": 260,
+      "text": "## Leave a question\n\nAfter you finish a book,\nwhat stays in your life?",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "question",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#ffdbcb"
+    },
+    {
+      "id": "action",
+      "type": "text",
+      "x": 980,
+      "y": 360,
+      "width": 365,
+      "height": 320,
+      "text": "## Start preparing\n\n- [x] Pick one short book\n- [x] Find a discussion theme\n- [ ] Invite six friends\n- [ ] Prepare a note card",
+      "bcAutoResize": false,
+      "bcSoftNotesPreset": "action",
+      "bcShape": "default",
+      "bcBorderStyle": "invisible",
+      "bcTextAlign": "left",
+      "styleAttributes": {
+        "shape": "rectangle",
+        "border": "invisible",
+        "textAlign": "left"
+      },
+      "color": "#fff1a5"
+    }
+  ],
+  "edges": [
+    {
+      "id": "spark-title",
+      "fromNode": "spark",
+      "toNode": "title",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "excerpt-title",
+      "fromNode": "excerpt",
+      "toNode": "title",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "title-concept",
+      "fromNode": "title",
+      "toNode": "concept",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "title-action",
+      "fromNode": "title",
+      "toNode": "action",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "question-title",
+      "fromNode": "question",
+      "toNode": "title",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    }
+  ]
+}

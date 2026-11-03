@@ -14,5 +14,8 @@ export default defineConfig({
         if (id === "obsidian") return id;
       }
     }
-  ]
+  ],
+  test: {
+    setupFiles: ["./src/test-setup.ts"]
+  }
 });

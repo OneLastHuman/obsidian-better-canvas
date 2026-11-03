@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type SupportedImageExtension = "png" | "jpg" | "gif" | "webp";
 
 export interface DetectedImageFormat {
@@ -37,7 +39,7 @@ export function detectImageFormat(bytes: Uint8Array): DetectedImageFormat {
     return { extension: "webp", mimeType: "image/webp" };
   }
 
-  throw new Error("图像服务返回的数据不是受支持的图片格式（PNG、JPEG、GIF 或 WebP）。");
+  throw new Error(t("The image service returned data in an unsupported image format (PNG, JPEG, GIF or WebP).", "图像服务返回的数据不是受支持的图片格式（PNG、JPEG、GIF 或 WebP）。"));
 }
 
 /** Decode and validate a base64-encoded image response without relying on Node APIs. */
@@ -46,7 +48,7 @@ export function decodeBase64Image(value: string): { bytes: Uint8Array } & Detect
   try {
     binary = atob(value.replace(/\s/g, ""));
   } catch {
-    throw new Error("图像服务返回了无效的 base64 图片数据。");
+    throw new Error(t("The image service returned invalid base64 image data.", "图像服务返回了无效的 base64 图片数据。"));
   }
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);

@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface SpacedRepetitionCard {
   question?: string;
   answer?: string;
@@ -19,16 +21,16 @@ export function normalizeSpacedRepetitionDeckTag(value: string): string {
 /** Keep output within the Vault and reject traversal/absolute paths. */
 export function normalizeSpacedRepetitionFolderPath(value: string): string {
   const raw = String(value ?? "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
-  if (!raw) throw new Error("复习卡组目录不能为空。");
+  if (!raw) throw new Error(t("Review deck folder cannot be empty.", "复习卡组目录不能为空。"));
   if (raw.startsWith("/") || /^[a-zA-Z]:/.test(raw)) {
-    throw new Error("复习卡组目录必须是 Vault 内的相对路径。");
+    throw new Error(t("Review deck folder must be a relative path inside the Vault.", "复习卡组目录必须是 Vault 内的相对路径。"));
   }
   const parts = raw.split("/");
   if (parts.some(part => !part.trim() || part.trim() === "." || part.trim() === "..")) {
-    throw new Error("复习卡组目录不能包含空路径段或 . / .. 路径段。");
+    throw new Error(t("Review deck folder cannot contain empty, . or .. path segments.", "复习卡组目录不能包含空路径段或 . / .. 路径段。"));
   }
   const clean = parts.map(part => part.trim().replace(/[<>:"|?*\u0000-\u001f]/g, "-").replace(/[. ]+$/g, ""));
-  if (clean.some(part => !part)) throw new Error("复习卡组目录中包含无效的目录名称。");
+  if (clean.some(part => !part)) throw new Error(t("Review deck folder contains an invalid folder name.", "复习卡组目录中包含无效的目录名称。"));
   return clean.join("/");
 }
 
@@ -76,7 +78,7 @@ export function formatSpacedRepetitionDeck(
     question: typeof card.question === "string" ? normalizeCardSide(card.question) : "",
     answer: typeof card.answer === "string" ? normalizeCardSide(card.answer) : ""
   })).filter(card => card.question && card.answer).slice(0, 100);
-  if (!valid.length) throw new Error("没有可导出的有效闪卡。");
+  if (!valid.length) throw new Error(t("There are no valid flashcards to export.", "没有可导出的有效闪卡。"));
 
   const tag = normalizeSpacedRepetitionDeckTag(deckName);
   const title = sanitizeSpacedRepetitionTitle(noteTitle);

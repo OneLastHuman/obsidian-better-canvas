@@ -1,9 +1,10 @@
 import { requestUrl } from "obsidian";
 import type { AIProtocol, AISettings } from "./ai";
+import { t } from "./i18n";
 
 function baseUrl(value: string): string {
   const base = value.trim().replace(/\/+$/, "");
-  if (!base) throw new Error("请先在设置中配置 AI API Base URL。");
+  if (!base) throw new Error(t("Configure the AI API base URL in settings first.", "请先在设置中配置 AI API Base URL。"));
   return base;
 }
 
@@ -47,13 +48,16 @@ export async function discoverModels(settings: AISettings): Promise<string[]> {
   }
   if (response.status < 200 || response.status >= 300) {
     const detail = body?.error?.message ?? body?.message ?? response.text;
-    throw new Error("获取模型列表失败（HTTP " + response.status + "）" +
-      (detail ? "：" + String(detail).slice(0, 500) : ""));
+    const detailText = detail ? String(detail).slice(0, 500) : "";
+    throw new Error(t(
+      `Failed to fetch the model list (HTTP ${response.status})` + (detailText ? ": " + detailText : ""),
+      `获取模型列表失败（HTTP ${response.status}）` + (detailText ? "：" + detailText : "")
+    ));
   }
 
   const models = normalizeModelNames(protocol, body);
   if (!models.length) {
-    throw new Error("供应商返回成功，但没有可识别的模型 ID。请检查 API 权限，或手动输入模型名称。");
+    throw new Error(t("The provider returned success but no recognizable model IDs. Check the API permissions or enter model names manually.", "供应商返回成功，但没有可识别的模型 ID。请检查 API 权限，或手动输入模型名称。"));
   }
   return models;
 }

@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 /**
  * Helpers for editing JSON Canvas document frontmatter.
  *
@@ -18,10 +20,10 @@ function parseJsonObject(raw: string, label: string): JsonObject {
   try {
     value = JSON.parse(raw);
   } catch {
-    throw new Error(`${label} 必须是有效的 JSON。`);
+    throw new Error(t(`${label} must be valid JSON.`, `${label} 必须是有效的 JSON。`));
   }
   if (!isJsonObject(value)) {
-    throw new Error(`${label} 必须是 JSON 对象。`);
+    throw new Error(t(`${label} must be a JSON object.`, `${label} 必须是 JSON 对象。`));
   }
   return value;
 }
@@ -29,7 +31,7 @@ function parseJsonObject(raw: string, label: string): JsonObject {
 function assertSafeTopLevelKeys(value: JsonObject): void {
   const forbidden = ["__proto__", "prototype", "constructor"];
   const key = Object.keys(value).find(candidate => forbidden.includes(candidate));
-  if (key) throw new Error(`不允许使用保留属性名：${key}`);
+  if (key) throw new Error(t(`Reserved property names are not allowed: ${key}`, `不允许使用保留属性名：${key}`));
 }
 
 export interface CanvasFrontmatterSnapshot {
@@ -40,7 +42,7 @@ export interface CanvasFrontmatterSnapshot {
 
 /** Read a Canvas JSON document and normalize absent metadata/frontmatter to empty objects. */
 export function readCanvasFrontmatter(rawCanvas: string): CanvasFrontmatterSnapshot {
-  const document = parseJsonObject(rawCanvas, "Canvas 文件");
+  const document = parseJsonObject(rawCanvas, t("Canvas file", "Canvas 文件"));
   const metadata: JsonObject = isJsonObject(document.metadata) ? document.metadata : {};
   const frontmatter: JsonObject = isJsonObject(metadata.frontmatter) ? metadata.frontmatter : {};
   return { document, metadata, frontmatter };

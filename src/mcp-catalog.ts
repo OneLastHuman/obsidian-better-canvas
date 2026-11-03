@@ -1,4 +1,5 @@
 import type { RemoteMcpResult } from "./mcp-result";
+import { t } from "./i18n";
 import { isJsonObject, parseJsonObjectPrompt } from "./prompt-input";
 
 export interface McpResource {
@@ -22,14 +23,14 @@ export interface McpPrompt {
 
 export function parseMcpPromptArguments(raw: string): Record<string, string> {
   let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { throw new Error("MCP prompt 参数不是有效 JSON。"); }
+  try { parsed = JSON.parse(raw); } catch { throw new Error(t("MCP prompt arguments are not valid JSON.", "MCP prompt 参数不是有效 JSON。")); }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("MCP prompt 参数必须是 JSON object。");
+    throw new Error(t("MCP prompt arguments must be a JSON object.", "MCP prompt 参数必须是 JSON object。"));
   }
   const output: Record<string, string> = {};
   for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
     if (!key.trim() || typeof value !== "string") {
-      throw new Error("MCP prompt 的每个参数都必须是有名称的字符串。");
+      throw new Error(t("Each MCP prompt argument must be a named string.", "MCP prompt 的每个参数都必须是有名称的字符串。"));
     }
     output[key] = value;
   }
@@ -43,12 +44,12 @@ export interface McpToolConfirmation {
 
 /** Parse the confirmed tool-call JSON before anything is sent to the MCP server. */
 export function parseMcpToolConfirmation(raw: string, toolNames: string[]): McpToolConfirmation {
-  const confirmed = parseJsonObjectPrompt(raw, "MCP 调用确认");
+  const confirmed = parseJsonObjectPrompt(raw, t("MCP call confirmation", "MCP 调用确认"));
   if (typeof confirmed.toolName !== "string" || !toolNames.includes(confirmed.toolName)) {
-    throw new Error("toolName 必须是当前 MCP 服务公开的工具名称。");
+    throw new Error(t("toolName must be a tool exposed by the current MCP server.", "toolName 必须是当前 MCP 服务公开的工具名称。"));
   }
   if (!isJsonObject(confirmed.arguments)) {
-    throw new Error("arguments 必须是 JSON object。");
+    throw new Error(t("arguments must be a JSON object.", "arguments 必须是 JSON object。"));
   }
   return { toolName: confirmed.toolName, arguments: confirmed.arguments };
 }
@@ -145,28 +146,28 @@ export async function collectMcpCatalogPages<T>(
 }
 
 export function formatMcpResourceCatalog(resources: ReadonlyArray<McpResource>): string {
-  const lines = ["# MCP Resources", "", "共 " + resources.length + " 个资源", ""];
+  const lines = ["# MCP Resources", "", t("Resources: " + resources.length, "共 " + resources.length + " 个资源"), ""];
   for (const item of resources) {
     lines.push("- **" + item.name + "**", "  - URI: \`" + item.uri + "\`");
     if (item.mimeType) lines.push("  - MIME: " + item.mimeType);
     if (item.description) lines.push("  - " + item.description);
   }
-  if (!resources.length) lines.push("此服务未公开 resources。");
+  if (!resources.length) lines.push(t("This server does not expose any resources.", "此服务未公开 resources。"));
   return lines.join("\n").slice(0, 12000);
 }
 
 export function formatMcpPromptCatalog(prompts: ReadonlyArray<McpPrompt>): string {
-  const lines = ["# MCP Prompts", "", "共 " + prompts.length + " 个提示模板", ""];
+  const lines = ["# MCP Prompts", "", t("Prompt templates: " + prompts.length, "共 " + prompts.length + " 个提示模板"), ""];
   for (const item of prompts) {
     lines.push("- **" + item.name + "**");
     if (item.description) lines.push("  - " + item.description);
     if (item.arguments.length) {
-      lines.push("  - 参数: " + item.arguments.map(arg =>
-        arg.name + (arg.required ? "（必填）" : "") + (arg.description ? " — " + arg.description : "")
+      lines.push(t("  - Arguments: ", "  - 参数: ") + item.arguments.map(arg =>
+        arg.name + (arg.required ? t(" (required)", "（必填）") : "") + (arg.description ? " — " + arg.description : "")
       ).join("; "));
     }
   }
-  if (!prompts.length) lines.push("此服务未公开 prompts。");
+  if (!prompts.length) lines.push(t("This server does not expose any prompts.", "此服务未公开 prompts。"));
   return lines.join("\n").slice(0, 12000);
 }
 
@@ -228,14 +229,15 @@ export function formatMcpResourceRead(uri: string, value: unknown): RemoteMcpRes
       const mimeType = typeof content.mimeType === "string" ? content.mimeType : "application/octet-stream";
       if (mimeType.toLowerCase().startsWith("image/")) {
         extractImages({ type: "image", mimeType, data: content.blob }, images);
-        return "[已附加资源图像，MIME: " + mimeType + "]";
+        return t("[Attached resource image, MIME: " + mimeType + "]", "[已附加资源图像，MIME: " + mimeType + "]");
       }
-      return "[资源为二进制数据，MIME: " + mimeType + "；为避免将未知二进制写入文本节点，未内嵌内容]";
+      return t("[Resource is binary data, MIME: " + mimeType + "; content not embedded to avoid writing unknown binary into a text node]",
+        "[资源为二进制数据，MIME: " + mimeType + "；为避免将未知二进制写入文本节点，未内嵌内容]");
     }
     if (typeof content?.text === "string") return content.text;
-    return "[资源内容 " + (index + 1) + "]\n" + asText(content);
+    return t("[Resource content " + (index + 1) + "]", "[资源内容 " + (index + 1) + "]") + "\n" + asText(content);
   }).filter(Boolean);
-  if (!contents.length) return { text: "# MCP Resource\n\nURI: " + uri + "\n\n服务器没有返回 contents。", images };
+  if (!contents.length) return { text: "# MCP Resource\n\nURI: " + uri + "\n\n" + t("The server did not return any contents.", "服务器没有返回 contents。"), images };
   return { text: "# MCP Resource\n\nURI: " + uri + "\n\n" + text.join("\n\n").slice(0, 12000), images };
 }
 
@@ -261,7 +263,7 @@ export function formatMcpPromptResult(name: string, value: unknown): RemoteMcpRe
     }
   }
   return {
-    text: ("# MCP Prompt: " + name + "\n\n" + (blocks.join("\n\n") || "服务器没有返回提示词消息。")).slice(0, 12000),
+    text: ("# MCP Prompt: " + name + "\n\n" + (blocks.join("\n\n") || t("The server did not return any prompt messages.", "服务器没有返回提示词消息。"))).slice(0, 12000),
     images
   };
 }

@@ -1,5 +1,6 @@
 import { normalizePath, type App, type TFile } from "obsidian";
 import { joinVaultPath } from "./vault-path";
+import { t } from "./i18n";
 
 export type OnboardingWelcomeState = "unseen" | "completed" | "skipped";
 export type OnboardingEmptyTipState = "unseen" | "dismissed";
@@ -23,7 +24,7 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
 };
 
 export const ONBOARDING_CANVAS_FOLDER = "Better Canvas";
-export const ONBOARDING_CANVAS_BASENAME = "快速入门";
+export const ONBOARDING_CANVAS_BASENAME = t("Quick Start", "快速入门");
 
 export function normalizeOnboardingState(value: unknown): OnboardingState {
   const raw = value && typeof value === "object" ? value as Partial<OnboardingState> : {};
@@ -128,7 +129,8 @@ export const EXAMPLE_CANVAS: ExampleCanvasData = {
       y: 210,
       width: 380,
       height: 200,
-      text: "# 把想法放在一起\n\n这是一张可以编辑的示例画布。\n双击文字，换成你自己的内容。",
+      text: t("# Put your ideas together\n\nThis is an editable example Canvas.\nDouble-click the text to make it your own.",
+        "# 把想法放在一起\n\n这是一张可以编辑的示例画布。\n双击文字，换成你自己的内容。"),
       color: "#f1d9a8",
       bcAutoResize: false
     },
@@ -139,7 +141,8 @@ export const EXAMPLE_CANVAS: ExampleCanvasData = {
       y: 20,
       width: 260,
       height: 150,
-      text: "## 一个念头\n\n先写下来，\n再慢慢整理。",
+      text: t("## One thought\n\nWrite it down first,\nthen tidy it up later.",
+        "## 一个念头\n\n先写下来，\n再慢慢整理。"),
       color: "#c9e7d4",
       bcAutoResize: false
     },
@@ -150,7 +153,8 @@ export const EXAMPLE_CANVAS: ExampleCanvasData = {
       y: 430,
       width: 260,
       height: 150,
-      text: "## 留下问题\n\n哪一件事\n值得先做？",
+      text: t("## Keep the question\n\nWhich single thing\nis worth doing first?",
+        "## 留下问题\n\n哪一件事\n值得先做？"),
       color: "#f4d2c3",
       bcAutoResize: false
     },
@@ -161,7 +165,8 @@ export const EXAMPLE_CANVAS: ExampleCanvasData = {
       y: 20,
       width: 260,
       height: 135,
-      text: "## 试试画布主题\n\n点击画布右侧的主题入口。",
+      text: t("## Try Canvas themes\n\nClick the theme entry on the right side of the Canvas.",
+        "## 试试画布主题\n\n点击画布右侧的主题入口。"),
       color: "#c9dceb",
       bcAutoResize: false
     },
@@ -172,7 +177,8 @@ export const EXAMPLE_CANVAS: ExampleCanvasData = {
       y: 205,
       width: 260,
       height: 135,
-      text: "## 试试节点样式\n\n选中卡片，再打开节点样式。",
+      text: t("## Try node styles\n\nSelect a card, then open node styles.",
+        "## 试试节点样式\n\n选中卡片，再打开节点样式。"),
       color: "#d7d0ea",
       bcAutoResize: false
     },
@@ -183,7 +189,8 @@ export const EXAMPLE_CANVAS: ExampleCanvasData = {
       y: 500,
       width: 380,
       height: 150,
-      text: "## 下一步\n\n按 Tab 创建子卡片。\n按 Enter 创建同级卡片。",
+      text: t("## Next step\n\nPress Tab to create a child card.\nPress Enter to create a sibling card.",
+        "## 下一步\n\n按 Tab 创建子卡片。\n按 Enter 创建同级卡片。"),
       color: "#f0e2ad",
       bcAutoResize: false
     }
@@ -243,7 +250,7 @@ export async function createExampleCanvas(
       if (!app.vault.getAbstractFileByPath(path) || attempt === 19) throw error;
     }
   }
-  throw new Error("无法创建不重名的示例画布。");
+  throw new Error(t("Could not create a uniquely named example Canvas.", "无法创建不重名的示例画布。"));
 }
 
 export function openCanvasFile(app: App, file: TFile): Promise<void> {

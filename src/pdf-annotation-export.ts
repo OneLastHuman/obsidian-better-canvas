@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface PdfAnnotationBundleSummary {
   markdown: string;
   pageCount: number;
@@ -172,9 +174,9 @@ function quoteText(value: string): string {
   return value.split(/\r?\n/).map(line => "> " + escapeMarkdownText(line)).join("\n");
 }
 function timestampLabel(value?: number): string {
-  if (typeof value !== "number") return "时间未知";
+  if (typeof value !== "number") return t("Unknown time", "时间未知");
   try { return new Date(value).toISOString(); }
-  catch { return "时间未知"; }
+  catch { return t("Unknown time", "时间未知"); }
 }
 function fencedCodeBlock(value: string, language: string): string {
   const backtick = String.fromCharCode(96);
@@ -233,36 +235,38 @@ export function buildPdfAnnotationMarkdown(
     ? generatedAt.toISOString()
     : new Date(0).toISOString();
   const lines: string[] = [
-    "# PDF 批注导出", "",
-    "- 来源 Canvas：" + (sourceCanvasPath ? escapeMarkdownText(sourceCanvasPath) : "未指定"),
-    "- 导出时间：" + generatedLabel,
-    "- 页面数：" + pages.length,
-    "- 文字高亮数：" + highlightCount,
-    "- 手绘笔迹数：" + strokeCount, "",
-    "> 本报告不会修改源 PDF 或 Canvas。每页包含有界的归一化批注 JSON；超出导出上限的数据会被截断，完整原始数据仍以源 Canvas 为准。", ""
+    t("# PDF annotation export", "# PDF 批注导出"), "",
+    t("- Source Canvas: ", "- 来源 Canvas：") +
+      (sourceCanvasPath ? escapeMarkdownText(sourceCanvasPath) : t("Not specified", "未指定")),
+    t("- Exported: ", "- 导出时间：") + generatedLabel,
+    t("- Pages: ", "- 页面数：") + pages.length,
+    t("- Text highlights: ", "- 文字高亮数：") + highlightCount,
+    t("- Freehand strokes: ", "- 手绘笔迹数：") + strokeCount, "",
+    t("> This report never modifies the source PDF or Canvas. Each page includes bounded, normalized annotation JSON; data beyond the export limits is truncated, and the source Canvas remains the complete original.",
+      "> 本报告不会修改源 PDF 或 Canvas。每页包含有界的归一化批注 JSON；超出导出上限的数据会被截断，完整原始数据仍以源 Canvas 为准。"), ""
   ];
 
   for (const page of pages) {
-    lines.push("## " + escapeMarkdownText(page.file) + " — 第 " + page.page + " 页", "");
-    lines.push("- 来源节点 ID：" + (page.id ? escapeMarkdownText(page.id) : "未记录"), "");
-    lines.push("### 文字高亮（" + page.highlights.length + "）", "");
+    lines.push("## " + escapeMarkdownText(page.file) + " — " + t("Page " + page.page, "第 " + page.page + " 页"), "");
+    lines.push(t("- Source node ID: ", "- 来源节点 ID：") + (page.id ? escapeMarkdownText(page.id) : t("Not recorded", "未记录")), "");
+    lines.push(t("### Text highlights (" + page.highlights.length + ")", "### 文字高亮（" + page.highlights.length + "）"), "");
     if (!page.highlights.length) {
-      lines.push("无文字高亮。", "");
+      lines.push(t("No text highlights.", "无文字高亮。"), "");
     } else {
       page.highlights.forEach((highlight, index) => {
-        lines.push((index + 1) + ". 颜色 " + escapeMarkdownText(highlight.color) +
-          "；区域数 " + highlight.rects.length +
-          "；时间 " + timestampLabel(highlight.createdAt) +
-          (highlight.textTruncated ? "；文本已截断" : ""), "");
-        lines.push(highlight.text ? quoteText(highlight.text) : "> （无可用文字内容）", "");
+        lines.push((index + 1) + t(". Color ", ". 颜色 ") + escapeMarkdownText(highlight.color) +
+          t("; regions: ", "；区域数 ") + highlight.rects.length +
+          t("; time: ", "；时间 ") + timestampLabel(highlight.createdAt) +
+          (highlight.textTruncated ? t("; text truncated", "；文本已截断") : ""), "");
+        lines.push(highlight.text ? quoteText(highlight.text) : t("> (No usable text content)", "> （无可用文字内容）"), "");
       });
     }
 
-    lines.push("### 手绘笔迹（" + page.strokes.length + "）", "");
+    lines.push(t("### Freehand strokes (" + page.strokes.length + ")", "### 手绘笔迹（" + page.strokes.length + "）"), "");
     if (!page.strokes.length) {
-      lines.push("无手绘笔迹。", "");
+      lines.push(t("No freehand strokes.", "无手绘笔迹。"), "");
     } else {
-      lines.push("| 序号 | 工具 | 颜色 | 线宽 | 点数 | 时间 |");
+      lines.push(t("| # | Tool | Color | Width | Points | Time |", "| 序号 | 工具 | 颜色 | 线宽 | 点数 | 时间 |"));
       lines.push("| ---: | --- | --- | ---: | ---: | --- |");
       page.strokes.forEach((stroke, index) => {
         lines.push("| " + (index + 1) + " | " + stroke.tool + " | " +
@@ -272,12 +276,13 @@ export function buildPdfAnnotationMarkdown(
       lines.push("");
     }
     const json = JSON.stringify({ highlights: page.highlights, strokes: page.strokes }, null, 2);
-    lines.push("### 归一化坐标数据", "", fencedCodeBlock(json, "json"), "");
+    lines.push(t("### Normalized coordinate data", "### 归一化坐标数据"), "", fencedCodeBlock(json, "json"), "");
   }
 
   if (budget.truncated) {
-    lines.push("## 导出限制", "",
-      "由于批注数量或坐标点数超过安全上限，本报告包含截断数据。未包含的数据仍保留在源 Canvas 中。", "");
+    lines.push(t("## Export limits", "## 导出限制"), "",
+      t("This report contains truncated data because the number of annotations or coordinate points exceeded safety limits. Data not included here is still kept in the source Canvas.",
+        "由于批注数量或坐标点数超过安全上限，本报告包含截断数据。未包含的数据仍保留在源 Canvas 中。"), "");
   }
 
   return {

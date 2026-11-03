@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type ProviderRequestProtocol = "openai" | "anthropic" | "gemini";
 
 const RESERVED_KEYS = new Set([
@@ -25,11 +27,11 @@ function isCredentialField(key: string): boolean {
 }
 
 function validateValue(value: unknown, path: string, depth: number, count: { value: number }): void {
-  if (depth > MAX_DEPTH) throw new Error("请求参数 JSON 嵌套层级超过 8 层。");
-  if (++count.value > MAX_TOTAL_VALUES) throw new Error("请求参数 JSON 内容过多（最多 500 个值）。");
+  if (depth > MAX_DEPTH) throw new Error(t("Request params JSON is nested deeper than 8 levels.", "请求参数 JSON 嵌套层级超过 8 层。"));
+  if (++count.value > MAX_TOTAL_VALUES) throw new Error(t("Request params JSON has too many values (max 500).", "请求参数 JSON 内容过多（最多 500 个值）。"));
   if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     if (typeof value === "number" && !Number.isFinite(value)) {
-      throw new Error("请求参数中的数字必须是有限值：" + path);
+      throw new Error(t("Request params numbers must be finite: " + path, "请求参数中的数字必须是有限值：" + path));
     }
     return;
   }
@@ -37,32 +39,32 @@ function validateValue(value: unknown, path: string, depth: number, count: { val
     for (let i = 0; i < value.length; i++) validateValue(value[i], path + "[" + i + "]", depth + 1, count);
     return;
   }
-  if (!isPlainRecord(value)) throw new Error("请求参数只允许 JSON object、array 和基本类型：" + path);
+  if (!isPlainRecord(value)) throw new Error(t("Request params only allow JSON objects, arrays and primitives: " + path, "请求参数只允许 JSON object、array 和基本类型：" + path));
   for (const [key, child] of Object.entries(value)) {
-    if (isCredentialField(key)) throw new Error("请求参数中不能包含凭据字段：" + path + "." + key);
+    if (isCredentialField(key)) throw new Error(t("Request params cannot include credential fields: " + path + "." + key, "请求参数中不能包含凭据字段：" + path + "." + key));
     const normalizedKey = key.toLowerCase();
     if (["__proto__", "prototype", "constructor"].includes(normalizedKey)) {
-      throw new Error("请求参数包含禁止的对象属性：" + key);
+      throw new Error(t("Request params include a forbidden object property: " + key, "请求参数包含禁止的对象属性：" + key));
     }
     validateValue(child, path + "." + key, depth + 1, count);
   }
 }
 
 export function validateProviderParams(value: unknown): Record<string, unknown> {
-  if (!isPlainRecord(value)) throw new Error("高级请求参数必须是 JSON object，不能是数组或 null。");
+  if (!isPlainRecord(value)) throw new Error(t("Advanced request params must be a JSON object, not an array or null.", "高级请求参数必须是 JSON object，不能是数组或 null。"));
   const entries = Object.entries(value);
   if (entries.length > MAX_TOP_LEVEL_KEYS) {
-    throw new Error("高级请求参数最多支持 64 个顶层字段。");
+    throw new Error(t("Advanced request params support at most 64 top-level fields.", "高级请求参数最多支持 64 个顶层字段。"));
   }
   const count = { value: 0 };
   for (const [key, child] of entries) {
-    if (!key.trim()) throw new Error("请求参数字段名不能为空。");
+    if (!key.trim()) throw new Error(t("Request param field names cannot be empty.", "请求参数字段名不能为空。"));
     const lower = key.toLowerCase();
     if (RESERVED_KEYS.has(lower)) {
-      throw new Error("字段“" + key + "”由 Better Canvas 控制，不能放进额外请求参数。");
+      throw new Error(t("Field “" + key + "” is controlled by Better Canvas and cannot be added to extra request params.", "字段“" + key + "”由 Better Canvas 控制，不能放进额外请求参数。"));
     }
     if (/(^|[_-])(api[_-]?key|access[_-]?token|authorization|secret|password)([_-]|$)/i.test(key)) {
-      throw new Error("请求参数中不能包含凭据字段：" + key);
+      throw new Error(t("Request params cannot include credential fields: " + key, "请求参数中不能包含凭据字段：" + key));
     }
     validateValue(child, key, 1, count);
   }
@@ -72,18 +74,18 @@ export function validateProviderParams(value: unknown): Record<string, unknown> 
 export function parseProviderParamsJson(raw: string): Record<string, unknown> {
   const rawSource = String(raw ?? "");
   if (rawSource.length > MAX_JSON_LENGTH) {
-    throw new Error("高级请求参数 JSON 超过 16 KB 上限。");
+    throw new Error(t("Advanced request params JSON exceeds the 16 KB limit.", "高级请求参数 JSON 超过 16 KB 上限。"));
   }
   const source = rawSource.trim();
   if (!source) return {};
   if (source.length > MAX_JSON_LENGTH) {
-    throw new Error("高级请求参数 JSON 超过 16 KB 上限。");
+    throw new Error(t("Advanced request params JSON exceeds the 16 KB limit.", "高级请求参数 JSON 超过 16 KB 上限。"));
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(source);
   } catch {
-    throw new Error("高级请求参数不是有效的 JSON。");
+    throw new Error(t("Advanced request params are not valid JSON.", "高级请求参数不是有效的 JSON。"));
   }
   return validateProviderParams(parsed);
 }
@@ -120,7 +122,7 @@ export function resolveTemperature(
   const number = typeof value === "number" ? value : Number(value);
   const maximum = providerTemperatureLimit(protocol);
   if (!Number.isFinite(number) || number < 0 || number > maximum) {
-    throw new Error("Temperature 必须是 0 到 " + maximum + " 之间的数字。");
+    throw new Error(t("Temperature must be a number from 0 to " + maximum + ".", "Temperature 必须是 0 到 " + maximum + " 之间的数字。"));
   }
   return number;
 }
@@ -134,7 +136,7 @@ export function resolveMaxOutputTokens(value: unknown): number | undefined {
   const number = typeof value === "number" ? value : Number(value);
   if (number === 0) return undefined;
   if (!Number.isInteger(number) || number < 1 || number > 200_000) {
-    throw new Error("最大输出 token 数必须是 1 到 200000 的整数，或填 0 使用默认值。");
+    throw new Error(t("Max output tokens must be an integer from 1 to 200000, or 0 to use the default.", "最大输出 token 数必须是 1 到 200000 的整数，或填 0 使用默认值。"));
   }
   return number;
 }

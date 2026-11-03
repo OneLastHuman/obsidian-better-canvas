@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { readCanvasData, type CanvasData, type CanvasNodeData, type CanvasEdgeData } from "./canvas";
 import { clearSketchCanvas, decorateSketchCanvas } from "./sketch-renderer";
 import { clearSoftNotesNode, decorateSoftNotesNode } from "./soft-notes-style";
@@ -7,24 +8,24 @@ import { clearRoundedMapNode, decorateRoundedMapNode, pruneRoundedMapGeometry } 
 export type CanvasThemeId = "default" | "scrapbook" | "sketch" | "rounded-map" | "research" | "soft-notes";
 
 export const SCRAPBOOK_PRESETS = [
-  { id: "tape", label: "胶带便签", sample: "拾起灵感", color: "#f4dfaa" },
-  { id: "lined", label: "横线纸", sample: "慢慢记录", color: "#f8f3e7" },
-  { id: "torn", label: "撕边纸", sample: "留住片刻", color: "#e8c6b9" },
-  { id: "photo", label: "照片框", sample: "珍藏一页", color: "#fffaf0" },
-  { id: "label", label: "标签", sample: "值得收藏", color: "#d4dfc8" }
+  { id: "tape", label: t("Tape note", "胶带便签"), sample: t("Catch an idea", "拾起灵感"), color: "#f4dfaa" },
+  { id: "lined", label: t("Lined paper", "横线纸"), sample: t("Jot it down", "慢慢记录"), color: "#f8f3e7" },
+  { id: "torn", label: t("Torn paper", "撕边纸"), sample: t("Hold the moment", "留住片刻"), color: "#e8c6b9" },
+  { id: "photo", label: t("Photo frame", "照片框"), sample: t("A page to keep", "珍藏一页"), color: "#fffaf0" },
+  { id: "label", label: t("Label", "标签"), sample: t("Worth keeping", "值得收藏"), color: "#d4dfc8" }
 ] as const;
 
 export const SCRAPBOOK_COLORS = [
-  { id: "ochre", label: "麦穗", value: "#bd9455" },
-  { id: "clay", label: "陶土", value: "#bf826c" },
-  { id: "rose", label: "干玫瑰", value: "#bd8990" },
-  { id: "sage", label: "鼠尾草", value: "#91a17c" },
-  { id: "olive", label: "橄榄", value: "#8d9470" },
-  { id: "moss", label: "苔绿", value: "#6d8b78" },
-  { id: "sky", label: "雾蓝", value: "#8ba4ad" },
-  { id: "lavender", label: "灰紫", value: "#a194b0" },
-  { id: "sand", label: "沙色", value: "#bea987" },
-  { id: "ink", label: "棕墨", value: "#897563" }
+  { id: "ochre", label: t("Wheat", "麦穗"), value: "#bd9455" },
+  { id: "clay", label: t("Clay", "陶土"), value: "#bf826c" },
+  { id: "rose", label: t("Dried rose", "干玫瑰"), value: "#bd8990" },
+  { id: "sage", label: t("Sage", "鼠尾草"), value: "#91a17c" },
+  { id: "olive", label: t("Olive", "橄榄"), value: "#8d9470" },
+  { id: "moss", label: t("Moss", "苔绿"), value: "#6d8b78" },
+  { id: "sky", label: t("Misty blue", "雾蓝"), value: "#8ba4ad" },
+  { id: "lavender", label: t("Lavender gray", "灰紫"), value: "#a194b0" },
+  { id: "sand", label: t("Sand", "沙色"), value: "#bea987" },
+  { id: "ink", label: t("Brown ink", "棕墨"), value: "#897563" }
 ] as const;
 
 export function resolveCanvasTheme(data: Partial<CanvasData>): CanvasThemeId {

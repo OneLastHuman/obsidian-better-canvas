@@ -6,6 +6,7 @@ import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from 
 import { emitAIUsageEvent, extractProviderUsage, mergeUsageCounts, type AIUsageTokenCounts } from "./ai-usage-core";
 import { runLocalAgent } from "./local-agent-cli";
 import { isAdditionalAgentBackend, localAgentConfig, type TextBackend, type LocalAgentConfig } from "./local-agent-settings";
+import { t } from "./i18n";
 
 export type AIProtocol = "openai" | "anthropic" | "gemini";
 
@@ -52,7 +53,7 @@ function protocolOf(settings: AISettings): AIProtocol {
 
 function rootUrl(baseUrl: string): string {
   const base = baseUrl.trim().replace(/\/+$/, "");
-  if (!base) throw new Error("请先在 Better Canvas 设置中填写 API Base URL。");
+  if (!base) throw new Error(t("Set the API Base URL in Better Canvas settings first.", "请先在 Better Canvas 设置中填写 API Base URL。"));
   return base;
 }
 
@@ -65,7 +66,7 @@ function endpoint(baseUrl: string, path: string): string {
 function geminiEndpoint(settings: AISettings, streaming: boolean, modelOverride?: string): string {
   const base = rootUrl(settings.baseUrl);
   const model = String(modelOverride || settings.model).trim().replace(/^models\//, "");
-  if (!model) throw new Error("请先在 Better Canvas 设置中填写 Gemini model。");
+  if (!model) throw new Error(t("Set the Gemini model in Better Canvas settings first.", "请先在 Better Canvas 设置中填写 Gemini model。"));
   const action = streaming ? "streamGenerateContent" : "generateContent";
   const alreadyAction = base.match(/^(.*\/models\/[^/:]+):(generateContent|streamGenerateContent)$/);
   const result = alreadyAction
@@ -86,7 +87,7 @@ function bodyOf(response: any): any {
 
 function responseError(status: number, body: any, rawText?: string): Error {
   const detail = body?.error?.message ?? body?.message ?? rawText ?? (typeof body === "string" ? body : "");
-  return new Error("AI API 请求失败（HTTP " + status + "）" + (detail ? ": " + String(detail).slice(0, 1200) : ""));
+  return new Error(t(`AI API request failed (HTTP ${status})`, `AI API 请求失败（HTTP ${status}）`) + (detail ? ": " + String(detail).slice(0, 1200) : ""));
 }
 
 function contentText(content: ChatMessageContent): string {
@@ -218,7 +219,7 @@ function parseCompletion(protocol: AIProtocol, body: any): string {
   // error responses can include their original message. A 2xx response must
   // not leak JSON.parse's implementation-specific exception into the Notice.
   if (typeof body === "string") {
-    throw new Error("AI 服务返回了成功状态，但没有找到可用的文本内容。");
+    throw new Error(t("The AI service returned a success status but no usable text content.", "AI 服务返回了成功状态，但没有找到可用的文本内容。"));
   }
   if (protocol === "anthropic") {
     const text = Array.isArray(body?.content)
@@ -237,7 +238,7 @@ function parseCompletion(protocol: AIProtocol, body: any): string {
       if (joined) return joined;
     }
   }
-  throw new Error("AI 服务返回了成功状态，但没有找到可用的文本内容。");
+  throw new Error(t("The AI service returned a success status but no usable text content.", "AI 服务返回了成功状态，但没有找到可用的文本内容。"));
 }
 
 async function completeWithCodex(
@@ -245,9 +246,9 @@ async function completeWithCodex(
   messages: ChatMessage[],
   signal: AbortSignal
 ): Promise<string> {
-  if (!Platform.isDesktopApp) throw new Error("Codex CLI 后端仅支持 Obsidian 桌面版。");
+  if (!Platform.isDesktopApp) throw new Error(t("The Codex CLI backend only works in the Obsidian desktop app.", "Codex CLI 后端仅支持 Obsidian 桌面版。"));
   if (hasUnsupportedACPContent(messages)) {
-    throw new Error("Codex CLI 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到大模型 API 后端。");
+    throw new Error(t("Codex CLI only supports text tasks right now. This request includes image or file context; switch to an LLM API backend.", "Codex CLI 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到大模型 API 后端。"));
   }
   const prompt = messages.map(message =>
     message.role.toUpperCase() + ":\n" + contentText(message.content)
@@ -265,21 +266,21 @@ export async function chatCompletion(
   messages: ChatMessage[]
 ): Promise<string> {
   if (isAdditionalAgentBackend(settings.backend)) {
-    if (!Platform.isDesktopApp) throw new Error("本地 Agent 仅支持 Obsidian 桌面版。");
-    if (hasUnsupportedACPContent(messages)) throw new Error("本地 Agent 当前仅支持文本任务。图片或文件上下文请切换到模型服务 API。");
+    if (!Platform.isDesktopApp) throw new Error(t("Local agents only work in the Obsidian desktop app.", "本地 Agent 仅支持 Obsidian 桌面版。"));
+    if (hasUnsupportedACPContent(messages)) throw new Error(t("Local agents only support text tasks right now. Switch to a model service API for image or file context.", "本地 Agent 当前仅支持文本任务。图片或文件上下文请切换到模型服务 API。"));
     return runLocalAgent(messages, { backend: settings.backend, ...localAgentConfig(settings, settings.backend) });
   }
   if (settings.backend === "opencode-acp") {
-    if (!Platform.isDesktopApp) throw new Error("OpenCode ACP 仅支持 Obsidian 桌面版。");
+    if (!Platform.isDesktopApp) throw new Error(t("OpenCode ACP only works in the Obsidian desktop app.", "OpenCode ACP 仅支持 Obsidian 桌面版。"));
     if (hasUnsupportedACPContent(messages)) {
-      throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
+      throw new Error(t("Local OpenCode ACP only supports text tasks right now. This request includes image or file context; switch to an API backend to keep multimodal content.", "本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。"));
     }
     return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, model: settings.opencodeModel });
   }
   if (settings.backend === "codex-cli") {
     return completeWithCodex(settings, messages, new AbortController().signal);
   }
-  if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
+  if (!settings.model.trim()) throw new Error(t("Set the chat model in Better Canvas settings first.", "请先在 Better Canvas 设置中填写 Chat model。"));
   const protocol = protocolOf(settings);
   let response: any;
   if (protocol === "anthropic") {
@@ -321,14 +322,14 @@ export async function chatCompletionStream(
   onDelta: (delta: string) => void
 ): Promise<string> {
   if (isAdditionalAgentBackend(settings.backend)) {
-    if (!Platform.isDesktopApp) throw new Error("本地 Agent 仅支持 Obsidian 桌面版。");
-    if (hasUnsupportedACPContent(messages)) throw new Error("本地 Agent 当前仅支持文本任务。图片或文件上下文请切换到模型服务 API。");
+    if (!Platform.isDesktopApp) throw new Error(t("Local agents only work in the Obsidian desktop app.", "本地 Agent 仅支持 Obsidian 桌面版。"));
+    if (hasUnsupportedACPContent(messages)) throw new Error(t("Local agents only support text tasks right now. Switch to a model service API for image or file context.", "本地 Agent 当前仅支持文本任务。图片或文件上下文请切换到模型服务 API。"));
     return runLocalAgent(messages, { backend: settings.backend, ...localAgentConfig(settings, settings.backend), signal, onDelta });
   }
   if (settings.backend === "opencode-acp") {
-    if (!Platform.isDesktopApp) throw new Error("OpenCode ACP 仅支持 Obsidian 桌面版。");
+    if (!Platform.isDesktopApp) throw new Error(t("OpenCode ACP only works in the Obsidian desktop app.", "OpenCode ACP 仅支持 Obsidian 桌面版。"));
     if (hasUnsupportedACPContent(messages)) {
-      throw new Error("本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。");
+      throw new Error(t("Local OpenCode ACP only supports text tasks right now. This request includes image or file context; switch to an API backend to keep multimodal content.", "本机 OpenCode ACP 当前仅支持文本任务。此请求包含图片或文件上下文，请切换到 API 后端以保留多模态内容。"));
     }
     return runOpenCodeACP(messages, { binaryPath: settings.opencodeBinaryPath, model: settings.opencodeModel, signal, onDelta });
   }
@@ -338,7 +339,7 @@ export async function chatCompletionStream(
     onDelta(answer);
     return answer;
   }
-  if (!settings.model.trim()) throw new Error("请先在 Better Canvas 设置中填写 Chat model。");
+  if (!settings.model.trim()) throw new Error(t("Set the chat model in Better Canvas settings first.", "请先在 Better Canvas 设置中填写 Chat model。"));
   const protocol = protocolOf(settings);
   const streamingUrl = protocol === "gemini"
     ? geminiEndpoint(settings, true)
@@ -440,7 +441,7 @@ export async function chatCompletionStream(
   buffer += decoder.decode();
   if (buffer) consumeLine(buffer);
   if (signal.aborted) throw new DOMException("The AI request was aborted.", "AbortError");
-  if (!accumulated.trim()) throw new Error("AI 服务结束了请求，但没有返回可显示的文本内容。");
+  if (!accumulated.trim()) throw new Error(t("The AI service ended the request without returning displayable text.", "AI 服务结束了请求，但没有返回可显示的文本内容。"));
   emitAIUsageEvent(protocol, settings.model, reportedUsage);
   return accumulated.trim();
 }
@@ -451,10 +452,10 @@ export async function generateImage(
 ): Promise<{ bytes: Uint8Array; extension: string }> {
   const protocol = protocolOf(settings);
   const model = settings.imageModel.trim() || settings.model.trim();
-  if (!model) throw new Error("请先在设置中填写 Image model。");
+  if (!model) throw new Error(t("Set the image model in settings first.", "请先在设置中填写 Image model。"));
 
   if (protocol === "anthropic") {
-    throw new Error("Anthropic 原生 Messages API 不提供图像生成 endpoint。请切换到支持图像生成的 Gemini 或 OpenAI 兼容 profile。");
+    throw new Error(t("The Anthropic native Messages API has no image generation endpoint. Switch to a Gemini or OpenAI-compatible profile that supports image generation.", "Anthropic 原生 Messages API 不提供图像生成 endpoint。请切换到支持图像生成的 Gemini 或 OpenAI 兼容 profile。"));
   }
 
   if (protocol === "gemini") {
@@ -478,7 +479,7 @@ export async function generateImage(
     }) : null;
     const inline = image?.inlineData ?? image?.inline_data;
     if (typeof inline?.data !== "string") {
-      throw new Error("Gemini 图像模型未返回图片内容；请确认该模型支持图像生成。");
+      throw new Error(t("The Gemini image model returned no image content; check that this model supports image generation.", "Gemini 图像模型未返回图片内容；请确认该模型支持图像生成。"));
     }
     const validated = decodeBase64Image(inline.data);
     return { bytes: validated.bytes, extension: validated.extension };
@@ -507,11 +508,11 @@ export async function generateImage(
   if (typeof first?.url === "string") {
     const imageResponse = await requestUrl({ url: first.url, method: "GET", throw: false });
     if (imageResponse.status < 200 || imageResponse.status >= 300) {
-      throw new Error("下载生成图片失败（HTTP " + imageResponse.status + "）。");
+      throw new Error(t(`Failed to download the generated image (HTTP ${imageResponse.status}).`, `下载生成图片失败（HTTP ${imageResponse.status}）。`));
     }
     const bytes = new Uint8Array(imageResponse.arrayBuffer);
     const detected = detectImageFormat(bytes);
     return { bytes, extension: detected.extension };
   }
-  throw new Error("图像服务没有返回 b64_json 或可下载的图片 URL。");
+  throw new Error(t("The image service returned neither b64_json nor a downloadable image URL.", "图像服务没有返回 b64_json 或可下载的图片 URL。"));
 }

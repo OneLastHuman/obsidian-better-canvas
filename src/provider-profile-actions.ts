@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface ProviderProfileIdentity {
   id: string;
   name?: string | null;
@@ -26,10 +28,10 @@ export function confirmAndRemoveProviderProfile<T extends ProviderProfileIdentit
   const nextActiveProfile = isActive
     ? profiles.find((_candidate, candidateIndex) => candidateIndex !== index)
     : undefined;
-  const profileName = String(profile.name || "未命名服务");
+  const profileName = String(profile.name || t("Untitled provider", "未命名服务"));
   const confirmationMessage = isActive
-    ? `确定删除当前使用的 AI 服务商“${profileName}”吗？删除后将切换到“${String(nextActiveProfile?.name || "未命名服务")}”。此操作无法撤销。`
-    : `确定删除 AI 服务商“${profileName}”吗？此操作无法撤销。`;
+    ? t(`Delete the AI provider currently in use, “${profileName}”? The plugin will switch to “${String(nextActiveProfile?.name || t("Untitled provider", "未命名服务"))}”. This cannot be undone.`, `确定删除当前使用的 AI 服务商“${profileName}”吗？删除后将切换到“${String(nextActiveProfile?.name || "未命名服务")}”。此操作无法撤销。`)
+    : t(`Delete the AI provider “${profileName}”? This cannot be undone.`, `确定删除 AI 服务商“${profileName}”吗？此操作无法撤销。`);
 
   if (!confirmDelete(confirmationMessage)) {
     return { confirmed: false, activeProviderId };

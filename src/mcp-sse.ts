@@ -1,5 +1,6 @@
 import { normalizeMcpToolResult, type RemoteMcpResult } from "./mcp-result";
 import type { RemoteMcpTool } from "./mcp";
+import { t } from "./i18n";
 import {
   collectMcpCatalogPages,
   formatMcpPromptResult,
@@ -100,30 +101,30 @@ export class SseMcpConnection {
   }
 
   async connect(): Promise<void> {
-    if (!this.streamUrl) throw new Error("请先填写远程 MCP SSE endpoint URL。");
+    if (!this.streamUrl) throw new Error(t("Enter the remote MCP SSE endpoint URL first.", "请先填写远程 MCP SSE endpoint URL。"));
     let parsed: URL;
     try {
       parsed = new URL(this.streamUrl);
     } catch {
-      throw new Error("MCP SSE endpoint URL 格式不正确。");
+      throw new Error(t("The MCP SSE endpoint URL is not valid.", "MCP SSE endpoint URL 格式不正确。"));
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new Error("MCP SSE endpoint 必须使用 HTTP 或 HTTPS。");
+      throw new Error(t("The MCP SSE endpoint must use HTTP or HTTPS.", "MCP SSE endpoint 必须使用 HTTP 或 HTTPS。"));
     }
 
     const response = await this.waitFor(fetch(parsed.toString(), {
       method: "GET",
       headers: this.headers("text/event-stream"),
       signal: this.controller.signal
-    }), 15_000, "MCP SSE 连接请求超时。");
+    }), 15_000, t("MCP SSE connection request timed out.", "MCP SSE 连接请求超时。"));
     if (!response.ok) {
       const detail = (await response.text().catch(() => "")).slice(0, 1000);
-      throw new Error("MCP SSE 连接失败（HTTP " + response.status + "）" + (detail ? "：" + detail : ""));
+      throw new Error(t("MCP SSE connection failed (HTTP " + response.status + ")", "MCP SSE 连接失败（HTTP " + response.status + "）") + (detail ? ": " + detail : ""));
     }
-    if (!response.body) throw new Error("MCP SSE 响应没有可读取的事件流。");
+    if (!response.body) throw new Error(t("The MCP SSE response has no readable event stream.", "MCP SSE 响应没有可读取的事件流。"));
     this.reader = response.body.getReader();
     void this.readEvents();
-    await this.waitFor(this.endpointPromise, 15_000, "MCP SSE 连接成功，但没有收到 endpoint 事件。");
+    await this.waitFor(this.endpointPromise, 15_000, t("MCP SSE connected but no endpoint event was received.", "MCP SSE 连接成功，但没有收到 endpoint 事件。"));
   }
 
   private async waitFor<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -165,7 +166,7 @@ export class SseMcpConnection {
 
   private handleFrame(frame: SseFrame): void {
     if (frame.event === "error") {
-      throw new Error("MCP SSE 服务报告错误：" + frame.data.slice(0, 1000));
+      throw new Error(t("MCP SSE server reported an error: ", "MCP SSE 服务报告错误：") + frame.data.slice(0, 1000));
     }
     if (frame.event === "endpoint") {
       try {
@@ -191,19 +192,19 @@ export class SseMcpConnection {
     this.pending.delete(key);
     clearTimeout(handler.timer);
     if (response.error) {
-      handler.reject(new Error("MCP SSE JSON-RPC 错误" +
+      handler.reject(new Error(t("MCP SSE JSON-RPC error", "MCP SSE JSON-RPC 错误") +
         (response.error.code === undefined ? "" : " (" + response.error.code + ")") +
-        "：" + String(response.error.message ?? JSON.stringify(response.error))));
+        ": " + String(response.error.message ?? JSON.stringify(response.error))));
     } else if ("result" in response) {
       handler.resolve(response.result);
     } else {
-      handler.reject(new Error("MCP SSE 返回了不完整的 JSON-RPC 响应。"));
+      handler.reject(new Error(t("MCP SSE returned an incomplete JSON-RPC response.", "MCP SSE 返回了不完整的 JSON-RPC 响应。")));
     }
   }
 
   private post(method: string, params: Record<string, unknown>, id?: string): Promise<any> {
     if (this.closed) return Promise.reject(new Error("MCP SSE connection is closed."));
-    if (!this.postUrl) return Promise.reject(new Error("MCP SSE message endpoint 尚未就绪。"));
+    if (!this.postUrl) return Promise.reject(new Error(t("The MCP SSE message endpoint is not ready yet.", "MCP SSE message endpoint 尚未就绪。")));
     const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
     if (id !== undefined) message.id = id;
 
@@ -215,7 +216,7 @@ export class SseMcpConnection {
     }).then(async response => {
       if (!response.ok) {
         const detail = (await response.text().catch(() => "")).slice(0, 1200);
-        throw new Error("MCP SSE POST 失败（HTTP " + response.status + "）" + (detail ? "：" + detail : ""));
+        throw new Error(t("MCP SSE POST failed (HTTP " + response.status + ")", "MCP SSE POST 失败（HTTP " + response.status + "）") + (detail ? ": " + detail : ""));
       }
       if (id !== undefined) {
         const contentType = response.headers.get("content-type") ?? "";
@@ -233,7 +234,7 @@ export class SseMcpConnection {
   }
 
   async notify(method: string, params: Record<string, unknown>): Promise<void> {
-    await this.waitFor(this.post(method, params), 60_000, "MCP SSE notification 请求超时。");
+    await this.waitFor(this.post(method, params), 60_000, t("MCP SSE notification request timed out.", "MCP SSE notification 请求超时。"));
   }
 
   async request<T>(method: string, params: Record<string, unknown>): Promise<T> {
@@ -242,7 +243,7 @@ export class SseMcpConnection {
     const resultPromise = new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error("MCP SSE 请求超时：" + method));
+        reject(new Error(t("MCP SSE request timed out: " + method, "MCP SSE 请求超时：" + method)));
       }, 60_000);
       this.pending.set(id, { resolve, reject, timer });
     });
@@ -306,7 +307,7 @@ async function withSse<T>(
 export async function listSseMcpTools(endpoint: string, apiKey: string): Promise<RemoteMcpTool[]> {
   return await withSse(endpoint, apiKey, async connection => {
     const result = await connection.request<any>("tools/list", {});
-    if (!Array.isArray(result?.tools)) throw new Error("MCP SSE 服务没有返回 tools 数组。");
+    if (!Array.isArray(result?.tools)) throw new Error(t("The MCP SSE server did not return a tools array.", "MCP SSE 服务没有返回 tools 数组。"));
     return result.tools.filter((tool: any) => typeof tool?.name === "string").map((tool: any) => ({
       name: tool.name,
       description: typeof tool.description === "string" ? tool.description : "",
@@ -321,13 +322,13 @@ export async function callSseMcpTool(
   name: string,
   args: Record<string, unknown>
 ): Promise<RemoteMcpResult> {
-  if (!name.trim()) throw new Error("MCP tool 名称不能为空。");
+  if (!name.trim()) throw new Error(t("MCP tool name cannot be empty.", "MCP tool 名称不能为空。"));
   return await withSse(endpoint, apiKey, async connection => {
     const result = await connection.request<any>("tools/call", {
       name: name.trim(),
       arguments: args
     });
-    if (result?.isError) throw new Error("MCP SSE 工具执行失败：" + JSON.stringify(result.content ?? result));
+    if (result?.isError) throw new Error(t("MCP SSE tool call failed: ", "MCP SSE 工具执行失败：") + JSON.stringify(result.content ?? result));
     return normalizeMcpToolResult(result);
   });
 }
@@ -341,7 +342,7 @@ export async function listSseMcpResources(endpoint: string, apiKey: string): Pro
 }
 
 export async function readSseMcpResource(endpoint: string, apiKey: string, uri: string): Promise<RemoteMcpResult> {
-  if (!uri.trim()) throw new Error("MCP resource URI 不能为空。");
+  if (!uri.trim()) throw new Error(t("MCP resource URI cannot be empty.", "MCP resource URI 不能为空。"));
   return await withSse(endpoint, apiKey, async connection => {
     const result = await connection.request<any>("resources/read", { uri: uri.trim() });
     return formatMcpResourceRead(uri.trim(), result);
@@ -361,7 +362,7 @@ export async function getSseMcpPrompt(
   name: string,
   args: Record<string, string>
 ): Promise<RemoteMcpResult> {
-  if (!name.trim()) throw new Error("MCP prompt 名称不能为空。");
+  if (!name.trim()) throw new Error(t("MCP prompt name cannot be empty.", "MCP prompt 名称不能为空。"));
   return await withSse(endpoint, apiKey, async connection => {
     const result = await connection.request<any>("prompts/get", { name: name.trim(), arguments: args });
     return formatMcpPromptResult(name.trim(), result);

@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface NamedPromptProfile {
   id: string;
   name: string;
@@ -28,14 +30,14 @@ export function upsertNamedPromptProfile(
 ): NamedPromptProfile[] {
   const name = nameInput.trim();
   const prompt = promptInput.trim();
-  if (!name) throw new Error("提示词名称不能为空。");
-  if (!prompt) throw new Error("提示词内容不能为空。");
+  if (!name) throw new Error(t("Prompt name cannot be empty.", "提示词名称不能为空。"));
+  if (!prompt) throw new Error(t("Prompt content cannot be empty.", "提示词内容不能为空。"));
   const existing = profiles.find(profile => profile.name.toLocaleLowerCase() === name.toLocaleLowerCase());
   if (existing) {
     return profiles.map(profile => profile.id === existing.id ? { ...profile, name, prompt } : profile);
   }
   if (!newId.trim() || profiles.some(profile => profile.id === newId)) {
-    throw new Error("新提示词标识无效或重复。");
+    throw new Error(t("The new prompt ID is invalid or already in use.", "新提示词标识无效或重复。"));
   }
   return [...profiles, { id: newId, name, prompt }];
 }

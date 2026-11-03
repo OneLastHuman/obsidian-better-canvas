@@ -26,7 +26,9 @@ Better Canvas is an enhancement plugin for Obsidian Canvas. Collect loose ideas 
 
 **Canvas editing and themes need no AI configuration.** Content stays in your vault's `.canvas` files.
 
-*Screenshots come from the real Obsidian 1.14.4 interface (mostly Windows; the question dialog is macOS). The example content is available in the [sample canvases](docs/examples/readme-showcase/); capture and verification scope are documented in the [screenshot notes](docs/screenshots/README.md).*
+The interface follows Obsidian's language: English by default, Chinese when Obsidian uses a Chinese locale.
+
+*Screenshots come from the real Obsidian 1.15.0 interface on Linux (light default theme, default interface scale). The English example content is available in the [sample canvases](docs/examples/readme-showcase/en/); capture and verification scope are documented in the [screenshot notes](docs/screenshots/README.md).*
 
 ## Choose a canvas theme that fits your content
 
@@ -160,9 +162,9 @@ On first enable, a one-time welcome entry appears. You can create a built-in sam
 4. Select the card and choose a preset under **Node style**.
 5. Press `Tab` to add a child node and keep expanding.
 
-You can also copy the [sample canvases](docs/examples/readme-showcase/) into your vault and edit the content shown in the screenshots directly.
+You can also copy the [sample canvases](docs/examples/readme-showcase/en/) into your vault and edit the content shown in the screenshots directly.
 
-Plugin settings are grouped into 4 categories: **Canvas, Actions, AI assistant, Files**. You can configure layout spacing, shortcuts, model services, and export options. Click **Save changes** to apply them, or **Discard changes** to restore the saved settings.
+Plugin settings are grouped into 4 categories: **Canvas, Interaction, AI assistant, Files**. You can configure layout spacing, shortcuts, model services, and export options. Click **Save changes** to apply them, or **Discard changes** to restore the saved settings.
 
 ### Keyboard shortcuts
 
