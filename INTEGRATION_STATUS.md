@@ -1,3 +1,3 @@
 # Integration status
 
-Better Canvas 0.1.0 is published as a desktop-only GitHub Release. The `main` branch remains the development line; check the latest Build workflow and the release page before treating a build as a verified release.
+Better Canvas is listed in the Obsidian community directory. Version 0.1.2 prepares the English and Simplified Chinese interface update for the desktop-only release channel. Check the latest Build workflow and the release page for publication and verification results; the `main` branch remains the development line.
