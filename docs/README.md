@@ -59,7 +59,7 @@
 
 ## 项目网站
 
-线上入口：[English](https://onelasthuman.github.io/obsidian-better-canvas/) / [中文](https://onelasthuman.github.io/obsidian-better-canvas/zh/)。网站聚焦 AI、思维导图和六款画布主题，主题预览使用真实插件截图。
+线上入口：[English](https://onelasthuman.github.io/obsidian-better-canvas/) / [中文](https://onelasthuman.github.io/obsidian-better-canvas/zh/)。网站首屏明确 Better Canvas 是 Obsidian 原生 Canvas 的增强插件，重点介绍插件中的 AI、思维导图和六款画布主题；主题预览使用真实插件截图。
 
 网站无需构建或安装依赖。在仓库根目录运行 `python3 -m http.server 4173 --directory site`，访问 `http://localhost:4173/` 或 `/zh/`。`site/site.js` 只负责主题预览；禁用 JavaScript 时，主题选项仍可打开对应截图。截图来源与验证边界见[截图说明](screenshots/README.md)。
 
