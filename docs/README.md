@@ -48,6 +48,7 @@
 | [`release/`](../release/README.md) | 主分支成功构建后自动同步的安装文件 |
 | [`scripts/`](../scripts/) | 元数据、工作流工件策略与桌面验证脚本 |
 | [`.github/`](../.github/) | Issue/PR 模板与构建、发布工作流 |
+| [`site/`](../site/) | GitHub Pages 项目网站；英文首页、`zh/` 中文首页及本地静态资源 |
 | [`docs/examples/`](examples/README.md) | 用户示例及示例依赖的图片 |
 | [`docs/design/`](design/README.md) | 设计说明与可打开的原型 |
 | [`docs/screenshots/`](screenshots/README.md) | 产品文档使用的截图 |
@@ -55,3 +56,11 @@
 | `dist/` | 打包生成的 ZIP 与校验和，已由 Git 忽略 |
 
 新增文档按用途放入对应目录，并补充本页或目录内的索引。临时测试截图和日志按 [测试规范](TESTING.md) 保存到仓库外。
+
+## 项目网站
+
+线上入口：[English](https://onelasthuman.github.io/obsidian-better-canvas/) / [中文](https://onelasthuman.github.io/obsidian-better-canvas/zh/)。网站聚焦 AI、思维导图和六款画布主题，主题预览使用真实插件截图。
+
+网站无需构建或安装依赖。在仓库根目录运行 `python3 -m http.server 4173 --directory site`，访问 `http://localhost:4173/` 或 `/zh/`。`site/site.js` 只负责主题预览；禁用 JavaScript 时，主题选项仍可打开对应截图。截图来源与验证边界见[截图说明](screenshots/README.md)。
+
+合并 `site/` 的改动到 `main` 后，[Pages 工作流](../.github/workflows/pages.yml) 自动部署；也可手动触发该工作流。GitHub 仓库的 Settings → Pages → Source 应为 **GitHub Actions**。部署结果以 Actions 中 Pages 的成功状态和线上页面为准。

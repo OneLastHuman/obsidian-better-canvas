@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="README.md"><strong>English</strong></a> ·
+  <a href="https://onelasthuman.github.io/obsidian-better-canvas/zh/">项目网站</a> ·
   <a href="#安装">安装</a> ·
   <a href="#选一种适合内容的画布">画布主题</a> ·
   <a href="#从第一张卡片开始">开始使用</a> ·
