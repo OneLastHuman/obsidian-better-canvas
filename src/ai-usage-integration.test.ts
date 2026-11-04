@@ -2,9 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { requestUrl } from "obsidian";
 import { chatCompletion, chatCompletionStream, type AISettings } from "./ai";
 import { AI_USAGE_EVENT } from "./ai-usage-core";
+import { requestStream } from "./desktop-stream-request";
 
 vi.mock("obsidian", () => ({
   requestUrl: vi.fn()
+}));
+
+vi.mock("./desktop-stream-request", () => ({
+  requestStream: vi.fn()
 }));
 
 const settings: AISettings = {
@@ -81,15 +86,14 @@ describe("AI usage event integration", () => {
       "data: " + JSON.stringify({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 } }) + "\n\n",
       "data: [DONE]\n\n"
     ].join("");
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+    vi.mocked(requestStream).mockResolvedValue(
       new Response(streamBody, { status: 200, headers: { "content-type": "text/event-stream" } })
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     await expect(chatCompletionStream(settings, messages, new AbortController().signal, vi.fn()))
       .resolves.toBe("Hello.");
 
-    const requestInit = fetchMock.mock.calls[0]?.[1];
+    const requestInit = vi.mocked(requestStream).mock.calls[0]?.[1];
     const requestBody = JSON.parse(String(requestInit?.body));
     expect(requestBody.stream_options).toEqual({ include_usage: true });
     expect(dispatchEventSpy).toHaveBeenCalledOnce();
@@ -108,15 +112,14 @@ describe("AI usage event integration", () => {
       "data: " + JSON.stringify({ choices: [{ delta: { content: "ok" } }] }) + "\n\n",
       "data: [DONE]\n\n"
     ].join("");
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+    vi.mocked(requestStream).mockResolvedValue(
       new Response(streamBody, { status: 200, headers: { "content-type": "text/event-stream" } })
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     await expect(chatCompletionStream(gatewaySettings, messages, new AbortController().signal, vi.fn()))
       .resolves.toBe("ok");
 
-    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    const requestBody = JSON.parse(String(vi.mocked(requestStream).mock.calls[0]?.[1]?.body));
     expect(requestBody.stream_options).toBeUndefined();
     expect(dispatchEventSpy).toHaveBeenCalledOnce();
   });

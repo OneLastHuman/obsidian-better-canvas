@@ -16,11 +16,12 @@ Before publishing a fix, open the plugin in the authenticated [Obsidian Communit
 
 Keep local checks, preview findings, and the public latest-release scorecard separate. The public **Risks** label is not proof of malware, and a local lint pass does not clear it. Obsidian does not publish an exact numeric threshold; network and clipboard capabilities remain disclosures when those features are present.
 
-Review these retained findings rather than removing working features to hide them:
+The warning fixes preserve existing rendering and streaming behavior:
 
-- Streaming AI and MCP SSE use `fetch` for incremental responses and cancellation. The public `requestUrl` response is buffered and has no response stream or abort signal.
-- The published [scanner implementation](https://github.com/obsidianmd/obsidian-workflows/blob/main/src/lint.ts) maps the plugin minimum of Obsidian 1.14.4 to its newest known Electron bucket, labelled Obsidian 1.11.4. Its compatibility detector broadly flags `clip-path`, text-decoration features, and Grid `column-gap`; inspect the actual syntax and desktop behavior when assessing these warnings.
-- GPL licensing, base64 media handling, Vault enumeration and clipboard access describe existing capabilities. The ZIP/checksum asset recommendation is explained below.
+- AI streaming and legacy MCP SSE use the desktop Electron network session through `requestStream`, including incremental response bodies and cancellation. Buffered requests continue to use `requestUrl`; its public response has no stream or abort signal. The streaming adapter uses the current window's Electron session so configured proxies remain available.
+- The published [scanner implementation](https://github.com/obsidianmd/obsidian-workflows/blob/main/src/lint.ts) maps the plugin minimum of Obsidian 1.14.4 to its newest known Electron bucket, labelled Obsidian 1.11.4. Its compatibility detector flags whole feature families. Declaration-local `doiuse-disable` / `doiuse-enable` pairs document the supported syntax: `polygon()`, `path()` and same-document SVG clips, plus decoration line/color/thickness. Can I Use's partial-support notes concern [external SVG clips](https://caniuse.com/css-clip-path) and unused [`text-decoration-skip` values](https://caniuse.com/text-decoration). These exceptions do not disable other rules or later declarations. Keep `release/styles.css` synchronized so generated copies do not repeat the same findings.
+- Website grids use `gap: 0 <column spacing>` rather than `column-gap`, preserving zero row spacing and avoiding the detector's multicolumn classification.
+- GPL licensing, base64 media handling, Vault enumeration and clipboard access remain capability disclosures. The ZIP/checksum asset recommendation is explained below.
 
 After the reviewed fix is merged and a new version is published through the workflow below, check the new release's actual scan result. Do not move an existing version tag or claim that a preview changed the public latest-release scorecard.
 

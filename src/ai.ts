@@ -1,5 +1,6 @@
 import { Platform, requestUrl, type RequestUrlResponse } from "obsidian";
 import { runLocalCodex } from "./codex-cli";
+import { requestStream } from "./desktop-stream-request";
 import { decodeBase64Image, detectImageFormat } from "./image-payload";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
 import { mergeProviderParams, resolveMaxOutputTokens, resolveTemperature } from "./provider-params";
@@ -399,7 +400,7 @@ export async function chatCompletionStream(
 
   let response: Response;
   try {
-    response = await fetch(streamingUrl, {
+    response = await requestStream(streamingUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
