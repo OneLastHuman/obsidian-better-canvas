@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="README.zh.md"><strong>中文</strong></a> ·
+  <a href="https://onelasthuman.github.io/obsidian-better-canvas/">Website</a> ·
   <a href="#installation">Install</a> ·
   <a href="#choose-a-canvas-theme-that-fits-your-content">Canvas themes</a> ·
   <a href="#start-with-your-first-card">Getting started</a> ·
