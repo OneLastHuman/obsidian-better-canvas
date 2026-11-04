@@ -1,4 +1,6 @@
-import type { CanvasData, CanvasEdgeData, CanvasNodeData } from "./canvas";
+import type { App, EventRef, Events, Plugin, TAbstractFile } from "obsidian";
+import { normalizeCanvasData, type CanvasData } from "./canvas";
+import { isCanvasViewRuntime, type CanvasRuntime, type CanvasViewRuntime } from "./canvas-runtime";
 
 export type AdvancedCanvasEventName =
   | "advanced-canvas:settings-changed"
@@ -173,18 +175,30 @@ export function diffAdvancedCanvasSnapshots(
 }
 
 interface PatchRecord {
-  target: any;
-  key: string;
-  original: (...args: any[]) => any;
-  wrapped: (...args: any[]) => any;
+  restore: () => void;
+}
+
+function patchProperty<T, K extends keyof T>(target: T, key: K, wrapped: T[K]): PatchRecord {
+  const original = target[key];
+  target[key] = wrapped;
+  return { restore: () => { if (target[key] === wrapped) target[key] = original; } };
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return value !== null && (typeof value === "object" || typeof value === "function") &&
+    "then" in value && typeof value.then === "function";
+}
+
+interface BridgePlugin extends Pick<Plugin, "register"> {
+  saveSettings?: (this: BridgePlugin, ...args: unknown[]) => unknown;
 }
 
 interface CanvasBridgeState {
-  view: any;
-  canvas: any;
-  container: any;
+  view: CanvasViewRuntime;
+  canvas: CanvasRuntime;
+  container: HTMLElement | null;
   snapshot: AdvancedCanvasSnapshot;
-  baseGetData: (...args: any[]) => any;
+  baseGetData: CanvasRuntime["getData"];
   listeners: Array<() => void>;
   patches: PatchRecord[];
   renderedElements: Map<string, unknown>;
@@ -200,7 +214,7 @@ interface CanvasBridgeState {
   knownEdgeIds: Set<string>;
   initialLoadSeen: boolean;
   filePath: string;
-  observer?: any;
+  observer?: MutationObserver;
 }
 
 export interface AdvancedCanvasEventBridgeOptions {
@@ -213,16 +227,16 @@ export interface AdvancedCanvasEventBridgeOptions {
  * subscriber deliberately changes the data in a data-loaded:before callback.
  */
 export class AdvancedCanvasEventBridge {
-  private readonly app: any;
-  private readonly plugin: any;
+  private readonly app: App;
+  private readonly plugin: BridgePlugin;
   private readonly scheduleFrame: (callback: () => void) => unknown;
-  private states = new Map<any, CanvasBridgeState>();
-  private subscriptions: Array<{ emitter: any; ref: any }> = [];
+  private states = new Map<CanvasViewRuntime, CanvasBridgeState>();
+  private subscriptions: Array<{ emitter: Events; ref: EventRef }> = [];
   private settingsPatch: PatchRecord | null = null;
   private started = false;
   private stopped = false;
 
-  constructor(app: any, plugin: any, options: AdvancedCanvasEventBridgeOptions = {}) {
+  constructor(app: App, plugin: BridgePlugin, options: AdvancedCanvasEventBridgeOptions = {}) {
     this.app = app;
     this.plugin = plugin;
     this.scheduleFrame = options.scheduleFrame ?? (callback => window.requestAnimationFrame(callback));
@@ -238,7 +252,7 @@ export class AdvancedCanvasEventBridge {
     }
     const vault = this.app?.vault;
     if (typeof vault?.on === "function") {
-      this.subscribe(vault, vault.on("modify", (file: any) => this.onVaultModify(file)));
+      this.subscribe(vault, vault.on("modify", file => this.onVaultModify(file)));
     }
     workspace?.onLayoutReady?.(() => this.scan());
     this.patchSettingsSave();
@@ -257,57 +271,51 @@ export class AdvancedCanvasEventBridge {
         // Different Obsidian builds expose slightly different event cleanup APIs.
       }
     }
-    this.restorePatch(this.settingsPatch);
+    this.settingsPatch?.restore();
     this.settingsPatch = null;
     this.started = false;
   }
 
-  private subscribe(emitter: any, ref: any): void {
+  private subscribe(emitter: Events, ref: EventRef): void {
     if (emitter && ref) this.subscriptions.push({ emitter, ref });
   }
 
-  private emit(name: AdvancedCanvasEventName, ...args: unknown[]): void {
+  private emit = (name: AdvancedCanvasEventName, ...args: unknown[]): void => {
     if (this.stopped) return;
     try {
       this.app?.workspace?.trigger?.(name, ...args);
     } catch (error) {
       console.warn("Better Canvas event bridge listener failed:", name, error);
     }
-  }
+  };
 
   private patchSettingsSave(): void {
     const target = this.plugin;
     if (!target || typeof target.saveSettings !== "function") return;
     const original = target.saveSettings;
-    const self = this;
-    const wrapped = function (this: any, ...args: any[]) {
-      const result = original.apply(this, args);
-      if (result && typeof result.then === "function") {
+    const emit = this.emit;
+    const wrapped = function (this: BridgePlugin, ...args: unknown[]) {
+      const result: unknown = original.apply(this, args);
+      if (isPromiseLike(result)) {
         return result.then((value: unknown) => {
-          self.emit("advanced-canvas:settings-changed");
+          emit("advanced-canvas:settings-changed");
           return value;
         });
       }
-      self.emit("advanced-canvas:settings-changed");
+      emit("advanced-canvas:settings-changed");
       return result;
     };
-    target.saveSettings = wrapped;
-    this.settingsPatch = { target, key: "saveSettings", original, wrapped };
-  }
-
-  private restorePatch(patch: PatchRecord | null): void {
-    if (!patch) return;
-    if (patch.target?.[patch.key] === patch.wrapped) patch.target[patch.key] = patch.original;
+    this.settingsPatch = patchProperty(target, "saveSettings", wrapped);
   }
 
   private scan(): void {
     if (this.stopped) return;
     const leaves = this.app?.workspace?.getLeavesOfType?.("canvas") ?? [];
-    const currentViews = new Set<any>();
+    const currentViews = new Set<CanvasViewRuntime>();
     for (const leaf of leaves) {
-      const view = leaf?.view;
-      const canvas = view?.canvas;
-      if (!view || !canvas || view.getViewType?.() && view.getViewType() !== "canvas") continue;
+      const view = leaf.view;
+      if (!isCanvasViewRuntime(view)) continue;
+      const canvas = view.canvas;
       currentViews.add(view);
       const existing = this.states.get(view);
       if (existing && existing.canvas === canvas) {
@@ -322,33 +330,31 @@ export class AdvancedCanvasEventBridge {
     }
   }
 
-  private attach(view: any, canvas: any): void {
-    const state = {} as CanvasBridgeState;
-    state.view = view;
-    state.canvas = canvas;
-    state.container = view.containerEl ?? view.contentEl ?? null;
-    state.baseGetData = typeof canvas.getData === "function"
-      ? canvas.getData.bind(canvas)
-      : () => ({});
-    state.listeners = [];
-    state.patches = [];
-    state.renderedElements = new Map();
-    state.hoveredNodeId = "";
-    state.dragging = false;
-    state.pendingViewportBefore = false;
-    state.pendingSave = false;
-    state.pendingKeyboardInput = false;
-    state.frameQueued = false;
-    state.dataLoadDepth = 0;
-    state.dispatchingDataRequest = false;
-    state.filePath = this.filePathOf(state);
-    state.snapshot = this.takeSnapshot(state);
-    state.knownNodeIds = new Set(
-      state.snapshot.data.nodes.map(node => String(node?.id ?? "")).filter(Boolean)
-    );
-    state.knownEdgeIds = new Set(
-      state.snapshot.data.edges.map(edge => String(edge?.id ?? "")).filter(Boolean)
-    );
+  private attach(view: CanvasViewRuntime, canvas: CanvasRuntime): void {
+    const baseGetData = canvas.getData.bind(canvas);
+    const snapshot = this.takeSnapshot({ view, canvas, baseGetData });
+    const state: CanvasBridgeState = {
+      view,
+      canvas,
+      container: view.containerEl ?? view.contentEl ?? null,
+      baseGetData,
+      snapshot,
+      listeners: [],
+      patches: [],
+      renderedElements: new Map(),
+      hoveredNodeId: "",
+      dragging: false,
+      pendingViewportBefore: false,
+      pendingSave: false,
+      pendingKeyboardInput: false,
+      frameQueued: false,
+      dataLoadDepth: 0,
+      dispatchingDataRequest: false,
+      filePath: view.file?.path ?? "",
+      knownNodeIds: new Set(snapshot.data.nodes.map(node => node.id).filter(Boolean)),
+      knownEdgeIds: new Set(snapshot.data.edges.map(edge => edge.id).filter(Boolean)),
+      initialLoadSeen: false
+    };
     // A canvas that already holds data was loaded before the bridge attached, so
     // its next import is a regular edit rather than the view's initial file load.
     state.initialLoadSeen = state.knownNodeIds.size > 0 || state.knownEdgeIds.size > 0;
@@ -360,39 +366,29 @@ export class AdvancedCanvasEventBridge {
     this.emitRenderedNodes(state);
   }
 
-  private filePathOf(state: CanvasBridgeState): string {
-    const path = state.view?.file?.path;
-    return typeof path === "string" ? path : "";
-  }
-
   private detach(state: CanvasBridgeState): void {
     this.emit("advanced-canvas:canvas-view-unloaded:before", state.view);
     for (const cleanup of state.listeners.splice(0)) {
       try { cleanup(); } catch { /* cleanup should never block unload */ }
     }
     try { state.observer?.disconnect?.(); } catch { /* optional observer */ }
-    for (const patch of state.patches.splice(0).reverse()) this.restorePatch(patch);
+    for (const patch of state.patches.splice(0).reverse()) patch.restore();
     this.states.delete(state.view);
   }
 
-  private readData(state: CanvasBridgeState): CanvasData {
+  private readData(state: Pick<CanvasBridgeState, "canvas" | "baseGetData">): CanvasData {
     try {
-      const raw = state.baseGetData.call(state.canvas) ?? {};
-      return {
-        ...raw,
-        nodes: Array.isArray(raw.nodes) ? raw.nodes : [],
-        edges: Array.isArray(raw.edges) ? raw.edges : []
-      } as CanvasData;
+      return normalizeCanvasData(state.baseGetData.call(state.canvas));
     } catch {
       return { nodes: [], edges: [] };
     }
   }
 
-  private takeSnapshot(state: CanvasBridgeState): AdvancedCanvasSnapshot {
+  private takeSnapshot(state: Pick<CanvasBridgeState, "view" | "canvas" | "baseGetData">): AdvancedCanvasSnapshot {
     const data = this.readData(state);
     const selectedElements = Array.from(state.canvas?.selection?.values?.() ?? []);
     const selectedIds = selectedElements
-      .map((element: any) => element?.id ?? element?.node?.id ?? element?.getData?.()?.id)
+      .map(element => element.id ?? element.node?.id ?? element.getData?.()?.id)
       .filter((id: unknown): id is string => typeof id === "string");
     const viewport: CanvasViewportSnapshot = {};
     const zoom = Number(state.canvas?.zoom);
@@ -406,7 +402,7 @@ export class AdvancedCanvasEventBridge {
       if (node?.isEditing) editingNodeIds.push(String(id));
     }
     const metadata = state.canvas?.metadata?.frontmatter ??
-      (state.view?.file ? { path: state.view.file.path, frontmatter: state.view.file.frontmatter } : data.metadata);
+      (state.view?.file ? { path: state.view.file.path, frontmatter: "frontmatter" in state.view.file ? state.view.file.frontmatter : undefined } : data.metadata);
     const readOnly = Boolean(
       state.canvas?.readOnly ||
       state.canvas?.readonly ||
@@ -423,7 +419,7 @@ export class AdvancedCanvasEventBridge {
     };
   }
 
-  private scheduleSnapshot(state: CanvasBridgeState, keyboardInput: boolean): void {
+  private scheduleSnapshot = (state: CanvasBridgeState, keyboardInput: boolean): void => {
     if (this.stopped || !this.states.has(state.view)) return;
     state.pendingKeyboardInput = state.pendingKeyboardInput || keyboardInput;
     if (state.frameQueued) return;
@@ -435,7 +431,7 @@ export class AdvancedCanvasEventBridge {
       state.pendingKeyboardInput = false;
       this.processSnapshot(state, this.takeSnapshot(state), usingKeyboard);
     });
-  }
+  };
 
   private processSnapshot(
     state: CanvasBridgeState,
@@ -531,15 +527,15 @@ export class AdvancedCanvasEventBridge {
     }
   }
 
-  private listen(state: CanvasBridgeState, name: string, callback: (event: any) => void, options?: any): void {
+  private listen<K extends keyof HTMLElementEventMap>(state: CanvasBridgeState, name: K, callback: (event: HTMLElementEventMap[K]) => void, options?: boolean | AddEventListenerOptions): void {
     const container = state.container;
     if (!container?.addEventListener) return;
     container.addEventListener(name, callback, options);
-    state.listeners.push(() => container.removeEventListener(name, callback, options?.capture ?? options ?? false));
+    state.listeners.push(() => container.removeEventListener(name, callback, typeof options === "object" ? options.capture : options));
   }
 
   private bindDomEvents(state: CanvasBridgeState): void {
-    this.listen(state, "pointerdown", (event: any) => {
+    this.listen(state, "pointerdown", () => {
       if (!state.pendingViewportBefore) {
         state.pendingViewportBefore = true;
         this.emit("advanced-canvas:viewport-changed:before", state.canvas);
@@ -558,7 +554,7 @@ export class AdvancedCanvasEventBridge {
     };
     this.listen(state, "pointerup", finishPointer, true);
     this.listen(state, "pointercancel", finishPointer, true);
-    this.listen(state, "keyup", (event: any) => {
+    this.listen(state, "keyup", event => {
       this.scheduleSnapshot(state, true);
       if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "c") {
         const data = this.readData(state);
@@ -570,7 +566,7 @@ export class AdvancedCanvasEventBridge {
         this.emit("advanced-canvas:copy", state.canvas, { nodes: selectedNodes, edges: selectedEdges });
       }
     }, true);
-    this.listen(state, "keydown", (event: any) => {
+    this.listen(state, "keydown", event => {
       if (!(event.ctrlKey || event.metaKey) || event.key?.toLowerCase() !== "z") return;
       if (event.shiftKey) this.emit("advanced-canvas:redo", state.canvas);
       else this.emit("advanced-canvas:undo", state.canvas);
@@ -583,7 +579,7 @@ export class AdvancedCanvasEventBridge {
       this.scheduleSnapshot(state, false);
     }, { capture: true, passive: true });
     this.listen(state, "input", () => this.scheduleSnapshot(state, false), true);
-    this.listen(state, "dblclick", (event: any) => {
+    this.listen(state, "dblclick", event => {
       const preventDefault = { value: false };
       this.emit("advanced-canvas:double-click", state.canvas, event, preventDefault);
       if (preventDefault.value) {
@@ -592,7 +588,7 @@ export class AdvancedCanvasEventBridge {
       }
     }, true);
     this.listen(state, "contextmenu", () => this.emit("advanced-canvas:popup-menu-created", state.canvas), true);
-    this.listen(state, "pointerover", (event: any) => {
+    this.listen(state, "pointerover", event => {
       const id = this.nodeIdFromTarget(state, event.target);
       if (!id || id === state.hoveredNodeId) return;
       state.hoveredNodeId = id;
@@ -601,12 +597,13 @@ export class AdvancedCanvasEventBridge {
     }, true);
   }
 
-  private nodeIdFromTarget(state: CanvasBridgeState, target: any): string {
+  private nodeIdFromTarget(state: CanvasBridgeState, target: EventTarget | null): string {
     const data = this.readData(state);
     for (const item of data.nodes) {
       const node = state.canvas.nodes?.get?.(item.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
-      if (element && (element === target || element.contains?.(target))) return item.id;
+      const ownerWindow = element?.ownerDocument.defaultView;
+      if (element && (element === target || (ownerWindow && target instanceof ownerWindow.Node && element.contains(target)))) return item.id;
     }
     return "";
   }
@@ -623,34 +620,33 @@ export class AdvancedCanvasEventBridge {
 
   private patchCanvasMethods(state: CanvasBridgeState): void {
     const canvas = state.canvas;
+    const emit = this.emit;
+    const scheduleSnapshot = this.scheduleSnapshot;
     const getData = canvas?.getData;
     if (typeof getData === "function") {
-      const bridge = this;
-      const wrapped = function (this: any, ...args: any[]) {
-        const data = getData.apply(this, args);
+      const wrapped = function (this: CanvasRuntime, ...args: unknown[]) {
+        const data: unknown = getData.apply(this, args);
         if (!state.dispatchingDataRequest) {
           state.dispatchingDataRequest = true;
-          try { bridge.emit("advanced-canvas:data-requested", canvas, data); }
+          try { emit("advanced-canvas:data-requested", canvas, data); }
           finally { state.dispatchingDataRequest = false; }
         }
         return data;
       };
-      canvas.getData = wrapped;
-      state.patches.push({ target: canvas, key: "getData", original: getData, wrapped });
+      state.patches.push(patchProperty(canvas, "getData", wrapped));
     }
 
-    for (const key of ["importData", "setData"]) {
+    for (const key of ["importData", "setData"] as const) {
       const original = canvas?.[key];
       if (typeof original !== "function") continue;
-      const bridge = this;
-      const wrapped = function (this: any, incoming: any, ...args: any[]) {
+      const wrapped = function (this: CanvasRuntime, incoming: CanvasData, ...args: unknown[]) {
         const outermost = state.dataLoadDepth === 0;
         let data = incoming;
-        let setData = (next: any) => { data = next; };
+        const setData = (next: CanvasData) => { data = next; };
         if (outermost) {
-          bridge.emit("advanced-canvas:data-loaded:before", canvas, incoming, setData);
+          emit("advanced-canvas:data-loaded:before", canvas, incoming, setData);
         }
-        const filePath = bridge.filePathOf(state);
+        const filePath = state.view.file?.path ?? "";
         if (filePath && filePath !== state.filePath) {
           // A pane can swap canvas files without recreating its view or canvas
           // object, so the ids tracked for the previous file must be dropped
@@ -676,7 +672,7 @@ export class AdvancedCanvasEventBridge {
           }
         }
         state.dataLoadDepth += 1;
-        let result: any;
+        let result: unknown;
         try {
           result = original.call(this, data, ...args);
         } catch (error) {
@@ -686,11 +682,11 @@ export class AdvancedCanvasEventBridge {
         const complete = (): void => {
           state.dataLoadDepth = Math.max(0, state.dataLoadDepth - 1);
           if (outermost) {
-            bridge.emit("advanced-canvas:data-loaded:after", canvas, data, setData);
-            bridge.scheduleSnapshot(state, false);
+            emit("advanced-canvas:data-loaded:after", canvas, data, setData);
+            scheduleSnapshot(state, false);
           }
         };
-        if (result && typeof result.then === "function") {
+        if (isPromiseLike(result)) {
           return result.then((value: unknown) => { complete(); return value; }, (error: unknown) => {
             complete();
             throw error;
@@ -699,24 +695,22 @@ export class AdvancedCanvasEventBridge {
         complete();
         return result;
       };
-      canvas[key] = wrapped;
-      state.patches.push({ target: canvas, key, original, wrapped });
+      state.patches.push(patchProperty(canvas, key, wrapped));
     }
 
     const requestSave = canvas?.requestSave;
     if (typeof requestSave === "function") {
-      const bridge = this;
-      const wrapped = function (this: any, ...args: any[]) {
+      const wrapped = function (this: CanvasRuntime, ...args: unknown[]) {
         state.pendingSave = true;
-        bridge.emit("advanced-canvas:canvas-saved:before", canvas);
-        return requestSave.apply(this, args);
+        emit("advanced-canvas:canvas-saved:before", canvas);
+        const result: unknown = requestSave.apply(this, args);
+        return result;
       };
-      canvas.requestSave = wrapped;
-      state.patches.push({ target: canvas, key: "requestSave", original: requestSave, wrapped });
+      state.patches.push(patchProperty(canvas, "requestSave", wrapped));
     }
   }
 
-  private onVaultModify(file: any): void {
+  private onVaultModify(file: TAbstractFile): void {
     const path = typeof file?.path === "string" ? file.path : "";
     if (!path) return;
     for (const state of this.states.values()) {

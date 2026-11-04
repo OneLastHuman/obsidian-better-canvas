@@ -1,3 +1,7 @@
+import * as childProcess from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as processModule from "node:process";
 import * as path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -9,7 +13,12 @@ import {
 } from "./local-agent-discovery";
 import type { NodeRuntimeModules } from "./node-runtime";
 
-function fakeFileSystem(files: string[], directories: Record<string, string[]> = {}) {
+interface TestFileSystem {
+  statSync(file: string): { isFile(): boolean };
+  readdirSync(directory: string): Array<{ name: string; isDirectory(): boolean }>;
+}
+
+function fakeFileSystem(files: string[], directories: Record<string, string[]> = {}): TestFileSystem {
   const present = new Set(files.map(file => path.normalize(file)));
   return {
     statSync(file: string) {
@@ -25,19 +34,21 @@ function fakeFileSystem(files: string[], directories: Record<string, string[]> =
 }
 
 function testRuntime(options: {
-  platform?: string;
+  platform?: NodeJS.Platform;
   env?: Record<string, string | undefined>;
   home?: string;
   files?: string[];
   directories?: Record<string, string[]>;
+  fs?: TestFileSystem;
 } = {}): NodeRuntimeModules {
+  // The filesystem fixture implements the stat/directory subset used by discovery.
   return {
-    childProcess: {},
-    os: { homedir: () => options.home ?? "/home/tester" },
-    process: { platform: options.platform ?? "linux", env: options.env ?? { PATH: "/usr/bin:/bin" } },
-    fs: fakeFileSystem(options.files ?? [], options.directories ?? {}),
+    childProcess,
+    os: { ...os, homedir: () => options.home ?? "/home/tester" },
+    process: { ...processModule, platform: options.platform ?? "linux", env: options.env ?? { PATH: "/usr/bin:/bin" } },
+    fs: { ...fs, ...(options.fs ?? fakeFileSystem(options.files ?? [], options.directories ?? {})) },
     path
-  };
+  } as unknown as NodeRuntimeModules;
 }
 
 function candidates(name: string, overrides: Partial<AgentBinaryCandidatesInput> = {}): string[] {
@@ -150,8 +161,8 @@ describe("agent binary lookup", () => {
 
   it("drops a cached path once the executable disappears", () => {
     const files = new Set(["/usr/bin/codex"]);
-    const runtime: NodeRuntimeModules = {
-      ...testRuntime({ env: { PATH: "/usr/bin" } }),
+    const runtime = testRuntime({
+      env: { PATH: "/usr/bin" },
       fs: {
         statSync: (file: string) => {
           if (files.has(file)) return { isFile: () => true };
@@ -159,7 +170,7 @@ describe("agent binary lookup", () => {
         },
         readdirSync: () => { throw new Error("ENOENT"); }
       }
-    };
+    });
     expect(findAgentBinary("codex", runtime)).toBe("/usr/bin/codex");
     files.clear();
     expect(findAgentBinary("codex", runtime)).toBeNull();

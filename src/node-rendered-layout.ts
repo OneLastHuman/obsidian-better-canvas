@@ -1,5 +1,5 @@
 import type { CanvasNodeData } from "./canvas";
-import { resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { resolveCanvasNodeShape } from "./canvas-node-style";
 import type { CanvasThemeId } from "./canvas-theme";
 import { AUTO_RESIZE_LAYOUT, type AutoResizeLayout } from "./node-auto-resize";
 import { roundedMapInsets } from "./rounded-map-style";
@@ -26,7 +26,7 @@ export function fitContentDimension(
 type Insets = { top: number; right: number; bottom: number; left: number };
 
 export function textShapeInsets(theme: CanvasThemeId, node: CanvasNodeData, width: number, height: number): Insets | null {
-  const shape = resolveCanvasNodeShape(node as CanvasNodeStyleSource);
+  const shape = resolveCanvasNodeShape(node);
   if (theme === "soft-notes") {
     const [top, right, bottom, left] = softNotesPreset(node.bcSoftNotesPreset).inset;
     return { top: top * height, right: right * width, bottom: bottom * height, left: left * width };

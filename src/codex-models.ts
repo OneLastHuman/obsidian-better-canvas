@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { clearTimeout, setTimeout } from "node:timers";
 import { resolveLaunchCommand } from "./agent-launcher";
 import { resolveAgentBinary } from "./local-agent-discovery";
 import { loadNodeRuntimeModules } from "./node-runtime";
@@ -58,9 +59,9 @@ export async function listCodexModels(options: CodexModelListOptions = {}): Prom
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
         shell: false
-      }) as ChildProcessWithoutNullStreams;
+      });
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
       return;
     }
 
@@ -122,7 +123,10 @@ export async function listCodexModels(options: CodexModelListOptions = {}): Prom
     const consumeLine = (line: string) => {
       if (settled || !line.trim()) return;
       let message: Record<string, unknown> | undefined;
-      try { message = record(JSON.parse(line)); } catch { return; }
+      try {
+        const parsed: unknown = JSON.parse(line);
+        message = record(parsed);
+      } catch { return; }
       if (!message) return;
       if (typeof message.method === "string") {
         if (typeof message.id === "number" || typeof message.id === "string") {

@@ -1,3 +1,5 @@
+import * as childProcess from "node:child_process";
+import * as processModule from "node:process";
 import { EventEmitter } from "node:events";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -6,7 +8,7 @@ import { PassThrough, Writable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runLocalCodex } from "./codex-cli";
 import { clearAgentDiscoveryCache } from "./local-agent-discovery";
-import { loadNodeRuntimeModules } from "./node-runtime";
+import { loadNodeRuntimeModules, type NodeRuntimeModules } from "./node-runtime";
 
 vi.mock("./node-runtime", () => ({
   loadNodeRuntimeModules: vi.fn()
@@ -37,11 +39,22 @@ class FakeChild extends EventEmitter {
 }
 
 const spawn = vi.fn();
-const runtime = {
-  childProcess: { spawn },
-  os: { tmpdir: () => "/tmp/codex-tmp" },
-  process: { platform: "linux" }
-};
+function runtimeFixture(overrides: {
+  os?: Partial<NodeRuntimeModules["os"]>;
+  process?: Partial<NodeRuntimeModules["process"]>;
+  fs?: object;
+  path?: NodeRuntimeModules["path"];
+} = {}): NodeRuntimeModules {
+  // These subprocess fixtures implement only the host methods exercised by the launcher.
+  return {
+    childProcess: { ...childProcess, spawn },
+    os: { ...os, tmpdir: () => "/tmp/codex-tmp", ...overrides.os },
+    process: { ...processModule, platform: "linux", env: {}, ...overrides.process },
+    fs: { ...fs, ...overrides.fs },
+    path: overrides.path ?? path
+  } as unknown as NodeRuntimeModules;
+}
+const runtime = runtimeFixture();
 
 /** Resolves as soon as the CLI process is spawned, so tests never guess at timing. */
 function startRun(options: { binaryPath?: string; model?: string; signal?: AbortSignal } = {}) {
@@ -94,8 +107,7 @@ describe("Local Codex CLI process handling", () => {
   });
 
   it("uses a discovered install path when the bare command is not on PATH", async () => {
-    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
-      ...runtime,
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtimeFixture({
       process: { platform: "linux", env: { PATH: "/usr/bin:/bin" } },
       fs: {
         statSync: (file: string) => {
@@ -104,7 +116,7 @@ describe("Local Codex CLI process handling", () => {
         }
       },
       path
-    });
+    }));
     const { child, promise, spawned } = startRun();
     await spawned;
     expect(spawn.mock.calls[0][0]).toBe("/opt/homebrew/bin/codex");
@@ -121,12 +133,11 @@ describe("Local Codex CLI process handling", () => {
       await fs.promises.writeFile(path.join(root, "node.exe"), "fixture");
       const wrapper = path.join(root, "codex.cmd");
       await fs.promises.writeFile(wrapper, '@ECHO off\n"%_prog%" "%dp0%/node_modules/example/cli.js" %*\n');
-      vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
-        ...runtime,
+      vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtimeFixture({
         process: { platform: "win32", env: { Path: root }, execPath: path.join(root, "node.exe") },
         fs: { promises: fs.promises },
         path
-      });
+      }));
       const { child, promise, spawned } = startRun({ binaryPath: wrapper });
       await spawned;
       expect(spawn.mock.calls[0][0]).toBe(path.join(root, "node.exe"));
@@ -148,8 +159,7 @@ describe("Local Codex CLI process handling", () => {
       [entry, "// fixture, never executed"],
       [nodePath, "fixture"]
     ]);
-    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
-      ...runtime,
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtimeFixture({
       os: { tmpdir: () => "C:\\tmp", homedir: () => "C:\\Users\\tester" },
       process: {
         platform: "win32",
@@ -170,7 +180,7 @@ describe("Local Codex CLI process handling", () => {
         }
       },
       path: path.win32
-    });
+    }));
     const { child, promise, spawned } = startRun({ binaryPath: wrapper });
     await spawned;
     expect(spawn.mock.calls[0][0]).toBe(nodePath);

@@ -1,4 +1,6 @@
-import type { CanvasData, CanvasNodeData } from "./canvas";
+import { Events, Plugin, TAbstractFile, TFile, type Vault } from "obsidian";
+import { readCanvasData, type CanvasData, type CanvasNodeData } from "./canvas";
+import { isCanvasViewRuntime, type CanvasRuntime } from "./canvas-runtime";
 import { t } from "./i18n";
 
 export interface HtmlPreviewBlock {
@@ -9,7 +11,7 @@ export interface HtmlPreviewBlock {
 export const MAX_HTML_PREVIEW_LENGTH = 200_000;
 const controls = new WeakMap<HTMLElement, { source: string; file: boolean; error: string; open: boolean }>();
 interface FileRead {
-  file: any;
+  file: TFile;
   stamp: string;
   result: Promise<string>;
 }
@@ -41,7 +43,7 @@ export function extractHtmlPreviewBlocks(text: unknown): HtmlPreviewBlock[] {
   return blocks;
 }
 
-function nodeElement(canvas: any, nodeId: string): HTMLElement | null {
+function nodeElement(canvas: CanvasRuntime, nodeId: string): HTMLElement | null {
   const internal = canvas?.nodes?.get?.(nodeId);
   const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
   return element?.ownerDocument && element.isConnected ? element : null;
@@ -63,15 +65,15 @@ function renderControls(element: HTMLElement, source: string, file = false, erro
   controls.set(element, controlState);
 
   const doc = element.ownerDocument;
-  toolbar = doc.createElement("div");
+  toolbar = doc.win.createDiv();
   toolbar.className = "bc-html-preview-toolbar" + (file ? " bc-html-file-preview" : "");
 
-  const button = doc.createElement("button");
+  const button = doc.win.createEl("button");
   button.type = "button";
   button.className = "bc-html-preview-toggle";
   button.title = t("Preview HTML in a sandbox", "在沙盒中预览 HTML");
   let frame: HTMLIFrameElement | undefined;
-  const message = doc.createElement("div");
+  const message = doc.win.createDiv();
   message.className = "bc-html-preview-error";
   message.setAttribute("role", "status");
   message.textContent = error;
@@ -81,14 +83,14 @@ function renderControls(element: HTMLElement, source: string, file = false, erro
   const show = (visible: boolean): void => {
     controlState.open = visible;
     if (visible && !frame && !error) {
-      frame = doc.createElement("iframe");
+      frame = doc.win.createEl("iframe");
       frame.className = "bc-html-preview-frame";
       frame.title = t("HTML preview", "HTML 预览");
       // Never grant same-origin, forms, popups, downloads or top navigation.
       frame.setAttribute("sandbox", "allow-scripts");
       frame.setAttribute("referrerpolicy", "no-referrer");
       frame.srcdoc = source;
-      toolbar!.appendChild(frame);
+      toolbar.appendChild(frame);
     } else if (!visible) {
       frame?.remove();
       frame = undefined;
@@ -112,7 +114,7 @@ function renderControls(element: HTMLElement, source: string, file = false, erro
   element.classList.add("bc-has-html-preview");
 }
 
-export function syncHtmlPreviewNode(canvas: any, node: CanvasNodeData): void {
+export function syncHtmlPreviewNode(canvas: CanvasRuntime, node: CanvasNodeData): void {
   const element = nodeElement(canvas, node.id);
   if (!element) return;
   const blocks = extractHtmlPreviewBlocks(node.text);
@@ -134,14 +136,14 @@ export function isHtmlPreviewCandidate(node: CanvasNodeData): boolean {
  * Cache reads across decoration/DOM events. Each completion must still match the
  * current node, DOM element and cache entry, including after unload or invalidation.
  */
-export function syncHtmlPreviews(canvas: any, data?: CanvasData, vault?: any): void {
+export function syncHtmlPreviews(canvas: CanvasRuntime, data?: CanvasData, vault?: Vault): void {
   if (!canvas) return;
   let state = states.get(canvas);
   if (!state) {
     state = { reads: new Map(), pending: new Map() };
     states.set(canvas, state);
   }
-  const nodes = data?.nodes ?? (canvas?.getData?.()?.nodes ?? []);
+  const nodes = data?.nodes ?? readCanvasData(canvas).nodes;
   const livePaths = new Set<string>();
   const liveIds = new Set<string>();
   for (const node of nodes) {
@@ -167,7 +169,7 @@ export function syncHtmlPreviews(canvas: any, data?: CanvasData, vault?: any): v
       if (html) renderControls(element, "", true, message);
       else removeControls(element);
     };
-    if (!file || typeof file.extension !== "string" || typeof vault?.cachedRead !== "function") {
+    if (!(file instanceof TFile) || !vault) {
       state.reads.delete(path);
       state.pending.delete(node.id);
       fail(t("Could not read the HTML file. Make sure it is still in the vault.", "无法读取 HTML 文件。请确认文件仍在仓库中。"));
@@ -199,7 +201,7 @@ export function syncHtmlPreviews(canvas: any, data?: CanvasData, vault?: any): v
     const currentNode = (): CanvasNodeData | undefined => {
       if (states.get(canvas) !== state || state.reads.get(path) !== read ||
           state.pending.get(node.id)?.read !== read || nodeElement(canvas, node.id) !== element) return;
-      return readCanvasNodes(canvas).find(candidate => candidate.id === node.id && candidate.type === "file" && candidate.file === path);
+      return readCanvasData(canvas).nodes.find(candidate => candidate.id === node.id && candidate.type === "file" && candidate.file === path);
     };
     void read.result.then(text => {
       const current = currentNode();
@@ -216,39 +218,39 @@ export function syncHtmlPreviews(canvas: any, data?: CanvasData, vault?: any): v
   for (const id of state.pending.keys()) if (!liveIds.has(id)) state.pending.delete(id);
 }
 
-function readCanvasNodes(canvas: any): CanvasNodeData[] {
-  const nodes = canvas?.getData?.()?.nodes;
-  return Array.isArray(nodes) ? nodes : [];
-}
 
-export function clearHtmlPreviews(canvas: any): void {
+export function clearHtmlPreviews(canvas: CanvasRuntime): void {
   states.delete(canvas);
   for (const internal of canvas?.nodes?.values?.() ?? []) {
     const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
-    if (element?.querySelector) removeControls(element);
+    if (element) removeControls(element);
   }
 }
 
 /** File and DOM lifecycle is independent of text auto-resize and readonly mode. */
 export class HtmlPreviewManager {
-  private views = new Map<any, { container: HTMLElement; observer: MutationObserver; timer?: ReturnType<typeof setTimeout> }>();
+  private views = new Map<CanvasRuntime, { container: HTMLElement; observer: MutationObserver; timer?: number }>();
   private stopped = false;
 
-  constructor(private readonly plugin: any) {}
+  constructor(private readonly plugin: Plugin) {}
 
   start(): void {
     const { workspace, vault } = this.plugin.app;
     for (const name of ["layout-change", "active-leaf-change"]) {
-      this.plugin.registerEvent(workspace.on(name, () => this.refresh()));
+      this.plugin.registerEvent((workspace as Events).on(name, () => this.refresh()));
     }
     for (const name of ["advanced-canvas:node-changed", "advanced-canvas:node-text-content-changed",
       "advanced-canvas:data-loaded:after"]) {
-      this.plugin.registerEvent(workspace.on(name, (canvas: any) => {
-        if (this.views.has(canvas)) syncHtmlPreviews(canvas, undefined, vault);
+      this.plugin.registerEvent((workspace as Events).on(name, (value: unknown) => {
+        for (const canvas of this.views.keys()) {
+          if (value === canvas) syncHtmlPreviews(canvas, undefined, vault);
+        }
       }));
     }
     for (const name of ["create", "modify", "delete", "rename"]) {
-      this.plugin.registerEvent(vault.on(name, (file: any, oldPath?: string) => {
+      this.plugin.registerEvent((vault as Events).on(name, (value: unknown, oldPath?: string) => {
+        if (!(value instanceof TAbstractFile)) return;
+        const file = value;
         for (const canvas of this.views.keys()) {
           // Folder renames/deletes invalidate descendant paths too.
           for (const path of states.get(canvas)?.reads.keys() ?? []) {
@@ -259,26 +261,29 @@ export class HtmlPreviewManager {
         }
       }));
     }
-    this.plugin.registerEvent(workspace.on("advanced-canvas:canvas-view-unloaded:before", (view: any) => this.remove(view.canvas)));
+    this.plugin.registerEvent((workspace as Events).on("advanced-canvas:canvas-view-unloaded:before", (view: unknown) => {
+      if (isCanvasViewRuntime(view)) this.remove(view.canvas);
+    }));
     this.plugin.register(() => this.stop());
     workspace.onLayoutReady(() => this.refresh());
   }
 
   refresh(): void {
     if (this.stopped) return;
-    const live = new Set<any>();
+    const live = new Set<CanvasRuntime>();
     for (const leaf of this.plugin.app.workspace.getLeavesOfType("canvas")) {
-      const { canvas, containerEl } = leaf.view ?? {};
+      if (!isCanvasViewRuntime(leaf.view)) continue;
+      const { canvas, containerEl } = leaf.view;
       if (!canvas || !containerEl?.ownerDocument) continue;
       live.add(canvas);
       if (this.views.get(canvas)?.container !== containerEl) {
         this.remove(canvas);
-        const Observer = containerEl.ownerDocument.defaultView?.MutationObserver;
+        const Observer = (containerEl.ownerDocument.defaultView)?.MutationObserver;
         if (!Observer) continue;
         const observer = new Observer(() => {
           const entry = this.views.get(canvas);
           if (!entry || entry.timer !== undefined) return;
-          entry.timer = setTimeout(() => {
+          entry.timer = window.setTimeout(() => {
             entry.timer = undefined;
             syncHtmlPreviews(canvas, undefined, this.plugin.app.vault);
           }, 50);
@@ -291,10 +296,10 @@ export class HtmlPreviewManager {
     for (const canvas of this.views.keys()) if (!live.has(canvas)) this.remove(canvas);
   }
 
-  private remove(canvas: any): void {
+  private remove(canvas: CanvasRuntime): void {
     const entry = this.views.get(canvas);
     entry?.observer.disconnect();
-    if (entry?.timer !== undefined) clearTimeout(entry.timer);
+    if (entry?.timer !== undefined) window.clearTimeout(entry.timer);
     this.views.delete(canvas);
     clearHtmlPreviews(canvas);
   }

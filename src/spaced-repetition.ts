@@ -29,7 +29,7 @@ export function normalizeSpacedRepetitionFolderPath(value: string): string {
   if (parts.some(part => !part.trim() || part.trim() === "." || part.trim() === "..")) {
     throw new Error(t("Review deck folder cannot contain empty, . or .. path segments.", "复习卡组目录不能包含空路径段或 . / .. 路径段。"));
   }
-  const clean = parts.map(part => part.trim().replace(/[<>:"|?*\u0000-\u001f]/g, "-").replace(/[. ]+$/g, ""));
+  const clean = parts.map(part => part.trim().replace(/[<>:"|?*]|[^\u0020-\uffff]/g, "-").replace(/[. ]+$/g, ""));
   if (clean.some(part => !part)) throw new Error(t("Review deck folder contains an invalid folder name.", "复习卡组目录中包含无效的目录名称。"));
   return clean.join("/");
 }
@@ -37,7 +37,7 @@ export function normalizeSpacedRepetitionFolderPath(value: string): string {
 export function sanitizeSpacedRepetitionTitle(value: string): string {
   const firstLine = String(value ?? "").replace(/\r\n?/g, "\n").split("\n", 1)[0]
     .replace(/^\s*#+\s*/, "").trim();
-  const clean = firstLine.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-")
+  const clean = firstLine.replace(/[\\/:*?"<>|]|[^\u0020-\uffff]/g, "-")
     .replace(/^\.+/, "").replace(/\s+/g, " ").replace(/[. ]+$/g, "").slice(0, 80).trim();
   return clean && !/^[-_]+$/.test(clean) ? clean : "Flashcards";
 }

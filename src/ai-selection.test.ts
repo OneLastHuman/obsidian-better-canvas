@@ -10,6 +10,7 @@ vi.mock("obsidian", () => ({
   Component: class {},
   ItemView: class {},
   Modal: class {},
+  Menu: class {},
   SuggestModal: class {},
   PluginSettingTab: class {},
   TFile: class {},
@@ -32,12 +33,13 @@ vi.mock("./ai", () => ({
   generateImage: vi.fn()
 }));
 
-import { TFile } from "obsidian";
+import { Menu, TFile } from "obsidian";
 import { chatCompletion, chatCompletionStream, generateImage } from "./ai";
 import { insertCanvasNode, type CanvasData, type CanvasNodeData } from "./canvas";
-import BetterCanvasFeatures from "./feature-integrator";
+import BetterCanvasFeatures, { type FeaturePlugin } from "./feature-integrator";
 import BetterCanvasPlugin from "./main";
 import { LOCAL_AGENTS, updateLocalAgentConfig } from "./local-agent-settings";
+import type { CanvasNodeRuntime, CanvasSelectionRuntime } from "./canvas-runtime";
 
 function node(id: string, x = 0, y = 0): CanvasNodeData {
   return { id, type: "text", text: `Notes ${id}`, x, y, width: 200, height: 100 };
@@ -53,11 +55,12 @@ function makeCanvas() {
       ],
       metadata: { custom: "preserved" }
     } as CanvasData,
-    selection: new Set<any>([{ id: "a" }, { id: "b" }, { id: "as" }]),
-    nodes: new Map<string, any>(),
+    selection: new Set<CanvasSelectionRuntime>([{ id: "a" }, { id: "b" }, { id: "as" }]),
+    nodes: new Map<string, CanvasNodeRuntime>(),
     readonly: false,
-    wrapperEl: { classList: { contains: (_name: string) => false } },
-    getData() { return this.data; },
+    // This fixture exercises read-only guards, which only inspect classList.contains.
+    wrapperEl: { classList: { contains: (_name: string) => false } } as unknown as HTMLElement,
+    getData(): CanvasData { return this.data; },
     importData(data: CanvasData) {
       this.data = data;
       this.nodes = new Map(data.nodes.map(item => [item.id, { id: item.id }]));
@@ -91,11 +94,13 @@ function setup() {
     settings: {
       backend: "api",
       activeProviderId: "default",
-      providerProfiles: [{ id: "default", protocol: "openai", model: "test-model" }]
-    } as Record<string, any>
+      providerProfiles: [{ id: "default", name: "Default", protocol: "openai", baseUrl: "", apiKey: "", model: "test-model", imageModel: "gpt-image-1" }]
+    }
   };
-  const features = new BetterCanvasFeatures(plugin);
-  return { canvas, plugin, features, workspace, vault };
+  // Feature entry points use only this partial plugin's workspace, vault and settings.
+  const featurePlugin = plugin as unknown as FeaturePlugin & typeof plugin;
+  const features = new BetterCanvasFeatures(featurePlugin);
+  return { canvas, plugin: featurePlugin, features, workspace, vault };
 }
 
 beforeEach(() => {
@@ -123,7 +128,7 @@ describe("AI selection menu", () => {
     });
     plugin.registerCanvasContextMenu();
     const items = new Map<string, () => void>();
-    const menu = {
+    const menu = Object.assign(new Menu(), {
       addItem(callback: (item: any) => void) {
         let title = "";
         const item = {
@@ -134,7 +139,7 @@ describe("AI selection menu", () => {
         callback(item);
       },
       addSeparator: vi.fn()
-    };
+    });
     return { handlers, features, items, menu, canvas };
   }
 
@@ -225,7 +230,7 @@ describe("AI generation from multiple nodes", () => {
   it("checks the source node's provider and model instead of the global profile", () => {
     const { canvas, plugin, features } = setup();
     plugin.settings.providerProfiles.push({
-      id: "local", baseUrl: "http://localhost:11434/v1", apiKey: "", model: ""
+      id: "local", name: "Local", protocol: "openai", baseUrl: "http://localhost:11434/v1", apiKey: "", model: "", imageModel: "gpt-image-1"
     });
     canvas.data.nodes[0].bcAIProvider = "local";
     canvas.data.nodes[0].bcAIModel = "node-model";

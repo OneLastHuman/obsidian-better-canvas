@@ -7,7 +7,7 @@ import { resolveSketchStyle } from "./sketch-style";
 import { resolveSoftNotesStyle } from "./soft-notes-style";
 import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
 import { researchColor, researchFill, researchPreset, RESEARCH_SERIF } from "./research-style";
-import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 import { roundedMapInsets, roundedMapPath, ROUNDED_MAP_INK, ROUNDED_MAP_PAPER, ROUNDED_MAP_STROKE } from "./rounded-map-style";
 import { t } from "./i18n";
 
@@ -22,12 +22,18 @@ export interface FullCanvasSvgOptions {
   margin?: number;
 }
 
+function styleAttributes(item: CanvasNodeData | CanvasEdgeData): Record<string, unknown> {
+  const value = item.styleAttributes;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value : {};
+}
+
 function number(value: unknown, fallback = 0): number {
   const result = typeof value === "number" ? value : Number(value);
   return Number.isFinite(result) ? result : fallback;
 }
 
-function xml(value: unknown): string {
+function xml(value: string | number | null | undefined): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -46,7 +52,7 @@ const canvasPalette: Record<string, string> = {
 };
 
 function safeSvgColor(value: unknown, fallback: string): string {
-  const raw = String(value ?? "").trim();
+  const raw = (typeof value === "string" || typeof value === "number" ? String(value) : "").trim();
   if (!raw) return fallback;
   if (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw)) return raw;
   if (/^(?:rgb|rgba|hsl|hsla)\([\d.\s,%+/-]+\)$/i.test(raw)) return raw;
@@ -55,28 +61,28 @@ function safeSvgColor(value: unknown, fallback: string): string {
 }
 
 function nodeColor(node: CanvasNodeData): string {
-  const attrs = (node as any).styleAttributes ?? {};
+  const attrs = styleAttributes(node);
   const stored = node.color !== undefined && node.color !== null && node.color !== ""
     ? node.color
     : attrs.fillColor ?? attrs.backgroundColor;
-  const raw = String(stored ?? "");
+  const raw = typeof stored === "string" || typeof stored === "number" ? String(stored) : "";
   if (canvasPalette[raw]) return canvasPalette[raw];
   return safeSvgColor(raw, "none");
 }
 
 function edgeColor(edge: CanvasEdgeData): string {
-  const attrs = (edge as any).styleAttributes ?? {};
+  const attrs = styleAttributes(edge);
   const stored = edge.color !== undefined && edge.color !== null && edge.color !== ""
     ? edge.color
     : attrs.strokeColor ?? attrs.color;
-  const raw = String(stored ?? "");
+  const raw = typeof stored === "string" || typeof stored === "number" ? String(stored) : "";
   if (canvasPalette[raw]) return canvasPalette[raw];
   return safeSvgColor(raw, "#7b8794");
 }
 
 function nodeText(node: CanvasNodeData): string {
   if (typeof node.text === "string" && node.text.trim()) return node.text;
-  if (typeof node.file === "string") return node.file + (typeof (node as any).subpath === "string" ? String((node as any).subpath) : "");
+  if (typeof node.file === "string") return node.file + (typeof node.subpath === "string" ? node.subpath : "");
   if (typeof node.url === "string") return node.url;
   return node.type === "group" ? "" : "[" + node.type + " node]";
 }
@@ -99,8 +105,9 @@ function edgeSides(from: CanvasNodeData, to: CanvasNodeData): [string, string] {
 }
 
 function arrowStyleFor(edge: CanvasEdgeData): string {
-  const attrs = (edge as any).styleAttributes ?? {};
-  const raw = String((edge as any).bcArrowStyle ?? attrs.arrow ?? "default");
+  const attrs = styleAttributes(edge);
+  const value = edge.bcArrowStyle ?? attrs.arrow;
+  const raw = typeof value === "string" || typeof value === "number" ? String(value) : "default";
   if (raw === "triangle") return "default";
   if (raw === "halved-triangle") return "half-triangle";
   return [
@@ -112,7 +119,7 @@ function arrowStyleFor(edge: CanvasEdgeData): string {
 function arrowMarker(id: string, style: string, color: string): string {
   let path = "M1 1 L11 6 L1 11 Z";
   let fill = color;
-  let stroke = color;
+  const stroke = color;
   let strokeWidth = 1;
   if (style === "triangle-outline") {
     fill = "none";
@@ -152,14 +159,17 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
   const sides = edgeSides(from, to);
   const start = sidePoint(from, String(edge.fromSide || sides[0]), true);
   const end = sidePoint(to, String(edge.toSide || sides[1]), false);
-  const attrs = (edge as any).styleAttributes ?? {};
-  const style = String(attrs.lineStyle ?? attrs.path ?? (edge as any).bcPathStyle ?? (edge as any).style ?? "");
+  const attrs = styleAttributes(edge);
+  const styleValue = attrs.lineStyle ?? attrs.path ?? edge.bcPathStyle ?? edge.style;
+  const style = typeof styleValue === "string" || typeof styleValue === "number" ? String(styleValue) : "";
   const dash = style.includes("dot") ? "2 5" : style.includes("dash") ? "8 5" : "";
-  const rawArrowStyle = (edge as any).bcArrowStyle ?? attrs.arrow;
+  const rawArrowStyle = edge.bcArrowStyle ?? attrs.arrow;
   const arrowStyle = arrowStyleFor(edge);
-  const noArrows = String(rawArrowStyle ?? "").toLowerCase() === "none";
-  const fromEnd = String((edge as any).fromEnd ?? attrs.startArrowhead ?? "");
-  const toEnd = String((edge as any).toEnd ?? attrs.endArrowhead ?? "");
+  const noArrows = typeof rawArrowStyle === "string" && rawArrowStyle.toLowerCase() === "none";
+  const fromEndValue = edge.fromEnd ?? attrs.startArrowhead;
+  const toEndValue = edge.toEnd ?? attrs.endArrowhead;
+  const fromEnd = typeof fromEndValue === "string" || typeof fromEndValue === "number" ? String(fromEndValue) : "";
+  const toEnd = typeof toEndValue === "string" || typeof toEndValue === "number" ? String(toEndValue) : "";
   const startVisible = !noArrows && (fromEnd
     ? fromEnd !== "none" && fromEnd !== "null"
     : Boolean(rawArrowStyle));
@@ -168,7 +178,7 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
     : true);
   const color = rounded && !edge.color && !edge.bcColor && !attrs.strokeColor && !attrs.color
     ? ROUNDED_MAP_INK : edgeColor(rounded && !edge.color && edge.bcColor ? { ...edge, color: edge.bcColor } : edge);
-  const lineWidth = Math.max(0.5, Math.min(10, number(attrs.strokeWidth ?? attrs.lineWidth ?? (edge as any).bcWidth, rounded ? 3 : 2)));
+  const lineWidth = Math.max(0.5, Math.min(10, number(attrs.strokeWidth ?? attrs.lineWidth ?? edge.bcWidth, rounded ? 3 : 2)));
   const markers: string[] = [];
   const markerAttrs: string[] = [];
   if (startVisible && arrowStyle !== "none") {
@@ -181,7 +191,7 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
     markers.push(arrowMarker(id, arrowStyle, color));
     markerAttrs.push(' marker-end="url(#' + id + ')"');
   }
-  const routeMethod = attrs.pathfindingMethod ?? (edge as any).bcPathfindingMethod;
+  const routeMethod = attrs.pathfindingMethod ?? edge.bcPathfindingMethod;
   const routePoints = ["direct", "square", "a-star"].includes(String(routeMethod))
     ? routePointsForMethod(
         String(routeMethod) as CanvasEdgeRouteMethod,
@@ -238,44 +248,39 @@ function renderEdge(edge: CanvasEdgeData, nodes: Map<string, CanvasNodeData>, in
     (dash ? ' stroke-dasharray="' + dash + '"' : "") + markerAttrs.join("") + "/>" + label;
 }
 
-function polygonPoints(x: number, y: number, w: number, h: number, sides: number, rotate = -Math.PI / 2): string {
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const points: string[] = [];
-  for (let i = 0; i < sides; i++) {
-    const a = rotate + (i * Math.PI * 2) / sides;
-    points.push((cx + Math.cos(a) * w * 0.46) + "," + (cy + Math.sin(a) * h * 0.46));
-  }
-  return points.join(" ");
-}
 
 function wrapNodeText(node: CanvasNodeData, clipId: string, sketch = false, research = false, soft = false): string {
   const hasMarkdownText = typeof node.text === "string" && node.text.trim().length > 0;
   const raw = research && node.type === "text" ? String(node.text ?? "") : hasMarkdownText ? String(node.text) : nodeText(node);
   if (!raw) return "";
-  const attrs = (node as any).styleAttributes ?? {};
+  const attrs = styleAttributes(node);
   const sketchStyle = sketch ? resolveSketchStyle(node) : null;
   const softStyle = soft ? resolveSoftNotesStyle(node) : null;
   const freeHeading = softStyle?.preset.id === "free" && /^#{1,6}\s/m.test(raw);
   const fontSize = softStyle ? softStyle.preset.id === "free" ? freeHeading ? 16 : 30 : 18 : sketchStyle
     ? sketchStyle.fontSize
     : Math.max(10, Math.min(28, number(attrs.fontSize, 16)));
-  const alignRaw = softStyle?.align ?? sketchStyle?.align ?? String(attrs.textAlign ?? attrs.textAlignment ?? (node as any).bcTextAlign ?? "left");
+  const alignValue = attrs.textAlign ?? attrs.textAlignment ?? node.bcTextAlign;
+  const alignRaw = softStyle?.align ?? sketchStyle?.align ?? (typeof alignValue === "string" || typeof alignValue === "number" ? String(alignValue) : "left");
   const anchor = alignRaw === "center" ? "middle" : alignRaw === "right" ? "end" : "start";
   const startX = anchor === "middle" ? node.x + node.width / 2 : anchor === "end" ? node.x + node.width - 12 : node.x + 12;
+  const fontFamilyValue = attrs.fontFamily ?? attrs.font;
   const fontFamily = softStyle?.preset.id === "free" && !freeHeading ? "BC Soft Notes Title, cursive" : sketch || soft
     ? "BC Sketch Hand, Segoe Print, cursive"
-    : xml(String(attrs.fontFamily ?? attrs.font ?? (research ? RESEARCH_SERIF : "Inter,Arial,sans-serif")));
-  const rawWeight = String(attrs.fontWeight ?? "normal");
+    : xml(typeof fontFamilyValue === "string" || typeof fontFamilyValue === "number" ? fontFamilyValue : research ? RESEARCH_SERIF : "Inter,Arial,sans-serif");
+  const weightValue = attrs.fontWeight;
+  const rawWeight = typeof weightValue === "string" || typeof weightValue === "number" ? String(weightValue) : "normal";
   const resolvedWeight = /^(?:normal|bold|bolder|lighter|[1-9]00)$/i.test(rawWeight) ? rawWeight : "normal";
   const fontWeight = sketch && resolvedWeight === "normal" ? "600" : resolvedWeight;
-  const rawFontStyle = String(attrs.fontStyle ?? "normal");
+  const fontStyleValue = attrs.fontStyle;
+  const rawFontStyle = typeof fontStyleValue === "string" || typeof fontStyleValue === "number" ? String(fontStyleValue) : "normal";
   const fontStyle = /^(?:normal|italic|oblique)$/i.test(rawFontStyle) ? rawFontStyle : "normal";
-  const rawDecoration = String(attrs.textDecoration ?? "none");
+  const decorationValue = attrs.textDecoration;
+  const rawDecoration = typeof decorationValue === "string" || typeof decorationValue === "number" ? String(decorationValue) : "none";
   const textDecoration = /^(?:none|underline|overline|line-through)$/i.test(rawDecoration) ? rawDecoration : "none";
   const textColor = soft ? "#292e28" : sketch
     ? sketchStyle?.preset?.id === "annotation" ? "#696b65" : "#262520"
-    : xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? (node as any).bcTextColor, research ? "#303831" : "#202124"));
+    : xml(safeSvgColor(attrs.textColor ?? attrs.fontColor ?? node.bcTextColor, research ? "#303831" : "#202124"));
   const maxChars = Math.max(8, Math.floor((node.width - 24) / (fontSize * (sketch || soft ? 0.95 : 0.58))));
   const maxLines = Math.max(1, Math.min(80, Math.floor((node.height - 26) / (fontSize * 1.35))));
   const lines = layoutMarkdownForSvg(raw, maxChars, maxLines, fontSize);
@@ -424,9 +429,7 @@ function renderSketchExportNode(node: CanvasNodeData, index: number): string {
   const ink = resolveSketchStyle(node).preset?.id === "annotation" ? "#696b65" : "#262520";
   const geometry = '<g transform="translate(' + x + ' ' + y + ')">' +
     renderSketchNodeSvg(node, { ink }) + "</g>";
-  const imageDataUrl = typeof (node as any).bcExportImageDataUrl === "string"
-    ? String((node as any).bcExportImageDataUrl)
-    : "";
+  const imageDataUrl = typeof node.bcExportImageDataUrl === "string" ? node.bcExportImageDataUrl : "";
   const imageMarkup = imageDataUrl.startsWith("data:image/") && node.type === "file"
     ? '<image x="' + (x + 6) + '" y="' + (y + 6) + '" width="' + Math.max(1, width - 12) +
       '" height="' + Math.max(1, height - 30) + '" href="' + xml(imageDataUrl) +
@@ -459,14 +462,14 @@ function renderSoftNotesExportNode(node: CanvasNodeData, index: number): string 
 
 function renderRoundedMapExportNode(node: CanvasNodeData, index: number): string | null {
   if (node.type === "group") return null;
-  const shape = resolveCanvasNodeShape(node as CanvasNodeStyleSource);
+  const shape = resolveCanvasNodeShape(node);
   const path = roundedMapPath(shape, node.width, node.height);
   if (!path) return null;
   const { x, y, width, height } = node;
   const inset = roundedMapInsets(shape, width, height);
   const clipId = "bc-clip-" + index;
-  const attrs = (node.styleAttributes ?? {}) as Record<string, unknown>;
-  const border = resolveCanvasNodeBorder(node as CanvasNodeStyleSource);
+  const attrs = styleAttributes(node);
+  const border = resolveCanvasNodeBorder(node);
   const stroke = border === "none" || border === "invisible" ? "none" : ROUNDED_MAP_INK;
   const dash = border === "dashed" ? ' stroke-dasharray="10 6"' : border === "dotted" ? ' stroke-dasharray="1 8"' : "";
   const rawFill = nodeColor(node);
@@ -481,7 +484,7 @@ function renderRoundedMapExportNode(node: CanvasNodeData, index: number): string
     height: Math.max(1, height - inset.y - inset.bottom + 26),
     styleAttributes: { ...attrs, fontSize: attrs.fontSize ?? 18, textColor: attrs.textColor ?? ROUNDED_MAP_INK,
       fontFamily: attrs.fontFamily ?? "Avenir Next, PingFang SC, Microsoft YaHei, sans-serif",
-      textAlign: node.bcTextAlign ?? attrs.textAlign ?? "left" }
+      textAlign: node.bcTextAlign ?? (typeof attrs.textAlign === "string" ? attrs.textAlign : "left") }
   };
   const image = typeof node.bcExportImageDataUrl === "string" && node.bcExportImageDataUrl.startsWith("data:image/") && node.type === "file"
     ? `<image x="${x + inset.x}" y="${y + inset.y}" width="${Math.max(1, width - inset.x - inset.right)}" height="${Math.max(1, height - inset.y - inset.bottom)}" href="${xml(node.bcExportImageDataUrl)}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>`
@@ -499,16 +502,18 @@ function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded
   }
   const x = number(node.x), y = number(node.y);
   const width = Math.max(1, number(node.width, 280)), height = Math.max(1, number(node.height, 140));
-  const attrs = (node as any).styleAttributes ?? {};
-  const shape = String(attrs.shape ?? (node as any).bcShape ?? (node as any).shape ?? "rectangle").toLowerCase();
+  const attrs = styleAttributes(node);
+  const shapeValue = attrs.shape ?? node.bcShape ?? node.shape;
+  const shape = (typeof shapeValue === "string" || typeof shapeValue === "number" ? String(shapeValue) : "rectangle").toLowerCase();
   research = research && node.type !== "group";
   const fill = research ? researchFill(node) : nodeColor(node);
-  const border = research ? researchColor(node) : String(attrs.borderColor ?? "#858b93");
-  const borderStyle = String((node as any).bcBorderStyle ?? attrs.borderStyle ?? attrs.border ?? "");
+  const borderValue = attrs.borderColor;
+  const border = research ? researchColor(node) : typeof borderValue === "string" || typeof borderValue === "number" ? String(borderValue) : "#858b93";
+  const borderStyleValue = node.bcBorderStyle ?? attrs.borderStyle ?? attrs.border;
+  const borderStyle = typeof borderStyleValue === "string" || typeof borderStyleValue === "number" ? String(borderStyleValue) : "";
   const dash = borderStyle.includes("dash") ? ' stroke-dasharray="8 5"' : borderStyle.includes("dot") ? ' stroke-dasharray="2 5"' : "";
   const stroke = borderStyle === "invisible" ? "none" : border;
   const clipId = "bc-clip-" + index;
-  const clip = "";
 
   let geometry: string;
   const strokeWidth = Math.max(0.5, Math.min(10, number(attrs.borderWidth, 1.5)));
@@ -609,9 +614,7 @@ function renderNode(node: CanvasNodeData, index: number, sketch = false, rounded
   }
   const text = wrapNodeText(node, clipId, false, research);
   const clipPath = '<clipPath id="' + clipId + '"><rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="5"/></clipPath>';
-  const imageDataUrl = typeof (node as any).bcExportImageDataUrl === "string"
-    ? String((node as any).bcExportImageDataUrl)
-    : "";
+  const imageDataUrl = typeof node.bcExportImageDataUrl === "string" ? node.bcExportImageDataUrl : "";
   const imageMarkup = imageDataUrl.startsWith("data:image/") && node.type === "file"
     ? '<image x="' + (x + 6) + '" y="' + (y + 6) + '" width="' + Math.max(1, width - 12) +
       '" height="' + Math.max(1, height - 30) + '" href="' + xml(imageDataUrl) +

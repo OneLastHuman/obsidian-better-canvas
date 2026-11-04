@@ -1,11 +1,22 @@
+import * as childProcess from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as processModule from "node:process";
 import { EventEmitter } from "node:events";
 import { PassThrough, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listCodexModels, type CodexModelListOptions } from "./codex-models";
-import { loadNodeRuntimeModules } from "./node-runtime";
+import { loadNodeRuntimeModules, type NodeRuntimeModules } from "./node-runtime";
 
 vi.mock("./node-runtime", () => ({
   loadNodeRuntimeModules: vi.fn()
+}));
+
+// Forward imported Node timers to the clock controlled by vi.useFakeTimers.
+vi.mock("node:timers", () => ({
+  setTimeout: (callback: () => void, delay?: number) => global.setTimeout(callback, delay),
+  clearTimeout: (timer: NodeJS.Timeout | undefined) => global.clearTimeout(timer)
 }));
 
 interface Message {
@@ -70,11 +81,14 @@ class FakeChild extends EventEmitter {
 }
 
 const spawn = vi.fn();
+// The child fixture supplies the stream and lifecycle subset used by this protocol client.
 const runtime = {
-  childProcess: { spawn },
-  os: { tmpdir: () => "/tmp/codex-model-list" },
-  process: { platform: "linux" }
-};
+  childProcess: { ...childProcess, spawn },
+  os: { ...os, tmpdir: () => "/tmp/codex-model-list" },
+  process: { ...processModule, platform: "linux", env: {} },
+  fs,
+  path
+} as unknown as NodeRuntimeModules;
 const children: FakeChild[] = [];
 
 function startRun(options: CodexModelListOptions = {}) {

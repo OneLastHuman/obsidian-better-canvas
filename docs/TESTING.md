@@ -51,7 +51,7 @@ npm view vitest version --fetch-retries=0 --fetch-timeout=5000
 
 本仓库的 package scripts 定义如下：
 
-- `npm run lint`：运行 Obsidian 官方 ESLint 规则；现有非安全规则先以警告方式提示，安全敏感规则会使检查失败。
+- `npm run lint`：运行 Obsidian 官方 recommended 规则并将显式 `any` 作为错误；不关闭 unsafe 系列类型检查，也不批量降低官方错误级别。流式 AI/MCP 的直接 `fetch` 仍保留官方警告，须单独复核；`requestUrl` 的公开接口没有流式响应体或取消信号。
 - `npm run validate:metadata`：校验 package.json、manifest.json 与 versions.json 的插件版本和最低 Obsidian 版本是否一致；不依赖 node_modules，CI 在安装依赖之前运行。
 - `npm run typecheck`：TypeScript 类型检查。
 - `npm test`：运行 Vitest 单元测试。
@@ -72,6 +72,8 @@ npm run verify:workflow-artifacts
 ```
 
 如果任务触及构建或开发脚本，也要验证相应命令的实际行为。检查构建产物是否存在、体积非零，并确认 `main.js`、`manifest.json` 和 `styles.css` 的部署路径符合 Obsidian 插件要求。
+
+社区目录的 Review 评分与本地命令结果分别记录。目录会扫描最新已发布版本；本地通过不代表线上标记已经更新。发布前在开发者后台使用 **Review branch → Run preview scan** 检查目标分支或 commit，流程及仍需解释的扫描项见 [发布指南](RELEASING.md#preview-the-community-review)。
 
 CI 只能证明 workflow 实际运行过的步骤。读取 Actions 时至少核对：
 

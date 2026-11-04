@@ -1,5 +1,35 @@
-import { loadPdfJs, TFile } from "obsidian";
+import { App, loadPdfJs, TFile } from "obsidian";
 import { t } from "./i18n";
+
+export interface PdfTextItem {
+  str?: string;
+  transform?: number[];
+  width?: number;
+}
+export interface PdfViewport {
+  width: number;
+  height: number;
+  scale: number;
+  transform: number[];
+}
+export interface PdfDocument {
+  numPages: number;
+  getPage(page: number): Promise<{
+    getTextContent(): Promise<{ items: PdfTextItem[] }>;
+    getViewport(options: { scale: number }): PdfViewport;
+    render(options: { canvasContext: CanvasRenderingContext2D; viewport: PdfViewport }): { promise: Promise<void> };
+  }>;
+}
+export interface PdfJsHost {
+  getDocument(options: { data: ArrayBuffer }): { promise: Promise<PdfDocument> };
+  Util?: { transform(first: number[], second: number[]): number[] };
+}
+export async function getPdfJs(): Promise<PdfJsHost> {
+  const host = window as Window & { pdfjsLib?: PdfJsHost };
+  if (!host.pdfjsLib) await loadPdfJs();
+  if (!host.pdfjsLib) throw new Error("PDF.js is unavailable.");
+  return host.pdfjsLib;
+}
 
 export interface PdfPageContext {
   pageNumber: number;
@@ -7,22 +37,22 @@ export interface PdfPageContext {
   imageDataUrl?: string;
 }
 
-const documents = new Map<string, Promise<any>>();
+const documents = new Map<string, Promise<PdfDocument>>();
 const pageCache = new Map<string, Promise<PdfPageContext>>();
 
 function documentCacheKey(file: TFile): string {
   return file.path + "|" + file.stat.mtime + "|" + file.stat.size;
 }
 
-async function getPdfDocument(app: any, file: TFile): Promise<any> {
+async function getPdfDocument(app: App, file: TFile): Promise<PdfDocument> {
   const key = documentCacheKey(file);
   const existing = documents.get(key);
   if (existing) return existing;
 
   const task = (async () => {
-    if (!(window as any).pdfjsLib) await loadPdfJs();
+    const pdfjs = await getPdfJs();
     const bytes = await app.vault.readBinary(file);
-    return (window as any).pdfjsLib.getDocument({ data: bytes }).promise;
+    return pdfjs.getDocument({ data: bytes }).promise;
   })();
   documents.set(key, task);
   try {
@@ -40,10 +70,9 @@ function pageFromSubpath(subpath?: string): number | null {
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
-function decodeText(content: any): string {
-  const items = Array.isArray(content?.items) ? content.items : [];
-  return items
-    .map((item: any) => typeof item?.str === "string" ? item.str : "")
+function decodeText(content: { items: PdfTextItem[] }): string {
+  return content.items
+    .map(item => item.str ?? "")
     .filter(Boolean)
     .join(" ")
     .replace(/[ \t]+/g, " ")
@@ -51,7 +80,7 @@ function decodeText(content: any): string {
     .trim();
 }
 
-async function getPageContext(app: any, file: TFile, pageNumber: number, includeImage: boolean): Promise<PdfPageContext> {
+async function getPageContext(app: App, file: TFile, pageNumber: number, includeImage: boolean): Promise<PdfPageContext> {
   const key = documentCacheKey(file) + "|page=" + pageNumber + "|image=" + includeImage;
   const cached = pageCache.get(key);
   if (cached) return cached;
@@ -71,7 +100,7 @@ async function getPageContext(app: any, file: TFile, pageNumber: number, include
       const rawViewport = page.getViewport({ scale: 1 });
       const scale = Math.min(1.25, 1400 / Math.max(1, rawViewport.width), 1800 / Math.max(1, rawViewport.height));
       const viewport = page.getViewport({ scale });
-      const canvas = document.createElement("canvas");
+      const canvas = document.win.createEl("canvas");
       canvas.width = Math.max(1, Math.ceil(viewport.width));
       canvas.height = Math.max(1, Math.ceil(viewport.height));
       const context = canvas.getContext("2d", { alpha: false });
@@ -98,7 +127,7 @@ async function getPageContext(app: any, file: TFile, pageNumber: number, include
 }
 
 export async function extractPdfPages(
-  app: any,
+  app: App,
   file: TFile,
   subpath?: string,
   maxPages = 3,

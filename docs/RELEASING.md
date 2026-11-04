@@ -10,6 +10,20 @@ Releases are created from versioned Git tags. The Release workflow runs the chec
 4. Run the [standard local checks](TESTING.md#3-本项目的标准本地检查), including lint and metadata validation. Record runtime checks separately as required by that guide.
 5. Submit the version changes through a PR under the [repository governance rules](REPOSITORY_GOVERNANCE.md). After the maintainer merges it into `main`, confirm the Build workflow passes on the merged commit.
 
+## Preview the community review
+
+Before publishing a fix, open the plugin in the authenticated [Obsidian Community developer dashboard](https://community.obsidian.md/) and choose **Review branch → Run preview scan**. Select the exact branch, tag, or commit being reviewed. A preview does not publish a release. See the [official review guidance](https://obsidian.md/blog/future-of-plugins/).
+
+Keep local checks, preview findings, and the public latest-release scorecard separate. The public **Risks** label is not proof of malware, and a local lint pass does not clear it. Obsidian does not publish an exact numeric threshold; network and clipboard capabilities remain disclosures when those features are present.
+
+Review these retained findings rather than removing working features to hide them:
+
+- Streaming AI and MCP SSE use `fetch` for incremental responses and cancellation. The public `requestUrl` response is buffered and has no response stream or abort signal.
+- The published [scanner implementation](https://github.com/obsidianmd/obsidian-workflows/blob/main/src/lint.ts) maps the plugin minimum of Obsidian 1.14.4 to its newest known Electron bucket, labelled Obsidian 1.11.4. Its compatibility detector broadly flags `clip-path`, text-decoration features, and Grid `column-gap`; inspect the actual syntax and desktop behavior when assessing these warnings.
+- GPL licensing, base64 media handling, Vault enumeration and clipboard access describe existing capabilities. The ZIP/checksum asset recommendation is explained below.
+
+After the reviewed fix is merged and a new version is published through the workflow below, check the new release's actual scan result. Do not move an existing version tag or claim that a preview changed the public latest-release scorecard.
+
 ## Publish
 
 From the latest `main` commit that contains the version changes, create and push an annotated tag. The tag must match the version in `manifest.json` exactly, without a `v` prefix. Replace `0.2.0` with the version you set above:

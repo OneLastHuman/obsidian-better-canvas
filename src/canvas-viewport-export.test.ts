@@ -47,11 +47,12 @@ describe("viewport SVG export filter", () => {
       querySelectorAll: (selector: string) => selector === "iframe" ? [frame] : []
     };
     const container = {
-      ownerDocument: { createElement: () => snapshot },
+      ownerDocument: { win: { createDiv: vi.fn(() => snapshot) } },
       cloneNode: () => clone,
       querySelectorAll: () => [source]
     };
     prepareViewportSvgExportClone(container as unknown as HTMLElement);
+    expect(container.ownerDocument.win.createDiv).toHaveBeenCalledOnce();
     expect(frame.replaceWith).toHaveBeenCalledWith(snapshot);
     expect(snapshot.className).toContain("markdown-source-view");
     expect(snapshot.appendChild).toHaveBeenCalledWith(contentCopy);
@@ -106,12 +107,12 @@ describe("viewport SVG export filter", () => {
     };
     const container: any = {
       ownerDocument: {
-        createElement: () => ({
+        win: { createDiv: () => ({
           style: {} as Record<string, string>,
           className: "",
           textContent: "",
           setCssStyles(styles: Record<string, string>) { Object.assign(this.style, styles); }
-        })
+        }) }
       },
       cloneNode: vi.fn(() => clone),
       querySelectorAll: (selector: string) => selector === "iframe" ? [sourceFrame] : []

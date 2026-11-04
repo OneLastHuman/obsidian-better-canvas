@@ -111,16 +111,21 @@ describe("rounded map functional presets", () => {
   });
 
   it("decorates without writing, updates size-dependent paths and clears them on theme switch", () => {
-    let data = { ...fixture(), bcTheme: "rounded-map" };
+    let data: CanvasData = { ...fixture(), bcTheme: "rounded-map" };
     const vars = new Map<string, string>();
     const nodeEl = { dataset: {} as Record<string, string>, style: {
       getPropertyValue: (key: string) => vars.get(key),
       setProperty: (key: string, value: string) => vars.set(key, value),
       removeProperty: (key: string) => vars.delete(key)
-    } };
+    } } as unknown as HTMLElement;
     // Exercise the theme's default rounded rectangle rather than the fixture's explicit hexagon.
     data.nodes[0].bcShape = "default";
-    const canvas = { getData: () => data, nodes: new Map([["a", { nodeEl }]]), wrapperEl: { dataset: {} } };
+    const canvas = {
+      getData: () => data,
+      importData: (next: CanvasData) => { data = next; },
+      nodes: new Map([["a", { id: "a", nodeEl }]]),
+      wrapperEl: { dataset: {}, querySelectorAll: () => [] } as unknown as HTMLElement
+    };
     const snapshot = structuredClone(data);
     decorateCanvasTheme(canvas);
     expect(data).toEqual(snapshot);
@@ -139,7 +144,8 @@ describe("rounded map functional presets", () => {
     const history: CanvasData[] = [];
     const canvas = {
       data: fixture(), readonly: false,
-      getData() { return this.data; },
+      getData(): CanvasData { return this.data; },
+      importData(data: CanvasData) { this.data = data; },
       pushHistory(data: CanvasData) { history.push(structuredClone(data)); }
     };
     expect(setCanvasTheme(canvas, "rounded-map")).toBe(true);

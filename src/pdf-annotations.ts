@@ -1,5 +1,7 @@
-import { ItemView, Notice } from "obsidian";
-import { insertCanvasNode, makeTextNode, readCanvasData } from "./canvas";
+import { ItemView, Notice, Plugin } from "obsidian";
+import { insertCanvasNode, makeTextNode, readCanvasData, type CanvasNodeData } from "./canvas";
+import { isCanvasViewRuntime, type CanvasRuntime } from "./canvas-runtime";
+import { confirmAction } from "./confirmation-modal";
 import { patchNode } from "./enhancements";
 import { strokeTouchesEraser } from "./pdf-annotation-geometry";
 import { buildPdfAnnotationMarkdown } from "./pdf-annotation-export";
@@ -33,8 +35,36 @@ interface PdfStroke {
   opacity?: number;
   createdAt?: number;
 }
+function isPoint(value: unknown): value is PdfPoint {
+  return typeof value === "object" && value !== null && "x" in value && "y" in value &&
+    typeof value.x === "number" && Number.isFinite(value.x) &&
+    typeof value.y === "number" && Number.isFinite(value.y);
+}
+function isRect(value: unknown): value is PdfRect {
+  return isPoint(value) && "width" in value && typeof value.width === "number" &&
+    "height" in value && typeof value.height === "number";
+}
+function readStrokes(value: unknown): PdfStroke[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry: unknown): entry is PdfStroke => typeof entry === "object" && entry !== null &&
+    "points" in entry && Array.isArray(entry.points) && entry.points.every(isPoint) &&
+    "color" in entry && typeof entry.color === "string" && "width" in entry && typeof entry.width === "number" &&
+    (!("tool" in entry) || entry.tool === undefined || entry.tool === "pen" || entry.tool === "highlighter") &&
+    (!("opacity" in entry) || entry.opacity === undefined || typeof entry.opacity === "number") &&
+    (!("createdAt" in entry) || entry.createdAt === undefined || typeof entry.createdAt === "number"));
+}
+function readHighlights(value: unknown): PdfTextHighlight[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry: unknown): entry is PdfTextHighlight => typeof entry === "object" && entry !== null &&
+    "text" in entry && typeof entry.text === "string" && "rects" in entry &&
+    Array.isArray(entry.rects) && entry.rects.every(isRect) &&
+    (!("color" in entry) || entry.color === undefined || typeof entry.color === "string") &&
+    (!("opacity" in entry) || entry.opacity === undefined || typeof entry.opacity === "number") &&
+    (!("createdAt" in entry) || entry.createdAt === undefined || typeof entry.createdAt === "number"));
+}
 
-function isPinnedPdf(node: any): boolean {
+
+function isPinnedPdf(node: CanvasNodeData | undefined): node is CanvasNodeData {
   return node?.type === "file" &&
     typeof node.file === "string" &&
     node.file.toLowerCase().endsWith(".pdf") &&
@@ -43,7 +73,7 @@ function isPinnedPdf(node: any): boolean {
 }
 
 function makeSvgElement<K extends keyof SVGElementTagNameMap>(name: K): SVGElementTagNameMap[K] {
-  return document.createElementNS("http://www.w3.org/2000/svg", name);
+  return createSvg(name);
 }
 
 /**
@@ -52,14 +82,14 @@ function makeSvgElement<K extends keyof SVGElementTagNameMap>(name: K): SVGEleme
  * database, so annotations remain portable with the .canvas file.
  */
 export class PdfAnnotationManager {
-  private plugin: any;
+  private plugin: Plugin;
   private observers = new Map<HTMLElement, MutationObserver>();
   private resizeObservers = new Map<HTMLElement, ResizeObserver>();
   private excerptContainers = new WeakSet<HTMLElement>();
   private toolbarContainers = new Map<HTMLElement, HTMLDivElement>();
   private refreshQueued = false;
 
-  constructor(plugin: any) {
+  constructor(plugin: Plugin) {
     this.plugin = plugin;
   }
 
@@ -119,9 +149,9 @@ export class PdfAnnotationManager {
     this.toolbarContainers.clear();
   }
 
-  private activeCanvas(): any | null {
-    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
-    return view?.getViewType?.() === "canvas" ? view.canvas ?? null : null;
+  private activeCanvas(): CanvasRuntime | null {
+    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView);
+    return isCanvasViewRuntime(view) ? view.canvas : null;
   }
 
   private async exportAnnotationsForActiveCanvas(): Promise<void> {
@@ -131,8 +161,8 @@ export class PdfAnnotationManager {
       return;
     }
 
-    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
-    const sourcePath = typeof view?.file?.path === "string" ? view.file.path : "";
+    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView);
+    const sourcePath = isCanvasViewRuntime(view) ? view.file?.path ?? "" : "";
     const bundle = buildPdfAnnotationMarkdown(readCanvasData(canvas).nodes, sourcePath);
     if (!bundle) {
       new Notice(t("This Canvas has no pinned PDF page annotations to export.", "当前 Canvas 没有可导出的固定 PDF 页面批注。"));
@@ -172,7 +202,7 @@ export class PdfAnnotationManager {
     }
   }
 
-  private selectedPdfNode(): { canvas: any; node: any } | null {
+  private selectedPdfNode(): { canvas: CanvasRuntime; node: CanvasNodeData } | null {
     const canvas = this.activeCanvas();
     const selection = canvas?.selection;
     if (!canvas || !selection || selection.size !== 1) {
@@ -180,7 +210,7 @@ export class PdfAnnotationManager {
       return null;
     }
     const selected = selection.values().next().value;
-    const node = readCanvasData(canvas).nodes.find((item: any) => item.id === selected?.id);
+    const node = readCanvasData(canvas).nodes.find(item => item.id === selected?.id);
     if (!isPinnedPdf(node)) {
       new Notice(t("Create a pinned PDF page node first (split the PDF into pages or create a paged annotation workspace).", "请先创建固定 PDF 页面节点（拆分 PDF 页面或创建分页批注工作区）。"));
       return null;
@@ -191,7 +221,7 @@ export class PdfAnnotationManager {
   private toggleForSelection(): void {
     const selected = this.selectedPdfNode();
     if (!selected) return;
-    const next = !Boolean(selected.node.bcPdfAnnotating);
+    const next = !selected.node.bcPdfAnnotating;
     patchNode(selected.canvas, selected.node.id, {
       bcPdfAnnotating: next,
       bcPdfTool: selected.node.bcPdfTool ?? "pen",
@@ -226,10 +256,8 @@ export class PdfAnnotationManager {
   private undoForSelection(): void {
     const selected = this.selectedPdfNode();
     if (!selected) return;
-    const strokes = Array.isArray(selected.node.bcPdfStrokes) ? selected.node.bcPdfStrokes as PdfStroke[] : [];
-    const highlights = Array.isArray(selected.node.bcPdfTextHighlights)
-      ? selected.node.bcPdfTextHighlights as PdfTextHighlight[]
-      : [];
+    const strokes = readStrokes(selected.node.bcPdfStrokes);
+    const highlights = readHighlights(selected.node.bcPdfTextHighlights);
     const lastStroke = strokes[strokes.length - 1];
     const lastHighlight = highlights[highlights.length - 1];
     if (!lastStroke && !lastHighlight) {
@@ -272,9 +300,10 @@ export class PdfAnnotationManager {
   refresh(): void {
     if (!this.plugin?.app?.workspace) return;
     for (const leaf of this.plugin.app.workspace.getLeavesOfType("canvas")) {
-      const view = leaf.view as any;
-      const canvas = view?.canvas;
-      const root = view?.containerEl as HTMLElement | undefined;
+      const view = leaf.view;
+      if (!isCanvasViewRuntime(view)) continue;
+      const canvas = view.canvas;
+      const root = view.containerEl;
       if (!canvas || !root) continue;
 
       if (!this.observers.has(root)) {
@@ -289,7 +318,7 @@ export class PdfAnnotationManager {
         const internal = canvas.nodes?.get?.(data.id);
         const nodeElement = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
         if (!(nodeElement instanceof HTMLElement)) continue;
-        const target = nodeElement.querySelector(".bc-pinned-pdf-embed-container") as HTMLElement | null;
+        const target = nodeElement.querySelector<HTMLElement>(".bc-pinned-pdf-embed-container");
         if (!target) continue;
         if (!this.resizeObservers.has(target)) {
           const observer = new ResizeObserver(() => this.scheduleRefresh());
@@ -301,10 +330,10 @@ export class PdfAnnotationManager {
     }
   }
 
-  private ensureToolbar(canvas: any, nodeData: any, container: HTMLElement): void {
+  private ensureToolbar(canvas: CanvasRuntime, nodeData: CanvasNodeData, container: HTMLElement): void {
     let toolbar = this.toolbarContainers.get(container);
     if (!toolbar) {
-      toolbar = document.createElement("div");
+      toolbar = container.ownerDocument.win.createDiv();
       toolbar.className = "bc-pdf-annotation-toolbar";
       toolbar.setAttribute("role", "toolbar");
       toolbar.setAttribute("aria-label", t("PDF page annotation tools", "PDF 页面批注工具"));
@@ -320,7 +349,7 @@ export class PdfAnnotationManager {
       ];
 
       for (const action of actions) {
-        const button = document.createElement("button");
+        const button = container.ownerDocument.win.createEl("button");
         button.type = "button";
         button.className = "bc-pdf-annotation-tool";
         button.dataset.action = action.id;
@@ -335,7 +364,7 @@ export class PdfAnnotationManager {
         button.addEventListener("click", event => {
           event.preventDefault();
           event.stopPropagation();
-          this.handleToolbarAction(canvas, nodeData.id, action.id);
+          void this.handleToolbarAction(canvas, nodeData.id, action.id);
         });
         toolbar.appendChild(button);
       }
@@ -344,10 +373,10 @@ export class PdfAnnotationManager {
       this.toolbarContainers.set(container, toolbar);
     }
 
-    const current = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeData.id) ?? nodeData;
+    const current = readCanvasData(canvas).nodes.find(node => node.id === nodeData.id) ?? nodeData;
     const readonly = Boolean(canvas?.wrapperEl?.classList?.contains("bc-readonly"));
-    const tool = String(current.bcPdfTool ?? "pen");
-    const color = String(current.bcPdfColor ?? "#e53935");
+    const tool = typeof current.bcPdfTool === "string" ? current.bcPdfTool : "pen";
+    const color = typeof current.bcPdfColor === "string" ? current.bcPdfColor : "#e53935";
     const annotating = Boolean(current.bcPdfAnnotating);
     const strokes = Array.isArray(current.bcPdfStrokes) ? current.bcPdfStrokes : [];
     const highlights = Array.isArray(current.bcPdfTextHighlights) ? current.bcPdfTextHighlights : [];
@@ -369,17 +398,17 @@ export class PdfAnnotationManager {
     }
   }
 
-  private handleToolbarAction(canvas: any, nodeId: string, action: string): void {
+  private async handleToolbarAction(canvas: CanvasRuntime, nodeId: string, action: string): Promise<void> {
     if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) {
       new Notice(t("This Canvas is in read-only mode; PDF annotations can't be changed.", "当前 Canvas 处于只读模式，不能修改 PDF 批注。"));
       return;
     }
-    const current = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeId) as any;
+    const current = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
     if (!isPinnedPdf(current)) return;
 
     if (action === "toggle") {
       patchNode(canvas, nodeId, {
-        bcPdfAnnotating: !Boolean(current.bcPdfAnnotating),
+        bcPdfAnnotating: !current.bcPdfAnnotating,
         bcPdfTool: current.bcPdfTool ?? "pen",
         bcPdfColor: current.bcPdfColor ?? "#e53935",
         bcPdfWidth: current.bcPdfWidth ?? 5
@@ -394,10 +423,8 @@ export class PdfAnnotationManager {
         : { bcPdfTool: "pen", bcPdfColor: "#e53935", bcPdfWidth: 5 };
       patchNode(canvas, nodeId, { ...settings, bcPdfAnnotating: true });
     } else if (action === "undo") {
-      const strokes = Array.isArray(current.bcPdfStrokes) ? current.bcPdfStrokes as PdfStroke[] : [];
-      const highlights = Array.isArray(current.bcPdfTextHighlights)
-        ? current.bcPdfTextHighlights as PdfTextHighlight[]
-        : [];
+      const strokes = readStrokes(current.bcPdfStrokes);
+      const highlights = readHighlights(current.bcPdfTextHighlights);
       const lastStroke = strokes[strokes.length - 1];
       const lastHighlight = highlights[highlights.length - 1];
       if (!lastStroke && !lastHighlight) return;
@@ -409,8 +436,24 @@ export class PdfAnnotationManager {
         patchNode(canvas, nodeId, { bcPdfStrokes: strokes.slice(0, -1) });
       }
     } else if (action === "clear") {
-      if (typeof window.confirm === "function" &&
-          !window.confirm(t("Remove all freehand annotations and text highlights from this PDF page? This can't be undone.", "清除此 PDF 页面的所有手绘批注与文字高亮？此操作无法撤销。"))) return;
+      const sourceView = this.plugin.app.workspace.getLeavesOfType("canvas")
+        .map(leaf => leaf.view)
+        .find(view => isCanvasViewRuntime(view) && view.canvas === canvas);
+      if (!isCanvasViewRuntime(sourceView) || !sourceView.file) return;
+      const sourceFile = sourceView.file;
+      const sourcePath = sourceFile.path;
+      if (!await confirmAction(this.plugin.app, {
+        title: t("Clear PDF annotations", "清除 PDF 批注"),
+        message: t("Remove all freehand annotations and text highlights from this PDF page? This can't be undone.", "清除此 PDF 页面的所有手绘批注与文字高亮？此操作无法撤销。"),
+        confirmLabel: t("Clear", "清空"), destructive: true
+      })) return;
+      const remainsOpen = this.plugin.app.workspace.getLeavesOfType("canvas")
+        .some(leaf => leaf.view === sourceView);
+      if (!remainsOpen || sourceView.canvas !== canvas || sourceView.file !== sourceFile ||
+          sourceView.file.path !== sourcePath || canvas.readonly || canvas.readOnly ||
+          canvas.wrapperEl?.classList.contains("bc-readonly")) return;
+      const latest = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
+      if (!isPinnedPdf(latest) || latest.file !== current.file || latest.subpath !== current.subpath) return;
       patchNode(canvas, nodeId, {
         bcPdfStrokes: [],
         bcPdfTextHighlights: [],
@@ -422,7 +465,7 @@ export class PdfAnnotationManager {
     this.scheduleRefresh();
   }
 
-  private attachOverlay(canvas: any, nodeData: any, container: HTMLElement): void {
+  private attachOverlay(canvas: CanvasRuntime, nodeData: CanvasNodeData, container: HTMLElement): void {
     this.ensureToolbar(canvas, nodeData, container);
     if (!this.excerptContainers.has(container)) {
       this.excerptContainers.add(container);
@@ -445,7 +488,7 @@ export class PdfAnnotationManager {
           return;
         }
         const latest = readCanvasData(canvas);
-        const source = latest.nodes.find((node: any) => node.id === nodeData.id);
+        const source = latest.nodes.find(node => node.id === nodeData.id);
         if (!source) {
           new Notice(t("PDF page node not found; can't create the annotation.", "找不到 PDF 页面节点，无法创建批注。"));
           return;
@@ -475,9 +518,7 @@ export class PdfAnnotationManager {
             return;
           }
 
-          const highlights = Array.isArray(source.bcPdfTextHighlights)
-            ? source.bcPdfTextHighlights as PdfTextHighlight[]
-            : [];
+          const highlights = readHighlights(source.bcPdfTextHighlights);
           highlights.push({
             text: selectedText.slice(0, 5000),
             rects,
@@ -491,7 +532,7 @@ export class PdfAnnotationManager {
           return;
         }
 
-        const excerptIndex = latest.nodes.filter((node: any) => node.bcPdfExcerptSource === source.id).length;
+        const excerptIndex = latest.nodes.filter(node => node.bcPdfExcerptSource === source.id).length;
         const quoted = selectedText.slice(0, 10000).split(/\r?\n/).map(line => "> " + line).join("\n");
         const body = t("PDF excerpt", "PDF 摘录") + "\n\n" + quoted +
           (selectedText.length > 10000 ? "\n\n" + t("(Excerpt truncated to 10,000 characters)", "（摘录已截断至 10,000 个字符）") : "") +
@@ -502,19 +543,17 @@ export class PdfAnnotationManager {
           source.y + excerptIndex * 190,
           { width: 340, height: Math.max(180, Math.min(420, Math.ceil(body.length / 42) * 24)) }
         );
-        (note as any).bcPdfExcerptSource = source.id;
+        note.bcPdfExcerptSource = source.id;
         insertCanvasNode(canvas, note, source.id);
         new Notice(t("Created a PDF text excerpt node and connected it to its page.", "已创建 PDF 文本摘录节点，并连接到对应页面。"));
       };
-      container.addEventListener("better-canvas-pdf-selection", onCreateExcerpt as EventListener);
-      this.plugin.register(() => container.removeEventListener("better-canvas-pdf-selection", onCreateExcerpt as EventListener));
+      container.addEventListener("better-canvas-pdf-selection", onCreateExcerpt);
+      this.plugin.register(() => container.removeEventListener("better-canvas-pdf-selection", onCreateExcerpt));
     }
 
-    let svg = container.querySelector(":scope > .bc-pdf-annotation-overlay") as SVGSVGElement | null;
-    const strokes = Array.isArray(nodeData.bcPdfStrokes) ? nodeData.bcPdfStrokes as PdfStroke[] : [];
-    const textHighlights = Array.isArray(nodeData.bcPdfTextHighlights)
-      ? nodeData.bcPdfTextHighlights as PdfTextHighlight[]
-      : [];
+    let svg = container.querySelector<SVGSVGElement>(":scope > .bc-pdf-annotation-overlay");
+    const strokes = readStrokes(nodeData.bcPdfStrokes);
+    const textHighlights = readHighlights(nodeData.bcPdfTextHighlights);
     if (strokes.length === 0 && textHighlights.length === 0 && !nodeData.bcPdfAnnotating) {
       svg?.remove();
       return;
@@ -531,7 +570,7 @@ export class PdfAnnotationManager {
 
     // Align the annotation SVG to the rendered PDF bitmap, not the complete
     // embed container (which also contains the selectable-text panel).
-    const pageCanvas = container.querySelector(".bc-pinned-pdf-page") as HTMLCanvasElement | null;
+    const pageCanvas = container.querySelector<HTMLCanvasElement>(".bc-pinned-pdf-page");
     if (pageCanvas) {
       svg.classList.add("bc-pdf-annotation-page-aligned");
       svg.setCssStyles({
@@ -611,7 +650,7 @@ export class PdfAnnotationManager {
     }).join(" ");
   }
 
-  private installPointerHandlers(canvas: any, nodeId: string, svg: SVGSVGElement): void {
+  private installPointerHandlers(canvas: CanvasRuntime, nodeId: string, svg: SVGSVGElement): void {
     let active: PdfPoint[] | null = null;
     let preview: SVGPathElement | null = null;
     let pointerId: number | null = null;
@@ -624,7 +663,7 @@ export class PdfAnnotationManager {
     };
 
     svg.addEventListener("pointerdown", event => {
-      if (svg.dataset.drawEnabled !== "true" || !event.isPrimary || (event as PointerEvent).button > 0) return;
+      if (svg.dataset.drawEnabled !== "true" || !event.isPrimary || (event).button > 0) return;
       event.preventDefault();
       event.stopPropagation();
       pointerId = event.pointerId;
@@ -654,8 +693,8 @@ export class PdfAnnotationManager {
       active.push(pointFromEvent(event));
       preview?.remove();
 
-      const current = readCanvasData(canvas).nodes.find((node: any) => node.id === nodeId) as any;
-      const existing = Array.isArray(current?.bcPdfStrokes) ? current.bcPdfStrokes as PdfStroke[] : [];
+      const current = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
+      const existing = readStrokes(current?.bcPdfStrokes);
       const tool = svg.dataset.tool === "highlighter" ? "highlighter" : svg.dataset.tool === "eraser" ? "eraser" : "pen";
 
       if (tool === "eraser") {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { zoomCanvasToFit } from "./canvas-zoom";
+import type { CanvasSelectionRuntime } from "./canvas-runtime";
 
 describe("zoomCanvasToFit", () => {
   it("zooms with all nodes selected and restores the prior selection afterward", () => {
@@ -25,7 +26,7 @@ describe("zoomCanvasToFit", () => {
   it("does not zoom an empty Canvas or a host without native zoom support", () => {
     const empty = {
       nodes: new Map(),
-      selection: new Set(),
+      selection: new Set<CanvasSelectionRuntime>(),
       select() {},
       zoomToSelection() { throw new Error("should not zoom"); }
     };

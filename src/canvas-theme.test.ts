@@ -15,10 +15,15 @@ describe("Canvas themes", () => {
       setProperty: (key: string, value: string) => properties.set(key, value),
       getPropertyValue: (key: string) => properties.get(key) ?? "",
       removeProperty: (key: string) => properties.delete(key)
-    } };
+    } } as unknown as HTMLElement;
     const properties = new Map<string, string>();
-    const wrapperEl = { dataset: {} as Record<string, string> };
-    const canvas = { getData: () => data, wrapperEl, nodes: new Map([["a", { nodeEl }]]) };
+    const wrapperEl = { dataset: {} as Record<string, string>, querySelectorAll: () => [] } as unknown as HTMLElement;
+    const canvas = {
+      getData: () => data,
+      importData: (next: CanvasData) => { data = next; },
+      wrapperEl,
+      nodes: new Map([["a", { id: "a", nodeEl }]])
+    };
     decorateCanvasTheme(canvas);
     expect(resolveCanvasTheme(data)).toBe("research");
     expect(nodeEl.dataset.bcResearchPreset).toBe("source");
@@ -76,7 +81,8 @@ describe("Canvas themes", () => {
     let saved: CanvasData | undefined;
     const canvas = {
       data: sample,
-      getData() { return { ...this.data, nodes: sample.nodes, edges: sample.edges }; },
+      getData(): CanvasData { return { ...this.data, nodes: sample.nodes, edges: sample.edges }; },
+      importData(data: CanvasData) { this.data = data; },
       pushHistory(data: CanvasData) { history.push(structuredClone(data)); },
       requestSave() { saved = this.getData(); }
     };
@@ -92,7 +98,8 @@ describe("Canvas themes", () => {
     let queuedHistory = false;
     const canvas = {
       data: sample,
-      getData() { return this.data; },
+      getData(): CanvasData { return this.data; },
+      importData(data: CanvasData) { this.data = data; },
       requestSave(history = true) { queuedHistory = history; }
     };
     setCanvasTheme(canvas, "scrapbook");
@@ -100,7 +107,12 @@ describe("Canvas themes", () => {
   });
 
   it("does not change a read-only board or a board already using the theme", () => {
-    const canvas = { data: sample, readonly: true, getData: () => sample };
+    const canvas = {
+      data: sample,
+      readonly: true,
+      getData(): CanvasData { return this.data; },
+      importData(data: CanvasData) { this.data = data; }
+    };
     expect(setCanvasTheme(canvas, "scrapbook")).toBe(false);
     expect(canvas.data).toBe(sample);
     canvas.readonly = false;
@@ -108,10 +120,15 @@ describe("Canvas themes", () => {
   });
 
   it("removes theme decorations when returning to an old snapshot", () => {
-    let data = { ...sample, bcTheme: "scrapbook" } as CanvasData;
-    const wrapperEl = { dataset: {} as Record<string, string> };
-    const nodeEl = { dataset: {} as Record<string, string> };
-    const canvas = { getData: () => data, wrapperEl, nodes: new Map([["a", { nodeEl }]]) };
+    let data: CanvasData = { ...sample, bcTheme: "scrapbook" };
+    const wrapperEl = { dataset: {} as Record<string, string>, querySelectorAll: () => [] } as unknown as HTMLElement;
+    const nodeEl = { dataset: {} as Record<string, string> } as unknown as HTMLElement;
+    const canvas = {
+      getData: () => data,
+      importData: (next: CanvasData) => { data = next; },
+      wrapperEl,
+      nodes: new Map([["a", { id: "a", nodeEl }]])
+    };
     decorateCanvasTheme(canvas);
     expect(wrapperEl.dataset.bcTheme).toBe("scrapbook");
     expect(nodeEl.dataset.bcPaper).toBe("tape");
@@ -124,12 +141,17 @@ describe("Canvas themes", () => {
   });
 
   it("marks a sketch board and clears the marker when another snapshot is loaded", () => {
-    let data = { ...sample, bcTheme: "sketch" } as CanvasData;
+    let data: CanvasData = { ...sample, bcTheme: "sketch" };
     const wrapperEl = {
       dataset: {} as Record<string, string>,
-      querySelectorAll: () => [] as any[]
+      querySelectorAll: () => []
+    } as unknown as HTMLElement;
+    const canvas = {
+      getData: () => data,
+      importData: (next: CanvasData) => { data = next; },
+      wrapperEl,
+      nodes: new Map()
     };
-    const canvas = { getData: () => data, wrapperEl, nodes: new Map() };
     decorateCanvasTheme(canvas);
     expect(wrapperEl.dataset.bcTheme).toBe("sketch");
     data = sample;
@@ -145,7 +167,8 @@ describe("automatic layout in Canvas style history", () => {
     return {
       data: structuredClone(initial),
       history: { data: [initial], current: 0 },
-      getData() { return structuredClone(this.data); },
+      getData(): CanvasData { return structuredClone(this.data); },
+      importData(data: CanvasData) { this.data = structuredClone(data); },
       requestSave() {},
       pushHistory(data: CanvasData) {
         this.history.data.splice(this.history.current + 1, Infinity, structuredClone(data));

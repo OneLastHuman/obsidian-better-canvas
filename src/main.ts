@@ -2,6 +2,7 @@ import {
   App,
   ItemView,
   getLanguage,
+  Menu,
   Modal,
   Notice,
   Plugin,
@@ -9,7 +10,9 @@ import {
   TFile
 } from "obsidian";
 import { setLanguage, t } from "./i18n";
-import BetterCanvasFeatures from "./feature-integrator";
+import BetterCanvasFeatures, { DEFAULT_FEATURE_SETTINGS, type FeatureSettings } from "./feature-integrator";
+import type BetterCanvasSettingsTab from "./settings";
+import { isCanvasRuntime, isCanvasViewRuntime, type CanvasRuntime } from "./canvas-runtime";
 import { getMindMapEditingCreationShortcut, isMindMapShortcutEnabled } from "./mindmap-shortcuts";
 import { EditingIframeShortcutRegistry } from "./canvas-editing-shortcuts";
 import { parseCssStyleDefinitions, applyCustomStyleChoice, cssSnippetVaultPathFromHref, type CustomStyleDefinition, type CustomStyleChoice, type CustomStyleKind } from "./custom-style-presets";
@@ -187,7 +190,7 @@ class CustomStylePresetModal extends SuggestModal<CustomStyleChoice> {
   }
 
   renderSuggestion(choice: CustomStyleChoice, element: HTMLElement): void {
-    element.createEl("div", {
+    element.createDiv({
       text: choice.definition.label + " — " + choice.option.label
     });
     element.createEl("small", {
@@ -253,7 +256,7 @@ class PresentationModal extends Modal {
     }
     const slide = this.slides[this.index];
     this.contentEl.createEl("h2", { text: slide.title || t(`Node ${this.index + 1}`, `节点 ${this.index + 1}`) });
-    this.contentEl.createEl("div", { cls: "better-canvas-slide", text: slide.body });
+    this.contentEl.createDiv({ cls: "better-canvas-slide", text: slide.body });
     this.contentEl.createEl("p", { text: t(`${this.index + 1} / ${this.slides.length} · ←/→ or PageUp/PageDown to change slides · Esc to exit`, `${this.index + 1} / ${this.slides.length} · ←/→ 或 PageUp/PageDown 翻页 · Esc 退出`) });
     const actions = this.contentEl.createDiv({ cls: "modal-button-container" });
     const previous = actions.createEl("button", { text: t("Previous", "上一张") });
@@ -277,8 +280,8 @@ class PresentationModal extends Modal {
 }
 
 export default class BetterCanvasPlugin extends Plugin {
-  declare settings: BetterCanvasSettings;
-  settingsTab: any = null;
+  declare settings: BetterCanvasSettings & FeatureSettings;
+  settingsTab?: BetterCanvasSettingsTab;
   private boundContainers = new WeakSet<HTMLElement>();
   private readonly editingIframeShortcuts = new EditingIframeShortcutRegistry(
     event => this.handleMindMapEditingShortcut(event)
@@ -292,7 +295,9 @@ export default class BetterCanvasPlugin extends Plugin {
   async onload(): Promise<void> {
     // Keep unknown/retired fields inert so upgrading never discards saved user data.
     setLanguage(getLanguage());
-    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() ?? {}) };
+    const savedData: unknown = await this.loadData();
+    const savedSettings = savedData && typeof savedData === "object" && !Array.isArray(savedData) ? savedData : {};
+    this.settings = { ...DEFAULT_SETTINGS, ...DEFAULT_FEATURE_SETTINGS, ...savedSettings };
     this.settings.systemPromptProfiles = normalizeNamedPromptProfiles(this.settings.systemPromptProfiles);
     if (this.settings.flashcardOutputMode !== "spaced-repetition") this.settings.flashcardOutputMode = "canvas";
     if (typeof this.settings.spacedRepetitionFolder !== "string") this.settings.spacedRepetitionFolder = "Better Canvas/Flashcards";
@@ -323,8 +328,8 @@ export default class BetterCanvasPlugin extends Plugin {
       this.scheduleOnboardingCheck();
     }));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.scheduleOnboardingCheck()));
-    this.registerEvent((this.app.workspace as any).on("advanced-canvas:node-added", () => this.dismissTipForActiveCanvas()));
-    this.registerEvent((this.app.workspace as any).on("advanced-canvas:data-loaded:after", () => this.scheduleOnboardingCheck(50)));
+    this.registerEvent(this.app.workspace.on("advanced-canvas:node-added", () => this.dismissTipForActiveCanvas()));
+    this.registerEvent(this.app.workspace.on("advanced-canvas:data-loaded:after", () => this.scheduleOnboardingCheck(50)));
     this.app.workspace.onLayoutReady(() => {
       this.bindCanvasKeyboard();
       this.scheduleOnboardingCheck();
@@ -423,7 +428,9 @@ export default class BetterCanvasPlugin extends Plugin {
       this.openOnboarding();
       return;
     }
-    if (!shouldOfferEmptyTip(shouldShowEmptyTip(this.settings), this.getCanvas(), this.activeCanvasContainer())) return;
+    const canvas = this.getCanvas();
+    const tipCanvas = canvas ? { nodes: { size: readCanvasData(canvas).nodes.length }, wrapperEl: canvas.wrapperEl } : null;
+    if (!shouldOfferEmptyTip(shouldShowEmptyTip(this.settings), tipCanvas, this.activeCanvasContainer())) return;
     const container = this.activeCanvasContainer();
     if (container) {
       const shown = showEmptyCanvasTip(container);
@@ -435,8 +442,8 @@ export default class BetterCanvasPlugin extends Plugin {
   }
 
   private activeCanvasContainer(): HTMLElement | null {
-    const view = this.app.workspace.activeLeaf?.view as any;
-    return view?.getViewType?.() === "canvas" && view.canvas ? view.containerEl ?? null : null;
+    const view = this.app.workspace.getActiveViewOfType(ItemView);
+    return isCanvasViewRuntime(view) ? view.containerEl : null;
   }
 
   private hasCanvasView(): boolean {
@@ -464,24 +471,23 @@ export default class BetterCanvasPlugin extends Plugin {
     ).open();
   }
 
-  private getCanvas(): any | null {
-    const view = this.app.workspace.getActiveViewOfType(ItemView) as any;
-    if (!view || view.getViewType?.() !== "canvas" || !view.canvas) return null;
-    return view.canvas;
+  private getCanvas(): CanvasRuntime | null {
+    const view = this.app.workspace.getActiveViewOfType(ItemView);
+    return isCanvasViewRuntime(view) ? view.canvas : null;
   }
 
-  private getSelectedRecord(canvas: any): CanvasNodeData | undefined {
+  private getSelectedRecord(canvas: CanvasRuntime): CanvasNodeData | undefined {
     return getSelectedNode(canvas);
   }
 
-  private selectNode(canvas: any, id: string): void {
-    const internalNode = canvas?.nodes?.get?.(id);
-    if (!internalNode) return;
+  private selectNode(canvas: CanvasRuntime | null, id: string): void {
+    const internalNode = canvas?.nodes?.get(id);
+    if (!canvas || !internalNode) return;
     canvas.selectOnly?.(internalNode);
     canvas.zoomToSelection?.();
   }
 
-  private selectedOrNotice(canvas = this.getCanvas()): { canvas: any; node: CanvasNodeData } | null {
+  private selectedOrNotice(canvas = this.getCanvas()): { canvas: CanvasRuntime; node: CanvasNodeData } | null {
     if (!canvas) {
       new Notice(t("Open an Obsidian Canvas first.", "请先打开一个 Obsidian Canvas。"));
       return null;
@@ -518,13 +524,13 @@ export default class BetterCanvasPlugin extends Plugin {
   }
 
   private registerCanvasContextMenu(): void {
-    const workspace = this.app.workspace as any;
-    const ref = workspace.on("canvas:node-menu", (menu: any, node: any) => {
-      if (!menu?.addItem || !node?.id) return;
-      const nodeId = String(node.id);
+    const workspace = this.app.workspace;
+    const ref = workspace.on("canvas:node-menu", (menu: unknown, node: unknown) => {
+      if (!(menu instanceof Menu) || !node || typeof node !== "object" || !("id" in node) || typeof node.id !== "string") return;
+      const nodeId = node.id;
       const canvas = this.getCanvas();
       const record = canvas ? readCanvasData(canvas).nodes.find(item => item.id === nodeId) : undefined;
-      const isGeneratedAI = Boolean((record as any)?.bcGenerated);
+      const isGeneratedAI = Boolean(record?.bcGenerated);
 
       addNodeAIContextMenuItems(menu, isGeneratedAI, actionId => {
         switch (actionId) {
@@ -543,15 +549,15 @@ export default class BetterCanvasPlugin extends Plugin {
         }
       });
 
-      menu.addItem((item: any) => item.setTitle(t("Arrange", "整理")).setIcon("git-branch").onClick(() => {
+      menu.addItem(item => item.setTitle(t("Arrange", "整理")).setIcon("git-branch").onClick(() => {
         this.selectNode(this.getCanvas(), nodeId);
         this.autoLayout();
       }));
     });
     this.registerEvent(ref);
 
-    this.registerEvent(workspace.on("canvas:selection-menu", (menu: any, canvas: any) => {
-      if (!menu?.addItem || !canvas) return;
+    this.registerEvent(workspace.on("canvas:selection-menu", (menu: unknown, canvas: unknown) => {
+      if (!(menu instanceof Menu) || !isCanvasRuntime(canvas)) return;
       const nodeIds = selectedCanvasNodeIds(canvas, readCanvasData(canvas).nodes.map(node => node.id));
       if (!nodeIds.length) return;
       const target = { canvas, nodeIds };
@@ -583,7 +589,7 @@ export default class BetterCanvasPlugin extends Plugin {
       if (typeof sheet.href !== "string" || !sheet.href) continue;
       const snippetPath = cssSnippetVaultPathFromHref(
         sheet.href,
-        String((this.app.vault as any).configDir ?? "")
+        this.app.vault.configDir
       );
       if (!snippetPath) continue;
       try {
@@ -611,7 +617,7 @@ export default class BetterCanvasPlugin extends Plugin {
       return;
     }
 
-    const selectedItems = Array.from(canvas.selection?.values?.() ?? []) as any[];
+    const selectedItems = Array.from(canvas.selection?.values() ?? []);
     const selectedIds = [...new Set(selectedItems
       .map(item => item?.id ?? item?.getData?.()?.id)
       .filter((id): id is string => typeof id === "string"))];
@@ -668,9 +674,9 @@ export default class BetterCanvasPlugin extends Plugin {
   }
 
   private bindCanvasKeyboard(): void {
-    const view = this.app.workspace.getActiveViewOfType(ItemView) as any;
-    if (!view || view.getViewType?.() !== "canvas" || !view.containerEl) return;
-    const container = view.containerEl as HTMLElement;
+    const view = this.app.workspace.getActiveViewOfType(ItemView);
+    if (!isCanvasViewRuntime(view)) return;
+    const container = view.containerEl;
     if (this.boundContainers.has(container)) return;
     this.boundContainers.add(container);
 
@@ -732,7 +738,7 @@ export default class BetterCanvasPlugin extends Plugin {
     else this.createSiblingNode();
   }
 
-  private navigateSelection(canvas: any, key: string): void {
+  private navigateSelection(canvas: CanvasRuntime, key: string): void {
     const current = this.getSelectedRecord(canvas);
     if (!current) return;
     const direction = key === "ArrowUp" ? "up" : key === "ArrowDown" ? "down" : key === "ArrowLeft" ? "left" : "right";

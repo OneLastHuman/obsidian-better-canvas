@@ -35,10 +35,59 @@ function makeCanvas(data: CanvasData = { nodes: [], edges: [] }): any {
 describe("Canvas data helpers", () => {
   it("normalizes absent canvas data without throwing", () => {
     expect(readCanvasData({})).toEqual({ nodes: [], edges: [] });
-    expect(readCanvasData({ getData: () => ({ nodes: [{ id: "a" }] }) })).toEqual({
-      nodes: [{ id: "a" }],
-      edges: []
+    const node = { id: "a", type: "text", x: 0, y: 0, width: 280, height: 140, otherPlugin: { keep: true } };
+    expect(readCanvasData({ getData: () => ({ nodes: [node], metadata: { keep: true } }) })).toEqual({
+      nodes: [node],
+      edges: [],
+      metadata: { keep: true }
     });
+  });
+
+  it("refuses a malformed snapshot before writing over existing data", () => {
+    let writes = 0;
+    const canvas = {
+      getData: () => ({ nodes: [{ id: "incomplete" }], edges: [] }),
+      importData: () => { writes += 1; }
+    };
+    expect(() => insertCanvasNode(canvas, makeTextNode("New node", 0, 0))).toThrow("Invalid Canvas snapshot");
+    expect(writes).toBe(0);
+  });
+
+  it("preserves null custom style resets when reading and inserting nodes", () => {
+    const resetAttributes = {
+      shape: null,
+      border: null,
+      textAlign: null,
+      path: null,
+      pathfindingMethod: null,
+      arrow: null,
+      custom: { keep: true }
+    };
+    const original: CanvasData = {
+      nodes: [{
+        id: "source", type: "text", text: "Keep me", x: 0, y: 0, width: 280, height: 140,
+        styleAttributes: resetAttributes
+      }],
+      edges: [{
+        id: "edge", fromNode: "source", toNode: "source",
+        styleAttributes: resetAttributes
+      }]
+    };
+    let saved = original;
+    const canvas = {
+      getData: () => saved,
+      importData: (next: CanvasData) => { saved = next; }
+    };
+
+    expect(readCanvasData(canvas)).toEqual(original);
+    const inserted = makeTextNode("New node", 400, 0);
+    insertCanvasNode(canvas, inserted);
+
+    const updated = readCanvasData(canvas);
+    expect(updated.nodes).toEqual([original.nodes[0], inserted]);
+    expect(updated.edges).toEqual(original.edges);
+    expect(updated.nodes[0].styleAttributes).toEqual(resetAttributes);
+    expect(updated.edges[0].styleAttributes).toEqual(resetAttributes);
   });
 
   it("creates JSON Canvas-compatible hexadecimal IDs", () => {

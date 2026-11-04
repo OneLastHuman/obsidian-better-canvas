@@ -76,21 +76,26 @@ export class AIUsageModal extends Modal {
 
     const actions = root.createDiv({ cls: "modal-button-container" });
     const save = actions.createEl("button", { text: t("Save rates", "保存费率"), cls: "mod-cta" });
-    save.addEventListener("click", async () => {
-      try {
-        parseAIModelPriceTable(textarea.value);
-        await this.onSavePrices(textarea.value);
-        this.close();
-        new Notice(t("Saved AI model rates.", "已保存 AI 模型费率。"));
-      } catch (error) {
-        new Notice(error instanceof Error ? error.message : t("Failed to save rates.", "保存费率失败。"));
-      }
+    save.addEventListener("click", () => {
+      void (async () => {
+        try {
+          parseAIModelPriceTable(textarea.value);
+          await this.onSavePrices(textarea.value);
+          this.close();
+          new Notice(t("Saved AI model rates.", "已保存 AI 模型费率。"));
+        } catch (error) {
+          new Notice(error instanceof Error ? error.message : t("Failed to save rates.", "保存费率失败。"));
+        }
+      })();
     });
     const clear = actions.createEl("button", { text: t("Clear usage history", "清空用量历史") });
-    clear.addEventListener("click", async () => {
-      await this.onClearHistory();
-      this.close();
-      new Notice(t("Cleared AI usage history.", "已清空 AI 用量历史。"));
+    clear.addEventListener("click", () => {
+      void this.onClearHistory().then(() => {
+        this.close();
+        new Notice(t("Cleared AI usage history.", "已清空 AI 用量历史。"));
+      }).catch(error => {
+        new Notice(error instanceof Error ? error.message : t("Failed to clear usage history.", "清空用量历史失败。"));
+      });
     });
   }
 

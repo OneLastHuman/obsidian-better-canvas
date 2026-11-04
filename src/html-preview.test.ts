@@ -1,5 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { clearHtmlPreviews, extractHtmlPreviewBlocks, HtmlPreviewManager, isHtmlPreviewCandidate, syncHtmlPreviews } from "./html-preview";
+import { TFile, type Plugin, type Vault } from "obsidian";
+import type { CanvasData } from "./canvas";
+import type { CanvasNodeRuntime } from "./canvas-runtime";
+
+vi.mock("obsidian", () => {
+  class TAbstractFile {}
+  class TFile extends TAbstractFile {}
+  return { TAbstractFile, TFile };
+});
 
 describe("HTML preview extraction", () => {
   it("extracts fenced HTML case-insensitively and leaves other languages alone", () => {
@@ -44,31 +53,36 @@ describe("HTML preview extraction", () => {
 
 describe("HTML preview candidates", () => {
   it("supports text, Markdown and HTML/HTM file nodes, including uppercase extensions", () => {
-    expect(isHtmlPreviewCandidate({ id: "t", type: "text", text: "```html\n<p>x</p>\n```" } as any)).toBe(true);
-    expect(isHtmlPreviewCandidate({ id: "m", type: "file", file: "notes/idea.md" } as any)).toBe(true);
+    const bounds = { x: 0, y: 0, width: 320, height: 240 };
+    expect(isHtmlPreviewCandidate({ ...bounds, id: "t", type: "text", text: "```html\n<p>x</p>\n```" })).toBe(true);
+    expect(isHtmlPreviewCandidate({ ...bounds, id: "m", type: "file", file: "notes/idea.md" })).toBe(true);
     for (const file of ["demo.html", "folder/demo.htm", "folder/DEMO.HTML", "demo.HTM"]) {
-      expect(isHtmlPreviewCandidate({ id: "h", type: "file", file } as any)).toBe(true);
+      expect(isHtmlPreviewCandidate({ ...bounds, id: "h", type: "file", file })).toBe(true);
     }
-    expect(isHtmlPreviewCandidate({ id: "b", type: "file", file: "demo.html.bak" } as any)).toBe(false);
-    expect(isHtmlPreviewCandidate({ id: "p", type: "file", file: "docs/book.pdf" } as any)).toBe(false);
-    expect(isHtmlPreviewCandidate({ id: "g", type: "group" } as any)).toBe(false);
+    expect(isHtmlPreviewCandidate({ ...bounds, id: "b", type: "file", file: "demo.html.bak" })).toBe(false);
+    expect(isHtmlPreviewCandidate({ ...bounds, id: "p", type: "file", file: "docs/book.pdf" })).toBe(false);
+    expect(isHtmlPreviewCandidate({ ...bounds, id: "g", type: "group" })).toBe(false);
   });
 });
 
 // Only the DOM surface used by the preview is simulated. Browser sandbox
 // enforcement and native Canvas interaction are verified separately in Obsidian.
+interface TestDocument {
+  win: { createEl(tag: string): Element; createDiv(): Element; createSpan(): Element };
+  defaultView: { MutationObserver: new (callback: () => void) => { disconnect(): void; observe(): void } };
+}
 class Element {
   children: Element[] = [];
   parent?: Element;
   className = "";
   classList = { add: vi.fn(), remove: vi.fn() };
   attributes = new Map<string, string>();
-  handlers = new Map<string, (event: any) => void>();
+  handlers = new Map<string, (event: { preventDefault(): void; stopPropagation(): void }) => void>();
   isConnected = true;
   hidden = false;
   srcdoc = "";
   textContent = "";
-  constructor(public tagName = "div", public ownerDocument: any = doc) {}
+  constructor(public tagName = "div", public ownerDocument: TestDocument = doc) {}
   appendChild(child: Element) { child.parent = this; this.children.push(child); return child; }
   remove() {
     if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this);
@@ -76,7 +90,7 @@ class Element {
   }
   setAttribute(name: string, value: string) { this.attributes.set(name, value); }
   getAttribute(name: string) { return this.attributes.get(name) ?? null; }
-  addEventListener(name: string, handler: (event: any) => void) { this.handlers.set(name, handler); }
+  addEventListener(name: string, handler: (event: { preventDefault(): void; stopPropagation(): void }) => void) { this.handlers.set(name, handler); }
   click() { this.handlers.get("click")?.({ preventDefault() {}, stopPropagation() {} }); }
   querySelector(selector: string): Element | null {
     const direct = selector.startsWith(":scope > ");
@@ -88,9 +102,13 @@ class Element {
     return null;
   }
 }
-const observers: Array<{ callback: () => void; disconnect: ReturnType<typeof vi.fn> }> = [];
-const doc = {
-  createElement: (tag: string) => new Element(tag),
+const observers: Array<{ callback: () => void; disconnect: Mock<() => void> }> = [];
+const doc: TestDocument = {
+  win: {
+    createEl: (tag: string): Element => new Element(tag),
+    createDiv: (): Element => new Element("div"),
+    createSpan: (): Element => new Element("span")
+  },
   defaultView: {
     MutationObserver: class {
       disconnect = vi.fn();
@@ -99,22 +117,25 @@ const doc = {
     }
   }
 };
+beforeEach(() => { vi.stubGlobal("window", globalThis); });
 afterEach(() => {
   observers.length = 0;
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 function fixture(path = "demo.html", source = "<button onclick='this.textContent=2'>1</button>") {
   const element = new Element();
   const node = { id: "node", type: "file", file: path, x: 10, y: 20, width: 320, height: 240, custom: "preserve" };
-  const data: any = { nodes: [node], edges: [], custom: "unchanged" };
+  const data: CanvasData = { nodes: [node], edges: [], custom: "unchanged" };
   const canvas = {
-    getData: () => data, nodes: new Map([["node", { nodeEl: element }]]),
+    getData: () => data, nodes: new Map<string, CanvasNodeRuntime>([["node", { id: "node", nodeEl: element as unknown as HTMLElement }]]),
     requestSave: vi.fn(), importData: vi.fn(), readonly: true
   };
-  const file = { path, extension: path.split(".").pop(), stat: { mtime: 1, size: source.length } };
-  const vault = { getAbstractFileByPath: vi.fn((): any => file), cachedRead: vi.fn(async () => source) };
+  const file = Object.assign(new TFile(), { path, extension: path.split(".").pop() ?? "", stat: { ctime: 1, mtime: 1, size: source.length } });
+  const vaultFixture = { getAbstractFileByPath: vi.fn((): TFile | null => file), cachedRead: vi.fn(async () => source) };
+  const vault = vaultFixture as typeof vaultFixture & Vault;
   return { element, node, data, canvas, file, vault };
 }
 
@@ -189,7 +210,7 @@ describe("file preview lifecycle", () => {
     const f = fixture();
     const second = new Element();
     f.data.nodes.push({ ...f.node, id: "second" });
-    f.canvas.nodes.set("second", { nodeEl: second });
+    f.canvas.nodes.set("second", { id: "second", nodeEl: second as unknown as HTMLElement });
     syncHtmlPreviews(f.canvas, undefined, f.vault);
     await flush();
     expect(f.vault.cachedRead).toHaveBeenCalledTimes(1);
@@ -283,16 +304,16 @@ describe("preview manager", () => {
   it("refreshes on Vault changes and DOM remounts and cleans up on unload", async () => {
     vi.useFakeTimers();
     const f = fixture();
-    const events = new Map<string, (...args: any[]) => void>();
-    const register = (name: string, handler: (...args: any[]) => void) => events.set(name, handler);
+    const events = new Map<string, (...args: unknown[]) => void>();
+    const register = (name: string, handler: (...args: unknown[]) => void) => events.set(name, handler);
     const containerEl = new Element();
-    const view = { canvas: f.canvas, containerEl };
+    const view = { canvas: f.canvas, containerEl, getViewType: () => "canvas" };
     const workspace = { on: register, onLayoutReady: (callback: () => void) => callback(), getLeavesOfType: () => [{ view }] };
     const cleanups: Array<() => void> = [];
     const manager = new HtmlPreviewManager({
       app: { workspace, vault: { ...f.vault, on: register } },
       registerEvent() {}, register: (cleanup: () => void) => cleanups.push(cleanup)
-    });
+    } as unknown as Plugin);
     manager.start();
     await flush();
     expect(f.element.querySelector("iframe")).not.toBeNull();
@@ -301,7 +322,7 @@ describe("preview manager", () => {
     await flush();
     expect(f.element.querySelector("iframe")!.srcdoc).toContain("Modified");
     const replacement = new Element();
-    f.canvas.nodes.set("node", { nodeEl: replacement });
+    f.canvas.nodes.set("node", { id: "node", nodeEl: replacement as unknown as HTMLElement });
     observers[0].callback();
     await vi.advanceTimersByTimeAsync(50);
     expect(replacement.querySelector("iframe")).not.toBeNull();

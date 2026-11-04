@@ -1,4 +1,5 @@
 import type { RemoteMcpResult } from "./mcp-result";
+import type { RemoteMcpTool } from "./mcp";
 import { t } from "./i18n";
 import { isJsonObject, parseJsonObjectPrompt } from "./prompt-input";
 
@@ -24,11 +25,11 @@ export interface McpPrompt {
 export function parseMcpPromptArguments(raw: string): Record<string, string> {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { throw new Error(t("MCP prompt arguments are not valid JSON.", "MCP prompt 参数不是有效 JSON。")); }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  if (!isJsonObject(parsed)) {
     throw new Error(t("MCP prompt arguments must be a JSON object.", "MCP prompt 参数必须是 JSON object。"));
   }
   const output: Record<string, string> = {};
-  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(parsed)) {
     if (!key.trim() || typeof value !== "string") {
       throw new Error(t("Each MCP prompt argument must be a named string.", "MCP prompt 的每个参数都必须是有名称的字符串。"));
     }
@@ -61,34 +62,58 @@ export interface McpCatalogPage<T> {
   nextCursor?: string;
 }
 
+export function normalizeMcpTools(value: unknown): RemoteMcpTool[] {
+  const tools: RemoteMcpTool[] = [];
+  const entries: unknown[] = Array.isArray(value) ? value : [];
+  for (const item of entries) {
+    if (!isJsonObject(item) || typeof item.name !== "string") continue;
+    tools.push({
+      name: item.name,
+      description: typeof item.description === "string" ? item.description : "",
+      inputSchema: isJsonObject(item.inputSchema) ? item.inputSchema : {}
+    });
+  }
+  return tools;
+}
+
 export function normalizeMcpResourcePage(value: unknown): McpCatalogPage<McpResource> {
-  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const raw = Array.isArray(record.resources) ? record.resources : [];
-  const items = raw.filter((item: any) => typeof item?.uri === "string" && item.uri.trim())
-    .map((item: any) => ({
+  const record = isJsonObject(value) ? value : {};
+  const raw: unknown[] = Array.isArray(record.resources) ? record.resources : [];
+  const items: McpResource[] = [];
+  for (const item of raw) {
+    if (!isJsonObject(item) || typeof item.uri !== "string" || !item.uri.trim()) continue;
+    items.push({
       uri: item.uri.trim(),
       name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : item.uri.trim(),
       ...(typeof item.description === "string" && item.description.trim() ? { description: item.description.trim() } : {}),
       ...(typeof item.mimeType === "string" && item.mimeType.trim() ? { mimeType: item.mimeType.trim() } : {})
-    }));
+    });
+  }
   return { items, rawEntryCount: raw.length, ...(typeof record.nextCursor === "string" && record.nextCursor ? { nextCursor: record.nextCursor } : {}) };
 }
 
 export function normalizeMcpPromptPage(value: unknown): McpCatalogPage<McpPrompt> {
-  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const raw = Array.isArray(record.prompts) ? record.prompts : [];
-  const items = raw.filter((item: any) => typeof item?.name === "string" && item.name.trim())
-    .map((item: any) => ({
-      name: item.name.trim(),
-      ...(typeof item.description === "string" && item.description.trim() ? { description: item.description.trim() } : {}),
-      arguments: Array.isArray(item.arguments) ? item.arguments.filter((arg: any) =>
-        typeof arg?.name === "string" && arg.name.trim()
-      ).map((arg: any) => ({
+  const record = isJsonObject(value) ? value : {};
+  const raw: unknown[] = Array.isArray(record.prompts) ? record.prompts : [];
+  const items: McpPrompt[] = [];
+  for (const item of raw) {
+    if (!isJsonObject(item) || typeof item.name !== "string" || !item.name.trim()) continue;
+    const args: McpPromptArgument[] = [];
+    const rawArgs: unknown[] = Array.isArray(item.arguments) ? item.arguments : [];
+    for (const arg of rawArgs) {
+      if (!isJsonObject(arg) || typeof arg.name !== "string" || !arg.name.trim()) continue;
+      args.push({
         name: arg.name.trim(),
         ...(typeof arg.description === "string" && arg.description.trim() ? { description: arg.description.trim() } : {}),
         ...(typeof arg.required === "boolean" ? { required: arg.required } : {})
-      })) : []
-    }));
+      });
+    }
+    items.push({
+      name: item.name.trim(),
+      ...(typeof item.description === "string" && item.description.trim() ? { description: item.description.trim() } : {}),
+      arguments: args
+    });
+  }
   return { items, rawEntryCount: raw.length, ...(typeof record.nextCursor === "string" && record.nextCursor ? { nextCursor: record.nextCursor } : {}) };
 }
 
@@ -148,7 +173,7 @@ export async function collectMcpCatalogPages<T>(
 export function formatMcpResourceCatalog(resources: ReadonlyArray<McpResource>): string {
   const lines = ["# MCP Resources", "", t("Resources: " + resources.length, "共 " + resources.length + " 个资源"), ""];
   for (const item of resources) {
-    lines.push("- **" + item.name + "**", "  - URI: \`" + item.uri + "\`");
+    lines.push("- **" + item.name + "**", "  - URI: `" + item.uri + "`");
     if (item.mimeType) lines.push("  - MIME: " + item.mimeType);
     if (item.description) lines.push("  - " + item.description);
   }
@@ -173,11 +198,11 @@ export function formatMcpPromptCatalog(prompts: ReadonlyArray<McpPrompt>): strin
 
 function asText(value: unknown): string {
   if (typeof value === "string") return value;
-  if (!value || typeof value !== "object") return "";
-  const item = value as Record<string, unknown>;
+  if (!isJsonObject(value)) return value && typeof value === "object" ? JSON.stringify(value, null, 2) : "";
+  const item = value;
   if (typeof item.text === "string") return item.text;
-  if (item.type === "resource" && item.resource && typeof item.resource === "object") {
-    const resource = item.resource as Record<string, unknown>;
+  if (item.type === "resource" && isJsonObject(item.resource)) {
+    const resource = item.resource;
     if (typeof resource.text === "string") return resource.text;
     if (typeof resource.uri === "string") return "[Embedded resource: " + resource.uri + "]";
   }
@@ -185,13 +210,13 @@ function asText(value: unknown): string {
 }
 
 function displayPromptContent(value: unknown): string {
-  if (!value || typeof value !== "object") return asText(value);
-  const item = value as Record<string, unknown>;
+  if (!isJsonObject(value)) return asText(value);
+  const item = value;
   if (item.type === "image") {
     return "[Image attachment" + (typeof item.mimeType === "string" ? ": " + item.mimeType : "") + "]";
   }
-  if (item.type === "resource" && item.resource && typeof item.resource === "object") {
-    const resource = item.resource as Record<string, unknown>;
+  if (item.type === "resource" && isJsonObject(item.resource)) {
+    const resource = item.resource;
     if (typeof resource.blob === "string") {
       return "[Embedded binary resource" + (typeof resource.mimeType === "string" ? ": " + resource.mimeType : "") + "]";
     }
@@ -200,15 +225,15 @@ function displayPromptContent(value: unknown): string {
 }
 
 function extractImages(value: unknown, images: RemoteMcpResult["images"]): void {
-  if (!value || typeof value !== "object") return;
-  const item = value as Record<string, unknown>;
+  if (!isJsonObject(value)) return;
+  const item = value;
   if (item.type === "image" && typeof item.data === "string" && typeof item.mimeType === "string") {
     const mimeType = item.mimeType.toLowerCase().split(";")[0].trim();
     if (mimeType.startsWith("image/") && item.data.length <= 28_000_000 && /^[A-Za-z0-9+/=\r\n]+$/.test(item.data)) {
       images.push({ mimeType, data: item.data });
     }
-  } else if (item.type === "resource" && item.resource && typeof item.resource === "object") {
-    const resource = item.resource as Record<string, unknown>;
+  } else if (item.type === "resource" && isJsonObject(item.resource)) {
+    const resource = item.resource;
     if (typeof resource.blob === "string" && typeof resource.mimeType === "string") {
       const mimeType = resource.mimeType.toLowerCase().split(";")[0].trim();
       if (mimeType.startsWith("image/") && resource.blob.length <= 28_000_000 && /^[A-Za-z0-9+/=\r\n]+$/.test(resource.blob)) {
@@ -219,13 +244,16 @@ function extractImages(value: unknown, images: RemoteMcpResult["images"]): void 
 }
 
 export function formatMcpResourceRead(uri: string, value: unknown): RemoteMcpResult {
-  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const contents = Array.isArray(record.contents) ? record.contents : [];
+  const record = isJsonObject(value) ? value : {};
+  const contents: unknown[] = Array.isArray(record.contents) ? record.contents : [];
   const images: RemoteMcpResult["images"] = [];
-  const text = contents.map((content: any, index: number) => {
-    if (content?.type === "image" || content?.type === "resource") extractImages(content, images);
-    if (typeof content?.text === "string") return content.text;
-    if (typeof content?.blob === "string") {
+  const text = contents.map((content, index) => {
+    if (!isJsonObject(content)) {
+      return t("[Resource content " + (index + 1) + "]", "[资源内容 " + (index + 1) + "]") + "\n" + asText(content);
+    }
+    if (content.type === "image" || content.type === "resource") extractImages(content, images);
+    if (typeof content.text === "string") return content.text;
+    if (typeof content.blob === "string") {
       const mimeType = typeof content.mimeType === "string" ? content.mimeType : "application/octet-stream";
       if (mimeType.toLowerCase().startsWith("image/")) {
         extractImages({ type: "image", mimeType, data: content.blob }, images);
@@ -234,7 +262,6 @@ export function formatMcpResourceRead(uri: string, value: unknown): RemoteMcpRes
       return t("[Resource is binary data, MIME: " + mimeType + "; content not embedded to avoid writing unknown binary into a text node]",
         "[资源为二进制数据，MIME: " + mimeType + "；为避免将未知二进制写入文本节点，未内嵌内容]");
     }
-    if (typeof content?.text === "string") return content.text;
     return t("[Resource content " + (index + 1) + "]", "[资源内容 " + (index + 1) + "]") + "\n" + asText(content);
   }).filter(Boolean);
   if (!contents.length) return { text: "# MCP Resource\n\nURI: " + uri + "\n\n" + t("The server did not return any contents.", "服务器没有返回 contents。"), images };
@@ -242,18 +269,19 @@ export function formatMcpResourceRead(uri: string, value: unknown): RemoteMcpRes
 }
 
 export function formatMcpPromptResult(name: string, value: unknown): RemoteMcpResult {
-  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const messages = Array.isArray(record.messages) ? record.messages : [];
+  const record = isJsonObject(value) ? value : {};
+  const messages: unknown[] = Array.isArray(record.messages) ? record.messages : [];
   const images: RemoteMcpResult["images"] = [];
   const blocks: string[] = [];
   if (typeof record.description === "string" && record.description.trim()) {
     blocks.push(record.description.trim());
   }
   for (const message of messages) {
-    const role = typeof message?.role === "string" ? message.role : "message";
-    const content = message?.content;
+    const role = isJsonObject(message) && typeof message.role === "string" ? message.role : "message";
+    const content: unknown = isJsonObject(message) ? message.content : undefined;
     if (Array.isArray(content)) {
-      for (const item of content) {
+      const parts: unknown[] = content;
+      for (const item of parts) {
         extractImages(item, images);
         blocks.push("[" + role + "] " + displayPromptContent(item));
       }

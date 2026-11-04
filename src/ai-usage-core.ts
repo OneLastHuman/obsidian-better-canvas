@@ -47,13 +47,20 @@ export function extractProviderUsage(
   payload: unknown
 ): AIUsageTokenCounts | null {
   if (!payload || typeof payload !== "object") return null;
-  const body = payload as Record<string, any>;
-  const usage = protocol === "anthropic"
-    ? body.usage ?? body.message?.usage
+  const body = payload as { usage?: unknown; message?: unknown; usageMetadata?: unknown; usage_metadata?: unknown };
+  const message = body.message;
+  const usageValue = protocol === "anthropic"
+    ? body.usage ?? (message && typeof message === "object" && "usage" in message ? message.usage : undefined)
     : protocol === "gemini"
       ? body.usageMetadata ?? body.usage_metadata
       : body.usage;
-  if (!usage || typeof usage !== "object") return null;
+  if (!usageValue || typeof usageValue !== "object") return null;
+  const usage = usageValue as {
+    input_tokens?: unknown; inputTokens?: unknown; promptTokenCount?: unknown; prompt_token_count?: unknown;
+    prompt_tokens?: unknown; output_tokens?: unknown; outputTokens?: unknown; candidatesTokenCount?: unknown;
+    candidates_token_count?: unknown; completion_tokens?: unknown; total_tokens?: unknown; totalTokenCount?: unknown;
+    total_token_count?: unknown; totalTokens?: unknown;
+  };
 
   const inputTokens = protocol === "anthropic"
     ? readFirstCount(usage.input_tokens, usage.inputTokens)

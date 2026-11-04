@@ -1,6 +1,6 @@
 import { t } from "./i18n";
 import type { CanvasData, CanvasNodeData } from "./canvas";
-import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 
 export type SketchPresetId = "heading" | "concept" | "action" | "decision" | "annotation" | "risk";
 export type SketchFill = "none" | "solid" | "hachure" | "cross-hatch";
@@ -102,8 +102,8 @@ export function resolveSketchStyle(node: CanvasNodeData): ResolvedSketchStyle {
   const explicitAlign = typeof node.bcTextAlign === "string" || typeof attrs.textAlign === "string";
   const explicitColor = typeof node.color === "string" && node.color.trim().length > 0;
   const explicitFill = sketchFill(node.bcSketchFill);
-  const shape = explicitShape ? resolveCanvasNodeShape(node as CanvasNodeStyleSource) : preset?.style.shape ?? "default";
-  const border = explicitBorder ? resolveCanvasNodeBorder(node as CanvasNodeStyleSource) : preset?.style.border ?? "solid";
+  const shape = explicitShape ? resolveCanvasNodeShape(node) : preset?.style.shape ?? "default";
+  const border = explicitBorder ? resolveCanvasNodeBorder(node) : preset?.style.border ?? "solid";
   const alignRaw = explicitAlign
     ? node.bcTextAlign ?? attrs.textAlign
     : preset?.style.align ?? "left";

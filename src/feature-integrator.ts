@@ -4,8 +4,13 @@ import {
   Modal,
   MarkdownPostProcessorContext,
   MarkdownRenderer,
+  MarkdownRenderChild,
   Notice,
   Platform,
+  Plugin,
+  Menu,
+  MenuItem,
+  EventRef,
   SuggestModal,
   TFile,
   TFolder
@@ -84,10 +89,60 @@ import { normalizeCommandDisplayName } from "./command-names";
 import { joinVaultPath } from "./vault-path";
 import { AIPromptModal } from "./ai-prompt-modal";
 import { resolveAIStatus } from "./onboarding-ai";
-import { resetOnboardingState } from "./onboarding";
+import { resetOnboardingState, type OnboardingState } from "./onboarding";
 import { t } from "./i18n";
+import { isCanvasViewRuntime, type CanvasRuntime, type CanvasNodeRuntime, type CanvasViewRuntime } from "./canvas-runtime";
+import type { NamedPromptProfile } from "./prompt-profiles";
+import { isCanvasData, isCanvasNodeData, type LayoutDirection } from "./canvas";
 
-interface ProviderProfile {
+function parseUnknownJson(raw: string): unknown {
+  const parsed: unknown = JSON.parse(raw);
+  return parsed;
+}
+
+function parseJsonRecord(raw: string): Record<string, unknown> {
+  const parsed = parseUnknownJson(raw);
+  if (!isJsonObject(parsed)) throw new Error(t("Expected a JSON object.", "需要 JSON 对象。"));
+  return parsed;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item: unknown) => typeof item === "string");
+}
+
+export interface FeaturePlugin extends Plugin {
+  settings: FeatureSettings;
+  settingsTab?: BetterCanvasSettingsTab;
+  saveSettings(): Promise<void>;
+  scheduleOnboardingCheck?(): void;
+}
+
+interface FeatureWorkspaceEvents {
+  "canvas:node-menu": [Menu, CanvasNodeRuntime];
+  "canvas:selection-menu": [Menu, CanvasRuntime];
+  "advanced-canvas:node-created": [CanvasRuntime, CanvasNodeRuntime];
+  "advanced-canvas:node-added": [CanvasRuntime, CanvasNodeRuntime];
+  "advanced-canvas:node-resized": [CanvasRuntime, CanvasNodeRuntime];
+  "advanced-canvas:data-loaded:before": [CanvasRuntime, CanvasData?];
+  "advanced-canvas:node-changed": [CanvasRuntime];
+  "advanced-canvas:data-loaded:after": [CanvasRuntime, CanvasData?];
+  "advanced-canvas:node-text-content-changed": [CanvasRuntime];
+  "advanced-canvas:node-rendered": [CanvasRuntime];
+  "advanced-canvas:node-editing-state-changed": [CanvasRuntime, CanvasNodeRuntime, boolean];
+  "advanced-canvas:readonly-changed": [CanvasRuntime, boolean];
+  "advanced-canvas:dragging-state-changed": [CanvasRuntime, boolean];
+  "advanced-canvas:canvas-view-unloaded:before": [CanvasViewRuntime];
+  "better-canvas:theme-changed": [];
+  "css-change": [];
+}
+
+declare module "obsidian" {
+  interface Workspace {
+    on<K extends keyof FeatureWorkspaceEvents>(name: K, callback: (...args: FeatureWorkspaceEvents[K]) => unknown, ctx?: unknown): EventRef;
+  }
+}
+
+export interface ProviderProfile {
   id: string;
   protocol?: AIProtocol;
   name: string;
@@ -100,7 +155,25 @@ interface ProviderProfile {
   maxOutputTokens?: number;
 }
 
-interface FeatureSettings {
+export interface FeatureSettings {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  systemPrompt: string;
+  direction: LayoutDirection;
+  systemPromptProfiles: NamedPromptProfile[];
+  activeSystemPromptProfile: string;
+  onboarding: OnboardingState;
+  gapX: number;
+  gapY: number;
+  defaultNodeTextAlign: "left" | "center" | "right";
+  attachmentFolder: string;
+  mindMapShortcutChildTabEnabled: boolean;
+  mindMapShortcutSiblingEnterEnabled: boolean;
+  mindMapShortcutAltArrowNavigationEnabled: boolean;
+  mindMapShortcutDirectionalCreationEnabled: boolean;
+  readOnlyDisableNodeMenusEnabled?: boolean;
+  readOnlyLockPanZoomEnabled?: boolean;
   providerProfiles: ProviderProfile[];
   activeProviderId: string;
   autoFileNodeEdgesEnabled: boolean;
@@ -142,6 +215,36 @@ const DEFAULT_PROFILES: ProviderProfile[] = [{
   temperature: 0.4,
   maxOutputTokens: 0
 }];
+
+export const DEFAULT_FEATURE_SETTINGS: Omit<FeatureSettings, "baseUrl" | "apiKey" | "model" | "systemPrompt" | "direction" | "systemPromptProfiles" | "activeSystemPromptProfile" | "onboarding" | "gapX" | "gapY" | "defaultNodeTextAlign" | "attachmentFolder" | "mindMapShortcutChildTabEnabled" | "mindMapShortcutSiblingEnterEnabled" | "mindMapShortcutAltArrowNavigationEnabled" | "mindMapShortcutDirectionalCreationEnabled"> = {
+  providerProfiles: [],
+  activeProviderId: "default",
+  autoFileNodeEdgesEnabled: true,
+  autoEdgesFrontmatterKey: "canvas-edges",
+  gridSize: 20,
+  mcpEndpoint: "",
+  mcpApiKey: "",
+  mcpTransport: "http",
+  mcpStdioConfig: '{"command":"","args":[],"env":{},"cwd":""}',
+  canvasMetadataEnabled: true,
+  exportPixelRatio: 2,
+  exportBackgroundColor: "",
+  imageProtocol: "openai",
+  imageBaseUrl: "https://api.openai.com/v1",
+  imageApiKey: "",
+  imageModel: "gpt-image-1",
+  imageSettingsMigrated: false,
+  codexBinaryPath: "",
+  codexModel: "",
+  backend: "api",
+  opencodeBinaryPath: "opencode",
+  opencodeModel: "",
+  localAgents: {},
+  flashcardOutputMode: "canvas",
+  spacedRepetitionFolder: "Better Canvas/Flashcards",
+  spacedRepetitionDeck: "better-canvas",
+  modelCapabilityReports: {}
+};
 
 class FeaturePromptModal extends Modal {
   constructor(
@@ -223,7 +326,7 @@ class AIModelPickerModal extends SuggestModal<string> {
   }
 
   renderSuggestion(model: string, element: HTMLElement): void {
-    element.createEl("div", { text: model });
+    element.createDiv({ text: model });
     if (model === this.currentModel) element.createEl("small", { text: t("Current model", "当前模型") });
   }
 
@@ -274,7 +377,7 @@ class CanvasLinkExplorerModal extends Modal {
     const list = section.createDiv({ cls: "bc-link-explorer-list" });
     for (const entry of entries) {
       const button = list.createEl("button", { cls: "bc-link-explorer-entry" });
-      button.createEl("span", { text: entry.title });
+      button.createSpan({ text: entry.title });
       button.createEl("small", { text: entry.detail });
       button.addEventListener("click", () => {
         this.close();
@@ -289,13 +392,13 @@ class CanvasLinkExplorerModal extends Modal {
 }
 
 export interface AISelectionTarget {
-  canvas: any;
+  canvas: CanvasRuntime;
   nodeIds: readonly string[];
 }
 
 interface AutoResizeObservation {
-  view: any;
-  canvas: any;
+  view: CanvasViewRuntime;
+  canvas: CanvasRuntime;
   container: HTMLElement;
   observer: MutationObserver;
   timer: number | null;
@@ -305,17 +408,17 @@ interface AutoResizeObservation {
 }
 
 export default class BetterCanvasFeatures {
-  private focusedCanvases = new Map<any, string>();
+  private focusedCanvases = new Map<CanvasRuntime, string>();
   private boundContainers = new WeakSet<HTMLElement>();
   private boundRouteContainers = new WeakSet<HTMLElement>();
   private resizeObservers = new Map<HTMLElement, AutoResizeObservation>();
-  private expectedAutoResizes = new Map<any, Map<string, { width: number; height: number }>>();
-  private expectedImportedResizes = new Map<any, Map<string, { width: number; height: number }>>();
-  private activeAutoResizes = new Map<any, Set<string>>();
-  private draggingCanvases = new Set<any>();
+  private expectedAutoResizes = new Map<CanvasRuntime, Map<string, { width: number; height: number }>>();
+  private expectedImportedResizes = new Map<CanvasRuntime, Map<string, { width: number; height: number }>>();
+  private activeAutoResizes = new Map<CanvasRuntime, Set<string>>();
+  private draggingCanvases = new Set<CanvasRuntime>();
   private fontDocuments = new Set<Document>();
   private stopped = false;
-  private activeGenerations = new Map<any, { controller: AbortController; nodeId: string }>();
+  private activeGenerations = new Map<CanvasRuntime, { controller: AbortController; nodeId: string }>();
   private metadataIndexer: CanvasMetadataIndexer | null = null;
   private pdfPageRenderer: PinnedPdfPageRenderer | null = null;
   private pdfAnnotations: PdfAnnotationManager | null = null;
@@ -327,9 +430,9 @@ export default class BetterCanvasFeatures {
   private cssBreakpointCache = new WeakMap<HTMLElement, number>();
   /** Nodes whose inline border colour this plugin wrote, so clearing only undoes its own write. */
   private coloredNodeHosts = new WeakSet<HTMLElement>();
-  private p: any;
+  private p: FeaturePlugin;
 
-  constructor(plugin: any) {
+  constructor(plugin: FeaturePlugin) {
     this.p = plugin;
     this.p.register(() => this.readonlyController.stop());
   }
@@ -349,10 +452,10 @@ export default class BetterCanvasFeatures {
       this.cleanup();
       closeAllLocalMcpSessions();
     });
-    this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-created", (canvas: any, node: any) => {
+    this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-created", (canvas: CanvasRuntime, node: CanvasNodeRuntime) => {
       this.applyDefaultTextAlignmentToNewNode(canvas, node);
     }));
-    this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-resized", (canvas: any, node: any) => {
+    this.p.registerEvent(this.p.app.workspace.on("advanced-canvas:node-resized", (canvas: CanvasRuntime, node: CanvasNodeRuntime) => {
       this.handleNodeResized(canvas, node);
     }));
     this.registerAutoResizeEvents();
@@ -453,11 +556,11 @@ export default class BetterCanvasFeatures {
     void this.regenerate();
   }
 
-  settings(): any {
-    return this.p.settings as any;
+  settings(): FeatureSettings {
+    return this.p.settings;
   }
 
-  private applyDefaultTextAlignmentToNewNode(canvas: any, node: any): void {
+  private applyDefaultTextAlignmentToNewNode(canvas: CanvasRuntime, node: CanvasNodeRuntime): void {
     if (!canvas || isCanvasReadOnly(canvas)) return;
     const nodeId = typeof node?.id === "string" ? node.id : node?.getData?.()?.id;
     if (typeof nodeId !== "string") return;
@@ -475,7 +578,7 @@ export default class BetterCanvasFeatures {
     }
   }
 
-  private handleNodeResized(canvas: any, node: any): void {
+  private handleNodeResized(canvas: CanvasRuntime, node: CanvasNodeRuntime): void {
     if (!canvas || this.isResizeReadOnly(canvas)) return;
     const nodeId = typeof node?.id === "string" ? node.id : node?.getData?.()?.id;
     if (typeof nodeId !== "string") return;
@@ -486,16 +589,16 @@ export default class BetterCanvasFeatures {
     this.expectedAutoResizes.get(canvas)?.delete(nodeId);
     this.expectedImportedResizes.get(canvas)?.delete(nodeId);
     if (currentNode && [expected, imported].some(size => size && size.width === currentNode.width && size.height === currentNode.height)) return;
-    if (!currentNode || (currentNode as any).bcAutoResize !== true) return;
+    if (!currentNode || (currentNode).bcAutoResize !== true) return;
     patchNode(canvas, nodeId, { bcAutoResize: false });
     if (typeof HTMLElement !== "undefined") this.decorate(canvas);
   }
 
-  private isResizeReadOnly(canvas: any): boolean {
+  private isResizeReadOnly(canvas: CanvasRuntime): boolean {
     return Boolean(canvas?.readonly || canvas?.readOnly || isCanvasReadOnly(canvas));
   }
 
-  private resizeTextNode(canvas: any, nodeId: string, saveHistory = true): boolean {
+  private resizeTextNode(canvas: CanvasRuntime, nodeId: string, saveHistory = true): boolean {
     if (this.isResizeReadOnly(canvas)) return false;
     const before = readCanvasData(canvas).nodes.find(node => node.id === nodeId);
     if (!before) return false;
@@ -510,7 +613,7 @@ export default class BetterCanvasFeatures {
       // A successful no-op also refreshes the preview; it must not mask a later
       // user resize. The bridge delivers actual geometry changes on a frame.
       if (resized && after && (after.width !== width || after.height !== height)) {
-        const expected = this.expectedAutoResizes.get(canvas) ?? new Map();
+        const expected = this.expectedAutoResizes.get(canvas) ?? new Map<string, { width: number; height: number }>();
         expected.set(nodeId, { width: after.width, height: after.height });
         this.expectedAutoResizes.set(canvas, expected);
       }
@@ -523,9 +626,9 @@ export default class BetterCanvasFeatures {
   }
 
   async probeProviderCapabilities(profileId: string): Promise<ModelCapabilityReport> {
-    const s = this.settings() as FeatureSettings & any;
+    const s = this.settings();
     const selected = (Array.isArray(s.providerProfiles) ? s.providerProfiles : [])
-      .find((profile: ProviderProfile) => profile.id === profileId) as ProviderProfile | undefined;
+      .find((profile: ProviderProfile) => profile.id === profileId);
     if (!selected) throw new Error(t("Could not find the AI provider profile to probe.", "找不到要探测的 AI 服务商配置。"));
 
     const profile = selected.id === "default"
@@ -555,7 +658,7 @@ export default class BetterCanvasFeatures {
       chatCompletion
     );
     const reports = s.modelCapabilityReports && typeof s.modelCapabilityReports === "object" && !Array.isArray(s.modelCapabilityReports)
-      ? s.modelCapabilityReports as Record<string, ModelCapabilityReport>
+      ? s.modelCapabilityReports
       : {};
     reports[modelCapabilityReportKey(report.profileId, report.protocol, report.model)] = report;
     const keys = Object.keys(reports);
@@ -577,7 +680,7 @@ export default class BetterCanvasFeatures {
     this.p.scheduleOnboardingCheck?.();
   }
 
-  resetOnboardingSettings(): any {
+  resetOnboardingSettings(): OnboardingState {
     return resetOnboardingState();
   }
 
@@ -614,9 +717,9 @@ export default class BetterCanvasFeatures {
         maxOutputTokens: 0
       }];
     }
-    s.providerProfiles = s.providerProfiles.filter((p: any) => p && typeof p.id === "string" && typeof p.baseUrl === "string");
-    if (!s.providerProfiles.length) s.providerProfiles = JSON.parse(JSON.stringify(DEFAULT_PROFILES));
-    for (const profile of s.providerProfiles as ProviderProfile[]) {
+    s.providerProfiles = s.providerProfiles.filter((p: ProviderProfile) => p && typeof p.id === "string" && typeof p.baseUrl === "string");
+    if (!s.providerProfiles.length) s.providerProfiles = DEFAULT_PROFILES.map(profile => ({ ...profile }));
+    for (const profile of s.providerProfiles) {
       if (typeof profile.requestParamsJson !== "string") profile.requestParamsJson = "{}";
       profile.temperature = normalizeTemperatureForProtocol(profile.temperature, profile.protocol ?? "openai");
       if (typeof profile.maxOutputTokens !== "number" || !Number.isInteger(profile.maxOutputTokens) || profile.maxOutputTokens < 0 || profile.maxOutputTokens > 200_000) profile.maxOutputTokens = 0;
@@ -637,8 +740,8 @@ export default class BetterCanvasFeatures {
     if (typeof s.codexBinaryPath !== "string") s.codexBinaryPath = "";
     if (typeof s.codexModel !== "string") s.codexModel = "";
     if (!s.imageSettingsMigrated) {
-      const legacyProvider = (s.providerProfiles as ProviderProfile[]).find((profile: ProviderProfile) => profile.id === s.activeProviderId)
-        ?? (s.providerProfiles as ProviderProfile[])[0];
+      const legacyProvider = s.providerProfiles.find((profile: ProviderProfile) => profile.id === s.activeProviderId)
+        ?? s.providerProfiles[0];
       const legacyProtocol = legacyProvider?.protocol ?? "openai";
       s.imageProtocol = legacyProtocol === "gemini" ? "gemini" : "openai";
       const defaults = {
@@ -670,9 +773,9 @@ export default class BetterCanvasFeatures {
   }
 
   private currentProvider(node?: CanvasNodeData): ProviderProfile {
-    const s = this.settings() as FeatureSettings & any;
-    const preferredId = typeof (node as any)?.bcAIProvider === "string"
-      ? String((node as any).bcAIProvider)
+    const s = this.settings();
+    const preferredId = typeof (node)?.bcAIProvider === "string"
+      ? String((node).bcAIProvider)
       : s.activeProviderId;
     const profile = s.providerProfiles.find((item: ProviderProfile) => item.id === preferredId)
       ?? s.providerProfiles.find((item: ProviderProfile) => item.id === s.activeProviderId)
@@ -693,7 +796,7 @@ export default class BetterCanvasFeatures {
     return profile;
   }
 
-  private aiSettings(node?: CanvasNodeData, modelOverride?: string): any {
+  private aiSettings(node?: CanvasNodeData, modelOverride?: string): AISettings {
     const s = this.settings();
     const profile = this.currentProvider(node);
     return {
@@ -723,12 +826,12 @@ export default class BetterCanvasFeatures {
     return override || this.currentProvider(node).model;
   }
 
-  private activeCanvasView(): any | null {
-    const view = this.p.app.workspace.getActiveViewOfType(ItemView) as any;
-    return view?.getViewType?.() === "canvas" && view.canvas ? view : null;
+  private activeCanvasView(): CanvasViewRuntime | null {
+    const view = this.p.app.workspace.getActiveViewOfType(ItemView);
+    return isCanvasViewRuntime(view) ? view : null;
   }
 
-  private canvas(): any | null {
+  private canvas(): CanvasRuntime | null {
     return this.activeCanvasView()?.canvas ?? null;
   }
 
@@ -768,7 +871,7 @@ export default class BetterCanvasFeatures {
     };
   }
 
-  private selected(canvas = this.canvas()): { canvas: any; node: CanvasNodeData } | null {
+  private selected(canvas = this.canvas()): { canvas: CanvasRuntime; node: CanvasNodeData } | null {
     if (!canvas) {
       new Notice(t("Open a Canvas first.", "请先打开一个 Canvas。"));
       return null;
@@ -795,7 +898,8 @@ export default class BetterCanvasFeatures {
     return { canvas, node };
   }
 
-  private selectNode(canvas: any, id: string): void {
+  private selectNode(canvas: CanvasRuntime | null, id: string): void {
+    if (!canvas) return;
     const node = canvas?.nodes?.get?.(id);
     if (!node) return;
     canvas.selectOnly?.(node);
@@ -872,7 +976,11 @@ export default class BetterCanvasFeatures {
     add("bc-related-questions", t("Generate follow-up research questions", "生成后续研究问题节点"), () => void this.generateRelatedQuestions());
     add("bc-generate-title", t("Generate node title or group name", "生成节点标题或分组名称"), () => void this.generateTitleOrGroupName());
     add("bc-expand-idea-mindmap", t("Expand an idea into a mind map with AI", "用 AI 将想法扩展为思维导图"), () => this.expandIdeaIntoMindMap());
-    add("bc-generate-flashcard-nodes", t("Generate standalone flashcard nodes", "生成独立复习闪卡节点"), () => this.generateFlashcardNodes());
+    add("bc-generate-flashcard-nodes", t("Generate standalone flashcard nodes", "生成独立复习闪卡节点"), () => {
+      void this.generateFlashcardNodes().catch((error: unknown) => {
+        new Notice(error instanceof Error ? error.message : String(error), 8000);
+      });
+    });
     add("bc-regenerate", t("Regenerate selected AI node", "重新生成所选 AI 节点"), () => void this.regenerate());
     add("bc-stop-ai", t("Stop current AI generation", "停止当前 AI 生成"), () => this.stopAI());
     add("bc-mcp-tool", t("Call a remote MCP tool", "调用远程 MCP 工具"), () => void this.runMcpTool());
@@ -890,8 +998,8 @@ export default class BetterCanvasFeatures {
   }
 
   private registerCanvasMenus(): void {
-    const workspace = this.p.app.workspace as any;
-    const nodeMenu = workspace.on("canvas:node-menu", (menu: any, node: any) => {
+    const workspace = this.p.app.workspace;
+    const nodeMenu = workspace.on("canvas:node-menu", (menu: Menu, node: CanvasNodeRuntime) => {
       if (!menu?.addItem || !node?.id) return;
       // Style now opens from the Canvas control stack, and colour, shape and
       // alignment live there. Their commands remain available for users who
@@ -903,14 +1011,14 @@ export default class BetterCanvasFeatures {
         [t("Send to back", "置底"), "layers-2", () => this.reorder(false)]
       ];
       for (const action of actions) {
-        menu.addItem((item: any) => item.setTitle(action[0]).setIcon(action[1]).onClick(() => {
+        menu.addItem((item: MenuItem) => item.setTitle(action[0]).setIcon(action[1]).onClick(() => {
           this.selectNode(this.canvas(), String(node.id));
           action[2]();
         }));
       }
-      const nodeData = node?.getData?.() ?? node;
+      const nodeData = node.getData?.() ?? node.data ?? (isCanvasNodeData(node) ? node : undefined);
       if (nodeData?.type === "file" && typeof nodeData.file === "string" && nodeData.file.toLowerCase().endsWith(".canvas")) {
-        menu.addItem((item: any) => item
+        menu.addItem((item: MenuItem) => item
           .setTitle(nodeData.portal ? t("Close Portal", "关闭 Portal") : t("Open Portal", "打开 Portal"))
           .setIcon(nodeData.portal ? "door-closed" : "door-open")
           .onClick(() => this.portalManager?.togglePortalForNode(String(node.id))));
@@ -918,11 +1026,11 @@ export default class BetterCanvasFeatures {
     });
     this.p.registerEvent(nodeMenu);
 
-    const selectionMenu = workspace.on("canvas:selection-menu", (menu: any, canvas: any) => {
+    const selectionMenu = workspace.on("canvas:selection-menu", (menu: Menu, canvas: CanvasRuntime) => {
       if (!menu?.addItem || !canvas) return;
-      menu.addItem((item: any) => item.setTitle(t("Select connections", "选连线")).setIcon("git-branch").onClick(() => this.selectEdges("all", canvas)));
-      menu.addItem((item: any) => item.setTitle(t("Wrap", "封装")).setIcon("file-plus").onClick(() => void this.encapsulate(canvas)));
-      menu.addItem((item: any) => item.setTitle(t("Connection style", "连线样式")).setIcon("palette").onClick(() => this.edgeStyle(canvas)));
+      menu.addItem((item: MenuItem) => item.setTitle(t("Select connections", "选连线")).setIcon("git-branch").onClick(() => this.selectEdges("all", canvas)));
+      menu.addItem((item: MenuItem) => item.setTitle(t("Wrap", "封装")).setIcon("file-plus").onClick(() => void this.encapsulate(canvas)));
+      menu.addItem((item: MenuItem) => item.setTitle(t("Connection style", "连线样式")).setIcon("palette").onClick(() => this.edgeStyle(canvas)));
     });
     this.p.registerEvent(selectionMenu);
   }
@@ -931,7 +1039,7 @@ export default class BetterCanvasFeatures {
     if (this.stopped) return;
     const liveContainers = new Set<HTMLElement>();
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
-      const view = leaf.view as any;
+      const view = isCanvasViewRuntime(leaf.view) ? leaf.view : null
       if (!view?.canvas) continue;
       liveContainers.add(view.containerEl);
       this.observeAutoResize(view, view.canvas);
@@ -950,7 +1058,7 @@ export default class BetterCanvasFeatures {
     this.refreshReadonly();
   }
 
-  private decorate(canvas: any, saveHistory = true): void {
+  private decorate(canvas: CanvasRuntime, saveHistory = true): void {
     if (this.stopped) return;
     // Themes and style edits can change --variable-breakpoint, and decorate
     // runs after both; zoom frames reuse the resolved values in between.
@@ -962,25 +1070,25 @@ export default class BetterCanvasFeatures {
       const node = canvas.nodes?.get?.(item.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
       if (!(element instanceof HTMLElement)) continue;
-      const host = (element.closest(".canvas-node") as HTMLElement | null) ?? element;
+      const host = element.closest<HTMLElement>(".canvas-node") ?? element;
       // Guard every write: an unchanged value would still invalidate style and
       // fire the container MutationObserver, which is the expensive part on
       // large boards where decorate runs after every edit.
-      const nodeColor = typeof (item as any).bcNodeColor === "string" ? String((item as any).bcNodeColor) : "";
+      const nodeColor = typeof (item).bcNodeColor === "string" ? String((item).bcNodeColor) : "";
       if (nodeColor) {
         if (host.style.borderColor !== nodeColor) host.style.borderColor = nodeColor;
         this.coloredNodeHosts.add(host);
       } else if (this.coloredNodeHosts.delete(host)) {
         host.style.removeProperty("border-color");
       }
-      const shape = resolveCanvasNodeShape(item as any);
+      const shape = resolveCanvasNodeShape(item);
       if (host.dataset.bcShape !== shape) host.dataset.bcShape = shape;
-      const border = resolveCanvasNodeBorder(item as any);
+      const border = resolveCanvasNodeBorder(item);
       if (host.dataset.bcBorder !== border) host.dataset.bcBorder = border;
       const previousClass = host.dataset.bcCustomClass;
       if (previousClass) host.classList.remove("bc-user-" + previousClass);
-      const nextClass = typeof (item as any).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item as any).bcCustomClass))
-        ? String((item as any).bcCustomClass) : "";
+      const nextClass = typeof (item).bcCustomClass === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(String((item).bcCustomClass))
+        ? String((item).bcCustomClass) : "";
       if (nextClass) host.classList.add("bc-user-" + nextClass);
       host.dataset.bcCustomClass = nextClass;
 
@@ -998,7 +1106,7 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     this.input(t("Set node color", "设置节点颜色"), t("e.g. #5c6bc0", "例如 #5c6bc0"), value => {
-      const span = document.createElement("span");
+      const span = this.p.app.workspace.containerEl.ownerDocument.win.createSpan();
       span.style.color = value;
       if (!span.style.color) {
         new Notice(t("Unrecognized color.", "无法识别颜色。"));
@@ -1022,7 +1130,7 @@ export default class BetterCanvasFeatures {
           new Notice(t("Invalid shape. Choose a supported flowchart shape.", "形状无效。请选择受支持的流程图形状。"));
           return;
         }
-        const priorAttributes = { ...((selection.node as any).styleAttributes ?? {}) };
+        const priorAttributes = { ...((selection.node).styleAttributes ?? {}) };
         // Advanced Canvas uses a null/default value rather than a literal
         // "rectangle" style. Keep our visual alias separately and omit the
         // non-standard value so other renderers fall back to the default box.
@@ -1034,7 +1142,7 @@ export default class BetterCanvasFeatures {
         });
         this.decorate(selection.canvas);
       },
-      String((selection.node as any).bcShape ?? "default")
+      String((selection.node).bcShape ?? "default")
     );
   }
 
@@ -1047,7 +1155,7 @@ export default class BetterCanvasFeatures {
         new Notice(t("Invalid border style.", "边框样式无效。"));
         return;
       }
-      const priorAttributes = (selection.node as any).styleAttributes ?? {};
+      const priorAttributes = (selection.node).styleAttributes ?? {};
       patchNode(selection.canvas, selection.node.id, {
         bcBorderStyle: style,
         styleAttributes: { ...priorAttributes, border: style === "double" ? "solid" : style }
@@ -1087,7 +1195,7 @@ export default class BetterCanvasFeatures {
       return;
     }
 
-    const initial = JSON.stringify((target as any).styleAttributes ?? {}, null, 2);
+    const initial = JSON.stringify((target).styleAttributes ?? {}, null, 2);
     this.input(
       t("Edit styleAttributes JSON", "编辑 styleAttributes JSON"),
       t("Enter a valid JSON object, e.g. { \"shape\": \"diamond\" }", "输入有效的 JSON 对象，例如 { \"shape\": \"diamond\" }"),
@@ -1134,10 +1242,10 @@ export default class BetterCanvasFeatures {
       patchNode(selected.canvas, selected.node.id, { bcZoomBreakpoint: breakpoint });
       this.applyZoomBreakpoints(selected.canvas);
       new Notice(t("Zoom breakpoint set: ", "已设置缩放断点：") + breakpoint);
-    }, typeof (selected.node as any).bcZoomBreakpoint === "number" ? String((selected.node as any).bcZoomBreakpoint) : "off");
+    }, typeof (selected.node).bcZoomBreakpoint === "number" ? String((selected.node).bcZoomBreakpoint) : "off");
   }
 
-  private applyZoomBreakpoints(canvas: any): void {
+  private applyZoomBreakpoints(canvas: CanvasRuntime): void {
     // Obsidian Canvas exposes zoom in log2 units; plugin/CSS breakpoints use
     // the human-facing linear scale (1 = 100%, 0.6 = 60%).
     const scale = canvasScaleFromLogZoom(canvas?.zoom);
@@ -1146,7 +1254,7 @@ export default class BetterCanvasFeatures {
       const node = canvas?.nodes?.get?.(nodeData.id);
       const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
       if (!(element instanceof HTMLElement)) continue;
-      const stored = (nodeData as any).bcZoomBreakpoint;
+      const stored = (nodeData).bcZoomBreakpoint;
       const breakpoint = typeof stored === "number" && Number.isFinite(stored)
         ? stored : this.cssBreakpointOf(element);
       if (!Number.isFinite(breakpoint)) {
@@ -1178,7 +1286,7 @@ export default class BetterCanvasFeatures {
       patchNode(selection.canvas, selection.node.id, { bcCustomClass: token || undefined });
       this.decorate(selection.canvas);
       new Notice(token ? t("Applied style class bc-user-", "已应用样式类 bc-user-") + token : t("Cleared the node custom style class.", "已清除节点自定义样式类。"));
-    }, String((selection.node as any).bcCustomClass ?? ""), true);
+    }, typeof selection.node.bcCustomClass === "string" ? selection.node.bcCustomClass : "", true);
   }
   private setNodeTextAlign(): void {
     const selection = this.selected();
@@ -1189,13 +1297,13 @@ export default class BetterCanvasFeatures {
         new Notice(t("Invalid alignment.", "对齐方式无效。"));
         return;
       }
-      const priorAttributes = (selection.node as any).styleAttributes ?? {};
+      const priorAttributes = (selection.node).styleAttributes ?? {};
       patchNode(selection.canvas, selection.node.id, {
         bcTextAlign: align,
         styleAttributes: { ...priorAttributes, textAlign: ["left", "center", "right"].includes(align) ? align : "left" }
       });
       this.decorate(selection.canvas);
-    }, String((selection.node as any).bcTextAlign ?? "left"));
+    }, String((selection.node).bcTextAlign ?? "left"));
   }
 
   private edgePathfinding(): void {
@@ -1203,13 +1311,13 @@ export default class BetterCanvasFeatures {
     if (!canvas) { new Notice(t("Open a Canvas first.", "请先打开 Canvas。")); return; }
     if (isCanvasReadOnly(canvas)) { new Notice(t("This Canvas is in read-only mode.", "当前 Canvas 处于只读模式。")); return; }
     this.input(t("Set connection pathfinding algorithm", "设置连线路径算法"), "bezier / direct / square / a-star", value => {
-      const method = value.trim().toLowerCase();
-      const allowed = ["bezier", "direct", "square", "a-star"];
-      if (!allowed.includes(method)) {
+      const allowed = ["bezier", "direct", "square", "a-star"] as const;
+      const method = allowed.find(method => method === value.trim().toLowerCase());
+      if (!method) {
         new Notice(t("Invalid pathfinding algorithm. Choose bezier, direct, square, or a-star.", "路径算法无效。请选择 bezier、direct、square 或 a-star。"));
         return;
       }
-      const count = styleSelectedEdgePathfinding(canvas, method as "bezier" | "direct" | "square" | "a-star");
+      const count = styleSelectedEdgePathfinding(canvas, method);
       this.decorate(canvas);
       new Notice(count ? t("Updated the pathfinding algorithm for " + count + " connections.", "已更新 " + count + " 条连线的路径算法。") : t("Select one or more connections first.", "请先选择一条或多条连线。"));
     }, "square");
@@ -1220,10 +1328,10 @@ export default class BetterCanvasFeatures {
     if (!canvas) { new Notice(t("Open a Canvas first.", "请先打开 Canvas。")); return; }
     if (isCanvasReadOnly(canvas)) { new Notice(t("This Canvas is in read-only mode.", "当前 Canvas 处于只读模式。")); return; }
     this.input(t("Set connection arrow style", "设置连线箭头样式"), "default / triangle-outline / half-triangle / thin-triangle / diamond / diamond-outline / circle / circle-outline / blunt / none", value => {
-      const allowed = ["default", "triangle-outline", "half-triangle", "thin-triangle", "diamond", "diamond-outline", "circle", "circle-outline", "blunt", "none"];
-      const style = value.trim().toLowerCase();
-      if (!allowed.includes(style)) { new Notice(t("Invalid arrow style.", "箭头样式无效。")); return; }
-      const count = styleSelectedEdgeArrow(canvas, style as any);
+      const allowed = ["default", "triangle-outline", "half-triangle", "thin-triangle", "diamond", "diamond-outline", "circle", "circle-outline", "blunt", "none"] as const;
+      const style = allowed.find(style => style === value.trim().toLowerCase());
+      if (!style) { new Notice(t("Invalid arrow style.", "箭头样式无效。")); return; }
+      const count = styleSelectedEdgeArrow(canvas, style);
       this.decorate(canvas);
       new Notice(count ? t("Set the arrow style for " + count + " connections.", "已设置 " + count + " 条连线的箭头样式。") : t("Select one or more connections first.", "请先选择一条或多条连线。"));
     }, "default");
@@ -1239,7 +1347,7 @@ export default class BetterCanvasFeatures {
   private toggleAutoResize(): void {
     const selection = this.selected();
     if (!selection || this.isResizeReadOnly(selection.canvas)) return;
-    const enabled = (selection.node as any).bcAutoResize !== true;
+    const enabled = (selection.node).bcAutoResize !== true;
     patchNode(selection.canvas, selection.node.id, { bcAutoResize: enabled });
     if (enabled) {
       this.decorate(selection.canvas);
@@ -1249,9 +1357,9 @@ export default class BetterCanvasFeatures {
     new Notice(enabled ? t("Auto-size enabled for this node.", "此节点已启用自动尺寸。") : t("Auto-size disabled for this node.", "此节点已关闭自动尺寸。"));
   }
 
-  private bindCanvasRouteRefresh(view: any): void {
-    const container = view?.containerEl as HTMLElement | undefined;
-    if (!(container instanceof HTMLElement) || this.boundRouteContainers.has(container)) return;
+  private bindCanvasRouteRefresh(view: CanvasViewRuntime): void {
+    const container = view.containerEl;
+    if (!(container.instanceOf(HTMLElement)) || this.boundRouteContainers.has(container)) return;
     this.boundRouteContainers.add(container);
 
     // Zooming only moves the viewport transform: node/edge geometry, text and
@@ -1297,14 +1405,14 @@ export default class BetterCanvasFeatures {
     });
   }
 
-  private bindMindMapShortcuts(view: any, canvas: any): void {
+  private bindMindMapShortcuts(view: CanvasViewRuntime, canvas: CanvasRuntime): void {
     const container = view?.containerEl;
-    if (!(container instanceof HTMLElement) || this.boundContainers.has(container)) return;
+    if (!(container.instanceOf(HTMLElement)) || this.boundContainers.has(container)) return;
     this.boundContainers.add(container);
 
     this.p.registerDomEvent(container, "keydown", (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.isContentEditable || target.closest("input, textarea, [contenteditable='true'], .cm-editor"))) return;
+      const target = event.target as Node | null;
+      if (target?.instanceOf?.(HTMLElement) && (target.isContentEditable || target.closest("input, textarea, [contenteditable='true'], .cm-editor"))) return;
       const selectedInternal = canvas?.selection?.values?.().next?.().value;
       if (!selectedInternal || selectedInternal.isEditing) return;
       const direction = event.key === "ArrowLeft" ? "left"
@@ -1337,11 +1445,11 @@ export default class BetterCanvasFeatures {
 
   private registerAutoResizeEvents(): void {
     const workspace = this.p.app.workspace;
-    for (const name of ["better-canvas:theme-changed", "css-change"]) {
+    for (const name of ["better-canvas:theme-changed", "css-change"] as const) {
       this.p.registerEvent(workspace.on(name, () => this.scheduleAutoResize(undefined, true)));
     }
-    for (const name of ["advanced-canvas:data-loaded:before", "advanced-canvas:data-loaded:after"]) {
-      this.p.registerEvent(workspace.on(name, (canvas: any, incoming?: CanvasData) => {
+    for (const name of ["advanced-canvas:data-loaded:before", "advanced-canvas:data-loaded:after"] as const) {
+      this.p.registerEvent(workspace.on(name, (canvas: CanvasRuntime, incoming?: CanvasData) => {
         // Undo/redo and preset imports also emit node-resized. Their restored
         // geometry is not a user dragging a corner and must preserve opt-in.
         const data = name.endsWith(":after") ? readCanvasData(canvas) : incoming;
@@ -1365,23 +1473,23 @@ export default class BetterCanvasFeatures {
       }));
     }
     for (const name of ["advanced-canvas:node-changed",
-      "advanced-canvas:node-text-content-changed", "advanced-canvas:node-rendered"]) {
-      this.p.registerEvent(workspace.on(name, (canvas: any) => this.scheduleAutoResize(canvas)));
+      "advanced-canvas:node-text-content-changed", "advanced-canvas:node-rendered"] as const) {
+      this.p.registerEvent(workspace.on(name, (canvas: CanvasRuntime) => this.scheduleAutoResize(canvas)));
     }
-    this.p.registerEvent(workspace.on("advanced-canvas:node-editing-state-changed", (canvas: any, _node: any, editing: boolean) => {
+    this.p.registerEvent(workspace.on("advanced-canvas:node-editing-state-changed", (canvas: CanvasRuntime, _node: CanvasNodeRuntime, editing: boolean) => {
       if (!editing) this.scheduleAutoResize(canvas, true);
     }));
-    this.p.registerEvent(workspace.on("advanced-canvas:readonly-changed", (canvas: any, readonly: boolean) => {
+    this.p.registerEvent(workspace.on("advanced-canvas:readonly-changed", (canvas: CanvasRuntime, readonly: boolean) => {
       if (!readonly) this.scheduleAutoResize(canvas, true);
     }));
-    this.p.registerEvent(workspace.on("advanced-canvas:dragging-state-changed", (canvas: any, dragging: boolean) => {
+    this.p.registerEvent(workspace.on("advanced-canvas:dragging-state-changed", (canvas: CanvasRuntime, dragging: boolean) => {
       if (dragging) this.draggingCanvases.add(canvas);
       else {
         this.draggingCanvases.delete(canvas);
         this.scheduleAutoResize(canvas);
       }
     }));
-    this.p.registerEvent(workspace.on("advanced-canvas:canvas-view-unloaded:before", (view: any) => {
+    this.p.registerEvent(workspace.on("advanced-canvas:canvas-view-unloaded:before", (view: CanvasViewRuntime) => {
       const state = this.resizeObservers.get(view?.containerEl);
       if (state) this.stopAutoResize(state);
     }));
@@ -1399,10 +1507,10 @@ export default class BetterCanvasFeatures {
     });
   }
 
-  private scheduleAutoResize(canvas?: any, invalidate = false): void {
+  private scheduleAutoResize(canvas?: CanvasRuntime, invalidate = false): void {
     if (this.stopped) return;
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
-      const view = leaf.view as any;
+      const view = isCanvasViewRuntime(leaf.view) ? leaf.view : null
       if (!view?.canvas || (canvas && canvas !== view.canvas)) continue;
       const state = this.observeAutoResize(view, view.canvas);
       if (!state) continue;
@@ -1488,23 +1596,22 @@ export default class BetterCanvasFeatures {
     this.draggingCanvases.delete(state.canvas);
   }
 
-  private observeAutoResize(view: any, canvas: any): AutoResizeObservation | undefined {
+  private observeAutoResize(view: CanvasViewRuntime, canvas: CanvasRuntime): AutoResizeObservation | undefined {
     const container = view?.containerEl;
-    if (typeof HTMLElement === "undefined" || !(container instanceof HTMLElement)) return;
+    if (typeof HTMLElement === "undefined" || !(container.instanceOf(HTMLElement))) return;
     const existing = this.resizeObservers.get(container);
     if (existing?.canvas === canvas) return existing;
     if (existing) this.stopAutoResize(existing);
-    const state = { view, canvas, container, timer: null, revision: 0, snapshots: new Map() } as AutoResizeObservation;
     const observer = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         if (mutation.type === "childList" || mutation.type === "characterData") {
-          const target = mutation.target.nodeType === 3 ? mutation.target.parentElement : mutation.target as Element;
+          const target = mutation.target.instanceOf(Element) ? mutation.target : mutation.target.parentElement;
           if (target?.closest?.(".markdown-preview-view")) { state.revision++; break; }
         }
       }
       this.queueAutoResize(state);
     });
-    state.observer = observer;
+    const state: AutoResizeObservation = { view, canvas, container, observer, timer: null, revision: 0, snapshots: new Map() };
     this.resizeObservers.set(container, state);
     observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true,
       attributeFilter: ["style", "transform", "class", "data-bc-theme"] });
@@ -1523,7 +1630,7 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     this.input(t("Set connection color", "设置连线颜色"), t("e.g. #5c6bc0", "例如 #5c6bc0"), value => {
-      const span = document.createElement("span");
+      const span = this.p.app.workspace.containerEl.ownerDocument.win.createSpan();
       span.style.color = value;
       if (!span.style.color) {
         new Notice(t("Unrecognized color.", "无法识别颜色。"));
@@ -1542,13 +1649,13 @@ export default class BetterCanvasFeatures {
       const parts = value.split(",");
       const color = (parts[0] ?? "").trim();
       const style = (parts[1] ?? "solid").trim().toLowerCase();
-      const span = document.createElement("span");
+      const span = this.p.app.workspace.containerEl.ownerDocument.win.createSpan();
       span.style.color = color;
-      if (!span.style.color || !["solid", "dashed", "dotted"].includes(style)) {
+      if (!span.style.color || (style !== "solid" && style !== "dashed" && style !== "dotted")) {
         new Notice(t("Invalid format.", "格式无效。"));
         return;
       }
-      const count = styleSelectedEdges(canvas, span.style.color, style as "solid" | "dashed" | "dotted");
+      const count = styleSelectedEdges(canvas, span.style.color, style);
       this.decorate(canvas);
       new Notice(count ? t("Updated " + count + " connections.", "已更新 " + count + " 条连线。") : t("Select connections first.", "请先选择连线。"));
     });
@@ -1592,9 +1699,9 @@ export default class BetterCanvasFeatures {
 
   /** Refresh read-only event guards after commands or setting changes. */
   refreshReadonly(): void {
-    const containers: any[] = [];
+    const containers: HTMLElement[] = [];
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
-      const view = leaf.view as any;
+      const view = isCanvasViewRuntime(leaf.view) ? leaf.view : null
       if (!view?.canvas) continue;
       this.readonlyController.bind(view, view.canvas, this.readonlyOptions());
       containers.push(view.containerEl ?? view.contentEl ?? view.canvas.wrapperEl);
@@ -1605,7 +1712,7 @@ export default class BetterCanvasFeatures {
   private toggleReadonly(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice(t("Open a Canvas first.", "请先打开 Canvas。")); return; }
-    const wrapper = canvas.wrapperEl as HTMLElement | undefined;
+    const wrapper = canvas.wrapperEl;
     if (!(wrapper instanceof HTMLElement)) { new Notice(t("Could not access the Canvas container.", "无法获取 Canvas 容器。")); return; }
     const enabled = !wrapper.classList.contains("bc-readonly");
     wrapper.classList.toggle("bc-readonly", enabled);
@@ -1634,7 +1741,7 @@ export default class BetterCanvasFeatures {
     canvas.requestFrame?.();
     new Notice(t("Aligned " + ids.size + " nodes to a " + step + " px grid.", "已将 " + ids.size + " 个节点对齐到 " + step + " px 网格。"));
   }
-  private selectedCanvasNodeIds(canvas: any): Set<string> {
+  private selectedCanvasNodeIds(canvas: CanvasRuntime): Set<string> {
     const ids = new Set<string>();
     for (const item of canvas?.selection?.values?.() ?? []) {
       const id = item?.id ?? item?.getData?.()?.id;
@@ -1704,7 +1811,7 @@ export default class BetterCanvasFeatures {
     this.applyFocus(canvas);
   }
 
-  private applyFocus(canvas: any): void {
+  private applyFocus(canvas: CanvasRuntime): void {
     const root = this.focusedCanvases.get(canvas);
     canvas?.wrapperEl?.classList.toggle("bc-focus-mode", Boolean(root));
     const data = readCanvasData(canvas);
@@ -1723,7 +1830,7 @@ export default class BetterCanvasFeatures {
     }
     for (const edgeData of data.edges) {
       const edge = canvas.edges?.get?.(edgeData.id);
-      const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
+      const path = edge?.path instanceof SVGElement ? edge.path : edge?.path?.display ?? edge?.path?.el;
       const related = Boolean(root) && (edgeData.fromNode === root || edgeData.toNode === root);
       if (path instanceof SVGElement) path.classList.toggle("bc-focus-dimmed", Boolean(root) && !related);
     }
@@ -1733,7 +1840,7 @@ export default class BetterCanvasFeatures {
    * Highlight every edge incident to the current node selection.
    * This is visual-only: Canvas JSON and the current selection remain untouched.
    */
-  private applySelectionEdgeHighlight(canvas: any): void {
+  private applySelectionEdgeHighlight(canvas: CanvasRuntime): void {
     if (!canvas) return;
     const data = readCanvasData(canvas);
     const nodeIds = new Set(data.nodes.map(node => node.id));
@@ -1741,7 +1848,7 @@ export default class BetterCanvasFeatures {
     const highlighted = connectedEdgeIds(data.edges, selected);
     for (const edgeData of data.edges) {
       const edge = canvas.edges?.get?.(edgeData.id);
-      const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
+      const path = edge?.path instanceof SVGElement ? edge.path : edge?.path?.display ?? edge?.path?.el;
       if (path instanceof SVGElement) {
         path.classList.toggle("bc-selection-related", highlighted.has(edgeData.id));
       }
@@ -1818,7 +1925,7 @@ export default class BetterCanvasFeatures {
       new Notice(t("Select the nodes to wrap first.", "请先选择要封装的节点。"));
       return;
     }
-    const childEdges = data.edges.filter((edge: any) => ids.has(edge.fromNode) && ids.has(edge.toNode));
+    const childEdges = data.edges.filter((edge: CanvasEdgeData) => ids.has(edge.fromNode) && ids.has(edge.toNode));
     this.input(t("Wrap selection", "封装选区"), t("New Canvas file name (no extension)", "新 Canvas 文件名（不需要扩展名）"), async name => {
       const base = name.replace(/[\\/:*?"<>|]/g, "-").trim();
       if (!base) return;
@@ -1852,7 +1959,7 @@ export default class BetterCanvasFeatures {
           height: 200
         };
 
-        const outerEdges = data.edges.flatMap((edge: any) => {
+        const outerEdges = data.edges.flatMap((edge: CanvasEdgeData) => {
           const fromSelected = ids.has(edge.fromNode);
           const toSelected = ids.has(edge.toNode);
           if (fromSelected && toSelected) return [];
@@ -1904,7 +2011,7 @@ export default class BetterCanvasFeatures {
   }
 
   private async materializeCanvasLinks(
-    view: any,
+    view: CanvasViewRuntime,
     sourcePath: string,
     outgoing: CanvasLinkExplorerEntry[],
     incoming: CanvasLinkExplorerEntry[]
@@ -1938,8 +2045,8 @@ export default class BetterCanvasFeatures {
         if (key) existingKeys.push(key);
       } else if (node.type === "file" && typeof node.file === "string") {
         const path = resolvePath(node.file, sourcePath);
-        const subpath = typeof (node as any).subpath === "string"
-          ? String((node as any).subpath).replace(/^#/, "")
+        const subpath = typeof (node).subpath === "string"
+          ? String((node).subpath).replace(/^#/, "")
           : "";
         const key = materializableLinkKey(path + (subpath ? "#" + subpath : ""));
         if (key) existingKeys.push(key);
@@ -1962,7 +2069,7 @@ export default class BetterCanvasFeatures {
 
     const limit = 100;
     const selectedId = canvas.selection?.size === 1
-      ? canvas.selection.values().next().value?.id as string | undefined
+      ? canvas.selection.values().next().value?.id
       : undefined;
     const validNodeIds = new Set(latest.nodes.map((node: CanvasNodeData) => node.id));
     const minY = latest.nodes.length ? Math.min(...latest.nodes.map((node: CanvasNodeData) => node.y)) : 0;
@@ -1989,7 +2096,7 @@ export default class BetterCanvasFeatures {
           x, y,
           width: 300,
           height: 100
-        } as CanvasNodeData;
+        };
       } else {
         const hashIndex = entry.target.indexOf("#");
         const rawPath = hashIndex >= 0 ? entry.target.slice(0, hashIndex) : entry.target;
@@ -2005,7 +2112,7 @@ export default class BetterCanvasFeatures {
             x, y,
             width: 300,
             height: 160
-          } as CanvasNodeData;
+          };
         } else {
           const body = entry.title + "\n\n[[" + entry.target + "]]" +
             (entry.detail ? "\n\n" + t("Source: ", "来源：") + entry.detail : "");
@@ -2088,7 +2195,7 @@ export default class BetterCanvasFeatures {
         }
       }
       if (node.type === "file" && typeof node.file === "string" && node.file.trim()) {
-        const subpath = typeof (node as any).subpath === "string" ? String((node as any).subpath) : "";
+        const subpath = typeof (node).subpath === "string" ? String((node).subpath) : "";
         addOutgoing({
           title: t("File node: ", "文件节点：") + (node.file.split("/").pop() || node.file),
           detail: node.file + (subpath ? "#" + subpath : ""),
@@ -2144,7 +2251,7 @@ export default class BetterCanvasFeatures {
             const cache = this.p.app.metadataCache.getFileCache(candidate);
             const markdownLinks = cache
               ? [...(cache.links ?? []), ...(cache.embeds ?? [])]
-                  .map((link: any) => String(link?.link ?? ""))
+                  .map((link) => String(link?.link ?? ""))
                   .filter(Boolean)
               : extractWikiLinks(await this.p.app.vault.cachedRead(candidate)).map(reference =>
                   reference.targetPath + (reference.subpath ? "#" + reference.subpath : "")
@@ -2163,8 +2270,8 @@ export default class BetterCanvasFeatures {
             }
           } else {
             const raw = await this.p.app.vault.cachedRead(candidate);
-            const json = JSON.parse(raw);
-            const nodes = Array.isArray(json?.nodes) ? json.nodes as CanvasNodeData[] : [];
+            const json = parseUnknownJson(raw);
+            const nodes = isJsonObject(json) && Array.isArray(json.nodes) ? json.nodes.filter(isCanvasNodeData) : [];
             for (const node of nodes) {
               if (typeof node.text === "string") {
                 for (const reference of extractWikiLinks(node.text)) {
@@ -2289,8 +2396,8 @@ export default class BetterCanvasFeatures {
       const sourceFile = view?.file;
       if (sourceFile instanceof TFile && sourceFile.extension === "canvas") {
         try {
-          const source = JSON.parse(await this.p.app.vault.read(sourceFile)) as CanvasData;
-          if (!Array.isArray(source?.nodes) || !Array.isArray(source?.edges)) {
+          const source = parseUnknownJson(await this.p.app.vault.read(sourceFile));
+          if (!isCanvasData(source)) {
             throw new Error(t("The original Canvas file is missing nodes or edges.", "原 Canvas 文件缺少 nodes 或 edges。"));
           }
           exportData = mergeCanvasExportData(liveData, source);
@@ -2314,14 +2421,14 @@ export default class BetterCanvasFeatures {
       const requestedBackground = String(settings.exportBackgroundColor ?? "").trim();
       let backgroundColor: string | undefined;
       if (requestedBackground) {
-        const probe = document.createElement("span");
+        const probe = this.p.app.workspace.containerEl.ownerDocument.win.createSpan();
         probe.style.backgroundColor = requestedBackground;
         if (!probe.style.backgroundColor) {
           throw new Error(t("Invalid export background color; leave it empty for a transparent background, or enter a valid CSS color.", "导出背景色无效；请留空使用透明背景，或输入有效 CSS 颜色。"));
         }
         backgroundColor = probe.style.backgroundColor;
       }
-      const exportOptions: any = {
+      const exportOptions: Parameters<typeof toPng>[1] = {
         cacheBust: true,
         pixelRatio,
         ...viewportExportAppearance(backgroundColor)
@@ -2332,7 +2439,7 @@ export default class BetterCanvasFeatures {
         const rect = container.getBoundingClientRect();
         // Keep the offscreen offset on an ancestor so computed logical insets
         // cannot carry it into html-to-image's serialized root.
-        exportHost = container.ownerDocument.createElement("div");
+        exportHost = container.ownerDocument.win.createDiv();
         exportHost.classList.add("bc-export-host");
         exportHost.setAttribute("aria-hidden", "true");
         softExportClone.classList.add("bc-soft-export-clone");
@@ -2366,7 +2473,7 @@ export default class BetterCanvasFeatures {
       } else {
         const binary = atob(payload);
         const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-        await this.p.app.vault.createBinary(filePath, bytes.buffer as ArrayBuffer);
+        await this.p.app.vault.createBinary(filePath, bytes.buffer);
       }
       notice.hide();
       new Notice(t("Exported " + filePath, "已导出 " + filePath));
@@ -2396,7 +2503,7 @@ export default class BetterCanvasFeatures {
       let backgroundColor: string | undefined;
       const requestedBackground = String(settings.exportBackgroundColor ?? "").trim();
       if (requestedBackground) {
-        const probe = document.createElement("span");
+        const probe = this.p.app.workspace.containerEl.ownerDocument.win.createSpan();
         probe.style.backgroundColor = requestedBackground;
         if (!probe.style.backgroundColor) {
           throw new Error(t("Invalid export background color; leave it empty for a transparent background, or enter a valid CSS color.", "导出背景色无效；请留空使用透明背景，或输入有效 CSS 颜色。"));
@@ -2406,13 +2513,13 @@ export default class BetterCanvasFeatures {
 
       const sourceData = readCanvasData(canvas);
       const selectedIds = selectionOnly
-        ? Array.from(canvas.selection ?? []).map((item: any) => String(item?.id ?? "")).filter(Boolean)
+        ? Array.from(canvas.selection ?? []).map((item) => String(item?.id ?? "")).filter(Boolean)
         : null;
       if (selectionOnly && (!selectedIds || selectedIds.length === 0)) {
         throw new Error(t("Select one or more nodes before exporting the selection.", "请先选择一个或多个节点，再执行选区导出。"));
       }
       const exportSource = selectionOnly
-        ? canvasDataForSelection(sourceData, selectedIds as string[])
+        ? canvasDataForSelection(sourceData, selectedIds ?? [])
         : sourceData;
       if (selectionOnly && exportSource.nodes.length === 0) {
         throw new Error(t("No selected nodes were found to export.", "未找到可导出的选中节点。"));
@@ -2420,7 +2527,7 @@ export default class BetterCanvasFeatures {
       const exportData = {
         ...exportSource,
         nodes: exportSource.nodes.map((node: CanvasNodeData) => ({ ...node })),
-        edges: exportSource.edges.map((edge: any) => ({ ...edge }))
+        edges: exportSource.edges.map((edge: CanvasEdgeData) => ({ ...edge }))
       };
       const mimeByExtension: Record<string, string> = {
         png: "image/png",
@@ -2461,7 +2568,7 @@ export default class BetterCanvasFeatures {
             const pages = await extractPdfPages(
               this.p.app,
               file,
-              typeof (node as any).subpath === "string" ? String((node as any).subpath) : undefined,
+              typeof (node).subpath === "string" ? String((node).subpath) : undefined,
               1,
               true
             );
@@ -2475,7 +2582,7 @@ export default class BetterCanvasFeatures {
               skippedImageCount++;
               continue;
             }
-            (node as any).bcExportImageDataUrl = preview;
+            (node).bcExportImageDataUrl = preview;
             embeddedImageBytes += previewBytes;
             embeddedImageCount++;
             embeddedPdfPreviewCount++;
@@ -2500,7 +2607,7 @@ export default class BetterCanvasFeatures {
           for (let offset = 0; offset < bytes.length; offset += 0x8000) {
             binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
           }
-          (node as any).bcExportImageDataUrl = "data:" + mime + ";base64," + btoa(binary);
+          (node).bcExportImageDataUrl = "data:" + mime + ";base64," + btoa(binary);
           embeddedImageBytes += buffer.byteLength;
           embeddedImageCount++;
         } catch {
@@ -2527,7 +2634,7 @@ export default class BetterCanvasFeatures {
           image.onerror = () => reject(new Error(t("Could not render the full Canvas SVG as PNG.", "无法将整张 Canvas SVG 渲染为 PNG。")));
           image.src = objectUrl;
         });
-        const output = document.createElement("canvas");
+        const output = this.p.app.workspace.containerEl.ownerDocument.win.createEl("canvas");
         output.width = pixelWidth;
         output.height = pixelHeight;
         const context = output.getContext("2d", { alpha: !backgroundColor });
@@ -2585,7 +2692,7 @@ export default class BetterCanvasFeatures {
   private async saveMcpResult(
     toolName: string,
     result: RemoteMcpResult,
-    canvas: any,
+    canvas: CanvasRuntime,
     source?: CanvasNodeData
   ): Promise<void> {
     if (!canvas) throw new Error(t("The MCP tool returned a result, but no Canvas is open.", "MCP 工具已返回结果，但当前没有打开的 Canvas。"));
@@ -2727,11 +2834,9 @@ export default class BetterCanvasFeatures {
       void (async () => {
         try {
           const raw = await this.p.app.vault.cachedRead(file);
-          const parsed = JSON.parse(raw);
-          const existingMetadata = parsed?.metadata && typeof parsed.metadata === "object"
-            ? parsed.metadata : {};
-          const currentFrontmatter = existingMetadata.frontmatter && typeof existingMetadata.frontmatter === "object"
-            ? existingMetadata.frontmatter : {};
+          const parsed = parseJsonRecord(raw);
+          const existingMetadata = isJsonObject(parsed.metadata) ? parsed.metadata : {};
+          const currentFrontmatter = isJsonObject(existingMetadata.frontmatter) ? existingMetadata.frontmatter : {};
           const currentValue = Object.prototype.hasOwnProperty.call(currentFrontmatter, key)
             ? JSON.stringify(currentFrontmatter[key], null, 2) : "";
           this.input(
@@ -2741,14 +2846,14 @@ export default class BetterCanvasFeatures {
               void (async () => {
                 try {
                   const latestRaw = await this.p.app.vault.cachedRead(file);
-                  const latest = JSON.parse(latestRaw);
-                  const latestMetadata = latest?.metadata && typeof latest.metadata === "object" ? latest.metadata : {};
-                  const frontmatter = { ...(latestMetadata.frontmatter && typeof latestMetadata.frontmatter === "object" ? latestMetadata.frontmatter : {}) };
+                  const latest = parseJsonRecord(latestRaw);
+                  const latestMetadata = isJsonObject(latest.metadata) ? latest.metadata : {};
+                  const frontmatter: Record<string, unknown> = { ...(isJsonObject(latestMetadata.frontmatter) ? latestMetadata.frontmatter : {}) };
                   if (valueInput.trim() === "__DELETE__") {
                     delete frontmatter[key];
                   } else {
                     try {
-                      frontmatter[key] = JSON.parse(valueInput);
+                      frontmatter[key] = parseUnknownJson(valueInput);
                     } catch {
                       frontmatter[key] = valueInput;
                     }
@@ -2851,16 +2956,16 @@ export default class BetterCanvasFeatures {
     const selection = this.selected();
     if (!selection) return;
     const s = this.settings();
-    const choices = (s.providerProfiles as ProviderProfile[]).map(profile => profile.id + " — " + profile.name).join("\n");
+    const choices = s.providerProfiles.map(profile => profile.id + " — " + profile.name).join("\n");
     this.input(t("Set node AI provider", "设置节点 AI 供应商"), choices + t("\n\nEnter a profile id", "\n\n输入 profile id"), value => {
-      const profile = (s.providerProfiles as ProviderProfile[]).find(item => item.id === value.trim());
+      const profile = s.providerProfiles.find(item => item.id === value.trim());
       if (!profile) return new Notice(t("No matching profile id.", "没有匹配的 profile id。"));
       patchNode(selection.canvas, selection.node.id, {
         bcAIProvider: profile.id,
         ...(isLocalAgentBackend(selection.node.bcAIProvider) ? { bcAIModel: undefined } : {})
       });
       new Notice(t("Node provider set to " + profile.name, "节点供应商已设置为 " + profile.name));
-    }, String((selection.node as any).bcAIProvider ?? s.activeProviderId));
+    }, typeof selection.node.bcAIProvider === "string" ? selection.node.bcAIProvider : s.activeProviderId);
   }
 
   private chooseModel(node: CanvasNodeData, onChoose: (model: string) => void): void {
@@ -2913,7 +3018,7 @@ export default class BetterCanvasFeatures {
     );
   }
 
-  private async runLocalCodexForNode(canvas: any, originalNode: CanvasNodeData, instruction: string): Promise<void> {
+  private async runLocalCodexForNode(canvas: CanvasRuntime, originalNode: CanvasNodeData, instruction: string): Promise<void> {
     if (!Platform.isDesktopApp) {
       new Notice(t("The local Codex CLI is only supported in the Obsidian desktop app.", "本地 Codex CLI 仅支持 Obsidian 桌面版。"));
       return;
@@ -2975,12 +3080,12 @@ export default class BetterCanvasFeatures {
           height: Math.max(180, Math.min(500, Math.ceil(answer.length / 42) * 24))
         }
       );
-      (responseNode as any).bcGenerated = true;
-      (responseNode as any).bcSourceNode = source.id;
-      (responseNode as any).bcPrompt = instruction;
-      (responseNode as any).bcAIProvider = "codex-cli";
-      (responseNode as any).bcAIModel = codexConfig.model || "configured-local-codex";
-      (responseNode as any).bcLocalCLI = true;
+      (responseNode).bcGenerated = true;
+      (responseNode).bcSourceNode = source.id;
+      (responseNode).bcPrompt = instruction;
+      (responseNode).bcAIProvider = "codex-cli";
+      (responseNode).bcAIModel = codexConfig.model || "configured-local-codex";
+      (responseNode).bcLocalCLI = true;
       insertCanvasNode(canvas, responseNode, source.id);
 
       notice.hide();
@@ -3009,13 +3114,20 @@ export default class BetterCanvasFeatures {
       new Notice(t("This Canvas is in read-only mode. Turn off read-only mode first.", "当前 Canvas 处于只读模式，请先解除只读模式。"));
       return;
     }
-    const folders = this.p.app.vault.getAllLoadedFiles().filter((file: any) => file instanceof TFolder) as TFolder[];
+    const folders = this.p.app.vault.getAllLoadedFiles().filter((file): file is TFolder => file instanceof TFolder);
     if (!folders.length) {
       new Notice(t("No folders are available in this vault.", "当前 Vault 中没有可选文件夹。"));
       return;
     }
 
-    const plugin = this;
+    const chooseFolder = (folder: TFolder): void => {
+      const provider = this.currentProvider();
+      this.input(
+        t("Batch run folder prompt", "批量运行文件夹 Prompt"),
+        t("Task instructions. Up to 20 Markdown files are processed; file contents are sent to the current provider “" + provider.name + "”.", "任务说明。最多处理 20 篇 Markdown；文件正文将发送给当前供应商“" + provider.name + "”。"),
+        prompt => void this.processPromptFolder(folder, prompt)
+      );
+    };
     class FolderPicker extends SuggestModal<TFolder> {
       getSuggestions(query: string): TFolder[] {
         const needle = query.trim().toLocaleLowerCase();
@@ -3024,16 +3136,11 @@ export default class BetterCanvasFeatures {
           folder.name.toLocaleLowerCase().includes(needle)).slice(0, 200);
       }
       renderSuggestion(folder: TFolder, element: HTMLElement): void {
-        element.createEl("div", { text: folder.name || "/" });
+        element.createDiv({ text: folder.name || "/" });
         element.createEl("small", { text: folder.path || "/" });
       }
       onChooseSuggestion(folder: TFolder): void {
-        const provider = plugin.currentProvider();
-        plugin.input(
-          t("Batch run folder prompt", "批量运行文件夹 Prompt"),
-          t("Task instructions. Up to 20 Markdown files are processed; file contents are sent to the current provider “" + provider.name + "”.", "任务说明。最多处理 20 篇 Markdown；文件正文将发送给当前供应商“" + provider.name + "”。"),
-          prompt => void plugin.processPromptFolder(folder, prompt)
-        );
+        chooseFolder(folder);
       }
     }
     new FolderPicker(this.p.app).open();
@@ -3073,8 +3180,8 @@ export default class BetterCanvasFeatures {
       t("Folder batch task\n", "文件夹批量任务\n") + folder.path + t("\n\nPrompt: ", "\n\nPrompt： ") + instruction,
       x, y, { width: 360, height: 180 }
     );
-    (root as any).bcBatchFolder = folder.path;
-    (root as any).bcBatchPrompt = instruction;
+    (root).bcBatchFolder = folder.path;
+    (root).bcBatchPrompt = instruction;
     insertCanvasNode(canvas, root, selected?.node.id);
 
     const profile = this.currentProvider();
@@ -3124,12 +3231,12 @@ export default class BetterCanvasFeatures {
           width: 340,
           height: Math.max(160, Math.min(420, Math.ceil(answer.length / 44) * 24))
         });
-        (result as any).bcGenerated = generationSucceeded;
-        (result as any).bcPrompt = instruction;
-        (result as any).bcSourceNode = source.id;
-        (result as any).bcSourcePath = file.path;
-        (result as any).bcAIProvider = isLocalAgentBackend(settings.backend) ? settings.backend : profile.id;
-        (result as any).bcAIModel = settings.model;
+        (result).bcGenerated = generationSucceeded;
+        (result).bcPrompt = instruction;
+        (result).bcSourceNode = source.id;
+        (result).bcSourcePath = file.path;
+        (result).bcAIProvider = isLocalAgentBackend(settings.backend) ? settings.backend : profile.id;
+        (result).bcAIModel = settings.model;
         insertCanvasNode(canvas, result, source.id);
 
         notice.setMessage(t("Processing folder: " + folder.path + " (" + (index + 1) + " / " + files.length + ")", "正在处理文件夹：" + folder.path + "（" + (index + 1) + " / " + files.length + "）"));
@@ -3142,7 +3249,7 @@ export default class BetterCanvasFeatures {
       "。最多处理 20 篇 Markdown，内容已发送给供应商“" + profile.name + "”。"));
   }
 
-  private aiContextNodes(canvas: any, rootIds: string | readonly string[]): CanvasNodeData[] {
+  private aiContextNodes(canvas: CanvasRuntime, rootIds: string | readonly string[]): CanvasNodeData[] {
     const data = readCanvasData(canvas);
     const roots = new Set(typeof rootIds === "string" ? [rootIds] : rootIds);
     const records = new Map(data.nodes.map(node => [node.id, node]));
@@ -3155,7 +3262,7 @@ export default class BetterCanvasFeatures {
     return [...connected].flatMap(id => records.has(id) ? [records.get(id)!] : []);
   }
 
-  private async getNodeContext(canvas: any, rootIds: string | readonly string[]): Promise<string> {
+  private async getNodeContext(canvas: CanvasRuntime, rootIds: string | readonly string[]): Promise<string> {
     const roots = new Set(typeof rootIds === "string" ? [rootIds] : rootIds);
     const sections: string[] = [];
     for (const node of this.aiContextNodes(canvas, rootIds)) {
@@ -3166,7 +3273,7 @@ export default class BetterCanvasFeatures {
           try { body = await this.p.app.vault.cachedRead(file); } catch { /* retain file path */ }
         } else if (file instanceof TFile && file.extension.toLowerCase() === "pdf") {
           try {
-            const pages = await extractPdfPages(this.p.app, file, (node as any).subpath, 3, false);
+            const pages = await extractPdfPages(this.p.app, file, typeof node.subpath === "string" ? node.subpath : undefined, 3, false);
             body = "[PDF: " + file.path + "]\n" + pages.map(page =>
               "Page " + page.pageNumber + ":\n" + (page.text || t("(No extractable text on this page; try a vision-capable model to view the page image.)", "(此页没有可提取的文本；可尝试让支持视觉的模型查看页面图像。)"))
             ).join("\n\n");
@@ -3181,7 +3288,7 @@ export default class BetterCanvasFeatures {
     return sections.join("\n\n--- Connected node ---\n\n").slice(0, 14000);
   }
 
-  private async getConnectedImages(canvas: any, rootIds: string | readonly string[]): Promise<Array<{ type: "image_url"; image_url: { url: string; detail: "auto" } }>> {
+  private async getConnectedImages(canvas: CanvasRuntime, rootIds: string | readonly string[]): Promise<Array<{ type: "image_url"; image_url: { url: string; detail: "auto" } }>> {
     const images: Array<{ type: "image_url"; image_url: { url: string; detail: "auto" } }> = [];
     for (const node of this.aiContextNodes(canvas, rootIds)) {
       if (node.type !== "file" || !node.file) continue;
@@ -3190,7 +3297,7 @@ export default class BetterCanvasFeatures {
       const ext = file.extension.toLowerCase();
       if (ext === "pdf") {
         try {
-          const pages = await extractPdfPages(this.p.app, file, (node as any).subpath, 1, true);
+          const pages = await extractPdfPages(this.p.app, file, typeof node.subpath === "string" ? node.subpath : undefined, 1, true);
           for (const page of pages) {
             if (page.imageDataUrl) images.push({ type: "image_url", image_url: { url: page.imageDataUrl, detail: "auto" } });
             if (images.length >= 4) break;
@@ -3221,12 +3328,14 @@ export default class BetterCanvasFeatures {
     return images;
   }
 
-  private parseJsonPayload<T>(raw: string): T {
+  private parseJsonPayload(raw: string): Record<string, unknown> {
     const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
     if (start < 0 || end <= start) throw new Error(t("AI did not return valid JSON.", "AI 没有返回有效 JSON。"));
-    return JSON.parse(cleaned.slice(start, end + 1)) as T;
+    const parsed: unknown = parseUnknownJson(cleaned.slice(start, end + 1));
+    if (!isJsonObject(parsed)) throw new Error(t("AI did not return a JSON object.", "AI 没有返回 JSON 对象。"));
+    return parsed;
   }
 
   private async testProvider(): Promise<void> {
@@ -3258,7 +3367,7 @@ export default class BetterCanvasFeatures {
         context += "\n\nGroup contents:\n" + contained.map((child: CanvasNodeData) => String(child.text ?? child.file ?? child.url ?? child.type)).join("\n").slice(0, 6000);
       }
       const raw = await this.completeStructured(t("Generate a short, specific English title from the Canvas content below. Return only JSON: {\"title\":\"...\"}. Use 4 to 24 characters or a phrase of suitable length; no quotes or numbering.\n\n", "根据以下 Canvas 内容生成一个简短、具体的中文标题。只返回 JSON：{\"title\":\"...\"}。标题 4 至 24 个汉字或适当长度的短语；不要带引号和序号。\n\n") + context, node);
-      const parsed = this.parseJsonPayload<{title?: string}>(raw);
+      const parsed = this.parseJsonPayload(raw);
       const title = typeof parsed.title === "string" ? parsed.title.trim().replace(/^["“”]+|["“”]+$/g, "") : "";
       if (!title) throw new Error(t("AI did not return a valid title.", "AI 没有返回有效标题。"));
       if (node.type === "group") {
@@ -3287,9 +3396,9 @@ export default class BetterCanvasFeatures {
         t("Generate 5 distinct follow-up research questions from the notes below. Return only JSON: {\"questions\":[\"Question 1\",\"Question 2\"]}. Each question must be under 100 characters; do not answer them and do not repeat.\n\n", "根据以下笔记生成 5 个有差异的后续研究问题，只返回 JSON：{\"questions\":[\"问题 1\",\"问题 2\"]}。每个问题不超过 100 字；不要回答问题，不要重复。\n\n") + context,
         selected.node
       );
-      const parsed = this.parseJsonPayload<{questions?: string[]}>(raw);
+      const parsed = this.parseJsonPayload(raw);
       const questions = Array.isArray(parsed.questions)
-        ? [...new Set(parsed.questions.filter(question => typeof question === "string").map(question => question.trim()).filter(Boolean))].slice(0, 8)
+        ? [...new Set(parsed.questions.filter((question): question is string => typeof question === "string").map(question => question.trim()).filter(Boolean))].slice(0, 8)
         : [];
       if (!questions.length) throw new Error(t("AI did not return a valid question list.", "AI 没有返回有效的问题列表。"));
       for (let i = 0; i < questions.length; i++) {
@@ -3313,7 +3422,7 @@ export default class BetterCanvasFeatures {
     ]);
   }
 
-  private async expandIdeaIntoMindMap(): Promise<void> {
+  private expandIdeaIntoMindMap(): void {
     const canvas = this.canvas();
     if (!canvas) { new Notice(t("Open a Canvas first.", "请先打开一个 Canvas。")); return; }
     const selected = this.selected(canvas);
@@ -3327,10 +3436,13 @@ export default class BetterCanvasFeatures {
           t("mark uncertain information and never invent sources. Topic: ", "不确定的信息需标明，不得编造来源。主题：") + idea + (context ? t("\nExisting Canvas context:\n", "\n现有 Canvas 上下文：\n") + context : "") ,
           selected?.node
         );
-        const parsed = this.parseJsonPayload<{nodes?: Array<{id?: string; parentId?: string | null; text?: string}>}>(raw);
-        const items = Array.isArray(parsed.nodes) ? parsed.nodes.slice(0, 24) : [];
+        const parsed = this.parseJsonPayload(raw);
+        const items = Array.isArray(parsed.nodes) ? parsed.nodes.filter(isJsonObject).slice(0, 24) : [];
         if (!items.length) throw new Error(t("AI returned an empty nodes array.", "AI 返回的 nodes 为空。"));
-        const validItems = items.filter(item => typeof item.text === "string" && item.text.trim());
+        const validItems = items.filter((item): item is Record<string, unknown> & { text: string; id?: string | number | boolean; parentId?: string | number | boolean | null } =>
+          typeof item.text === "string" && Boolean(item.text.trim()) &&
+          (item.id === undefined || typeof item.id === "string" || typeof item.id === "number" || typeof item.id === "boolean") &&
+          (item.parentId == null || typeof item.parentId === "string" || typeof item.parentId === "number" || typeof item.parentId === "boolean"));
         if (!validItems.length) throw new Error(t("AI did not provide valid node text.", "AI 没有提供有效的节点文本。"));
         const idMap = new Map<string, CanvasNodeData>();
         const fallbackRoot = selected?.node;
@@ -3418,9 +3530,9 @@ export default class BetterCanvasFeatures {
         t("Questions must prompt active recall; answers must be concise and verifiable; do not add facts that are not in the material. Material:\n", "问题要能主动回忆，答案简洁可验证；不要补充资料中没有的事实。资料：\n") + context,
         selected.node
       );
-      const parsed = this.parseJsonPayload<{cards?: Array<{question?: string; answer?: string}>}>(raw);
-      const cards = Array.isArray(parsed.cards) ? parsed.cards.slice(0, 12).filter(card =>
-        typeof card.question === "string" && Boolean(card.question.trim()) &&
+      const parsed = this.parseJsonPayload(raw);
+      const cards = Array.isArray(parsed.cards) ? parsed.cards.slice(0, 12).filter((card): card is { question: string; answer: string } =>
+        isJsonObject(card) && typeof card.question === "string" && Boolean(card.question.trim()) &&
         typeof card.answer === "string" && Boolean(card.answer.trim())) : [];
       if (!cards.length) throw new Error(t("AI did not return valid review flashcards.", "AI 未返回有效的复习闪卡。"));
       const fresh = this.aiSelection(selected);
@@ -3436,7 +3548,7 @@ export default class BetterCanvasFeatures {
       const position = this.aiOutputPosition(fresh.nodes);
       for (let i = 0; i < cards.length; i++) {
         const card = cards[i];
-        const text = t("Question: ", "问题：") + card.question!.trim() + t("\n\nAnswer: ", "\n\n答案：") + card.answer!.trim();
+        const text = t("Question: ", "问题：") + card.question.trim() + t("\n\nAnswer: ", "\n\n答案：") + card.answer.trim();
         const node = makeTextNode(text, position.x,
           position.y + i * 180, { width: 330, height: 150 });
         insertCanvasNode(selected.canvas, node, selected.nodeIds);
@@ -3458,6 +3570,10 @@ export default class BetterCanvasFeatures {
     nativeVideoUrl?: string,
     canvas = this.canvas()
   ): Promise<void> {
+    if (!canvas) {
+      new Notice(t("Open a Canvas first.", "请先打开一个 Canvas。"));
+      return;
+    }
     const selection = this.aiSelection({ canvas, nodeIds: typeof rootIds === "string" ? [rootIds] : rootIds });
     if (!selection) return;
     const { node: source, nodeIds } = selection;
@@ -3600,14 +3716,13 @@ export default class BetterCanvasFeatures {
   private async regenerate(): Promise<void> {
     const selection = this.selected();
     if (!selection) return;
-    const node = selection.node as any;
+    const node = selection.node;
     if (!node.bcGenerated || typeof node.bcSourceNode !== "string" || typeof node.bcPrompt !== "string") {
       new Notice(t("The selected node has no AI metadata to regenerate from.", "所选节点没有可重新生成的 AI 元数据。"));
       return;
     }
-    const sourceIds = Array.isArray(node.bcSourceNodes) && node.bcSourceNodes.length &&
-      node.bcSourceNodes.every((id: unknown) => typeof id === "string")
-      ? node.bcSourceNodes as string[] : [node.bcSourceNode];
+    const sourceIds = isStringArray(node.bcSourceNodes) && node.bcSourceNodes.length
+      ? node.bcSourceNodes : [node.bcSourceNode];
     const modelOverride = !isLocalAgentBackend(node.bcAIProvider) && typeof node.bcAIModel === "string" ? node.bcAIModel : undefined;
     await this.runAI(sourceIds, node.bcPrompt, modelOverride,
       node.id, undefined, selection.canvas);
@@ -3644,7 +3759,7 @@ export default class BetterCanvasFeatures {
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
       const path = folder + "/better-canvas-" + stamp + "." + result.extension;
       const bytes = result.bytes.slice();
-      await this.p.app.vault.createBinary(path, bytes.buffer as ArrayBuffer);
+      await this.p.app.vault.createBinary(path, bytes.buffer);
       const position = this.aiOutputPosition(fresh.nodes);
       const imageNode: CanvasNodeData = {
         id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
@@ -3715,7 +3830,7 @@ export default class BetterCanvasFeatures {
     }
   }
 
-  private mcpOutputContext(): { canvas: any; source?: CanvasNodeData } | null {
+  private mcpOutputContext(): { canvas: CanvasRuntime; source?: CanvasNodeData } | null {
     const canvas = this.canvas();
     if (!canvas) {
       new Notice(t("Open a Canvas first, then add the MCP result as a node.", "请先打开一个 Canvas，再将 MCP 结果添加为节点。"));
@@ -3935,13 +4050,13 @@ export default class BetterCanvasFeatures {
         t("\n\nAvailable tools:\n", "\n\n可用工具：\n") + JSON.stringify(menu),
         selection.node
       );
-      const proposal = this.parseJsonPayload<{toolName?: string; arguments?: Record<string, unknown>; reason?: string}>(raw);
+      const proposal = this.parseJsonPayload(raw);
       if (!proposal.toolName || typeof proposal.toolName !== "string") {
-        throw new Error(String(proposal.reason || t("AI did not choose an MCP tool.", "AI 没有选择 MCP 工具。")));
+        throw new Error(typeof proposal.reason === "string" && proposal.reason ? proposal.reason : t("AI did not choose an MCP tool.", "AI 没有选择 MCP 工具。"));
       }
       const tool = tools.find(item => item.name === proposal.toolName);
       if (!tool) throw new Error(t("The tool name returned by AI is not in the MCP tool list.", "AI 返回的工具名称不在 MCP 工具列表中。"));
-      if (!proposal.arguments || typeof proposal.arguments !== "object" || Array.isArray(proposal.arguments)) {
+      if (!isJsonObject(proposal.arguments)) {
         throw new Error(t("The tool arguments returned by AI are not a JSON object.", "AI 返回的工具参数不是 JSON object。"));
       }
       loading.hide();
@@ -3949,7 +4064,7 @@ export default class BetterCanvasFeatures {
       const suggested = {
         toolName: tool.name,
         arguments: proposal.arguments,
-        reason: String(proposal.reason ?? "")
+        reason: typeof proposal.reason === "string" ? proposal.reason : ""
       };
       const toolNames = tools.map(item => item.name);
       this.input(
@@ -4000,7 +4115,24 @@ export default class BetterCanvasFeatures {
     );
     if (!canvasFiles.length) { new Notice(t("No other Canvas files are available in the vault.", "Vault 中没有可用的其他 Canvas 文件。")); return; }
 
-    const thisManager = this;
+    const chooseCanvasFile = (file: TFile): void => {
+      const x = selection ? selection.node.x + selection.node.width + 100 : 0;
+      const y = selection ? selection.node.y : 0;
+      const node: CanvasNodeData = {
+        id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
+        type: "file",
+        file: file.path,
+        portal: true,
+        x,
+        y,
+        width: 360,
+        height: 260
+      };
+      insertCanvasNode(canvas, node, selection?.node.id);
+      const view = this.activeCanvasView();
+      if (view) void this.portalManager?.refreshView(view, true);
+      new Notice(t("Created and opened an editable Canvas Portal. Verify that the child Canvas content stays in sync.", "已创建并打开可编辑 Canvas Portal。请确认子画布内容同步正常。"));
+    };
     const ModalClass = class extends SuggestModal<TFile> {
       getSuggestions(query: string): TFile[] {
         const needle = query.trim().toLocaleLowerCase();
@@ -4009,26 +4141,11 @@ export default class BetterCanvasFeatures {
           .slice(0, 100);
       }
       renderSuggestion(file: TFile, element: HTMLElement): void {
-        element.createEl("div", { text: file.basename });
+        element.createDiv({ text: file.basename });
         element.createEl("small", { text: file.path });
       }
       onChooseSuggestion(file: TFile): void {
-        const x = selection ? selection.node.x + selection.node.width + 100 : 0;
-        const y = selection ? selection.node.y : 0;
-        const node: CanvasNodeData = {
-          id: Math.random().toString(16).slice(2, 18).padEnd(16, "0").slice(0, 16),
-          type: "file",
-          file: file.path,
-          portal: true,
-          x,
-          y,
-          width: 360,
-          height: 260
-        };
-        insertCanvasNode(canvas, node, selection?.node.id);
-        const view = thisManager.activeCanvasView();
-        if (view) void thisManager.portalManager?.refreshView(view, true);
-        new Notice(t("Created and opened an editable Canvas Portal. Verify that the child Canvas content stays in sync.", "已创建并打开可编辑 Canvas Portal。请确认子画布内容同步正常。"));
+        chooseCanvasFile(file);
       }
     };
     new ModalClass(this.p.app).open();
@@ -4103,7 +4220,7 @@ export default class BetterCanvasFeatures {
   }
 
   private async runPdfPageOcrRange(
-    canvas: any,
+    canvas: CanvasRuntime,
     sourceNode: CanvasNodeData,
     file: TFile,
     pages: number[]
@@ -4130,7 +4247,7 @@ export default class BetterCanvasFeatures {
         latestSource.y,
         { width: 380, height: 190 }
       );
-      (task as any).bcPdfOcrBatch = { source: file.path, pages, state: "running" };
+      (task).bcPdfOcrBatch = { source: file.path, pages, state: "running" };
       insertCanvasNode(canvas, task, latestSource.id);
 
       const pageNodes: Array<{ node: CanvasNodeData; page: number }> = [];
@@ -4163,7 +4280,7 @@ export default class BetterCanvasFeatures {
           t("For PDF file “", "请对 PDF 文件“") + file.path + t("”, run OCR transcription on page ", "”的第 ") + item.page +
           t(" instead of summarizing. Extract all visible text on this page line by line, preserving headings, paragraphs, bullets, tables, and formulas where possible, in Markdown. Mark unclear characters as [unclear] and do not guess invisible content. Transcribe only this page, not other pages.", " 页执行 OCR 转录，而不是总结。逐行提取该页所有可见文字，尽量保留标题、段落、项目符号、表格和公式结构，使用 Markdown。将无法确定的字符标成 [不清晰]，不要猜测不可见内容。只转录当前页，不要转录其他页。")
         );
-        const currentNodes = readCanvasData(canvas).nodes as any[];
+        const currentNodes = readCanvasData(canvas).nodes;
         const output = currentNodes.find(candidate =>
           candidate.bcSourceNode === item.node.id && candidate.bcGenerated === true
         );
@@ -4258,16 +4375,16 @@ export default class BetterCanvasFeatures {
     }, "10");
   }
 
-  private syncAutoEdges(canvas: any, canvasFile: TFile): void {
+  private syncAutoEdges(canvas: CanvasRuntime, canvasFile: TFile): void {
     if (canvas?.wrapperEl?.classList?.contains("bc-readonly")) return;
     const s = this.settings();
     if (!s.autoFileNodeEdgesEnabled) return;
     const data = readCanvasData(canvas);
     const prefix = "bc-auto-";
-    const keep = data.edges.filter((edge: any) => !String(edge.id).startsWith(prefix));
-    const fileNodes = data.nodes.filter((node: CanvasNodeData) =>
+    const keep = data.edges.filter((edge: CanvasEdgeData) => !String(edge.id).startsWith(prefix));
+    const fileNodes = data.nodes.filter((node): node is CanvasNodeData & { file: string } =>
       node.type === "file" && typeof node.file === "string"
-    ) as Array<CanvasNodeData & { file: string }>;
+    );
     const generated = buildAutoFileNodeEdges(
       fileNodes.map(node => ({ id: node.id, file: node.file })),
       filePath => {
@@ -4287,7 +4404,7 @@ export default class BetterCanvasFeatures {
   private refreshAutoEdges(): void {
     if (!this.settings().autoFileNodeEdgesEnabled) return;
     for (const leaf of this.p.app.workspace.getLeavesOfType("canvas")) {
-      const view = leaf.view as any;
+      const view = isCanvasViewRuntime(leaf.view) ? leaf.view : null
       if (view?.canvas && view?.file) this.syncAutoEdges(view.canvas, view.file);
     }
   }
@@ -4306,17 +4423,19 @@ export default class BetterCanvasFeatures {
       const file = this.p.app.metadataCache.getFirstLinkpathDest(decodeURIComponent(match[1]), context.sourcePath);
       if (!(file instanceof TFile) || file.extension !== "canvas") continue;
       try {
-        const json = JSON.parse(await this.p.app.vault.cachedRead(file));
-        const node = (json.nodes ?? []).find((item: CanvasNodeData) => item.id === decodeURIComponent(match[2]));
+        const json = parseUnknownJson(await this.p.app.vault.cachedRead(file));
+        const node = isCanvasData(json) ? json.nodes.find(item => item.id === decodeURIComponent(match[2])) : undefined;
         if (!node) continue;
         const body = String(node.text ?? node.file ?? node.url ?? "");
         if (item.classList.contains("internal-embed")) {
-          const preview = document.createElement("div");
+          const preview = item.ownerDocument.win.createDiv();
           preview.className = "better-canvas-node-embed";
           preview.dataset.source = file.path + "#" + node.id;
           item.replaceWith(preview);
           if (node.type === "text") {
-            await MarkdownRenderer.renderMarkdown(body, preview, context.sourcePath, this.p);
+            const renderChild = new MarkdownRenderChild(preview);
+            context.addChild(renderChild);
+            await MarkdownRenderer.render(this.p.app, body, preview, context.sourcePath, renderChild);
           } else if (node.type === "link" && typeof node.url === "string") {
             try {
               const url = new URL(node.url);
@@ -4338,7 +4457,9 @@ export default class BetterCanvasFeatures {
               const ext = embeddedFile.extension.toLowerCase();
               if (ext === "md" || ext === "markdown") {
                 const markdown = await this.p.app.vault.cachedRead(embeddedFile);
-                await MarkdownRenderer.renderMarkdown(markdown, preview, embeddedFile.path, this.p);
+                const renderChild = new MarkdownRenderChild(preview);
+                context.addChild(renderChild);
+                await MarkdownRenderer.render(this.p.app, markdown, preview, embeddedFile.path, renderChild);
               } else if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(ext)) {
                 const image = preview.createEl("img", {
                   attr: { src: this.p.app.vault.getResourcePath(embeddedFile), alt: embeddedFile.basename, loading: "lazy" }
@@ -4346,7 +4467,7 @@ export default class BetterCanvasFeatures {
                 image.classList.add("bc-media-embed-image");
               } else if (["mp3", "wav", "m4a", "ogg", "flac", "mp4", "webm", "mov"].includes(ext)) {
                 const isVideo = ["mp4", "webm", "mov"].includes(ext);
-                const media = document.createElement(isVideo ? "video" : "audio");
+                const media = preview.ownerDocument.win.createEl(isVideo ? "video" : "audio");
                 media.controls = true;
                 media.preload = "none";
                 media.src = this.p.app.vault.getResourcePath(embeddedFile);
@@ -4361,7 +4482,7 @@ export default class BetterCanvasFeatures {
               }
             }
           } else {
-            preview.createEl("p", { text: String(node.label ?? body) });
+            preview.createEl("p", { text: typeof node.label === "string" ? node.label : body });
           }
         } else {
           item.textContent = body.split("\n")[0] || file.basename;

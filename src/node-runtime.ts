@@ -1,11 +1,24 @@
 import { t } from "./i18n";
+import type * as ChildProcess from "node:child_process";
+import type * as Os from "node:os";
+import type * as Process from "node:process";
+import type * as Fs from "node:fs";
+import type * as Path from "node:path";
 
 export interface NodeRuntimeModules {
-  childProcess: any;
-  os: any;
-  process: any;
-  fs?: any;
-  path?: any;
+  childProcess: typeof ChildProcess;
+  os: typeof Os;
+  process: typeof Process;
+  fs: typeof Fs;
+  path: typeof Path;
+}
+
+interface RendererModules {
+  child_process: NodeRuntimeModules["childProcess"];
+  os: NodeRuntimeModules["os"];
+  process: NodeRuntimeModules["process"];
+  fs: NodeRuntimeModules["fs"];
+  path: NodeRuntimeModules["path"];
 }
 
 /**
@@ -14,22 +27,26 @@ export interface NodeRuntimeModules {
  * dynamic-import fallback is retained only for Node-based unit tests.
  */
 export async function loadNodeRuntimeModules(): Promise<NodeRuntimeModules> {
-  const host = globalThis as any;
-  const rendererWindow = host.window;
+  const rendererWindow = typeof window === "undefined" ? undefined : window;
   if (rendererWindow) {
-    const requireModule = rendererWindow.require;
-    if (typeof requireModule !== "function") {
+    const bridge: unknown = "require" in rendererWindow ? rendererWindow.require : undefined;
+    if (typeof bridge !== "function") {
       throw new Error(
         t("This Obsidian renderer cannot access local Node.js child process modules. Use MCP Streamable HTTP or SSE, or update to an Obsidian desktop version that provides the CommonJS bridge.", "当前 Obsidian 渲染环境无法访问本机 Node.js 子进程模块。请使用 MCP Streamable HTTP 或 SSE，或更新到提供 CommonJS 桥接的 Obsidian 桌面版本。")
       );
     }
+    // Electron's CommonJS bridge resolves these five builtins with their Node types.
+    const requireModule = <Name extends keyof RendererModules>(name: Name): RendererModules[Name] => {
+      const loaded: unknown = Reflect.apply(bridge, rendererWindow, [name]);
+      return loaded as RendererModules[Name];
+    };
     try {
       return {
-        childProcess: requireModule.call(rendererWindow, "child_process"),
-        os: requireModule.call(rendererWindow, "os"),
-        process: requireModule.call(rendererWindow, "process"),
-        fs: requireModule.call(rendererWindow, "fs"),
-        path: requireModule.call(rendererWindow, "path")
+        childProcess: requireModule("child_process"),
+        os: requireModule("os"),
+        process: requireModule("process"),
+        fs: requireModule("fs"),
+        path: requireModule("path")
       };
     } catch (error) {
       throw new Error(

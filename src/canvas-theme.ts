@@ -1,5 +1,6 @@
 import { t } from "./i18n";
 import { readCanvasData, type CanvasData, type CanvasNodeData, type CanvasEdgeData } from "./canvas";
+import type { CanvasRuntime } from "./canvas-runtime";
 import { clearSketchCanvas, decorateSketchCanvas } from "./sketch-renderer";
 import { clearSoftNotesNode, decorateSoftNotesNode } from "./soft-notes-style";
 import { clearResearchNode, decorateResearchNode } from "./research-style";
@@ -63,7 +64,7 @@ function historySignature(data: unknown): string | undefined {
 }
 
 /** Native importData updates nodes/edges only; the Canvas owns top-level data. */
-export function recordCanvasStyleHistory(canvas: any, data: CanvasData): void {
+export function recordCanvasStyleHistory(canvas: CanvasRuntime, data: CanvasData): void {
   canvas.requestPushHistory?.cancel?.();
   const current = canvas.history?.data?.[canvas.history.current];
   if (!current || historySignature(current) !== historySignature(data)) canvas.pushHistory?.(data);
@@ -87,22 +88,22 @@ function autoResizeHistoryInputs(node: CanvasNodeData): string | undefined {
  * Merge only derived layout when history still describes its content/style
  * inputs. Pending user edits keep their own undo boundary and scheduled save.
  */
-export function mergeAutoResizeIntoCurrentHistory(canvas: any, nodeId: string): boolean {
+export function mergeAutoResizeIntoCurrentHistory(canvas: CanvasRuntime, nodeId: string): boolean {
   const history = canvas?.history;
-  const current = history?.data?.[history.current] as CanvasData | undefined;
+  const current = history?.data?.[history.current];
   const live = readCanvasData(canvas);
   const node = live.nodes.find(item => item.id === nodeId);
   const stored = current?.nodes?.find(item => item.id === nodeId);
-  if (!current || !node || !stored || node.type !== "text" || node.bcAutoResize !== true) return false;
+  if (!history || !current || !node || !stored || node.type !== "text" || node.bcAutoResize !== true) return false;
   if (resolveCanvasTheme(current) !== resolveCanvasTheme(live)) return false;
   if (autoResizeHistoryInputs(node) !== autoResizeHistoryInputs(stored)) return false;
-  const attributes = node.styleAttributes as Record<string, unknown>;
+  const attributes = node.styleAttributes;
   const next = {
     ...stored,
     width: node.width,
     height: node.height,
     bcTextAlign: node.bcTextAlign,
-    styleAttributes: { ...stored.styleAttributes as Record<string, unknown>, textAlign: attributes?.textAlign }
+    styleAttributes: { ...stored.styleAttributes, textAlign: attributes?.textAlign }
   };
   history.data[history.current] = {
     ...current,
@@ -112,11 +113,11 @@ export function mergeAutoResizeIntoCurrentHistory(canvas: any, nodeId: string): 
 }
 
 /** Merge re-docking caused by automatic layout without creating an undo step. */
-export function mergeFloatingSidesIntoCurrentHistory(canvas: any, beforeEdges: CanvasEdgeData[]): boolean {
+export function mergeFloatingSidesIntoCurrentHistory(canvas: CanvasRuntime, beforeEdges: CanvasEdgeData[]): boolean {
   const history = canvas?.history;
-  const current = history?.data?.[history.current] as CanvasData | undefined;
+  const current = history?.data?.[history.current];
   const live = readCanvasData(canvas);
-  if (!current || resolveCanvasTheme(current) !== resolveCanvasTheme(live)) return false;
+  if (!history || !current || resolveCanvasTheme(current) !== resolveCanvasTheme(live)) return false;
   const beforeById = new Map(beforeEdges.map(edge => [edge.id, edge]));
   const liveById = new Map(live.edges.map(edge => [edge.id, edge]));
   const liveNodes = new Map(live.nodes.map(node => [node.id, node]));
@@ -150,7 +151,7 @@ export function mergeFloatingSidesIntoCurrentHistory(canvas: any, beforeEdges: C
   return changed;
 }
 
-export function setCanvasTheme(canvas: any, theme: CanvasThemeId): boolean {
+export function setCanvasTheme(canvas: CanvasRuntime, theme: CanvasThemeId): boolean {
   if (canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly")) return false;
   const before = readCanvasData(canvas);
   if (resolveCanvasTheme(before) === theme) return false;
@@ -163,7 +164,7 @@ export function setCanvasTheme(canvas: any, theme: CanvasThemeId): boolean {
 }
 
 /** CSS owns the visual treatment; decoration never writes back to the file. */
-export function decorateCanvasTheme(canvas: any): void {
+export function decorateCanvasTheme(canvas: CanvasRuntime): void {
   const data = readCanvasData(canvas);
   const theme = resolveCanvasTheme(data);
   const wrapper = canvas?.wrapperEl;
@@ -185,7 +186,7 @@ export function decorateCanvasTheme(canvas: any): void {
     else clearRoundedMapNode(el);
     if (theme === "scrapbook") {
       el.dataset.bcPaper = item.type === "group" ? "group" : scrapbookPreset(item.bcScrapbookPreset);
-      const attrs = item.styleAttributes as Record<string, unknown> | undefined;
+      const attrs = item.styleAttributes;
       el.dataset.bcPaperBorder = typeof item.bcBorderStyle === "string" || typeof attrs?.border === "string"
         ? "explicit" : "theme";
     } else {

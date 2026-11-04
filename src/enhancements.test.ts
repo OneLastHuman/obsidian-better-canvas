@@ -14,10 +14,20 @@ import {
   toggleGroupCollapse
 } from "./enhancements";
 import type { CanvasData } from "./canvas";
+import type { CanvasRuntime, CanvasSelectionRuntime } from "./canvas-runtime";
 
-function makeCanvas(data: CanvasData, selected: any[] = []): any {
+interface TestCanvas extends CanvasRuntime {
+  data: CanvasData;
+  saved: number;
+  frames: number;
+  getData(): CanvasData;
+  requestSave(...args: unknown[]): void;
+  requestFrame(): void;
+}
+
+function makeCanvas(data: CanvasData, selected: CanvasSelectionRuntime[] = []): TestCanvas {
   return {
-    data: JSON.parse(JSON.stringify(data)),
+    data: structuredClone(data),
     selection: new Set(selected),
     saved: 0,
     frames: 0,
@@ -25,7 +35,7 @@ function makeCanvas(data: CanvasData, selected: any[] = []): any {
       return this.data;
     },
     importData(next: CanvasData) {
-      this.data = JSON.parse(JSON.stringify(next));
+      this.data = structuredClone(next);
     },
     requestSave() {
       this.saved += 1;
@@ -82,14 +92,15 @@ describe("flowchart shape normalization", () => {
 
 describe("selectAllCanvasEdges", () => {
   it("selects every live edge after clearing the prior selection", () => {
-    const selected: any[] = [{ id: "old-selection" }];
+    const selected: CanvasSelectionRuntime[] = [{ id: "old-selection" }];
     const edgeA = { id: "a" };
     const edgeB = { id: "b" };
     let deselected = false;
     const canvas = {
+      ...makeCanvas({ nodes: [], edges: [] }),
       edges: new Map([["a", edgeA], ["b", edgeB]]),
       deselectAll: () => { deselected = true; selected.length = 0; },
-      select: (edge: any) => { selected.push(edge); }
+      select: (edge: CanvasSelectionRuntime) => { selected.push(edge); }
     };
 
     expect(selectAllCanvasEdges(canvas)).toBe(2);
@@ -98,9 +109,14 @@ describe("selectAllCanvasEdges", () => {
   });
 
   it("returns zero without changing selection when no edges can be selected", () => {
-    const canvas = { edges: new Map(), select: () => undefined, deselectAll: () => { throw new Error("should not clear"); } };
+    const canvas = {
+      ...makeCanvas({ nodes: [], edges: [] }),
+      edges: new Map(),
+      select: () => undefined,
+      deselectAll: () => { throw new Error("should not clear"); }
+    };
     expect(selectAllCanvasEdges(canvas)).toBe(0);
-    expect(selectAllCanvasEdges({ edges: new Map() })).toBe(0);
+    expect(selectAllCanvasEdges({ ...makeCanvas({ nodes: [], edges: [] }), edges: new Map() })).toBe(0);
   });
 });
 
@@ -108,11 +124,22 @@ describe("Canvas node decoration", () => {
   it("preserves the native border for nodes with the default border style", () => {
     class FakeHTMLElement {
       dataset: Record<string, string> = {};
-      style: Record<string, string> = {};
+      style = {
+        borderStyle: undefined as string | undefined,
+        textAlign: "",
+        properties: new Map<string, string>(),
+        getPropertyValue(key: string): string { return this.properties.get(key) ?? ""; },
+        setProperty(key: string, value: string): void { this.properties.set(key, value); },
+        removeProperty(key: string): string {
+          const previous = this.properties.get(key) ?? "";
+          this.properties.delete(key);
+          return previous;
+        }
+      };
       setCssStyles(styles: Record<string, string>): void {
         Object.assign(this.style, styles);
       }
-      querySelectorAll(): any[] {
+      querySelectorAll(): HTMLElement[] {
         return [];
       }
     }
@@ -121,11 +148,12 @@ describe("Canvas node decoration", () => {
     try {
       const element = new FakeHTMLElement();
       const canvas = {
+        importData: vi.fn(),
         getData: () => ({
           nodes: [{ id: "a", x: 0, y: 0, width: 100, height: 100, type: "text" }],
           edges: []
         }),
-        nodes: new Map([["a", { nodeEl: element }]]),
+        nodes: new Map([["a", { id: "a", nodeEl: element as unknown as HTMLElement }]]),
         edges: new Map()
       };
 
@@ -175,7 +203,7 @@ describe("floating edge side selection", () => {
       ],
       edges: [{ id: "ab", fromNode: "a", toNode: "b", fromSide: "bottom", toSide: "top", fromFloating: true }]
     });
-    canvas.history = { current: 0, data: [JSON.parse(JSON.stringify(canvas.data))] };
+    canvas.history = { current: 0, data: [structuredClone(canvas.data)] };
     canvas.requestSave = vi.fn();
     vi.stubGlobal("HTMLElement", class {});
     vi.stubGlobal("SVGElement", class {});
@@ -263,7 +291,7 @@ describe("Canvas edge helpers", () => {
   it("moves a node in z-order without altering edge references", () => {
     const canvas = makeCanvas(fixture);
     expect(reorderNode(canvas, "a", true)).toBe(true);
-    expect(canvas.data.nodes.map((node: any) => node.id)).toEqual(["b", "a"]);
+    expect(canvas.data.nodes.map(node => node.id)).toEqual(["b", "a"]);
     expect(canvas.data.edges).toEqual(fixture.edges);
   });
 });
@@ -272,7 +300,7 @@ describe("collapsible Canvas groups", () => {
   it("hides contained nodes and their edges, then restores geometry and boundary edges", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "group", x: 100, y: 50, width: 320, height: 220, type: "group", label: "Research" } as any,
+        { id: "group", x: 100, y: 50, width: 320, height: 220, type: "group", label: "Research" },
         { id: "inside", x: 130, y: 90, width: 110, height: 80, type: "text", text: "Inside" },
         { id: "outside", x: 520, y: 100, width: 110, height: 80, type: "text", text: "Outside" }
       ],
@@ -284,8 +312,8 @@ describe("collapsible Canvas groups", () => {
     const canvas = makeCanvas(data);
 
     expect(toggleGroupCollapse(canvas, "group")).toBe("collapsed");
-    expect(canvas.data.nodes.map((node: any) => node.id)).toEqual(["group", "outside"]);
-    expect(canvas.data.edges.map((edge: any) => edge.id)).toEqual(["group-outside"]);
+    expect(canvas.data.nodes.map(node => node.id)).toEqual(["group", "outside"]);
+    expect(canvas.data.edges.map(edge => edge.id)).toEqual(["group-outside"]);
     expect(canvas.data.nodes[0]).toMatchObject({
       bcCollapsed: true,
       bcCollapsedNodes: [{ id: "inside", x: 30, y: 40 }]
@@ -293,19 +321,19 @@ describe("collapsible Canvas groups", () => {
     expect(canvas.data.nodes[0].bcCollapsedEdges).toEqual([data.edges[0]]);
 
     expect(toggleGroupCollapse(canvas, "group")).toBe("expanded");
-    expect(canvas.data.nodes.find((node: any) => node.id === "inside")).toMatchObject({
+    expect(canvas.data.nodes.find(node => node.id === "inside")).toMatchObject({
       x: 130,
       y: 90,
       text: "Inside"
     });
-    expect(canvas.data.edges.map((edge: any) => edge.id).sort()).toEqual(["group-outside", "inside-outside"]);
-    expect(canvas.data.nodes.find((node: any) => node.id === "group")).not.toHaveProperty("bcCollapsedNodes");
+    expect(canvas.data.edges.map(edge => edge.id).sort()).toEqual(["group-outside", "inside-outside"]);
+    expect(canvas.data.nodes.find(node => node.id === "group")).not.toHaveProperty("bcCollapsedNodes");
   });
 
   it("reports an empty group without changing or saving the Canvas", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "group", x: 0, y: 0, width: 300, height: 220, type: "group", label: "Empty" } as any
+        { id: "group", x: 0, y: 0, width: 300, height: 220, type: "group", label: "Empty" }
       ],
       edges: []
     };
@@ -321,7 +349,7 @@ describe("collapsible Canvas groups", () => {
   it("does not restore a hidden edge after its outside endpoint is deleted", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "group", x: 0, y: 0, width: 300, height: 220, type: "group" } as any,
+        { id: "group", x: 0, y: 0, width: 300, height: 220, type: "group" },
         { id: "inside", x: 30, y: 40, width: 100, height: 80, type: "text", text: "Inside" },
         { id: "outside", x: 500, y: 50, width: 100, height: 80, type: "text", text: "Outside" }
       ],
@@ -332,19 +360,19 @@ describe("collapsible Canvas groups", () => {
     const canvas = makeCanvas(data);
 
     expect(toggleGroupCollapse(canvas, "group")).toBe("collapsed");
-    canvas.data.nodes = canvas.data.nodes.filter((node: any) => node.id !== "outside");
+    canvas.data.nodes = canvas.data.nodes.filter(node => node.id !== "outside");
     expect(toggleGroupCollapse(canvas, "group")).toBe("expanded");
-    expect(canvas.data.nodes.map((node: any) => node.id).sort()).toEqual(["group", "inside"]);
+    expect(canvas.data.nodes.map(node => node.id).sort()).toEqual(["group", "inside"]);
     expect(canvas.data.edges).toEqual([]);
   });
 
   it("preserves a collapsed nested group when its outer group is collapsed", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "outer", x: 0, y: 0, width: 500, height: 400, type: "group" } as any,
+        { id: "outer", x: 0, y: 0, width: 500, height: 400, type: "group" },
         { id: "inner", x: 30, y: 30, width: 220, height: 180, type: "group", bcCollapsed: true,
           bcCollapsedNodes: [{ id: "hidden", x: 15, y: 15, width: 60, height: 40, type: "text", text: "Nested" }],
-          bcCollapsedEdges: [] } as any,
+          bcCollapsedEdges: [] },
         { id: "visible", x: 300, y: 80, width: 100, height: 80, type: "text", text: "Visible" }
       ],
       edges: [{ id: "inner-visible", fromNode: "inner", fromSide: "right", toNode: "visible", toSide: "left" }]
@@ -353,12 +381,12 @@ describe("collapsible Canvas groups", () => {
 
     expect(toggleGroupCollapse(canvas, "outer")).toBe("collapsed");
     expect(toggleGroupCollapse(canvas, "outer")).toBe("expanded");
-    const restoredInner = canvas.data.nodes.find((node: any) => node.id === "inner");
+    const restoredInner = canvas.data.nodes.find(node => node.id === "inner");
     expect(restoredInner).toMatchObject({
       bcCollapsed: true,
       bcCollapsedNodes: [{ id: "hidden", text: "Nested" }]
     });
-    expect(canvas.data.nodes.find((node: any) => node.id === "visible")).toBeTruthy();
+    expect(canvas.data.nodes.find(node => node.id === "visible")).toBeTruthy();
     expect(canvas.data.edges).toEqual(data.edges);
   });
 });

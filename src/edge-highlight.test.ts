@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { connectedEdgeIds, selectedCanvasNodeIds } from "./edge-highlight";
+import type { CanvasSelectionRuntime } from "./canvas-runtime";
 
 const edges = [
   { id: "ab", fromNode: "a", toNode: "b" },
@@ -45,6 +46,7 @@ describe("connected Canvas edge highlighting", () => {
   it("fails closed for Canvas objects without an iterable selection", () => {
     expect(selectedCanvasNodeIds(null)).toEqual([]);
     expect(selectedCanvasNodeIds({})).toEqual([]);
-    expect(selectedCanvasNodeIds({ selection: {} })).toEqual([]);
+    // Exercise a malformed host selection at the runtime interface.
+    expect(selectedCanvasNodeIds({ selection: {} as Set<CanvasSelectionRuntime> })).toEqual([]);
   });
 });
