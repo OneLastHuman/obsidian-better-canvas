@@ -1,3 +1,5 @@
+import { isJsonObject } from "./prompt-input";
+
 export type AdditionalAgentBackend =
   | "claude-code" | "cursor-agent" | "gemini-cli" | "copilot-cli"
   | "qwen-code" | "aider" | "bob";
@@ -53,12 +55,21 @@ export function isAdditionalAgentBackend(backend: unknown): backend is Additiona
   return isLocalAgentBackend(backend) && backend !== "codex-cli" && backend !== "opencode-acp";
 }
 
-export function localAgentConfig(settings: Record<string, any>, backend: LocalAgentBackend): LocalAgentConfig {
+export interface LocalAgentSettings {
+  codexBinaryPath?: unknown;
+  codexModel?: unknown;
+  opencodeBinaryPath?: unknown;
+  opencodeModel?: unknown;
+  localAgents?: unknown;
+}
+
+
+export function localAgentConfig(settings: LocalAgentSettings, backend: LocalAgentBackend): LocalAgentConfig {
   const config = backend === "codex-cli"
     ? { binaryPath: settings.codexBinaryPath, model: settings.codexModel }
     : backend === "opencode-acp"
       ? { binaryPath: settings.opencodeBinaryPath, model: settings.opencodeModel }
-      : settings.localAgents?.[backend];
+      : isJsonObject(settings.localAgents) && isJsonObject(settings.localAgents[backend]) ? settings.localAgents[backend] : undefined;
   return {
     binaryPath: typeof config?.binaryPath === "string" ? config.binaryPath.trim() : "",
     model: typeof config?.model === "string" ? config.model.trim() : ""
@@ -66,7 +77,7 @@ export function localAgentConfig(settings: Record<string, any>, backend: LocalAg
 }
 
 export function updateLocalAgentConfig(
-  settings: Record<string, any>, backend: LocalAgentBackend, update: Partial<LocalAgentConfig>
+  settings: LocalAgentSettings, backend: LocalAgentBackend, update: Partial<LocalAgentConfig>
 ): void {
   const config = { ...localAgentConfig(settings, backend), ...update };
   if (backend === "codex-cli") {
@@ -76,7 +87,7 @@ export function updateLocalAgentConfig(
     settings.opencodeBinaryPath = config.binaryPath;
     settings.opencodeModel = config.model;
   } else {
-    settings.localAgents = { ...settings.localAgents, [backend]: config };
+    settings.localAgents = { ...(isJsonObject(settings.localAgents) ? settings.localAgents : {}), [backend]: config };
   }
 }
 

@@ -193,14 +193,14 @@ export function parseCanvasMarkdownMetadata(text: string): CanvasMarkdownMetadat
       const wikiBody = reference[1] ?? reference[2];
       const wikiParts = wikiBody?.split("|", 2);
       const destination = wikiBody !== undefined
-        ? wikiParts![0].trim()
+        ? wikiParts[0].trim()
         : (reference[4] ?? reference[6] ?? reference[7] ?? "").replace(/^<|>$/g, "").trim();
       const display = wikiBody !== undefined
-        ? (wikiParts![1] ?? wikiParts![0].split("#", 1)[0]).trim()
+        ? (wikiParts[1] ?? wikiParts[0].split("#", 1)[0]).trim()
         : markdownEmbed
-          ? reference[3]!.trim()
+          ? reference[3].trim()
           : markdownLink
-            ? reference[5]!.trim()
+            ? reference[5].trim()
             : destination;
       if (!destination) continue;
       const record: CanvasMarkdownReference = {
@@ -307,41 +307,63 @@ const AGGREGATED_NODE_METADATA_FIELDS = [
   "referenceLinks"
 ] as const;
 
+export interface CanvasMetadataAggregate {
+  links?: unknown[];
+  embeds?: unknown[];
+  tags?: unknown[];
+  headings?: unknown[];
+  sections?: unknown[];
+  listItems?: unknown[];
+  footnotes?: unknown[];
+  footnoteRefs?: unknown[];
+  referenceLinks?: unknown[];
+  blocks?: Record<string, unknown>;
+  nodes?: Record<string, unknown>;
+}
+
+interface CanvasMetadataPositionSource {
+  start?: unknown;
+  end?: unknown;
+}
+
 /** Convert a node-local metadata position into a Canvas-level position. */
-export function promoteCanvasNodeMetadataEntry(entry: any, nodeId: string): any {
-  const position = entry?.position;
+export function promoteCanvasNodeMetadataEntry(entry: Record<string, unknown>, nodeId: string): Record<string, unknown> {
+  const position = entry.position !== null && typeof entry.position === "object"
+    ? entry.position as CanvasMetadataPositionSource : {};
   const fallback = { line: 0, col: 0, offset: 0 };
   return {
     ...entry,
     position: {
       nodeId,
-      start: position?.start ?? fallback,
-      end: position?.end ?? position?.start ?? fallback
+      start: position.start ?? fallback,
+      end: position.end ?? position.start ?? fallback
     }
   };
 }
 
 /** Store per-node cache data and also expose its searchable metadata at Canvas level. */
-export function appendCanvasNodeMetadata(metadata: any, nodeId: string, nodeMetadata: any): void {
+export function appendCanvasNodeMetadata(metadata: CanvasMetadataAggregate, nodeId: string, nodeMetadata: unknown): void {
   metadata.nodes ??= {};
   metadata.nodes[nodeId] = nodeMetadata;
 
+  if (nodeMetadata === null || typeof nodeMetadata !== "object" || Array.isArray(nodeMetadata)) return;
+  const source = nodeMetadata as Record<string, unknown>;
   for (const field of AGGREGATED_NODE_METADATA_FIELDS) {
-    metadata[field] ??= [];
-    const entries = nodeMetadata?.[field];
+    const target = metadata[field] ??= [];
+    const entries: unknown = source[field];
     if (!Array.isArray(entries)) continue;
     for (const entry of entries) {
-      if (entry && typeof entry === "object") {
-        metadata[field].push(promoteCanvasNodeMetadataEntry(entry, nodeId));
+      if (entry !== null && typeof entry === "object" && !Array.isArray(entry)) {
+        target.push(promoteCanvasNodeMetadataEntry(entry as Record<string, unknown>, nodeId));
       }
     }
   }
 
   metadata.blocks ??= {};
-  if (nodeMetadata?.blocks && typeof nodeMetadata.blocks === "object") {
-    for (const [blockId, block] of Object.entries(nodeMetadata.blocks)) {
-      metadata.blocks[String(blockId)] ??= {
-        ...((block && typeof block === "object") ? block : {}),
+  if (source.blocks !== null && typeof source.blocks === "object") {
+    for (const [blockId, block] of Object.entries(source.blocks as Record<string, unknown>)) {
+      metadata.blocks[blockId] ??= {
+        ...(block !== null && typeof block === "object" ? block : {}),
         nodeId
       };
     }

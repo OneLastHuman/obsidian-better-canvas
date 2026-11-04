@@ -63,7 +63,7 @@ export function resolveSoftNotesStyle(node: CanvasNodeData): {
   preset: SoftNotesPreset; color: string; align: "left" | "center" | "right";
 } {
   const preset = softNotesPreset(node.bcSoftNotesPreset);
-  const attrs = node.styleAttributes as Record<string, unknown> | undefined;
+  const attrs = node.styleAttributes;
   const rawAlign = node.bcTextAlign ?? attrs?.textAlign ?? preset.align;
   // Only accept a hex colour, never arbitrary CSS or SVG supplied through JSON.
   const color = preset.id === "free" ? "transparent"
@@ -81,8 +81,7 @@ export function applySoftNotesPreset(
   const nodes = data.nodes.map(node => {
     if (!targets.has(node.id) || node.type !== "text") return node;
     updated++;
-    const attrs = node.styleAttributes && typeof node.styleAttributes === "object" && !Array.isArray(node.styleAttributes)
-      ? node.styleAttributes as Record<string, unknown> : {};
+    const attrs = node.styleAttributes ?? {};
     const next: CanvasNodeData = {
       ...node, bcSoftNotesPreset: preset.id, bcShape: "default",
       bcBorderStyle: "invisible", bcTextAlign: preset.align,
@@ -102,18 +101,18 @@ export function softNotesClip(preset: SoftNotesPreset): string {
 /** SVG object-bounding-box clips keep the same smooth curves at every node size. */
 export function ensureSoftNotesGeometry(doc: Document): void {
   if (!doc.body || doc.getElementById("bc-soft-geometry")) return;
-  const svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const svg = doc.win.createSvg("svg");
   svg.id = "bc-soft-geometry";
   svg.setAttribute("width", "0");
   svg.setAttribute("height", "0");
   svg.setAttribute("aria-hidden", "true");
   svg.classList.add("bc-soft-geometry");
-  const defs = doc.createElementNS(svg.namespaceURI, "defs");
+  const defs = doc.win.createSvg("defs");
   for (const preset of SOFT_NOTES_PRESETS.filter(item => item.path)) {
-    const clip = doc.createElementNS(svg.namespaceURI, "clipPath");
+    const clip = doc.win.createSvg("clipPath");
     clip.setAttribute("id", "bc-soft-clip-" + preset.id);
     clip.setAttribute("clipPathUnits", "objectBoundingBox");
-    const path = doc.createElementNS(svg.namespaceURI, "path");
+    const path = doc.win.createSvg("path");
     path.setAttribute("d", preset.path);
     path.setAttribute("transform", "scale(0.003125 0.004166666667)");
     clip.appendChild(path);
@@ -123,9 +122,35 @@ export function ensureSoftNotesGeometry(doc: Document): void {
   doc.body.appendChild(svg);
 }
 
+const headingObservers = new WeakMap<HTMLElement, MutationObserver>();
+
+function refreshSoftNotesHeadings(el: HTMLElement): void {
+  for (const sizer of el.querySelectorAll<HTMLElement>(".markdown-preview-sizer")) {
+    sizer.classList.toggle("bc-soft-has-heading", el.dataset.bcSoftNotes === "free" && !!sizer.querySelector("h1, h2"));
+  }
+}
+
+function observeSoftNotesHeadings(el: HTMLElement): void {
+  refreshSoftNotesHeadings(el);
+  if (el.dataset.bcSoftNotes !== "free") {
+    headingObservers.get(el)?.disconnect();
+    headingObservers.delete(el);
+    return;
+  }
+  if (headingObservers.has(el)) return;
+  const Observer = el.ownerDocument.defaultView?.MutationObserver;
+  if (!Observer) return;
+  const observer = new Observer(() => refreshSoftNotesHeadings(el));
+  observer.observe(el, { childList: true, subtree: true });
+  headingObservers.set(el, observer);
+}
+
 export function clearSoftNotesNode(el: HTMLElement): void {
   if (!el.dataset.bcSoftNotes) return;
   delete el.dataset.bcSoftNotes;
+  headingObservers.get(el)?.disconnect();
+  headingObservers.delete(el);
+  for (const sizer of el.querySelectorAll(".bc-soft-has-heading")) sizer.classList.remove("bc-soft-has-heading");
   for (const name of ["clip", "color", "align", "top", "right", "bottom", "left"]) {
     el.style.removeProperty("--bc-soft-" + name);
   }
@@ -136,6 +161,7 @@ export function decorateSoftNotesNode(el: HTMLElement, node: CanvasNodeData): vo
   ensureSoftNotesGeometry(el.ownerDocument);
   const { preset, color, align } = resolveSoftNotesStyle(node);
   el.dataset.bcSoftNotes = preset.id;
+  observeSoftNotesHeadings(el);
   el.style.setProperty("--bc-soft-clip", softNotesClip(preset));
   el.style.setProperty("--bc-soft-color", color);
   el.style.setProperty("--bc-soft-align", align);

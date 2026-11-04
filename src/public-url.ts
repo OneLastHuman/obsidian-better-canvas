@@ -46,7 +46,7 @@ function parseIPv6(host: string): number[] | null {
   if (halves.length === 1) return left.length === 8 ? left : null;
   const missing = 8 - left.length - right.length;
   if (missing < 1) return null;
-  return [...left, ...Array(missing).fill(0), ...right];
+  return [...left, ...Array<number>(missing).fill(0), ...right];
 }
 
 function isBlockedIPv6(host: string): boolean {

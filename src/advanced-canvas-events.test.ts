@@ -1,3 +1,4 @@
+import type { App } from "obsidian";
 import { describe, expect, it } from "vitest";
 import {
   AdvancedCanvasEventBridge,
@@ -108,6 +109,11 @@ class FakeEmitter {
   }
 }
 
+// The bridge only consumes workspace and vault; fixtures deliberately omit the rest of App.
+function fakeApp(workspace: FakeEmitter, vault = new FakeEmitter()): App {
+  return { workspace, vault } as unknown as App;
+}
+
 class FakeContainer {
   private handlers = new Map<string, Set<(event: any) => void>>();
 
@@ -158,7 +164,7 @@ describe("Advanced Canvas event bridge", () => {
     workspace.getLeavesOfType = () => [{ view }];
     workspace.onLayoutReady = (callback: () => void) => { layoutReady = callback; };
     const vault = new FakeEmitter();
-    const app = { workspace, vault };
+    const app = fakeApp(workspace, vault);
     const cleanups: Array<() => void> = [];
     const plugin = { register: (callback: () => void) => cleanups.push(callback) };
     const container = new FakeContainer();
@@ -223,7 +229,7 @@ describe("Advanced Canvas event bridge", () => {
     const canvas = makeCanvas({ nodes: [], edges: [] });
     const view: any = { canvas, containerEl: new FakeContainer(), file: { path: "Boards/Existing.canvas" }, getViewType: () => "canvas" };
     workspace.getLeavesOfType = () => [{ view }];
-    const app = { workspace, vault: new FakeEmitter() };
+    const app = fakeApp(workspace);
     const plugin = { register() {} };
     const scheduled: Array<() => void> = [];
     const bridge = new AdvancedCanvasEventBridge(app, plugin, { scheduleFrame: callback => scheduled.push(callback) });
@@ -266,7 +272,7 @@ describe("Advanced Canvas event bridge", () => {
     });
     const view: any = { canvas, containerEl: new FakeContainer(), file: { path: "Boards/Existing.canvas" }, getViewType: () => "canvas" };
     workspace.getLeavesOfType = () => [{ view }];
-    const app = { workspace, vault: new FakeEmitter() };
+    const app = fakeApp(workspace);
     const plugin = { register() {} };
     const bridge = new AdvancedCanvasEventBridge(app, plugin, { scheduleFrame: callback => callback() });
 
@@ -289,7 +295,7 @@ describe("Advanced Canvas event bridge", () => {
     });
     const view: any = { canvas, containerEl: new FakeContainer(), file: { path: "Boards/First.canvas" }, getViewType: () => "canvas" };
     workspace.getLeavesOfType = () => [{ view }];
-    const app = { workspace, vault: new FakeEmitter() };
+    const app = fakeApp(workspace);
     const plugin = { register() {} };
     const scheduled: Array<() => void> = [];
     const bridge = new AdvancedCanvasEventBridge(app, plugin, { scheduleFrame: callback => scheduled.push(callback) });
@@ -342,7 +348,7 @@ describe("Advanced Canvas event bridge", () => {
     const workspace = new FakeEmitter() as any;
     workspace.getLeavesOfType = () => [{ view }];
     workspace.onLayoutReady = () => {};
-    const app = { workspace, vault: new FakeEmitter() };
+    const app = fakeApp(workspace);
     const plugin = { register() {} };
     const container = new FakeContainer();
     const canvas = makeCanvas({ nodes: [], edges: [] });

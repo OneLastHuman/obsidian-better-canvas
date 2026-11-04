@@ -47,7 +47,7 @@ textarea.bc-modal-prompt-textarea {
   width: 100%;
   height: auto;
   display: block;
-  background: white;
+  background: #fff;
 }
 .bc-pdf-annotation-overlay.bc-pdf-annotation-page-aligned {
   inset: auto;
@@ -73,6 +73,12 @@ textarea.bc-modal-prompt-textarea {
   /* Fully transparent mask, used when a shape defines no outline ring. */
   --bc-ring-off: linear-gradient(transparent, transparent);
 }
+/* Node alignment is inherited from one custom property; theme rules can refine
+   it without competing with inline text-align on the card and its children. */
+.canvas-node[data-bc-text-align],
+.canvas-node[data-bc-text-align] :is(.canvas-node-content, .canvas-node-container, .canvas-node-iframe) {
+  text-align: var(--bc-node-text-align, left);
+}
 .canvas-node[data-bc-auto-resize="true"] .canvas-node-content .markdown-preview-view > .markdown-preview-sizer {
   flex: 0 0 auto;
   margin-block: auto;
@@ -86,16 +92,13 @@ textarea.bc-modal-prompt-textarea {
 .canvas-node[data-bc-auto-resize="true"] .markdown-rendered {
   overflow-wrap: anywhere;
 }
-.canvas-node[data-bc-auto-resize="true"][data-bc-auto-shape="true"] .canvas-node-content {
-  padding: var(--bc-auto-content-padding) !important;
-}
 
 /* Modern card treatment: a soft tint of the node colour inside a low-contrast
    border, instead of a saturated outline around a plain white card. Better
    Canvas decorates every Canvas node, so this is the default look; a node
    without a colour keeps the neutral surface. */
 .canvas-node[data-bc-shape] .canvas-node-container {
-  border-color: color-mix(in oklab, var(--canvas-color, var(--text-muted)) 30%, var(--background-modifier-border));
+  border-color: var(--bc-node-border-color, color-mix(in oklab, var(--canvas-color, var(--text-muted)) 30%, var(--background-modifier-border)));
   background-color: color-mix(in oklab, var(--canvas-color, var(--text-muted)) 9%, var(--background-primary));
   box-shadow:
     0 1px 2px rgb(0 0 0 / 5%),
@@ -103,7 +106,7 @@ textarea.bc-modal-prompt-textarea {
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 .canvas-node[data-bc-shape]:not(.is-themed) .canvas-node-container {
-  border-color: var(--background-modifier-border);
+  border-color: var(--bc-node-border-color, var(--background-modifier-border));
   background-color: var(--background-primary);
 }
 .canvas-node[data-bc-shape] .canvas-node-content {
@@ -113,7 +116,7 @@ textarea.bc-modal-prompt-textarea {
 .canvas-node[data-bc-shape].is-focused .canvas-node-container,
 .canvas-node[data-bc-shape].is-selected .canvas-node-container,
 .canvas-node[data-bc-shape].is-editing .canvas-node-container {
-  border-color: color-mix(in oklab, var(--color-accent) 65%, var(--background-modifier-border));
+  border-color: var(--bc-node-border-color, color-mix(in oklab, var(--color-accent) 65%, var(--background-modifier-border)));
   box-shadow:
     0 0 0 3px color-mix(in oklab, var(--color-accent) 16%, transparent),
     0 10px 26px -14px rgb(0 0 0 / 26%);
@@ -137,23 +140,21 @@ textarea.bc-modal-prompt-textarea {
   border-radius: 50% / 12%;
 }
 .canvas-node[data-bc-shape="predefined-process"] .canvas-node-container {
-  border-left-width: 4px !important;
-  border-left-style: double !important;
-  border-right-width: 4px !important;
-  border-right-style: double !important;
+  --bc-node-side-border-width: 4px;
+  --bc-node-side-border-style: double;
+  border-left-width: 4px;
+  border-left-style: var(--bc-node-border-style, double);
+  border-right-width: 4px;
+  border-right-style: var(--bc-node-border-style, double);
 }
-.canvas-node[data-bc-border="dashed"] .canvas-node-container {
-  border-style: dashed !important;
-}
-.canvas-node[data-bc-border="dotted"] .canvas-node-container {
-  border-style: dotted !important;
-}
-.canvas-node[data-bc-border="double"] .canvas-node-container {
-  border-style: double !important;
-}
-.canvas-node[data-bc-border="invisible"] .canvas-node-container,
-.canvas-node[data-bc-border="none"] .canvas-node-container {
-  border-color: transparent !important;
+/* Explicit border metadata feeds both the default card and themed borders. */
+.canvas-node[data-bc-border="dashed"] { --bc-node-border-style: dashed; }
+.canvas-node[data-bc-border="dotted"] { --bc-node-border-style: dotted; }
+.canvas-node[data-bc-border="double"] { --bc-node-border-style: double; }
+.canvas-node[data-bc-border="invisible"],
+.canvas-node[data-bc-border="none"] { --bc-node-border-color: transparent; }
+.canvas-node:is([data-bc-border="dashed"], [data-bc-border="dotted"], [data-bc-border="double"]) .canvas-node-container {
+  border-style: var(--bc-node-border-style);
 }
 /* A borderless card keeps the resting lift and the accent selection ring, so
    removing the border does not make it look pasted flat or unselected. */
@@ -189,7 +190,8 @@ textarea.bc-modal-prompt-textarea {
 .canvas-node[data-bc-shape="cloud"] .canvas-node-container,
 .canvas-node[data-bc-shape="document"] .canvas-node-container {
   border-radius: 0;
-  border-color: transparent !important;
+  --bc-node-border-color: transparent;
+  border-color: var(--bc-node-border-color);
   /* Shared with the ring masks and the panel previews below. */
   clip-path: var(--bc-shape-outline);
 }
@@ -339,14 +341,14 @@ textarea.bc-modal-prompt-textarea {
 .canvas-node[data-bc-shape].is-themed.is-focused::after {
   background-color: var(--canvas-color);
 }
-.canvas-node.bc-focus-dimmed {
-  opacity: 0.12 !important;
+.canvas-wrapper .canvas-node.bc-focus-dimmed {
+  opacity: 0.12;
   filter: blur(0.5px);
   transition: opacity 100ms ease;
 }
-.canvas-edges path.bc-focus-dimmed,
-.bc-focus-mode .canvas-edges path.bc-focus-dimmed {
-  opacity: 0.1 !important;
+.canvas-wrapper .canvas-edges path.bc-focus-dimmed,
+.canvas-wrapper.bc-focus-mode .canvas-edges path.bc-focus-dimmed {
+  opacity: 0.1;
 }
 .better-canvas-node-embed {
   margin: 0.6rem 0;
@@ -362,21 +364,22 @@ textarea.bc-modal-prompt-textarea {
   margin-bottom: 0;
 }
 
-/* Better Canvas read-only mode keeps the canvas background available for panning/zooming. */
-.bc-readonly .canvas-node,
-.bc-readonly .canvas-edges,
-.bc-readonly .canvas-edges * {
-  pointer-events: none !important;
+/* Keep the background available for panning/zooming. Suppress node hit targets
+   through inheritance so previews and PDF text can opt back into interaction. */
+.canvas-wrapper.bc-readonly .canvas-node,
+.canvas-wrapper.bc-readonly .canvas-edges,
+.canvas-wrapper.bc-readonly .canvas-edges * {
+  pointer-events: none;
 }
-.bc-readonly .canvas-node {
-  cursor: default !important;
+.canvas-wrapper.bc-readonly .canvas-node {
+  cursor: default;
 }
 
 /* Per-node zoom breakpoints: preserve node geometry while simplifying its content at low zoom. */
-.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-content,
-.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-iframe,
-.canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-container {
-  visibility: hidden !important;
+.canvas-wrapper .canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-content,
+.canvas-wrapper .canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-iframe,
+.canvas-wrapper .canvas-node[data-bc-breakpoint-hidden="true"] .canvas-node-container {
+  visibility: hidden;
 }
 
 /* Pinned PDF page nodes render a stable page snapshot inside the Canvas card. */
@@ -492,10 +495,10 @@ textarea.bc-modal-prompt-textarea {
   z-index: 2;
   pointer-events: none;
 }
-.bc-pdf-selectable-text-run {
+.bc-pdf-text-layer .bc-pdf-selectable-text-run {
   position: absolute;
   display: block;
-  color: transparent !important;
+  color: transparent;
   background: transparent;
   padding: 0;
   margin: 0;
@@ -570,7 +573,7 @@ textarea.bc-modal-prompt-textarea {
   min-height: 120px;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
-  background: white;
+  background: #fff;
   pointer-events: auto;
 }
 .bc-html-preview-frame[hidden] {
@@ -636,8 +639,8 @@ textarea.bc-modal-prompt-textarea {
   min-width: 0;
   max-width: 100%;
 }
-.bc-settings-root .setting-item:has(textarea) { flex-direction: column; align-items: stretch; }
-.bc-settings-root .setting-item:has(textarea) .setting-item-control { width: 100%; }
+.bc-settings-root .setting-item.bc-settings-textarea { flex-direction: column; align-items: stretch; }
+.bc-settings-root .setting-item.bc-settings-textarea .setting-item-control { width: 100%; }
 .bc-settings-root textarea { width: 100%; min-height: 90px; }
 .bc-settings-root .bc-settings-details { margin-bottom: var(--size-4-2); }
 .bc-settings-root .bc-settings-details > summary { cursor: pointer; list-style: none; }
@@ -668,7 +671,7 @@ textarea.bc-modal-prompt-textarea {
 .bc-settings-root .bc-settings-nav-button:focus-visible,
 .bc-settings-root .bc-settings-details > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 @media (max-width: 600px) {
-  .modal.mod-settings:has(.bc-settings-root) .vertical-tab-header {
+  .modal.mod-settings.bc-settings-modal .vertical-tab-header {
     flex: 0 0 144px;
     width: 144px;
     min-width: 144px;
@@ -746,10 +749,10 @@ textarea.bc-modal-prompt-textarea {
 }
 
 /* Highlight edges incident to the current Canvas node selection. */
-.canvas-edges path.bc-selection-related {
-  opacity: 1 !important;
+.canvas-wrapper .canvas-edges path.bc-selection-related {
+  opacity: 1;
   filter: drop-shadow(0 0 2px var(--interactive-accent));
-  stroke-width: 2.5px !important;
+  stroke-width: 2.5px;
   transition: filter 100ms ease, stroke-width 100ms ease, opacity 100ms ease;
 }
 
@@ -1419,12 +1422,12 @@ textarea.bc-modal-prompt-textarea {
   color: var(--bc-paper-ink);
   background-color: var(--bc-paper-fill);
   background-image: var(--bc-paper-grain);
-  border-color: #a48b694f;
+  border-color: var(--bc-node-border-color, #a48b694f);
   box-shadow: 0 1px 1px #6a503425, 1px 4px 6px -3px #6a50344a, 3px 14px 24px -14px #6a503452;
 }
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper].is-themed .canvas-node-container {
   background-color: color-mix(in oklab, var(--canvas-color) 22%, var(--bc-paper-fill));
-  border-color: color-mix(in oklab, var(--canvas-color) 40%, #b7a78b);
+  border-color: var(--bc-node-border-color, color-mix(in oklab, var(--canvas-color) 40%, #b7a78b));
 }
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper][data-bc-shape="default"] .canvas-node-container {
   border-radius: 3px 6px 4px 3px;
@@ -1529,11 +1532,20 @@ textarea.bc-modal-prompt-textarea {
 }
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="group"] .canvas-node-container {
   background: #f8f2e521;
-  border: 1.5px dashed #b39b7b;
+  border: 1.5px var(--bc-node-border-style, dashed) var(--bc-node-border-color, #b39b7b);
+  border-left-width: var(--bc-node-side-border-width, 1.5px);
+  border-right-width: var(--bc-node-side-border-width, 1.5px);
+  border-left-style: var(--bc-node-border-style, var(--bc-node-side-border-style, dashed));
+  border-right-style: var(--bc-node-border-style, var(--bc-node-side-border-style, dashed));
   box-shadow: none;
   border-radius: 7px;
 }
-.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="group"][data-bc-paper-border="explicit"][data-bc-border="solid"] .canvas-node-container { border-style: solid; }
+.canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="group"][data-bc-paper-border="explicit"][data-bc-border="solid"] .canvas-node-container {
+  border-top-style: solid;
+  border-bottom-style: solid;
+  border-left-style: var(--bc-node-side-border-style, solid);
+  border-right-style: var(--bc-node-side-border-style, solid);
+}
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="group"] .canvas-group-label {
   color: #6c5743;
   background: #e4d3b4;
@@ -1729,12 +1741,15 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   opacity: 0.7;
   background: transparent;
 }
+/* This theme scope matches the default selection rules; its later position
+   replaces their card paint while the separate sketch frame draws the ink. */
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node .canvas-node-container {
   color: var(--bc-sketch-ink);
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+  background-color: transparent;
+  background-image: none;
+  --bc-node-border-color: transparent;
+  border-color: var(--bc-node-border-color);
+  box-shadow: none;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node-container {
   position: relative;
@@ -1767,7 +1782,7 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   h1, h2, h3, h4, h5, h6
 ) {
   color: var(--bc-sketch-ink);
-  font-family: var(--bc-sketch-font) !important;
+  font-family: var(--bc-sketch-font);
   font-weight: 600;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node-content :is(h1, h2, h3, h4, h5, h6) {
@@ -1775,22 +1790,22 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   line-height: 1.3;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="heading"] .canvas-node-content {
-  font-size: 30px !important;
-  line-height: 1.35 !important;
+  font-size: 30px;
+  line-height: 1.35;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="concept"] .canvas-node-content,
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="action"] .canvas-node-content,
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="risk"] .canvas-node-content {
-  font-size: 24px !important;
-  line-height: 1.4 !important;
+  font-size: 24px;
+  line-height: 1.4;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="decision"] .canvas-node-content {
-  font-size: 22px !important;
-  line-height: 1.35 !important;
+  font-size: 22px;
+  line-height: 1.35;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="annotation"] .canvas-node-content {
-  font-size: 20px !important;
-  line-height: 1.55 !important;
+  font-size: 20px;
+  line-height: 1.55;
   color: var(--bc-sketch-muted);
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="annotation"] .canvas-node-content :is(p, li) {
@@ -1825,17 +1840,21 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   outline-offset: 7px;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch="free"] .canvas-node-container {
-  border-color: color-mix(in srgb, var(--bc-sketch-ink) 25%, transparent) !important;
+  --bc-node-border-color: color-mix(in srgb, var(--bc-sketch-ink) 25%, transparent);
+  border-color: var(--bc-node-border-color);
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="annotation"] .canvas-node-container,
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset="heading"] .canvas-node-container {
-  border-color: transparent !important;
+  --bc-node-border-color: transparent;
+  border-color: var(--bc-node-border-color);
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch="free"] .canvas-node-container {
-  border-style: solid;
+  border-style: var(--bc-node-border-style, solid);
+  border-left-style: var(--bc-node-border-style, var(--bc-node-side-border-style, solid));
+  border-right-style: var(--bc-node-border-style, var(--bc-node-side-border-style, solid));
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch="free"] .canvas-node-container {
-  box-shadow: none !important;
+  box-shadow: none;
 }
 .canvas-wrapper[data-bc-theme="sketch"] .canvas-node[data-bc-sketch-preset] .canvas-node-label {
   display: none;
@@ -2056,33 +2075,35 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   background: #fcfcf8;
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-background { opacity: .55; }
+/* Theme and preset specificity outranks generic shapes and selection paint.
+   Clipping stays on the container, leaving handles and anchors uncropped. */
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .canvas-node-container {
-  background: var(--bc-soft-color) !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  outline: none !important;
-  clip-path: var(--bc-soft-clip) !important;
+  background: var(--bc-soft-color);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  outline: none;
+  clip-path: var(--bc-soft-clip);
   transition: none;
   color: #292e28;
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes]::after,
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .canvas-node-container::after {
-  display: none !important;
+  display: none;
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .canvas-node-content {
   box-sizing: border-box;
   padding: var(--bc-soft-top) var(--bc-soft-right) var(--bc-soft-bottom) var(--bc-soft-left);
-  background: transparent !important;
+  background: transparent;
   color: #292e28;
-  text-align: var(--bc-soft-align) !important;
+  text-align: var(--bc-soft-align);
   font: 18px/1.65 "BC Sketch Hand", cursive;
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] :is(.markdown-preview-view, .markdown-source-view, .cm-content, .markdown-rendered) {
-  background: transparent !important;
+  background: transparent;
   color: #292e28;
   font-family: "BC Sketch Hand", cursive;
-  text-align: var(--bc-soft-align) !important;
+  text-align: var(--bc-soft-align);
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes] .markdown-preview-view {
   padding: 0;
@@ -2111,7 +2132,7 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   line-height: 1.6;
 }
 .canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes="free"] :is(h1,h2) { font-size: 42px; }
-.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes="free"] .markdown-preview-sizer:has(h1,h2) p {
+.canvas-wrapper[data-bc-theme="soft-notes"] .canvas-node[data-bc-soft-notes="free"] .markdown-preview-sizer.bc-soft-has-heading p {
   font: 16px/1.7 "BC Sketch Hand", cursive;
   color: #78816e;
 }
@@ -2205,7 +2226,7 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] .canvas-node-container {
   color: var(--bc-research-ink);
   background: var(--bc-research-fill, var(--bc-research-paper));
-  border-color: color-mix(in srgb, var(--bc-research-accent) 45%, #d9d9ce);
+  border-color: var(--bc-node-border-color, color-mix(in srgb, var(--bc-research-accent) 45%, #d9d9ce));
   box-shadow: 0 1px 2px #3038310c;
 }
 .canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset] :is(.canvas-node-content, .markdown-preview-view, .markdown-source-view, .cm-editor, .markdown-embed) {
@@ -2418,7 +2439,7 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node:not(.canvas-node-group) .canvas-node-container {
   background: var(--canvas-color, #c8dff3);
   color: var(--bc-rounded-ink);
-  border-color: var(--bc-rounded-ink);
+  border-color: var(--bc-node-border-color, var(--bc-rounded-ink));
   border-width: 4px;
   box-shadow: none;
 }
@@ -2432,7 +2453,7 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   --text-accent: #315b86;
 }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded] .canvas-node-container {
-  border: 0 !important;
+  border: 0;
   border-radius: 0;
   clip-path: var(--bc-rounded-clip);
 }
@@ -2580,3 +2601,11 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .bc-mini-rounded-terminal { left: 14px; top: 54px; }
 .bc-mini-rounded-process { right: 14px; top: 42px; }
 .bc-mini-rounded-decision { right: 28px; top: 101px; }
+
+/* Measured shape insets take precedence over preset padding. Keep this after
+   theme rules: the wrapper scope ties their specificity without priorities,
+   while the unscoped form also serves detached layout measurement nodes. */
+.canvas-node[data-bc-auto-resize="true"][data-bc-auto-shape="true"] .canvas-node-content,
+.canvas-wrapper .canvas-node[data-bc-auto-resize="true"][data-bc-auto-shape="true"] .canvas-node-content {
+  padding: var(--bc-auto-content-padding);
+}

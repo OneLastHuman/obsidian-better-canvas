@@ -1,5 +1,6 @@
-import { requestUrl } from "obsidian";
-import { normalizeMcpToolResult, RemoteMcpResult } from "./mcp-result";
+import { requestUrl, type RequestUrlResponse } from "obsidian";
+import { normalizeMcpToolResult, type RemoteMcpResult } from "./mcp-result";
+import { isJsonObject } from "./prompt-input";
 import { t } from "./i18n";
 import {
   collectMcpCatalogPages,
@@ -7,6 +8,7 @@ import {
   formatMcpResourceRead,
   normalizeMcpPromptPage,
   normalizeMcpResourcePage,
+  normalizeMcpTools,
   type McpPrompt,
   type McpResource
 } from "./mcp-catalog";
@@ -19,15 +21,20 @@ export interface RemoteMcpTool {
   inputSchema?: Record<string, unknown>;
 }
 
-function parseResponse(response: any): any {
-  if (response?.json && typeof response.json === "object") return response.json;
-  const body = String(response?.text ?? "");
+function parseResponse(response: RequestUrlResponse): unknown {
+  const json: unknown = response.json;
+  if (json && typeof json === "object") return json;
+  const body = response.text;
   try {
-    return JSON.parse(body);
+    const parsed: unknown = JSON.parse(body);
+    return parsed;
   } catch {
     const dataLine = body.split("\n").find(line => line.startsWith("data:"));
     if (dataLine) {
-      try { return JSON.parse(dataLine.slice(5).trim()); } catch { /* continue */ }
+      try {
+        const parsed: unknown = JSON.parse(dataLine.slice(5).trim());
+        return parsed;
+      } catch { /* continue */ }
     }
   }
   return body;
@@ -39,7 +46,7 @@ async function rpc(
   method: string,
   params: Record<string, unknown>,
   sessionId?: string
-): Promise<{ body: any; sessionId?: string }> {
+): Promise<{ body: unknown; sessionId?: string }> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream"
@@ -62,12 +69,17 @@ async function rpc(
     throw: false
   });
   const body = parseResponse(response);
+  const record = isJsonObject(body) ? body : {};
+  const error = record.error;
+  const errorMessage = isJsonObject(error) ? error.message : undefined;
   if (response.status < 200 || response.status >= 300) {
-    const detail = body?.error?.message ?? body?.message ?? response.text;
-    throw new Error(t("MCP request failed (HTTP " + response.status + ")", "MCP 请求失败（HTTP " + response.status + "）") + (detail ? ": " + detail : ""));
+    const detail = errorMessage ?? record.message ?? response.text;
+    throw new Error(t("MCP request failed (HTTP " + response.status + ")", "MCP 请求失败（HTTP " + response.status + "）") +
+      (detail ? ": " + (typeof detail === "string" ? detail : JSON.stringify(detail)) : ""));
   }
-  if (body?.error) throw new Error(t("MCP error: ", "MCP 错误: ") + (body.error.message ?? JSON.stringify(body.error)));
-  return { body: body?.result ?? body, sessionId: response.headers?.["mcp-session-id"] ?? sessionId };
+  if (error) throw new Error(t("MCP error: ", "MCP 错误: ") +
+    (typeof errorMessage === "string" ? errorMessage : JSON.stringify(error)));
+  return { body: record.result ?? body, sessionId: response.headers["mcp-session-id"] ?? sessionId };
 }
 
 async function initialize(endpoint: string, apiKey: string): Promise<{ sessionId?: string }> {
@@ -84,13 +96,9 @@ export async function listRemoteTools(endpoint: string, apiKey: string): Promise
   if (!endpoint.trim()) throw new Error(t("Set the MCP Streamable HTTP endpoint in settings first.", "请先在设置中填写 MCP Streamable HTTP endpoint。"));
   const init = await initialize(endpoint, apiKey);
   const result = await rpc(endpoint, apiKey, "tools/list", {}, init.sessionId);
-  const tools = result.body?.tools;
+  const tools = isJsonObject(result.body) ? result.body.tools : undefined;
   if (!Array.isArray(tools)) throw new Error(t("The MCP server did not return a tools array.", "MCP 服务没有返回 tools 数组。"));
-  return tools.filter((tool: any) => typeof tool?.name === "string").map((tool: any) => ({
-    name: tool.name,
-    description: typeof tool.description === "string" ? tool.description : "",
-    inputSchema: tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : {}
-  }));
+  return normalizeMcpTools(tools);
 }
 
 export async function callRemoteTool(
@@ -107,7 +115,7 @@ export async function callRemoteTool(
     arguments: args
   }, init.sessionId);
   const value = result.body;
-  if (value?.isError) throw new Error(t("MCP tool call failed: ", "MCP 工具执行失败: ") + JSON.stringify(value.content ?? value));
+  if (isJsonObject(value) && value.isError) throw new Error(t("MCP tool call failed: ", "MCP 工具执行失败: ") + JSON.stringify(value.content ?? value));
   return normalizeMcpToolResult(value);
 }
 

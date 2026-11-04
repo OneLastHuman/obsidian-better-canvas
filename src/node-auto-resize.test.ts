@@ -41,12 +41,18 @@ vi.mock("obsidian", () => ({
   requestUrl: vi.fn()
 }));
 
-import BetterCanvasFeatures from "./feature-integrator";
+import BetterCanvasFeatures, { type FeaturePlugin } from "./feature-integrator";
 import BetterCanvasPlugin from "./main";
 import { resizeNodeToText } from "./enhancements";
 import * as enhancements from "./enhancements";
 import * as htmlPreview from "./html-preview";
 import type { CanvasData } from "./canvas";
+
+class FakeNode {
+  instanceOf<T extends object>(constructor: abstract new (...args: never[]) => T): this is this & T {
+    return this instanceof constructor;
+  }
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -96,7 +102,9 @@ function createMockPlugin() {
     registerMarkdownPostProcessor: vi.fn()
   };
 
-  return { plugin, app, events, registeredCleanups };
+  // These tests supply only the host services exercised by feature initialization.
+  const featurePlugin = plugin as unknown as FeaturePlugin & typeof plugin;
+  return { plugin: featurePlugin, app, events, registeredCleanups };
 }
 
 function makeCanvas(data: CanvasData): any {
@@ -316,7 +324,7 @@ describe("Node auto-resize manual drag-resize override", () => {
 describe("HTML preview shutdown integration", () => {
   it("does not restart previews from a queued Canvas frame after plugin unload", () => {
     const handlers = new Map<string, () => void>();
-    class Element {
+    class Element extends FakeNode {
       addEventListener(name: string, callback: () => void) { handlers.set(name, callback); }
       removeEventListener(name: string) { handlers.delete(name); }
     }
@@ -350,7 +358,7 @@ describe("theme-aware auto-resize coordination", () => {
   function setup() {
     vi.useFakeTimers();
     const observers: Array<{ callback: MutationCallback; disconnect: ReturnType<typeof vi.fn> }> = [];
-    class Element {
+    class Element extends FakeNode {
       classList = { contains: vi.fn(() => false), remove: vi.fn() };
       preview: Element | null = null;
       ownerDocument: any;
@@ -363,6 +371,7 @@ describe("theme-aware auto-resize coordination", () => {
       removeEventListener: vi.fn((event: string) => fontListeners.delete(event))
     };
     vi.stubGlobal("HTMLElement", Element);
+    vi.stubGlobal("Element", Element);
     vi.stubGlobal("MutationObserver", class {
       callback: MutationCallback;
       disconnect = vi.fn();
@@ -385,7 +394,7 @@ describe("theme-aware auto-resize coordination", () => {
     nodeEl.preview = new Element();
     nodeEl.preview.preview = nodeEl.preview;
     canvas.nodes.get("node-1").nodeEl = nodeEl;
-    const view = { canvas, containerEl: container };
+    const view = { canvas, containerEl: container, getViewType: () => "canvas" };
     context.app.workspace.getLeavesOfType.mockReturnValue([{ view }] as never);
     const resize = vi.spyOn(enhancements, "resizeNodeToText").mockReturnValue(true);
     const syncHtml = vi.spyOn(htmlPreview, "syncHtmlPreviews");

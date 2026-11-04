@@ -38,7 +38,7 @@ export function prepareViewportSvgExportClone(container: HTMLElement): HTMLEleme
       try {
         const content = source.contentDocument?.querySelector(".cm-content");
         if (content) {
-          const snapshot = container.ownerDocument.createElement("div");
+          const snapshot = container.ownerDocument.win.createDiv();
           snapshot.className = "markdown-source-view bc-export-editor-snapshot";
           snapshot.appendChild(content.cloneNode(true));
           // CodeMirror's empty img sentinels are cursor controls, not images;
@@ -49,7 +49,7 @@ export function prepareViewportSvgExportClone(container: HTMLElement): HTMLEleme
         }
       } catch { /* Cross-origin previews are omitted below. */ }
     }
-    const label = container.ownerDocument.createElement("div");
+    const label = container.ownerDocument.win.createDiv();
     label.className = "bc-export-html-preview-label";
     label.textContent = "[HTML preview omitted from export]";
     const rect = source?.getBoundingClientRect?.();

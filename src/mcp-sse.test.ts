@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   callSseMcpTool,
   getSseMcpPrompt,
@@ -10,6 +10,17 @@ import {
   SseMcpConnection,
   splitSseFrames
 } from "./mcp-sse";
+
+beforeEach(() => {
+  vi.stubGlobal("window", {
+    setTimeout: (callback: () => void, timeoutMs: number) => globalThis.setTimeout(callback, timeoutMs),
+    clearTimeout: (timer: NodeJS.Timeout) => globalThis.clearTimeout(timer)
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("legacy MCP SSE parsing", () => {
   it("parses endpoint and message events across a partial buffer", () => {
@@ -71,10 +82,6 @@ describe("legacy MCP SSE parsing", () => {
 });
 
 describe("legacy MCP SSE JSON-RPC round trip", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it("lists and calls tools using SSE messages with an explicit endpoint event", async () => {
     const encoder = new TextEncoder();
     let eventController: ReadableStreamDefaultController<Uint8Array> | undefined;

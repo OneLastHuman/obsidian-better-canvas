@@ -1,3 +1,6 @@
+import { selectedNodeIds } from "./canvas";
+import type { CanvasRuntime } from "./canvas-runtime";
+
 export interface ConnectedEdge {
   id: string;
   fromNode: string;
@@ -30,14 +33,12 @@ export function connectedEdgeIds(
 }
 
 /** Read node IDs from an Obsidian Canvas selection without treating selected edges as nodes. */
-export function selectedCanvasNodeIds(canvas: any, availableNodeIds?: Iterable<string>): string[] {
-  const selection = canvas?.selection;
-  if (!selection || typeof selection.values !== "function") return [];
-  const allowed = availableNodeIds ? new Set(availableNodeIds) : undefined;
-  const ids: string[] = [];
-  for (const selected of selection.values()) {
-    const id = selected?.id ?? selected?.node?.id ?? selected?.getData?.()?.id;
-    if (typeof id === "string" && (!allowed || allowed.has(id)) && !ids.includes(id)) ids.push(id);
-  }
-  return ids;
+export function selectedCanvasNodeIds(
+  canvas: Pick<Partial<CanvasRuntime>, "selection"> | null | undefined,
+  availableNodeIds?: Iterable<string>
+): string[] {
+  const ids = selectedNodeIds(canvas);
+  if (!availableNodeIds) return ids;
+  const allowed = new Set(availableNodeIds);
+  return ids.filter(id => allowed.has(id));
 }

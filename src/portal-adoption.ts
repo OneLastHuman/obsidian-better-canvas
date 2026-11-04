@@ -8,20 +8,18 @@ type Rectangle = Pick<CanvasNodeData, "x" | "y" | "width" | "height">;
  */
 function hasUsableRectangle(value: unknown): value is Rectangle {
   if (!value || typeof value !== "object") return false;
-  const rect = value as Partial<Rectangle>;
+  if (!("x" in value) || !("y" in value) || !("width" in value) || !("height" in value)) return false;
+  const { x, y, width, height } = value;
   if (
-    !Number.isFinite(rect.x) ||
-    !Number.isFinite(rect.y) ||
-    !Number.isFinite(rect.width) ||
-    !Number.isFinite(rect.height) ||
-    (rect.width as number) <= 0 ||
-    (rect.height as number) <= 0
+    typeof x !== "number" || typeof y !== "number" ||
+    typeof width !== "number" || typeof height !== "number" ||
+    !Number.isFinite(x) || !Number.isFinite(y) ||
+    !Number.isFinite(width) || !Number.isFinite(height) ||
+    width <= 0 || height <= 0
   ) return false;
 
-  // Finite components can still overflow when the rectangle's far edge is
-  // computed, which would otherwise make containment comparisons unreliable.
-  return Number.isFinite((rect.x as number) + (rect.width as number)) &&
-    Number.isFinite((rect.y as number) + (rect.height as number));
+  // Finite components can still overflow when the rectangle's far edge is computed.
+  return Number.isFinite(x + width) && Number.isFinite(y + height);
 }
 
 function isUsableInset(inset: number): boolean {
@@ -48,7 +46,7 @@ export function findContainingPortal(
   return portals
     .filter(portal => {
       if (!portal || typeof portal !== "object" || !hasUsableRectangle(portal)) return false;
-      if (portal.id === candidate.id || (portal as any).portal !== true) return false;
+      if (portal.id === candidate.id || portal.portal !== true) return false;
       if (currentCanvasPath && portal.file === currentCanvasPath) return false;
       return centerX >= portal.x + inset &&
         centerX <= portal.x + portal.width - inset &&
@@ -86,7 +84,7 @@ export function findContainingPortalForGroup(
   return portals
     .filter(portal => {
       if (!portal || typeof portal !== "object" || !hasUsableRectangle(portal)) return false;
-      if (portal.id === candidate.id || (portal as any).portal !== true) return false;
+      if (portal.id === candidate.id || portal.portal !== true) return false;
       if (currentCanvasPath && portal.file === currentCanvasPath) return false;
       const portalMinX = portal.x + inset;
       const portalMinY = portal.y + inset;

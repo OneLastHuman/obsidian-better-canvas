@@ -12,7 +12,9 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
-    "lib": ["DOM", "ES2022"],
+    "strictBuiltinIteratorReturn": true,
+    "strictBindCallApply": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "types": ["node"]
   },
   "include": ["src/**/*.ts"]

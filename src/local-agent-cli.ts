@@ -1,6 +1,7 @@
 import type { ChatMessage } from "./ai";
 import { resolveLaunchCommand } from "./agent-launcher";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { clearTimeout, setTimeout } from "node:timers";
 import { loadNodeRuntimeModules, type NodeRuntimeModules } from "./node-runtime";
 import { resolveAgentBinary } from "./local-agent-discovery";
 import type { AdditionalAgentBackend } from "./local-agent-settings";
@@ -68,8 +69,10 @@ function object(value: unknown): JsonObject {
 function textContent(value: unknown): string {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
-  return value.filter(part => part?.type === "text" && typeof part.text === "string")
-    .map(part => part.text).join("");
+  return value.map((part: unknown) => {
+    const content = object(part);
+    return content.type === "text" && typeof content.text === "string" ? content.text : "";
+  }).join("");
 }
 
 function errorText(value: unknown): string {
@@ -119,7 +122,10 @@ class AgentOutput {
   private consume(line: string): void {
     if (!line.trim()) return;
     let event: JsonObject;
-    try { event = object(JSON.parse(line)); } catch { return; }
+    try {
+      const parsed: unknown = JSON.parse(line);
+      event = object(parsed);
+    } catch { return; }
     const data = object(event.data);
     if (event.type === "session.error") {
       this.failed = errorText(data);
@@ -130,7 +136,7 @@ class AgentOutput {
       return;
     }
     if (event.type === "result") {
-      if (event.is_error || event.status === "error" || String(event.subtype ?? "").startsWith("error")) {
+      if (event.is_error || event.status === "error" || (typeof event.subtype === "string" && event.subtype.startsWith("error"))) {
         this.failed = errorText(event.error ?? event.errors ?? event.result ?? event.last_message);
       } else {
         const value = this.backend === "bob" ? event.last_message : event.result;
@@ -191,7 +197,7 @@ async function commandArgs(
   runtime: NodeRuntimeModules
 ): Promise<{ args: string[]; history?: string }> {
   const io = runtime.fs.promises;
-  const join = runtime.path.join;
+  const join = runtime.path.join.bind(runtime.path);
   let args: string[];
   let history: string | undefined;
   switch (backend) {
@@ -322,7 +328,7 @@ async function runProcess(
           } : {})
         }
       });
-    } catch (error) { reject(error); return; }
+    } catch (error) { reject(error instanceof Error ? error : new Error(String(error))); return; }
 
     let settled = false;
     let failure: Error | undefined;
@@ -335,9 +341,9 @@ async function runProcess(
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
-      globalThis.clearTimeout(timeout);
-      globalThis.clearTimeout(forceKill);
-      globalThis.clearTimeout(killDeadline);
+      clearTimeout(timeout);
+      clearTimeout(forceKill);
+      clearTimeout(killDeadline);
       options.signal?.removeEventListener("abort", onAbort);
       if (error) reject(error);
       else resolve(parser);
@@ -347,14 +353,14 @@ async function runProcess(
       failure = error;
       try { child.kill("SIGTERM"); } catch { /* The close event may already be queued. */ }
       if (settled) return;
-      forceKill = globalThis.setTimeout(() => {
+      forceKill = setTimeout(() => {
         try { child.kill("SIGKILL"); } catch { /* Best effort when the process has disappeared. */ }
-        if (!settled) killDeadline = globalThis.setTimeout(() => finish(failure), 1500);
+        if (!settled) killDeadline = setTimeout(() => finish(failure), 1500);
       }, 1500);
     };
     const onAbort = () => terminate(abortError());
     options.signal?.addEventListener("abort", onAbort, { once: true });
-    timeout = globalThis.setTimeout(() => terminate(new Error("Local agent timed out after " + Math.round(timeoutMs / 1000) + " seconds.")), timeoutMs);
+    timeout = setTimeout(() => terminate(new Error("Local agent timed out after " + Math.round(timeoutMs / 1000) + " seconds.")), timeoutMs);
 
     child.once("error", (error: Error) => {
       const detail = /ENOENT|EINVAL/i.test(error.message)
@@ -365,7 +371,7 @@ async function runProcess(
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
       if (settled || failure) return;
-      try { parser.write(chunk); } catch (error) { terminate(error as Error); }
+      try { parser.write(chunk); } catch (error) { terminate(error instanceof Error ? error : new Error(String(error))); }
     });
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {

@@ -64,7 +64,7 @@ export function createCanvasTextMeasurer(font = MEASURE_FONT_FALLBACK): TextMeas
   if (cached) return cached;
   if (typeof document === "undefined") return null;
   try {
-    const canvas = document.createElement("canvas");
+    const canvas = document.win.createEl("canvas");
     const context = canvas.getContext("2d");
     if (!context) return null;
     context.font = font;

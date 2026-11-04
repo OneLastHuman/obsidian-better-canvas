@@ -1,4 +1,4 @@
-import { Platform, requestUrl } from "obsidian";
+import { Platform, requestUrl, type RequestUrlResponse } from "obsidian";
 import { runLocalCodex } from "./codex-cli";
 import { decodeBase64Image, detectImageFormat } from "./image-payload";
 import { hasUnsupportedACPContent, runOpenCodeACP } from "./opencode-acp";
@@ -75,19 +75,27 @@ function geminiEndpoint(settings: AISettings, streaming: boolean, modelOverride?
   return streaming ? result + (result.includes("?") ? "&" : "?") + "alt=sse" : result;
 }
 
-function bodyOf(response: any): any {
-  if (response?.json && typeof response.json === "object") return response.json;
-  const raw = String(response?.text ?? "");
+function bodyOf(response: RequestUrlResponse): unknown {
+  const json: unknown = response.json;
+  if (json && typeof json === "object") return json;
+  const raw = response.text;
   try {
-    return JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    return parsed;
   } catch {
     return raw;
   }
 }
 
-function responseError(status: number, body: any, rawText?: string): Error {
-  const detail = body?.error?.message ?? body?.message ?? rawText ?? (typeof body === "string" ? body : "");
-  return new Error(t(`AI API request failed (HTTP ${status})`, `AI API 请求失败（HTTP ${status}）`) + (detail ? ": " + String(detail).slice(0, 1200) : ""));
+function responseError(status: number, body: unknown, rawText?: string): Error {
+  const message = body && typeof body === "object" && "message" in body ? body.message : undefined;
+  const error = body && typeof body === "object" && "error" in body ? body.error : undefined;
+  const nestedMessage = error && typeof error === "object" && "message" in error ? error.message : undefined;
+  const detail = nestedMessage ?? message ?? rawText ?? (typeof body === "string" ? body : "");
+  const detailText = typeof detail === "string" ? detail
+    : typeof detail === "number" || typeof detail === "boolean" ? String(detail)
+    : rawText ?? "";
+  return new Error(t(`AI API request failed (HTTP ${status})`, `AI API 请求失败（HTTP ${status}）`) + (detail && detailText ? ": " + detailText.slice(0, 1200) : ""));
 }
 
 function contentText(content: ChatMessageContent): string {
@@ -116,9 +124,18 @@ function nativeHeaders(settings: AISettings, protocol: AIProtocol, accept = "app
   return headers;
 }
 
-function anthropicContent(content: ChatMessageContent): any {
+type AnthropicContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+
+type GeminiPart =
+  | { text: string }
+  | { fileData: { fileUri: string; mimeType?: string } }
+  | { inlineData: { mimeType: string; data: string } };
+
+function anthropicContent(content: ChatMessageContent): string | AnthropicContentPart[] {
   if (typeof content === "string") return content;
-  return content.map(part => {
+  return content.map<AnthropicContentPart>(part => {
     if (part.type === "text") return { type: "text", text: part.text };
     if (part.type === "file_data") {
       return { type: "text", text: "[Video URL omitted: native URL video context is supported only by the Gemini adapter]" };
@@ -132,9 +149,9 @@ function anthropicContent(content: ChatMessageContent): any {
   });
 }
 
-function geminiParts(content: ChatMessageContent): any[] {
+function geminiParts(content: ChatMessageContent): GeminiPart[] {
   if (typeof content === "string") return [{ text: content }];
-  const result: any[] = [];
+  const result: GeminiPart[] = [];
   for (const part of content) {
     if (part.type === "text") {
       result.push({ text: part.text });
@@ -214,7 +231,33 @@ function toOpenAIRequest(settings: AISettings, messages: ChatMessage[], streamin
   return body;
 }
 
-function parseCompletion(protocol: AIProtocol, body: any): string {
+function textPart(value: unknown): string {
+  return value && typeof value === "object" && "text" in value && typeof value.text === "string" ? value.text : "";
+}
+
+function geminiResponseParts(body: unknown): unknown[] {
+  if (!body || typeof body !== "object" || !("candidates" in body) || !Array.isArray(body.candidates)) return [];
+  const candidates: unknown[] = body.candidates;
+  const first = candidates[0];
+  if (!first || typeof first !== "object" || !("content" in first)) return [];
+  const content = first.content;
+  if (!content || typeof content !== "object" || !("parts" in content) || !Array.isArray(content.parts)) return [];
+  const parts: unknown[] = content.parts;
+  return parts;
+}
+
+function openAIResponseContent(body: unknown, section: "message" | "delta"): unknown {
+  if (!body || typeof body !== "object" || !("choices" in body) || !Array.isArray(body.choices)) return undefined;
+  const choices: unknown[] = body.choices;
+  const first = choices[0];
+  if (!first || typeof first !== "object") return undefined;
+  const message = section === "message"
+    ? ("message" in first ? first.message : undefined)
+    : ("delta" in first ? first.delta : undefined);
+  return message && typeof message === "object" && "content" in message ? message.content : undefined;
+}
+
+function parseCompletion(protocol: AIProtocol, body: unknown): string {
   // bodyOf() preserves an unparsable success response as raw text so HTTP
   // error responses can include their original message. A 2xx response must
   // not leak JSON.parse's implementation-specific exception into the Notice.
@@ -222,19 +265,20 @@ function parseCompletion(protocol: AIProtocol, body: any): string {
     throw new Error(t("The AI service returned a success status but no usable text content.", "AI 服务返回了成功状态，但没有找到可用的文本内容。"));
   }
   if (protocol === "anthropic") {
-    const text = Array.isArray(body?.content)
-      ? body.content.filter((part: any) => part?.type === "text" && typeof part.text === "string").map((part: any) => part.text).join("")
-      : "";
+    const content: unknown = body && typeof body === "object" && "content" in body ? body.content : undefined;
+    const parts: unknown[] = Array.isArray(content) ? content : [];
+    const text = parts.filter(part => part && typeof part === "object" && "type" in part && part.type === "text")
+      .map(textPart).join("");
     if (text.trim()) return text.trim();
   } else if (protocol === "gemini") {
-    const parts = body?.candidates?.[0]?.content?.parts;
-    const text = Array.isArray(parts) ? parts.map((part: any) => typeof part?.text === "string" ? part.text : "").join("") : "";
+    const text = geminiResponseParts(body).map(textPart).join("");
     if (text.trim()) return text.trim();
   } else {
-    const content = body?.choices?.[0]?.message?.content;
+    const content = openAIResponseContent(body, "message");
     if (typeof content === "string" && content.trim()) return content.trim();
     if (Array.isArray(content)) {
-      const joined = content.map((item: any) => typeof item?.text === "string" ? item.text : "").filter(Boolean).join("\n").trim();
+      const parts: unknown[] = content;
+      const joined = parts.map(textPart).filter(Boolean).join("\n").trim();
       if (joined) return joined;
     }
   }
@@ -282,7 +326,7 @@ export async function chatCompletion(
   }
   if (!settings.model.trim()) throw new Error(t("Set the chat model in Better Canvas settings first.", "请先在 Better Canvas 设置中填写 Chat model。"));
   const protocol = protocolOf(settings);
-  let response: any;
+  let response: RequestUrlResponse;
   if (protocol === "anthropic") {
     response = await requestUrl({
       url: endpoint(settings.baseUrl, "messages"),
@@ -374,7 +418,7 @@ export async function chatCompletionStream(
 
   if (!response.ok) {
     const raw = await response.text().catch(() => "");
-    let bodyError: any = raw;
+    let bodyError: unknown = raw;
     try { bodyError = JSON.parse(raw); } catch { /* keep raw message */ }
     throw responseError(response.status, bodyError, raw);
   }
@@ -398,21 +442,25 @@ export async function chatCompletionStream(
     const payload = trimmed.slice(5).trim();
     if (!payload) return false;
     if (payload === "[DONE]") return true;
-    let event: any;
+    let event: unknown;
     try { event = JSON.parse(payload); } catch { return false; }
 
     reportedUsage = mergeUsageCounts(reportedUsage, extractProviderUsage(protocol, event));
     let delta = "";
     if (protocol === "anthropic") {
-      if (event?.type === "content_block_delta" && typeof event?.delta?.text === "string") delta = event.delta.text;
-      else if (event?.type === "content_block_start" && typeof event?.content_block?.text === "string") delta = event.content_block.text;
+      if (event && typeof event === "object" && "type" in event) {
+        if (event.type === "content_block_delta" && "delta" in event) delta = textPart(event.delta);
+        else if (event.type === "content_block_start" && "content_block" in event) delta = textPart(event.content_block);
+      }
     } else if (protocol === "gemini") {
-      const parts = event?.candidates?.[0]?.content?.parts;
-      if (Array.isArray(parts)) delta = parts.map((part: any) => typeof part?.text === "string" ? part.text : "").join("");
+      delta = geminiResponseParts(event).map(textPart).join("");
     } else {
-      const value = event?.choices?.[0]?.delta?.content;
+      const value = openAIResponseContent(event, "delta");
       if (typeof value === "string") delta = value;
-      else if (Array.isArray(value)) delta = value.map((part: any) => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("");
+      else if (Array.isArray(value)) {
+        const parts: unknown[] = value;
+        delta = parts.map(textPart).filter(Boolean).join("");
+      }
     }
     if (delta) {
       accumulated += delta;
@@ -472,16 +520,21 @@ export async function generateImage(
     });
     const body = bodyOf(response);
     if (response.status < 200 || response.status >= 300) throw responseError(response.status, body, response.text);
-    const parts = body?.candidates?.[0]?.content?.parts;
-    const image = Array.isArray(parts) ? parts.find((part: any) => {
-      const inline = part?.inlineData ?? part?.inline_data;
-      return typeof inline?.data === "string";
-    }) : null;
-    const inline = image?.inlineData ?? image?.inline_data;
-    if (typeof inline?.data !== "string") {
+    const parts = geminiResponseParts(body);
+    let imageData: string | undefined;
+    for (const part of parts) {
+      if (!part || typeof part !== "object") continue;
+      const inlineData = "inlineData" in part ? part.inlineData : undefined;
+      const inline = inlineData ?? ("inline_data" in part ? part.inline_data : undefined);
+      if (inline && typeof inline === "object" && "data" in inline && typeof inline.data === "string") {
+        imageData = inline.data;
+        break;
+      }
+    }
+    if (imageData === undefined) {
       throw new Error(t("The Gemini image model returned no image content; check that this model supports image generation.", "Gemini 图像模型未返回图片内容；请确认该模型支持图像生成。"));
     }
-    const validated = decodeBase64Image(inline.data);
+    const validated = decodeBase64Image(imageData);
     return { bytes: validated.bytes, extension: validated.extension };
   }
 
@@ -500,12 +553,13 @@ export async function generateImage(
   const body = bodyOf(response);
   if (response.status < 200 || response.status >= 300) throw responseError(response.status, body, response.text);
 
-  const first = body?.data?.[0];
-  if (typeof first?.b64_json === "string") {
+  const data: unknown[] = body && typeof body === "object" && "data" in body && Array.isArray(body.data) ? body.data : [];
+  const first = data[0];
+  if (first && typeof first === "object" && "b64_json" in first && typeof first.b64_json === "string") {
     const validated = decodeBase64Image(first.b64_json);
     return { bytes: validated.bytes, extension: validated.extension };
   }
-  if (typeof first?.url === "string") {
+  if (first && typeof first === "object" && "url" in first && typeof first.url === "string") {
     const imageResponse = await requestUrl({ url: first.url, method: "GET", throw: false });
     if (imageResponse.status < 200 || imageResponse.status >= 300) {
       throw new Error(t(`Failed to download the generated image (HTTP ${imageResponse.status}).`, `下载生成图片失败（HTTP ${imageResponse.status}）。`));

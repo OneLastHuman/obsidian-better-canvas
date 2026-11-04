@@ -1,5 +1,6 @@
-import { App, ItemView, Modal, Notice, TFile } from "obsidian";
-import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
+import { App, ItemView, Menu, Modal, Notice, Plugin, TFile } from "obsidian";
+import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, isCanvasData, isCanvasNodeData, readCanvasData } from "./canvas";
+import { isCanvasViewRuntime, type CanvasNodeRuntime, type CanvasRuntime, type CanvasViewRuntime } from "./canvas-runtime";
 import { findContainingPortal, findContainingPortalForGroup } from "./portal-adoption";
 import { t } from "./i18n";
 
@@ -25,7 +26,7 @@ function mirrorInfo(id: unknown): MirrorInfo | null {
   return { portalId, childId };
 }
 
-function isMirrorNode(node: any): boolean {
+function isMirrorNode(node: CanvasNodeData): boolean {
   return Boolean(mirrorInfo(node?.id));
 }
 
@@ -36,7 +37,7 @@ export function hasMovedOpenPortal(
 ): boolean {
   if (!previousPositions) return false;
   return nodes.some(node => {
-    if (!isCanvasFileNode(node) || (node as any).portal !== true) return false;
+    if (!isCanvasFileNode(node) || node.portal !== true) return false;
     const previous = previousPositions.get(node.id);
     return Boolean(previous && (
       Math.abs(node.x - previous.x) > 0.5 ||
@@ -45,20 +46,20 @@ export function hasMovedOpenPortal(
   });
 }
 
-function isCanvasFileNode(node: any): node is CanvasNodeData {
-  return node?.type === "file" && typeof node.file === "string" && node.file.toLowerCase().endsWith(".canvas");
+function isCanvasFileNode(node: unknown): node is CanvasNodeData & { file: string } {
+  return isCanvasNodeData(node) && node.type === "file" && typeof node.file === "string" && node.file.toLowerCase().endsWith(".canvas");
 }
 
 function parseCanvasJson(raw: string): CanvasData {
-  const value = JSON.parse(raw || "{}");
-  if (!value || typeof value !== "object" || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
+  const value: unknown = JSON.parse(raw || "{}");
+  if (!isCanvasData(value)) {
     throw new Error(t("The file is not valid JSON Canvas: it needs nodes and edges arrays.", "文件不是有效的 JSON Canvas：需要 nodes 和 edges 数组。"));
   }
-  return value as CanvasData;
+  return value;
 }
 
-function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+function deepClone<T extends CanvasData | CanvasNodeData | CanvasEdgeData>(value: T): T {
+  return structuredClone(value);
 }
 
 function center(node: CanvasNodeData): { x: number; y: number } {
@@ -90,8 +91,8 @@ function childIdFromEdgeId(portalId: string, id: string): string {
 }
 
 interface ViewPatch {
-  original: (...args: any[]) => any;
-  wrapper: (...args: any[]) => any;
+  original: NonNullable<CanvasViewRuntime["getViewData"]>;
+  wrapper: NonNullable<CanvasViewRuntime["getViewData"]>;
 }
 
 interface PortalSnapshot {
@@ -145,11 +146,11 @@ class PortalTextPromptModal extends Modal {
 }
 
 export class CanvasPortalManager {
-  private plugin: any;
-  private viewPatches = new Map<any, ViewPatch>();
+  private plugin: Pick<Plugin, "app" | "addCommand" | "registerEvent" | "register">;
+  private viewPatches = new Map<CanvasViewRuntime, ViewPatch>();
   private boundViews = new WeakSet<HTMLElement>();
   private signatures = new WeakMap<object, string>();
-  private writingFiles = new Map<string, any>();
+  private writingFiles = new Map<string, CanvasViewRuntime>();
   private lastPortalPositions = new WeakMap<object, Map<string, { x: number; y: number }>>();
   private portalRefreshInProgress = new WeakSet<object>();
   private readyPortalIds = new WeakMap<object, Set<string>>();
@@ -157,7 +158,7 @@ export class CanvasPortalManager {
   private adoptionInFlight = new WeakSet<object>();
   private stopped = false;
 
-  constructor(plugin: any) {
+  constructor(plugin: Pick<Plugin, "app" | "addCommand" | "registerEvent" | "register">) {
     this.plugin = plugin;
   }
 
@@ -172,10 +173,10 @@ export class CanvasPortalManager {
       name: "Better Canvas: " + t("Create a text node in the selected Portal", "在所选 Portal 中创建文本节点"),
       callback: () => this.promptForTextNodeInPortal()
     });
-    this.plugin.registerEvent(this.plugin.app.workspace.on("canvas:node-menu", (menu: any, node: any) => {
-      const nodeData = node?.getData?.() ?? node;
+    this.plugin.registerEvent(this.plugin.app.workspace.on("canvas:node-menu", (menu: Menu, node: CanvasNodeRuntime | CanvasNodeData) => {
+      const nodeData = isCanvasNodeData(node) ? node : node.getData?.();
       if (!menu?.addItem || !isCanvasFileNode(nodeData) || nodeData.portal !== true) return;
-      menu.addItem((item: any) => item
+      menu.addItem(item => item
         .setTitle(t("Create a text node in the Portal source canvas", "在 Portal 源画布中创建文本节点"))
         .setIcon("plus")
         .onClick(() => this.promptForTextNodeInPortal(String(node?.id ?? nodeData.id))));
@@ -193,7 +194,8 @@ export class CanvasPortalManager {
       if (file.extension.toLowerCase() !== "canvas") return;
       const origin = this.writingFiles.get(file.path);
       for (const leaf of this.plugin.app.workspace.getLeavesOfType("canvas")) {
-        const view = leaf.view as any;
+        const view = leaf.view;
+        if (!isCanvasViewRuntime(view)) continue;
         if (origin && view === origin) continue;
         // A Canvas saving itself already has the latest live state. Other
         // views that embed that file still need to rebuild their portal mirrors.
@@ -216,10 +218,14 @@ export class CanvasPortalManager {
   async refreshAll(force = false): Promise<void> {
     if (this.stopped) return;
     const leaves = this.plugin.app.workspace.getLeavesOfType("canvas");
-    await Promise.all(leaves.map((leaf: any) => this.refreshView(leaf.view, force)));
+    const pending: Promise<void>[] = [];
+    for (const leaf of leaves) {
+      if (isCanvasViewRuntime(leaf.view)) pending.push(this.refreshView(leaf.view, force));
+    }
+    await Promise.all(pending);
   }
 
-  async refreshView(view: any, force = false): Promise<void> {
+  async refreshView(view: CanvasViewRuntime, force = false): Promise<void> {
     if (this.stopped || !view?.canvas || !view?.containerEl) return;
     this.patchViewSerializer(view);
     this.bindViewInteractions(view);
@@ -231,7 +237,7 @@ export class CanvasPortalManager {
       return;
     }
     const canonical = this.canonicalizeForSave(rawData);
-    const portalNodes = canonical.nodes.filter((node: any) => isCanvasFileNode(node) && node.portal === true);
+    const portalNodes = canonical.nodes.filter(isCanvasFileNode).filter(node => node.portal === true);
     const signature = await this.buildSignature(view, canonical.nodes, portalNodes);
     const currentHasMirrors = rawData.nodes.some(isMirrorNode);
     if (!force && this.signatures.get(view) === signature && (portalNodes.length === 0 || currentHasMirrors)) return;
@@ -273,8 +279,7 @@ export class CanvasPortalManager {
     const loadedPortalIds = new Set(portalNodes.map((node: CanvasNodeData) => node.id));
     const storedCrossEdges = new Map<string, CanvasEdgeData[]>();
     for (const portalNode of portalNodes) {
-      const list = Array.isArray((portalNode as any).bcPortalEdges)
-        ? (portalNode as any).bcPortalEdges as CanvasEdgeData[] : [];
+      const list = portalNode.bcPortalEdges ?? [];
       storedCrossEdges.set(portalNode.id, list);
     }
     const storedEdgeIds = new Set<string>();
@@ -313,8 +318,8 @@ export class CanvasPortalManager {
       for (const edge of observed) merged.set(edge.id, deepClone(edge));
 
       if (portalNode.portal === true) {
-        if (merged.size) (portalNode as any).bcPortalEdges = [...merged.values()];
-        else delete (portalNode as any).bcPortalEdges;
+        if (merged.size) portalNode.bcPortalEdges = [...merged.values()];
+        else delete portalNode.bcPortalEdges;
         storedCrossEdges.set(portalNode.id, [...merged.values()]);
       }
     }
@@ -341,12 +346,12 @@ export class CanvasPortalManager {
     const mirrorIds = new Set<string>(snapshots.flatMap(snapshot => snapshot.mirroredNodes.map(node => node.id)));
     const childEdges = snapshots.flatMap(snapshot => snapshot.mirroredEdges);
     const restoredEdges = [...restoredCrossEdges.values()].map(edge => {
-      const copy = deepClone(edge) as any;
+      const copy = deepClone(edge);
       for (const endpoint of ["fromNode", "toNode"] as const) {
         const info = mirrorInfo(copy[endpoint]);
         if (info && !mirrorIds.has(copy[endpoint])) copy[endpoint] = info.portalId;
       }
-      return copy as CanvasEdgeData;
+      return copy;
     });
 
     const nextData: CanvasData = {
@@ -385,12 +390,12 @@ export class CanvasPortalManager {
     this.lastPortalPositions.set(view, positions);
   }
 
-  private canonicalizeForSave(input: CanvasData): CanvasData {
+  private canonicalizeForSave = (input: CanvasData): CanvasData => {
     const data = deepClone(input);
     const nodes = data.nodes.filter((node: CanvasNodeData) => !isMirrorNode(node));
     const portalNodes = nodes.filter(isCanvasFileNode);
     const portalNodeIds = new Set(portalNodes.map((node: CanvasNodeData) => node.id));
-    const openIds = new Set(portalNodes.filter((node: any) => node.portal === true).map((node: CanvasNodeData) => node.id));
+    const openIds = new Set(portalNodes.filter(node => node.portal === true).map((node: CanvasNodeData) => node.id));
     const boundary = new Map<string, CanvasEdgeData[]>();
 
     const edges: CanvasEdgeData[] = [];
@@ -413,7 +418,7 @@ export class CanvasPortalManager {
         boundary.set(owner, list);
       }
 
-      const rewritten = deepClone(edge) as any;
+      const rewritten = deepClone(edge);
       if (fromInfo) rewritten.fromNode = fromInfo.portalId;
       if (toInfo) rewritten.toNode = toInfo.portalId;
       const fromNode = nodes.find((node: CanvasNodeData) => node.id === rewritten.fromNode);
@@ -423,31 +428,32 @@ export class CanvasPortalManager {
         rewritten.fromSide = fromSide;
         rewritten.toSide = toSide;
       }
-      edges.push(rewritten as CanvasEdgeData);
+      edges.push(rewritten);
     }
 
     for (const portalNode of portalNodes) {
       if (portalNode.portal === true) {
         const crossing = boundary.get(portalNode.id) ?? [];
-        if (crossing.length) (portalNode as any).bcPortalEdges = crossing;
-        else delete (portalNode as any).bcPortalEdges;
+        if (crossing.length) portalNode.bcPortalEdges = crossing;
+        else delete portalNode.bcPortalEdges;
       }
     }
-    for (const node of nodes) delete (node as any).isPortalLoaded;
+    for (const node of nodes) delete node.isPortalLoaded;
     return { ...data, nodes, edges };
-  }
+  };
 
-  private patchViewSerializer(view: any): void {
-    if (this.viewPatches.has(view) || typeof view?.getViewData !== "function") return;
-    const original = view.getViewData.bind(view);
-    const manager = this;
-    const wrapper = function (...args: any[]) {
-      const result = original(...args);
+  private patchViewSerializer(view: CanvasViewRuntime): void {
+    if (this.viewPatches.has(view) || typeof view.getViewData !== "function") return;
+    const original = view.getViewData;
+    const canonicalize = this.canonicalizeForSave;
+    const sync = this.syncPortalFiles;
+    const wrapper = function (this: CanvasViewRuntime, ...args: unknown[]) {
+      const result: unknown = original.apply(this, args);
       if (typeof result !== "string") return result;
       try {
         const parsed = parseCanvasJson(result);
-        const cleaned = manager.canonicalizeForSave(parsed);
-        void manager.syncPortalFiles(view);
+        const cleaned = canonicalize(parsed);
+        void sync(view);
         return JSON.stringify(cleaned, null, 2);
       } catch (error) {
         console.warn("Better Canvas could not serialize portal data:", error);
@@ -458,9 +464,9 @@ export class CanvasPortalManager {
     this.viewPatches.set(view, { original, wrapper });
   }
 
-  private bindViewInteractions(view: any): void {
-    const container = view?.containerEl as HTMLElement | undefined;
-    if (!(container instanceof HTMLElement) || this.boundViews.has(container)) return;
+  private bindViewInteractions(view: CanvasViewRuntime): void {
+    const container = view.containerEl;
+    if (!(container.instanceOf(HTMLElement)) || this.boundViews.has(container)) return;
     this.boundViews.add(container);
     let pointerDownNodeIds = new Set<string>();
     let pointerDownPortalPositions = new Map<string, { x: number; y: number }>();
@@ -473,49 +479,51 @@ export class CanvasPortalManager {
       // drag an unselected Portal frame, so selection is not a reliable guard.
       pointerDownPortalPositions = new Map(
         data.nodes
-          .filter((node: any) => isCanvasFileNode(node) && node.portal === true)
+          .filter(node => isCanvasFileNode(node) && node.portal === true)
           .map((node: CanvasNodeData): [string, { x: number; y: number }] => [node.id, { x: node.x, y: node.y }])
       );
     };
 
-    const onPointerUp = () => {
-      window.setTimeout(async () => {
-        const canvas = view?.canvas;
-        if (!canvas) return;
-        const liveData = readCanvasData(canvas);
-        const liveIds = new Set(liveData.nodes.map((node: CanvasNodeData) => node.id));
-        const createdIds = new Set([...liveIds].filter(id => !pointerDownNodeIds.has(id) && !mirrorInfo(id)));
-        if (createdIds.size) await this.adoptCreatedNodesInsidePortals(view, createdIds);
+    const finishPointerInteraction = async (): Promise<void> => {
+      const canvas = view?.canvas;
+      if (!canvas) return;
+      const liveData = readCanvasData(canvas);
+      const liveIds = new Set(liveData.nodes.map((node: CanvasNodeData) => node.id));
+      const createdIds = new Set([...liveIds].filter(id => !pointerDownNodeIds.has(id) && !mirrorInfo(id)));
+      if (createdIds.size) await this.adoptCreatedNodesInsidePortals(view, createdIds);
 
-        // If a frame moved, rebuild from the source before any write-back. Using
-        // the new frame offset with old mirror coordinates shifts the source file.
-        if (hasMovedOpenPortal(pointerDownPortalPositions, readCanvasData(canvas).nodes)) {
-          await this.refreshView(view, true);
-        } else {
-          await this.syncPortalFiles(view);
-          await this.refreshView(view);
-        }
-        pointerDownNodeIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
-        pointerDownPortalPositions = new Map();
-      }, 50);
+      // Rebuild moved frames before write-back so old mirror coordinates never
+      // shift the source file relative to the new frame origin.
+      if (hasMovedOpenPortal(pointerDownPortalPositions, readCanvasData(canvas).nodes)) {
+        await this.refreshView(view, true);
+      } else {
+        await this.syncPortalFiles(view);
+        await this.refreshView(view);
+      }
+      pointerDownNodeIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
+      pointerDownPortalPositions = new Map();
+    };
+    const onPointerUp = () => {
+      window.setTimeout(() => { void finishPointerInteraction(); }, 50);
     };
 
+    const scanCreatedNodes = async (): Promise<void> => {
+      const canvas = view?.canvas;
+      if (!canvas) return;
+      const currentIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
+      const previousIds = this.lastNodeIds.get(container);
+      if (!previousIds) {
+        this.lastNodeIds.set(container, currentIds);
+        return;
+      }
+      const createdIds = new Set([...currentIds].filter(id => !previousIds.has(id) && !mirrorInfo(id)));
+      this.lastNodeIds.set(container, currentIds);
+      if (createdIds.size) await this.adoptCreatedNodesInsidePortals(view, createdIds);
+    };
     let mutationScanTimer: number | undefined;
     const observer = new MutationObserver(() => {
       if (mutationScanTimer !== undefined) window.clearTimeout(mutationScanTimer);
-      mutationScanTimer = window.setTimeout(async () => {
-        const canvas = view?.canvas;
-        if (!canvas) return;
-        const currentIds = new Set(readCanvasData(canvas).nodes.map((node: CanvasNodeData) => node.id));
-        const previousIds = this.lastNodeIds.get(container);
-        if (!previousIds) {
-          this.lastNodeIds.set(container, currentIds);
-          return;
-        }
-        const createdIds = new Set([...currentIds].filter(id => !previousIds.has(id) && !mirrorInfo(id)));
-        this.lastNodeIds.set(container, currentIds);
-        if (createdIds.size) await this.adoptCreatedNodesInsidePortals(view, createdIds);
-      }, 80);
+      mutationScanTimer = window.setTimeout(() => { void scanCreatedNodes(); }, 80);
     });
     observer.observe(container, { childList: true, subtree: true });
 
@@ -533,13 +541,13 @@ export class CanvasPortalManager {
     });
   }
 
-  private async buildSignature(view: any, nodes: CanvasNodeData[], openPortals: CanvasNodeData[]): Promise<string> {
-    const signature: any[] = [String(view?.file?.path ?? "")];
+  private async buildSignature(view: CanvasViewRuntime, nodes: CanvasNodeData[], openPortals: CanvasNodeData[]): Promise<string> {
+    const signature: unknown[] = [String(view?.file?.path ?? "")];
     for (const node of nodes.filter(isCanvasFileNode)) {
       const file = this.plugin.app.vault.getAbstractFileByPath(node.file);
       signature.push([
-        node.id, node.file, Boolean((node as any).portal), node.x, node.y, node.width, node.height,
-        JSON.stringify((node as any).bcPortalEdges ?? []),
+        node.id, node.file, Boolean(node.portal), node.x, node.y, node.width, node.height,
+        JSON.stringify(node.bcPortalEdges ?? []),
         file instanceof TFile ? file.stat.mtime : -1,
         file instanceof TFile ? file.stat.size : -1
       ]);
@@ -554,7 +562,7 @@ export class CanvasPortalManager {
    * covers pointer-created nodes as well as keyboard-created nodes detected by
    * the container MutationObserver. Existing nodes are never adopted implicitly.
    */
-  private async adoptCreatedNodesInsidePortals(view: any, createdIds: Set<string>): Promise<void> {
+  private async adoptCreatedNodesInsidePortals(view: CanvasViewRuntime, createdIds: Set<string>): Promise<void> {
     if (!view?.canvas || !view?.containerEl || !createdIds.size || this.stopped ||
         this.adoptionInFlight.has(view)) return;
     this.adoptionInFlight.add(view);
@@ -567,9 +575,9 @@ export class CanvasPortalManager {
       );
       if (!createdNodes.length) return;
 
-      const portals = data.nodes.filter((node: any) =>
-        isCanvasFileNode(node) && node.portal === true && node.id !== ""
-      ) as CanvasNodeData[];
+      const portals = data.nodes.filter(isCanvasFileNode).filter(node =>
+        node.portal === true && node.id !== ""
+      );
       const ownerByCreatedId = new Map<string, CanvasNodeData>();
 
       for (const node of createdNodes) {
@@ -614,16 +622,16 @@ export class CanvasPortalManager {
           }
 
           const sourceNodes = nodesForPortal.map((node: CanvasNodeData) => {
-            const copy: any = {
+            const copy: CanvasNodeData = {
               ...deepClone(node),
-              id: idMap.get(node.id),
+              id: idMap.get(node.id) ?? node.id,
               x: node.x - offsetX,
               y: node.y - offsetY
             };
             // Nested portal expansion is not yet supported; keep Canvas file nodes
             // as ordinary file nodes in the source Canvas.
             if (isCanvasFileNode(copy)) delete copy.portal;
-            return copy as CanvasNodeData;
+            return copy;
           });
 
           const ownerOfEndpoint = (id: string): string | undefined => {
@@ -659,7 +667,7 @@ export class CanvasPortalManager {
               id: edgeId,
               fromNode: fromNodeId,
               toNode: toNodeId
-            } as CanvasEdgeData);
+            });
             localEdgesThisPortal.add(edge.id);
           }
 
@@ -684,11 +692,11 @@ export class CanvasPortalManager {
 
       const newNodes = data.nodes.filter((node: CanvasNodeData) => !adoptedMap.has(node.id));
       const newEdges = data.edges.filter((edge: CanvasEdgeData) => !localEdgeIds.has(edge.id)).map((edge: CanvasEdgeData) => {
-        const copy = { ...edge } as CanvasEdgeData;
+        const copy = { ...edge };
         const from = adoptedMap.get(edge.fromNode);
         const to = adoptedMap.get(edge.toNode);
-        if (from) (copy as any).fromNode = mirrorId(from.portalId, from.sourceId);
-        if (to) (copy as any).toNode = mirrorId(to.portalId, to.sourceId);
+        if (from) copy.fromNode = mirrorId(from.portalId, from.sourceId);
+        if (to) copy.toNode = mirrorId(to.portalId, to.sourceId);
         return copy;
       });
       canvas.importData({ ...data, nodes: newNodes, edges: newEdges });
@@ -702,11 +710,11 @@ export class CanvasPortalManager {
     }
   }
 
-  private async syncPortalFiles(view: any): Promise<void> {
+  private syncPortalFiles = async (view: CanvasViewRuntime): Promise<void> => {
     const canvas = view?.canvas;
     if (!canvas || this.stopped || this.portalRefreshInProgress.has(view)) return;
     const data = readCanvasData(canvas);
-    const portalNodes = data.nodes.filter((node: any) => isCanvasFileNode(node) && node.portal === true);
+    const portalNodes = data.nodes.filter(isCanvasFileNode).filter(node => node.portal === true);
     if (hasMovedOpenPortal(this.lastPortalPositions.get(view), data.nodes)) {
       // A save may race ahead of pointerup. Never write old mirrored coordinates
       // using the new frame origin; rebuild the mirrors first, then allow saves.
@@ -743,8 +751,8 @@ export class CanvasPortalManager {
             id: originalNode.id,
             x: live.x - offsetX,
             y: live.y - offsetY,
-            portal: (originalNode as any).portal
-          } as CanvasNodeData);
+            portal: originalNode.portal
+          });
         }
 
         const nextEdges: CanvasEdgeData[] = [];
@@ -758,7 +766,7 @@ export class CanvasPortalManager {
             id: edgeId,
             fromNode: from.childId,
             toNode: to.childId
-          } as CanvasEdgeData);
+          });
         }
 
         if (JSON.stringify(source.nodes) === JSON.stringify(nextNodes) &&
@@ -772,7 +780,7 @@ export class CanvasPortalManager {
         this.writingFiles.delete(file.path);
       }
     }
-  }
+  };
 
   /**
    * Add a real text node to the source canvas backing a Portal. New content is
@@ -781,8 +789,9 @@ export class CanvasPortalManager {
    * nodes and gives users an explicit, reversible creation path.
    */
   private promptForTextNodeInPortal(portalNodeId?: string): void {
-    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
-    const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
+    const activeView = this.plugin.app.workspace.getActiveViewOfType(ItemView);
+    const view = isCanvasViewRuntime(activeView) ? activeView : null;
+    const canvas = view?.canvas;
     if (!canvas || !view) {
       new Notice(t("Open a Canvas that contains a Canvas Portal first.", "请先打开包含 Canvas Portal 的画布。"));
       return;
@@ -794,7 +803,7 @@ export class CanvasPortalManager {
       new Notice(t("Select a single node that points to a .canvas file.", "请只选择一个指向 .canvas 文件的节点。"));
       return;
     }
-    const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
+    const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId);
     if (!isCanvasFileNode(portalNode)) {
       new Notice(t("The selected node is not a Canvas file node.", "所选节点不是 Canvas 文件节点。"));
       return;
@@ -810,8 +819,9 @@ export class CanvasPortalManager {
   }
 
   async addTextNodeToPortal(text: string, portalNodeId?: string): Promise<void> {
-    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
-    const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
+    const activeView = this.plugin.app.workspace.getActiveViewOfType(ItemView);
+    const view = isCanvasViewRuntime(activeView) ? activeView : null;
+    const canvas = view?.canvas;
     if (!canvas || !view) {
       new Notice(t("Open a Canvas that contains a Canvas Portal first.", "请先打开包含 Canvas Portal 的画布。"));
       return;
@@ -828,7 +838,7 @@ export class CanvasPortalManager {
       return;
     }
 
-    const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
+    const portalNode = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId);
     if (!isCanvasFileNode(portalNode)) {
       new Notice(t("The selected node is not a Canvas file node.", "所选节点不是 Canvas 文件节点。"));
       return;
@@ -914,7 +924,7 @@ export class CanvasPortalManager {
     }
   }
 
-  private removePortalMirrors(canvas: any, portalId: string): boolean {
+  private removePortalMirrors(canvas: CanvasRuntime, portalId: string): boolean {
     const belongsToPortal = (id: unknown): boolean => mirrorInfo(id)?.portalId === portalId;
     const hasArtifacts = (): boolean => {
       const current = readCanvasData(canvas);
@@ -964,9 +974,10 @@ export class CanvasPortalManager {
   }
 
   togglePortalForNode(nodeId?: string): void {
-    const view = this.plugin.app.workspace.getActiveViewOfType(ItemView) as any;
-    const canvas = view?.getViewType?.() === "canvas" ? view.canvas : null;
-    if (!canvas) {
+    const activeView = this.plugin.app.workspace.getActiveViewOfType(ItemView);
+    const view = isCanvasViewRuntime(activeView) ? activeView : null;
+    const canvas = view?.canvas;
+    if (!canvas || !view) {
       new Notice(t("Open a Canvas first.", "请先打开 Canvas。"));
       return;
     }
@@ -980,7 +991,7 @@ export class CanvasPortalManager {
       new Notice(t("Select a single node that points to a .canvas file.", "请只选择一个指向 .canvas 文件的节点。"));
       return;
     }
-    const node = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId) as any;
+    const node = readCanvasData(canvas).nodes.find((item: CanvasNodeData) => item.id === selectedId);
     if (!isCanvasFileNode(node)) {
       new Notice(t("The selected node is not a Canvas file node.", "所选节点不是 Canvas 文件节点。"));
       return;
@@ -1020,9 +1031,9 @@ export class CanvasPortalManager {
     const data = readCanvasData(canvas);
     const nodes = data.nodes.map((item: CanvasNodeData) => {
       if (item.id !== node.id) return item;
-      const updated: any = { ...item, portal: nextOpen };
+      const updated = { ...item, portal: nextOpen };
       if (!nextOpen) delete updated.bcPortalEdges;
-      return updated as CanvasNodeData;
+      return updated;
     });
     canvas.importData({ ...data, nodes, edges: data.edges });
     canvas.requestSave?.();

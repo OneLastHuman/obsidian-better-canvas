@@ -1,5 +1,5 @@
 import type { CanvasData, CanvasNodeData } from "./canvas";
-import { resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { resolveCanvasNodeShape } from "./canvas-node-style";
 import { applyNodeVisualStyle, ROUNDED_MAP_PRESETS } from "./node-visual-style";
 
 export const ROUNDED_MAP_INK = "#34372f";
@@ -155,11 +155,14 @@ function liveRegistry(doc: Document | undefined): RoundedMapLive | null {
   if (!doc) return null;
   const existing = liveRegistries.get(doc);
   if (existing) return existing;
-  const Observer = (doc.defaultView as any)?.ResizeObserver;
-  if (typeof Observer !== "function") return null;
+  const Observer = doc.defaultView?.ResizeObserver;
+  const ElementClass = doc.defaultView?.HTMLElement;
+  if (typeof Observer !== "function" || !ElementClass) return null;
   const registry: RoundedMapLive = {
     observer: new Observer((entries: ResizeObserverEntry[]) => {
-      for (const entry of entries) refreshRoundedMapGeometry(entry.target as HTMLElement);
+      for (const entry of entries) {
+        if (entry.target.instanceOf(ElementClass)) refreshRoundedMapGeometry(entry.target);
+      }
     }),
     elements: new Set()
   };
@@ -239,7 +242,7 @@ export function clearRoundedMapNode(el: HTMLElement): void {
 
 export function decorateRoundedMapNode(el: HTMLElement, node: CanvasNodeData): void {
   if (node.type === "group") { clearRoundedMapNode(el); return; }
-  const shape = resolveCanvasNodeShape(node as CanvasNodeStyleSource);
+  const shape = resolveCanvasNodeShape(node);
   const css = roundedMapCss(shape, node.width, node.height);
   if (!Object.keys(css).length) { clearRoundedMapNode(el); return; }
   el.dataset.bcRounded = "true";

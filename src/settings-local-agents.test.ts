@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalAgentBackend, LocalModelOption } from "./local-agent-settings";
+import { Setting, type App, type Plugin, type SettingDefinitionItem, type SettingGroup } from "obsidian";
+import type { FeatureSettings } from "./feature-integrator";
+import { settingsFixture } from "./settings-test-fixtures";
 
 const host = vi.hoisted(() => {
   class Element {
@@ -7,6 +10,8 @@ const host = vi.hoisted(() => {
     children: Element[] = [];
     classes: string[] = [];
     querySelector() { return null; }
+    querySelectorAll() { return []; }
+    closest() { return null; }
     createDiv() {
       const child = new Element();
       this.children.push(child);
@@ -64,6 +69,7 @@ const host = vi.hoisted(() => {
     name = "";
     description = "";
     descEl = new Element();
+    controlEl = new Element();
     dropdown?: Dropdown;
     texts: Text[] = [];
     buttons: Button[] = [];
@@ -126,31 +132,35 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function setup(extra: Record<string, unknown> = {}) {
-  const live: Record<string, any> = {
-    backend: "codex-cli",
-    codexBinaryPath: "/tools/codex",
-    codexModel: "",
-    opencodeBinaryPath: "/tools/opencode",
-    opencodeModel: "",
-    localAgents: {
-      "gemini-cli": { binaryPath: "/tools/gemini", model: "retained-gemini" }
-    },
-    aiUsageRecords: [],
-    ...extra
-  };
+function setup(extra: Partial<FeatureSettings> = {}) {
+  const live = settingsFixture(extra);
   const features = {
     settings: () => live,
     save: vi.fn(async () => {}),
-    applySettings: vi.fn()
+    applySettings: vi.fn(),
+    resetOnboardingSettings: () => live.onboarding,
+    probeProviderCapabilities: vi.fn(async () => { throw new Error("Unexpected capability probe"); })
   };
-  const tab = new BetterCanvasSettingsTab({} as any, {} as any, features) as any;
-  tab.display = vi.fn();
-  tab.details = vi.fn(() => new host.Element());
+  const tab = new BetterCanvasSettingsTab({} as App, {} as Plugin, features);
+  tab.update = vi.fn();
+
+  function renderDefinitions(definitions: SettingDefinitionItem[]): void {
+    for (const definition of definitions) {
+      if ("type" in definition) {
+        renderDefinitions(definition.items ?? []);
+      } else if (definition.render && definition.searchable !== false) {
+        const setting = new Setting({} as HTMLElement).setName(definition.name).setDesc(definition.desc ?? "");
+        definition.render(setting, {} as SettingGroup);
+      }
+    }
+  }
 
   function render(backend: LocalAgentBackend = "codex-cli") {
     const index = host.rows.length;
-    tab.renderLocalAgentSettings(new host.Element(), new host.Element(), backend);
+    const definitions: SettingDefinitionItem[] = [];
+    const advanced: SettingDefinitionItem[] = [];
+    tab["renderLocalAgentSettings"](definitions, advanced, backend);
+    renderDefinitions([...definitions, ...advanced]);
     const rows = host.rows.slice(index);
     const modelRow = rows.find(row => row.dropdown)!;
     const texts = rows.flatMap(row => row.texts);
@@ -201,7 +211,7 @@ describe("local agent settings model picker", () => {
       expect(ui.model.value).toBe("");
       expect(ui.read.disabled).toBe(false);
       expect(ui.feedback.text).toContain("2");
-      expect(tab.hasUnsavedChanges).toBe(false);
+      expect(tab["hasUnsavedChanges"]).toBe(false);
       expect(features.save).not.toHaveBeenCalled();
     }
   );
@@ -252,7 +262,7 @@ describe("local agent settings model picker", () => {
     expect(ui.feedback.text).toContain("offline catalog");
     expect([...ui.model.options.entries()]).toEqual(before);
     expect(ui.model.value).toBe("listed");
-    expect(tab.currentSettings().codexModel).toBe("listed");
+    expect(tab["currentSettings"]().codexModel).toBe("listed");
     expect(live.codexModel).toBe("saved-model");
     expect(ui.read.disabled).toBe(false);
   });
@@ -271,7 +281,7 @@ describe("local agent settings model picker", () => {
 
     expect(oldSignal.aborted).toBe(true);
     expect(ui.read.disabled).toBe(false);
-    expect(tab.currentSettings().codexBinaryPath).toBe("/tools/new-codex");
+    expect(tab["currentSettings"]().codexBinaryPath).toBe("/tools/new-codex");
     expect(live.codexBinaryPath).toBe("/tools/codex");
     await ui.read.click();
     const currentFeedback = ui.feedback.text;
@@ -309,7 +319,7 @@ describe("local agent settings model picker", () => {
     expect(ui.model.options.has("custom/claude-model")).toBe(true);
     await ui.model.change("");
     expect(ui.manual.value).toBe("");
-    expect(tab.currentSettings().localAgents["claude-code"].model).toBe("");
+    expect(tab["currentSettings"]().localAgents["claude-code"].model).toBe("");
     expect(live.localAgents["claude-code"]).toBeUndefined();
     expect(features.save).not.toHaveBeenCalled();
   });
@@ -330,7 +340,7 @@ describe("local agent settings model picker", () => {
     expect(live.localAgents["claude-code"]).toBeUndefined();
     live.aiUsageRecords.push({ id: "background-usage" });
 
-    await tab.saveDraftSettings();
+    await tab["saveDraftSettings"]();
 
     expect(live.codexModel).toBe("codex-selected");
     expect(live.codexBinaryPath).toBe("/tools/codex-preview");
@@ -341,7 +351,7 @@ describe("local agent settings model picker", () => {
     expect(live.aiUsageRecords).toEqual([{ id: "background-usage" }]);
     expect(features.save).toHaveBeenCalledOnce();
     expect(features.applySettings).toHaveBeenCalledOnce();
-    expect(tab.hasUnsavedChanges).toBe(false);
+    expect(tab["hasUnsavedChanges"]).toBe(false);
   });
 
   it("discards local agent changes and reloads the latest saved configuration", async () => {
@@ -350,12 +360,12 @@ describe("local agent settings model picker", () => {
     await render("aider").manual.change("discarded-aider-model");
     live.codexModel = "updated-externally";
 
-    tab.discardChanges();
+    tab["discardChanges"]();
 
     expect(render().model.value).toBe("updated-externally");
     expect(render("aider").model.value).toBe("");
     expect(live.localAgents.aider).toBeUndefined();
-    expect(tab.hasUnsavedChanges).toBe(false);
+    expect(tab["hasUnsavedChanges"]).toBe(false);
     expect(features.save).not.toHaveBeenCalled();
   });
 
@@ -365,17 +375,17 @@ describe("local agent settings model picker", () => {
     await render("qwen-code").manual.change("qwen-retry-model");
     features.save.mockRejectedValueOnce(new Error("disk full"));
 
-    await tab.saveDraftSettings();
+    await tab["saveDraftSettings"]();
 
     expect(live.codexModel).toBe("saved");
     expect(live.localAgents["qwen-code"]).toBeUndefined();
-    expect(tab.currentSettings().codexModel).toBe("retry-model");
-    expect(tab.currentSettings().localAgents["qwen-code"].model).toBe("qwen-retry-model");
-    expect(tab.hasUnsavedChanges).toBe(true);
-    await tab.saveDraftSettings();
+    expect(tab["currentSettings"]().codexModel).toBe("retry-model");
+    expect(tab["currentSettings"]().localAgents["qwen-code"].model).toBe("qwen-retry-model");
+    expect(tab["hasUnsavedChanges"]).toBe(true);
+    await tab["saveDraftSettings"]();
     expect(live.codexModel).toBe("retry-model");
     expect(live.localAgents["qwen-code"].model).toBe("qwen-retry-model");
-    expect(tab.hasUnsavedChanges).toBe(false);
+    expect(tab["hasUnsavedChanges"]).toBe(false);
   });
 
   it("disables local model discovery on mobile", () => {
@@ -391,7 +401,7 @@ describe("local agent settings model picker", () => {
   });
 
   it("shows only the disabled default model control for IBM Bob", () => {
-    const { render, tab } = setup();
+    const { render } = setup();
     const ui = render("bob");
     expect([...ui.model.options.keys()]).toEqual([""]);
     expect(ui.model.disabled).toBe(true);
@@ -399,7 +409,6 @@ describe("local agent settings model picker", () => {
     expect(ui.read).toBeUndefined();
     expect(ui.manual).toBeUndefined();
     expect(ui.path.placeholder).toBe("bob");
-    expect(tab.details).not.toHaveBeenCalled();
     expect(listCodexModels).not.toHaveBeenCalled();
     expect(listOpenCodeModels).not.toHaveBeenCalled();
   });
@@ -410,16 +419,15 @@ describe("local agent executable discovery", () => {
     vi.mocked(discoverAgentBinary).mockResolvedValue("/opt/homebrew/bin/codex");
     const { render, tab, features, live } = setup({ codexBinaryPath: "" });
     const ui = render("codex-cli");
-    const row = ui.rows.find(item => item.name === "程序路径")!;
+    const row = ui.rows.find(item => item.texts.includes(ui.path))!;
     expect(ui.path.value).toBe("");
 
     await row.buttons[0].click();
 
     expect(discoverAgentBinary).toHaveBeenCalledWith("codex");
     expect(ui.path.value).toBe("/opt/homebrew/bin/codex");
-    expect(tab.currentSettings().codexBinaryPath).toBe("/opt/homebrew/bin/codex");
+    expect(tab["currentSettings"]().codexBinaryPath).toBe("/opt/homebrew/bin/codex");
     expect(live.codexBinaryPath).toBe("");
-    expect(row.descEl.children[0].text).toContain("已找到");
     expect(features.save).not.toHaveBeenCalled();
   });
 
@@ -427,13 +435,12 @@ describe("local agent executable discovery", () => {
     vi.mocked(discoverAgentBinary).mockResolvedValue(null);
     const { render } = setup({ opencodeBinaryPath: "" });
     const ui = render("opencode-acp");
-    const row = ui.rows.find(item => item.name === "程序路径")!;
+    const row = ui.rows.find(item => item.texts.includes(ui.path))!;
 
     await row.buttons[0].click();
 
     expect(discoverAgentBinary).toHaveBeenCalledWith("opencode");
     expect(ui.path.value).toBe("");
-    expect(row.descEl.children[0].text).toContain("没有找到");
     await ui.path.change("/custom/opencode");
     expect(ui.path.value).toBe("/custom/opencode");
   });

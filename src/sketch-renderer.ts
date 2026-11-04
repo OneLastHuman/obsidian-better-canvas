@@ -1,6 +1,8 @@
 import { RoughGenerator } from "roughjs/bin/generator.js";
 import { readCanvasData, type CanvasNodeData } from "./canvas";
-import { resolveSketchStyle } from "./sketch-style";
+import { resolveSketchStyle, type ResolvedSketchStyle } from "./sketch-style";
+import type { CanvasRuntime } from "./canvas-runtime";
+import type { Drawable } from "roughjs/bin/core.js";
 
 export const SKETCH_EDGE_FILTER_ID = "bc-sketch-wobble";
 export const SKETCH_FRAME_CLASS = "bc-sketch-frame";
@@ -74,7 +76,7 @@ function shapePath(shape: string, width: number, height: number): string {
   }
 }
 
-function fillMarkup(node: CanvasNodeData, width: number, height: number, style: ReturnType<typeof resolveSketchStyle>, options: SketchNodeSvgOptions): string {
+function fillMarkup(node: CanvasNodeData, width: number, height: number, style: ResolvedSketchStyle, options: SketchNodeSvgOptions): string {
   if (style.fill === "none") return "";
   const seed = sketchSeed(node.id + ":fill");
   const base = {
@@ -95,15 +97,15 @@ function fillMarkup(node: CanvasNodeData, width: number, height: number, style: 
   return `<g opacity="${options.fillOpacity ?? (style.fill === "solid" ? 0.24 : 0.58)}">${pathsToMarkup(drawable)}</g>`;
 }
 
-function pathsToMarkup(drawable: ReturnType<RoughGenerator["line"]>): string {
+function pathsToMarkup(drawable: Drawable): string {
   return generator.toPaths(drawable).map(path =>
     `<path d="${path.d}" stroke="${path.stroke}" stroke-width="${path.strokeWidth}" ` +
     `fill="${path.fill ?? "none"}" stroke-linecap="round" stroke-linejoin="round"/>`
   ).join("");
 }
 
-function outlineMarkup(node: CanvasNodeData, width: number, height: number, style: ReturnType<typeof resolveSketchStyle>, ink: string): string {
-  if (style.border === "invisible" || node.type === "group" && style.border === "invisible") return "";
+function outlineMarkup(node: CanvasNodeData, width: number, height: number, style: ResolvedSketchStyle, ink: string): string {
+  if (style.border === "invisible") return "";
   const seed = sketchSeed(node.id + ":outline");
   const dash = style.border === "dashed" ? [8, 6] : style.border === "dotted" ? [1.5, 5] : undefined;
   const base = {
@@ -122,7 +124,7 @@ function outlineMarkup(node: CanvasNodeData, width: number, height: number, styl
   return `<g opacity="${node.type === "group" ? 0.55 : 1}">${pathsToMarkup(drawable)}</g>`;
 }
 
-function ornamentMarkup(node: CanvasNodeData, width: number, height: number, style: ReturnType<typeof resolveSketchStyle>, ink: string): string {
+function ornamentMarkup(node: CanvasNodeData, width: number, height: number, style: ResolvedSketchStyle): string {
   if (style.preset?.id !== "heading") return "";
   const seed = sketchSeed(node.id + ":rule");
   const length = Math.min(Math.max(72, width - 32), 220);
@@ -151,7 +153,7 @@ export function renderSketchNodeSvg(node: CanvasNodeData, options: SketchNodeSvg
   return [
     fillMarkup(node, width, height, style, options),
     outlineMarkup(node, width, height, style, ink),
-    ornamentMarkup(node, width, height, style, ink)
+    ornamentMarkup(node, width, height, style)
   ].join("");
 }
 
@@ -175,7 +177,7 @@ export function sketchEdgeFilterDefs(id = SKETCH_EDGE_FILTER_ID): string {
     `</filter></defs></svg>`;
 }
 
-function nodeElement(canvas: any, nodeId: string): HTMLElement | null {
+function nodeElement(canvas: CanvasRuntime, nodeId: string): HTMLElement | null {
   if (typeof HTMLElement === "undefined") return null;
   const node = canvas?.nodes?.get?.(nodeId);
   const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
@@ -220,11 +222,11 @@ function appendSvgMarkup(target: Element, markup: string): boolean {
  * Layer the hand-drawn outline over native Canvas nodes. The SVG is
  * pointer-events:none and the node's rectangular interaction model is unchanged.
  */
-export function decorateSketchCanvas(canvas: any): void {
+export function decorateSketchCanvas(canvas: CanvasRuntime): void {
   const data = readCanvasData(canvas);
   const wrapper = canvas?.wrapperEl;
   if (typeof document === "undefined") return;
-  if (wrapper?.querySelector && !wrapper.querySelector("." + SKETCH_DEFS_CLASS)) {
+  if (wrapper && !wrapper.querySelector("." + SKETCH_DEFS_CLASS)) {
     const defs = parseSvgMarkup(wrapper.ownerDocument, sketchEdgeFilterDefs());
     if (defs && typeof wrapper.appendChild === "function") wrapper.appendChild(defs);
   }
@@ -243,7 +245,7 @@ export function decorateSketchCanvas(canvas: any): void {
     const existing = container.querySelector?.("svg." + SKETCH_FRAME_CLASS);
     if (existing instanceof SVGElement && existing.dataset.signature === signature) continue;
     existing?.remove();
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const svg = container.ownerDocument.win.createSvg("svg");
     svg.setAttribute("class", SKETCH_FRAME_CLASS);
     svg.setAttribute("viewBox", `0 0 ${Math.max(1, number(item.width, 280))} ${Math.max(1, number(item.height, 140))}`);
     svg.setAttribute("preserveAspectRatio", "none");
@@ -256,11 +258,11 @@ export function decorateSketchCanvas(canvas: any): void {
 }
 
 /** Remove every overlay and data attribute added by the sketch theme. */
-export function clearSketchCanvas(canvas: any): void {
+export function clearSketchCanvas(canvas: CanvasRuntime): void {
   const wrapper = canvas?.wrapperEl;
   for (const svg of wrapper?.querySelectorAll?.("svg." + SKETCH_FRAME_CLASS) ?? []) svg.remove?.();
   for (const defs of wrapper?.querySelectorAll?.("." + SKETCH_DEFS_CLASS) ?? []) defs.remove?.();
-  for (const element of wrapper?.querySelectorAll?.("[data-bc-sketch]") ?? []) {
+  for (const element of wrapper?.querySelectorAll<HTMLElement>("[data-bc-sketch]") ?? []) {
     if (!element.dataset) continue;
     delete element.dataset.bcSketch;
     delete element.dataset.bcSketchPreset;

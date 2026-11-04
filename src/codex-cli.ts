@@ -1,3 +1,5 @@
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { clearTimeout, setTimeout } from "node:timers";
 import { parseCodexJsonEvent } from "./codex-cli-events";
 import { resolveAgentBinary } from "./local-agent-discovery";
 import { resolveLaunchCommand } from "./agent-launcher";
@@ -60,7 +62,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let forceKill: ReturnType<typeof setTimeout> | undefined;
 
-    let child: ReturnType<typeof spawn>;
+    let child: ChildProcessWithoutNullStreams;
     try {
       child = spawn(launch.binary, launch.args, {
         cwd: tmpdir(),
@@ -69,7 +71,7 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
         shell: false
       });
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
       return;
     }
 
@@ -116,8 +118,8 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       finish(new Error(message));
     });
 
-    child.stdout!.setEncoding("utf8");
-    child.stdout!.on("data", (chunk: string) => {
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
       stdoutBuffer += chunk;
       if (stdoutBuffer.length > 1_000_000) {
         terminate();
@@ -129,8 +131,8 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       for (const line of lines) consumeLine(line);
     });
 
-    child.stderr!.setEncoding("utf8");
-    child.stderr!.on("data", (chunk: string) => {
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
       stderrTail = (stderrTail + chunk).slice(-8000);
     });
 
@@ -180,9 +182,9 @@ export async function runLocalCodex(prompt: string, options: LocalCodexOptions):
       finish(undefined, answer);
     });
 
-    child.stdin!.once("error", (error: Error) => {
+    child.stdin.once("error", (error: Error) => {
       if (!settled) finish(new Error(t("Could not send the prompt to Codex CLI: ", "无法向 Codex CLI 发送提示词：") + error.message));
     });
-    child.stdin!.end(prompt + "\n");
+    child.stdin.end(prompt + "\n");
   });
 }

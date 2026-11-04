@@ -1,8 +1,10 @@
+import type { CanvasRuntime } from "./canvas-runtime";
+
 /**
  * Reuse Obsidian Canvas' native zoom-to-selection behavior to fit all nodes
  * without leaving the whole Canvas selected after the camera has moved.
  */
-export function zoomCanvasToFit(canvas: any): number {
+export function zoomCanvasToFit(canvas: Partial<CanvasRuntime> | null | undefined): number {
   if (!canvas?.nodes?.values || typeof canvas.select !== "function" ||
       typeof canvas.zoomToSelection !== "function") return 0;
 

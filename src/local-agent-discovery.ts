@@ -23,7 +23,7 @@ interface DirectoryEntry {
 }
 
 interface FileSystemLike {
-  statSync(file: string): { isFile?(): boolean } | unknown;
+  statSync(file: string): unknown;
   readdirSync(directory: string, options: { withFileTypes: true }): DirectoryEntry[];
 }
 
@@ -215,11 +215,15 @@ export function agentBinaryCandidates(name: string, context: AgentBinaryCandidat
   return candidates;
 }
 
+function hasFileCheck(value: object): value is { isFile(): unknown } {
+  return "isFile" in value && typeof value.isFile === "function";
+}
+
 function isExecutableFile(fs: FileSystemLike, file: string): boolean {
   try {
     const stat = fs.statSync(file);
     if (stat && typeof stat === "object" && "isFile" in stat) {
-      return typeof stat.isFile === "function" ? stat.isFile() : false;
+      return hasFileCheck(stat) ? Boolean(stat.isFile()) : false;
     }
     return Boolean(stat);
   } catch {
@@ -239,12 +243,12 @@ export function findAgentBinary(
 ): string | null {
   const command = name.trim();
   if (!command) return null;
-  const fs = runtime.fs as FileSystemLike | undefined;
-  const path = runtime.path as PathLike | undefined;
+  const fs = runtime.fs;
+  const path = runtime.path;
   if (!fs?.statSync || !path?.join) return null;
 
   const platform = runtime.process?.platform ?? "linux";
-  const env = (runtime.process?.env ?? {}) as Record<string, string | undefined>;
+  const env = runtime.process?.env ?? {};
   const searchPath = envValue(env, "PATH", "Path");
   // Without a PATH there is nothing reliable to search; let spawn do its own lookup.
   if (!searchPath) return null;
@@ -291,7 +295,7 @@ export function resolveAgentBinary(
   runtime: NodeRuntimeModules,
   options: AgentBinarySearchOptions = {}
 ): string {
-  const env = (runtime.process?.env ?? {}) as Record<string, string | undefined>;
+  const env = runtime.process?.env ?? {};
   const raw = (configured ?? "").trim().replace(/^"|"$/g, "").trim();
   const value = expandHome(raw, runtime, env);
   if (value && /[\\/]/.test(value)) return value;

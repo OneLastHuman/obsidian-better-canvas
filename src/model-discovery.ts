@@ -41,14 +41,19 @@ export async function discoverModels(settings: AISettings): Promise<string[]> {
     throw: false
   });
 
-  let body: any = response.json;
+  let body: unknown = response.json;
   if (!body || typeof body !== "object") {
     try { body = JSON.parse(String(response.text ?? "")); }
     catch { body = { message: response.text }; }
   }
   if (response.status < 200 || response.status >= 300) {
-    const detail = body?.error?.message ?? body?.message ?? response.text;
-    const detailText = detail ? String(detail).slice(0, 500) : "";
+    const record = body && typeof body === "object" ? body as Record<string, unknown> : undefined;
+    const error = record?.error;
+    const nestedMessage = error && typeof error === "object" && "message" in error ? error.message : undefined;
+    const detail = nestedMessage ?? record?.message ?? response.text;
+    const detailText = !detail ? "" : (typeof detail === "string" ? detail
+      : typeof detail === "number" || typeof detail === "boolean" ? String(detail)
+      : response.text).slice(0, 500);
     throw new Error(t(
       `Failed to fetch the model list (HTTP ${response.status})` + (detailText ? ": " + detailText : ""),
       `获取模型列表失败（HTTP ${response.status}）` + (detailText ? "：" + detailText : "")

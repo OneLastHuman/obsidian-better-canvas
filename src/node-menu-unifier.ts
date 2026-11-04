@@ -1,13 +1,14 @@
 import { Notice, setIcon } from "obsidian";
-import type { Plugin } from "obsidian";
+import type { Events, Plugin } from "obsidian";
 import { makeTextNode, readCanvasData, type CanvasData, type CanvasNodeData } from "./canvas";
+import { isCanvasViewRuntime, type CanvasRuntime } from "./canvas-runtime";
 import { defaultNodeSize } from "./node-defaults";
 import {
   applyResearchPreset, applyResearchIntensity, researchPreset, researchIntensity,
   RESEARCH_PRESETS, RESEARCH_COLORS, RESEARCH_INTENSITIES
 } from "./research-style";
 import { decorateCanvas } from "./enhancements";
-import { resolveCanvasNodeBorder, resolveCanvasNodeShape, type CanvasNodeStyleSource } from "./canvas-node-style";
+import { resolveCanvasNodeBorder, resolveCanvasNodeShape } from "./canvas-node-style";
 import { applyRoundedMapPreset, roundedMapCss } from "./rounded-map-style";
 import { applyScrapbookPreset, decorateCanvasTheme, recordCanvasStyleHistory, resolveCanvasTheme, scrapbookPreset, SCRAPBOOK_PRESETS, SCRAPBOOK_COLORS } from "./canvas-theme";
 import { applySoftNotesPreset, resolveSoftNotesStyle, SOFT_NOTES_COLORS, SOFT_NOTES_PRESETS } from "./soft-notes-style";
@@ -49,7 +50,7 @@ type ControlGroup = {
 };
 
 type ActivePanel = {
-  canvas: any;
+  canvas: CanvasRuntime;
   nodeIds: string[];
   surface: HTMLElement;
   outsideHandler: (event: PointerEvent) => void;
@@ -61,16 +62,16 @@ type ActivePanel = {
 type PresetTransform = (data: CanvasData, ids: readonly string[]) => CanvasData;
 const PRESET_DRAG_TYPE = "application/x-better-canvas-node-preset";
 
-function selectedNodeIds(canvas: any): string[] | null {
-  const selected = Array.from(canvas?.selection?.values?.() ?? []) as any[];
+function selectedNodeIds(canvas: CanvasRuntime): string[] | null {
+  const selected = Array.from(canvas.selection?.values() ?? []);
   if (selected.length === 0) return null;
-  const ids = selected.map(item => item?.id ?? item?.getData?.()?.id);
-  if (ids.some(id => typeof id !== "string" || !canvas?.nodes?.has?.(id))) return null;
-  return [...new Set(ids as string[])].sort();
-}
-
-function nodeFromData(canvas: any, nodeId: string): CanvasNodeData | undefined {
-  return readCanvasData(canvas).nodes.find(node => node.id === nodeId);
+  const ids = new Set<string>();
+  for (const item of selected) {
+    const id = item.id ?? item.getData?.().id;
+    if (typeof id !== "string" || !canvas.nodes?.has(id)) return null;
+    ids.add(id);
+  }
+  return [...ids].sort();
 }
 
 function styleOf(node: CanvasNodeData): {
@@ -83,13 +84,11 @@ function styleOf(node: CanvasNodeData): {
   researchPreset: string;
   researchIntensity: number;
 } {
-  const styleAttributes = node.styleAttributes && typeof node.styleAttributes === "object"
-    ? node.styleAttributes as Record<string, unknown>
-    : {};
-  const border = resolveCanvasNodeBorder(node as CanvasNodeStyleSource);
+  const styleAttributes = node.styleAttributes ?? {};
+  const border = resolveCanvasNodeBorder(node);
   return {
     color: typeof node.color === "string" ? node.color.toLowerCase() : "",
-    shape: resolveCanvasNodeShape(node as CanvasNodeStyleSource),
+    shape: resolveCanvasNodeShape(node),
     border: border === "none" ? "invisible" : border,
     align: typeof node.bcTextAlign === "string"
       ? node.bcTextAlign
@@ -167,7 +166,7 @@ function addButton(
   action: (event: MouseEvent) => void,
   icon?: string
 ): HTMLButtonElement {
-  const button = document.createElement("button");
+  const button = parent.ownerDocument.win.createEl("button");
   button.type = "button";
   button.className = className;
   if (icon) {
@@ -175,7 +174,7 @@ function addButton(
     // Keep icon-only controls visible if the host renderer fails to inject the
     // SVG for this surface.
     if (!button.querySelector("svg")) {
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const svg = parent.ownerDocument.win.createSvg("svg");
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("width", "16");
       svg.setAttribute("height", "16");
@@ -187,7 +186,7 @@ function addButton(
       svg.setAttribute("stroke-linecap", "round");
       svg.setAttribute("stroke-linejoin", "round");
       for (const [d, extra] of ICON_FALLBACKS[icon] ?? []) {
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const path = parent.ownerDocument.win.createSvg("path");
         path.setAttribute("d", d);
         for (const [name, value] of Object.entries(extra ?? {})) path.setAttribute(name, value);
         svg.appendChild(path);
@@ -218,11 +217,12 @@ export default class NodeMenuUnifier {
   }
 
   start(): void {
-    const workspace = this.plugin.app.workspace as any;
+    const workspace = this.plugin.app.workspace;
+    const events: Events = workspace;
     this.plugin.registerEvent(workspace.on("layout-change", () => this.scanCanvases()));
     this.plugin.registerEvent(workspace.on("active-leaf-change", () => this.scanCanvases()));
-    this.plugin.registerEvent(workspace.on("better-canvas:theme-changed", () => this.renderStylePanel()));
-    this.plugin.registerEvent(workspace.on("advanced-canvas:data-loaded:after", (canvas: any) => {
+    this.plugin.registerEvent(events.on("better-canvas:theme-changed", () => this.renderStylePanel()));
+    this.plugin.registerEvent(events.on("advanced-canvas:data-loaded:after", (canvas: unknown) => {
       if (this.activePanel?.canvas !== canvas || this.panelRefreshFrame !== null) return;
       this.panelRefreshFrame = window.requestAnimationFrame(() => {
         this.panelRefreshFrame = null;
@@ -246,14 +246,14 @@ export default class NodeMenuUnifier {
   }
 
   private scanCanvases(): void {
-    const workspace = this.plugin.app.workspace as any;
+    const workspace = this.plugin.app.workspace;
     const liveContainers = new Set<HTMLElement>();
-    const liveCanvases = new Set<any>();
-    for (const leaf of workspace.getLeavesOfType?.("canvas") ?? []) {
-      const view = leaf?.view;
-      const container = view?.containerEl;
-      const canvas = view?.canvas;
-      if (!(container instanceof HTMLElement) || !canvas) continue;
+    const liveCanvases = new Set<CanvasRuntime>();
+    for (const leaf of workspace.getLeavesOfType("canvas")) {
+      const view = leaf.view;
+      if (!isCanvasViewRuntime(view)) continue;
+      const container = view.containerEl;
+      const canvas = view.canvas;
       liveContainers.add(container);
       liveCanvases.add(canvas);
       this.installCanvasControl(container, canvas);
@@ -269,7 +269,7 @@ export default class NodeMenuUnifier {
     }
   }
 
-  private installCanvasControl(container: HTMLElement, canvas: any): void {
+  private installCanvasControl(container: HTMLElement, canvas: CanvasRuntime): void {
     const controls = container.querySelector<HTMLElement>(".canvas-controls");
     if (!controls) return;
     if (this.controlGroups.has(container)) {
@@ -279,9 +279,9 @@ export default class NodeMenuUnifier {
 
     // Mirror Obsidian's own group/item markup so the entry inherits the native
     // size, radius, border and hover treatment.
-    const group = document.createElement("div");
+    const group = container.ownerDocument.win.createDiv();
     group.className = "canvas-control-group mod-raised bc-node-style-control-group";
-    const button = document.createElement("div");
+    const button = container.ownerDocument.win.createDiv();
     button.className = "canvas-control-item bc-node-style-control-item";
     button.setAttribute("role", "button");
     button.setAttribute("tabindex", "0");
@@ -297,7 +297,7 @@ export default class NodeMenuUnifier {
     const open = (event: Event): void => {
       event.preventDefault();
       event.stopPropagation();
-      const selected = Array.from(canvas?.selection?.values?.() ?? []) as unknown[];
+      const selected = Array.from(canvas.selection?.values() ?? []);
       const nodeIds = selectedNodeIds(canvas);
       // An empty Canvas selection opens the panel in its empty state. A
       // selection made only of edges (or a mixed selection) still cannot be
@@ -336,7 +336,7 @@ export default class NodeMenuUnifier {
     this.syncControlState(container, canvas);
   }
 
-  private syncControlState(container: HTMLElement, canvas: any): void {
+  private syncControlState(container: HTMLElement, canvas: CanvasRuntime): void {
     const record = this.controlGroups.get(container);
     if (!record) return;
     const nodeIds = selectedNodeIds(canvas);
@@ -347,7 +347,7 @@ export default class NodeMenuUnifier {
 
     const active = this.activePanel;
     if (!active || active.canvas !== canvas) return;
-    const selectedItems = Array.from(canvas?.selection?.values?.() ?? []) as any[];
+    const selectedItems = Array.from(canvas.selection?.values() ?? []);
     if (selectedItems.length === 0) {
       if (active.nodeIds.length) {
         active.nodeIds = [];
@@ -372,7 +372,7 @@ export default class NodeMenuUnifier {
     }
   }
 
-  private showStylePanel(canvas: any, nodeIds: readonly string[]): void {
+  private showStylePanel(canvas: CanvasRuntime, nodeIds: readonly string[]): void {
     this.dismissPanel();
     const targetIds = [...new Set(nodeIds)].sort();
     const currentData = readCanvasData(canvas);
@@ -382,11 +382,12 @@ export default class NodeMenuUnifier {
       return;
     }
 
-    const surface = document.createElement("aside");
+    const ownerDocument = this.controlsForCanvas(canvas)?.ownerDocument ?? this.plugin.app.workspace.containerEl.ownerDocument;
+    const surface = ownerDocument.win.createEl("aside");
     surface.className = "bc-node-style-panel";
     surface.setAttribute("role", "dialog");
     surface.setAttribute("aria-label", t("Node style", "节点样式"));
-    document.body.appendChild(surface);
+    ownerDocument.body.appendChild(surface);
 
     const active: ActivePanel = {
       canvas,
@@ -398,11 +399,11 @@ export default class NodeMenuUnifier {
       cleanupDrag: () => undefined
     };
     active.outsideHandler = event => {
-      if (surface.contains(event.target as Node)) return;
+      if (event.composedPath().includes(surface)) return;
       // A click on another Canvas node retargets the panel; the style control
       // toggles it; anywhere else dismisses it.
-      const target = event.target;
-      if (target instanceof Element &&
+      const target = event.target as Node | null;
+      if (target?.instanceOf?.(Element) &&
         (target.closest(".canvas-node") || target.closest(".bc-node-style-control-group"))) return;
       this.dismissPanel();
     };
@@ -414,9 +415,9 @@ export default class NodeMenuUnifier {
     };
     this.activePanel = active;
     this.installPresetDrop(active);
-    document.addEventListener("pointerdown", active.outsideHandler, true);
-    document.addEventListener("keydown", active.keyHandler, true);
-    window.addEventListener("resize", active.resizeHandler);
+    ownerDocument.addEventListener("pointerdown", active.outsideHandler, true);
+    ownerDocument.addEventListener("keydown", active.keyHandler, true);
+    ownerDocument.defaultView?.addEventListener("resize", active.resizeHandler);
     this.renderStylePanel();
   }
 
@@ -427,29 +428,29 @@ export default class NodeMenuUnifier {
     const controls = this.controlsForCanvas(active.canvas);
     const surface = active.surface;
     const margin = 12;
-    surface.style.maxHeight = Math.max(240, window.innerHeight - margin * 2) + "px";
-    const width = Math.min(316, Math.max(240, window.innerWidth - margin * 2));
+    const ownerWindow = surface.win;
+    surface.style.maxHeight = Math.max(240, ownerWindow.innerHeight - margin * 2) + "px";
+    const width = Math.min(316, Math.max(240, ownerWindow.innerWidth - margin * 2));
     surface.style.width = width + "px";
 
     const anchor = controls?.getBoundingClientRect();
-    const panelHeight = Math.min(surface.getBoundingClientRect().height, window.innerHeight - margin * 2);
+    const panelHeight = Math.min(surface.getBoundingClientRect().height, ownerWindow.innerHeight - margin * 2);
     const top = anchor
-      ? Math.min(Math.max(margin, anchor.top), Math.max(margin, window.innerHeight - panelHeight - margin))
+      ? Math.min(Math.max(margin, anchor.top), Math.max(margin, ownerWindow.innerHeight - panelHeight - margin))
       : margin;
     const left = anchor
       ? Math.max(margin, anchor.left - width - 10)
-      : window.innerWidth - width - margin;
+      : ownerWindow.innerWidth - width - margin;
     surface.style.top = Math.round(top) + "px";
     surface.style.left = Math.round(left) + "px";
   }
 
-  private controlsForCanvas(canvas: any): HTMLElement | null {
-    const workspace = this.plugin.app.workspace as any;
-    for (const leaf of workspace?.getLeavesOfType?.("canvas") ?? []) {
-      if (leaf?.view?.canvas !== canvas) continue;
-      const container = leaf.view.containerEl;
-      if (!(container instanceof HTMLElement)) return null;
-      return container.querySelector<HTMLElement>(".canvas-controls");
+  private controlsForCanvas(canvas: CanvasRuntime): HTMLElement | null {
+    const workspace = this.plugin.app.workspace;
+    for (const leaf of workspace.getLeavesOfType("canvas")) {
+      const view = leaf.view;
+      if (!isCanvasViewRuntime(view) || view.canvas !== canvas) continue;
+      return view.containerEl.querySelector<HTMLElement>(".canvas-controls");
     }
     return null;
   }
@@ -457,21 +458,24 @@ export default class NodeMenuUnifier {
   private dismissPanel(): void {
     const active = this.activePanel;
     if (!active) return;
-    document.removeEventListener("pointerdown", active.outsideHandler, true);
-    document.removeEventListener("keydown", active.keyHandler, true);
-    window.removeEventListener("resize", active.resizeHandler);
+    const ownerDocument = active.surface.ownerDocument;
+    ownerDocument.removeEventListener("pointerdown", active.outsideHandler, true);
+    ownerDocument.removeEventListener("keydown", active.keyHandler, true);
+    ownerDocument.defaultView?.removeEventListener("resize", active.resizeHandler);
     active.cleanupDrag();
     this.presetDrag = null;
     active.surface.remove();
     this.activePanel = null;
     for (const [container] of this.controlGroups) {
-      const canvas = (this.plugin.app.workspace as any)?.getLeavesOfType?.("canvas")
-        ?.find((leaf: any) => leaf?.view?.containerEl === container)?.view?.canvas;
+      const view = this.plugin.app.workspace.getLeavesOfType("canvas")
+        .map(leaf => leaf.view)
+        .find(view => isCanvasViewRuntime(view) && view.containerEl === container);
+      const canvas = isCanvasViewRuntime(view) ? view.canvas : undefined;
       if (canvas) this.syncControlState(container, canvas);
     }
   }
 
-  private isReadonly(canvas: any): boolean {
+  private isReadonly(canvas: CanvasRuntime): boolean {
     return Boolean(canvas?.readonly || canvas?.wrapperEl?.classList?.contains("bc-readonly"));
   }
 
@@ -533,14 +537,14 @@ export default class NodeMenuUnifier {
   }
 
   private installPresetDrop(active: ActivePanel): void {
-    const target = active.canvas.wrapperEl as HTMLElement | undefined;
+    const target = active.canvas.wrapperEl;
     if (!target?.addEventListener) return;
     const end = (): void => { this.presetDrag = null; };
     const handle = (event: DragEvent): void => {
       const drag = this.presetDrag;
       if (!drag || drag.panel !== active || !event.dataTransfer?.types.includes(PRESET_DRAG_TYPE)) return;
-      const element = event.target as Element | null;
-      if (element?.closest(".canvas-controls, .canvas-card-menu, .canvas-menu")) return;
+      const element = event.target as Node | null;
+      if (element?.instanceOf?.(Element) && element.closest(".canvas-controls, .canvas-card-menu, .canvas-menu")) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       const allowed = !this.isReadonly(active.canvas) &&
@@ -556,11 +560,11 @@ export default class NodeMenuUnifier {
     };
     target.addEventListener("dragover", handle, true);
     target.addEventListener("drop", handle, true);
-    document.addEventListener("dragend", end, true);
+    target.ownerDocument.addEventListener("dragend", end, true);
     active.cleanupDrag = () => {
       target.removeEventListener("dragover", handle, true);
       target.removeEventListener("drop", handle, true);
-      document.removeEventListener("dragend", end, true);
+      target.ownerDocument.removeEventListener("dragend", end, true);
     };
   }
 
@@ -767,32 +771,33 @@ export default class NodeMenuUnifier {
     const active = this.activePanel;
     if (!active) return;
     const data = readCanvasData(active.canvas);
-    const nodes = active.nodeIds.map(id => data.nodes.find(node => node.id === id));
-    if (nodes.some(node => !node)) {
+    const nodes = active.nodeIds.map(id => data.nodes.find(node => node.id === id))
+      .filter((node): node is CanvasNodeData => node !== undefined);
+    if (nodes.length !== active.nodeIds.length) {
       this.dismissPanel();
       new Notice(t("The target nodes no longer exist; the style panel was closed.", "目标节点已不存在，样式面板已关闭。"));
       return;
     }
-    const nodeStyles = nodes.map(node => styleOf(node as CanvasNodeData));
+    const nodeStyles = nodes.map(styleOf);
     const hasSelection = nodeStyles.length > 0;
     const hasMixedStyles = (["color", "shape", "border", "align", "fill", "sketchPreset", "researchPreset", "researchIntensity"] as const)
       .some(key => new Set(nodeStyles.map(style => style[key])).size > 1);
     const surface = active.surface;
     surface.replaceChildren();
 
-    const header = document.createElement("div");
+    const header = surface.ownerDocument.win.createDiv();
     header.className = "bc-node-style-header";
-    const heading = document.createElement("strong");
+    const heading = surface.ownerDocument.win.createEl("strong");
     heading.className = "bc-node-style-title";
     heading.textContent = t("Node style", "节点样式");
     header.appendChild(heading);
     if (!hasSelection) {
-      const count = document.createElement("span");
+      const count = surface.ownerDocument.win.createSpan();
       count.className = "bc-node-style-selection-count";
       count.textContent = t("No nodes selected", "未选择节点");
       header.appendChild(count);
     } else if (active.nodeIds.length > 1) {
-      const count = document.createElement("span");
+      const count = surface.ownerDocument.win.createSpan();
       count.className = "bc-node-style-selection-count";
       count.textContent = t(`${active.nodeIds.length} node${active.nodeIds.length === 1 ? "" : "s"}`, `${active.nodeIds.length} 个节点`) + (hasMixedStyles ? t(" · Some styles differ", " · 部分样式不同") : "");
       header.appendChild(count);
@@ -800,10 +805,10 @@ export default class NodeMenuUnifier {
     addButton(header, t("Close", "关闭"), "bc-node-style-close", () => this.dismissPanel(), "x");
     surface.appendChild(header);
 
-    const body = document.createElement("div");
+    const body = surface.ownerDocument.win.createDiv();
     body.className = "bc-node-style-scroll";
     surface.appendChild(body);
-    const hint = document.createElement("p");
+    const hint = surface.ownerDocument.win.createEl("p");
     hint.className = "bc-node-style-preset-hint";
     hint.textContent = hasSelection
       ? t("Click a preset to apply it to the selection; drag it onto the Canvas to create a card.", "点击预设应用到选区；拖入画布新建卡片。")
@@ -811,9 +816,9 @@ export default class NodeMenuUnifier {
     body.appendChild(hint);
 
     const addSection = (label: string): HTMLElement => {
-      const section = document.createElement("section");
+      const section = surface.ownerDocument.win.createEl("section");
       section.className = "bc-node-style-section";
-      const title = document.createElement("div");
+      const title = surface.ownerDocument.win.createDiv();
       title.className = "bc-node-style-section-title";
       title.textContent = label;
       section.appendChild(title);
@@ -829,8 +834,8 @@ export default class NodeMenuUnifier {
     const isRounded = canvasTheme === "rounded-map";
     surface.dataset.bcTheme = canvasTheme;
     if (isResearch) {
-      const applicable = nodes.filter(node => node?.type !== "group") as CanvasNodeData[];
-      const presets = document.createElement("div");
+      const applicable = nodes.filter(node => node.type !== "group");
+      const presets = surface.ownerDocument.win.createDiv();
       presets.className = "bc-research-presets";
       addSection(t("Paper Research · Presets", "纸本研究 · 功能预设")).appendChild(presets);
       for (const preset of RESEARCH_PRESETS) {
@@ -842,14 +847,14 @@ export default class NodeMenuUnifier {
         button.title = preset.label + " · " + preset.detail;
         button.setAttribute("aria-label", t(preset.label + ": " + preset.detail, preset.label + "：" + preset.detail));
         button.setAttribute("aria-pressed", state);
-        const preview = document.createElement("span");
+        const preview = surface.ownerDocument.win.createSpan();
         preview.className = "bc-research-preview";
         preview.dataset.bcResearchPreset = preset.id;
         preview.style.setProperty("--bc-research-accent", preset.color);
         preview.setAttribute("aria-hidden", "true");
         button.appendChild(preview);
       }
-      const intensities = document.createElement("div");
+      const intensities = surface.ownerDocument.win.createDiv();
       intensities.className = "bc-research-intensities";
       addSection(t("Paper tint intensity", "纸面色彩浓度")).appendChild(intensities);
       for (const intensity of RESEARCH_INTENSITIES) {
@@ -861,7 +866,7 @@ export default class NodeMenuUnifier {
       }
     }
     if (isScrapbook) {
-      const papers = document.createElement("div");
+      const papers = surface.ownerDocument.win.createDiv();
       papers.className = "bc-paper-presets";
       addSection(t("Scrapbook · Paper", "拼贴手账 · 纸片")).appendChild(papers);
       for (const preset of SCRAPBOOK_PRESETS) {
@@ -877,7 +882,7 @@ export default class NodeMenuUnifier {
         button.setAttribute("aria-label", preset.label);
         button.setAttribute("title", preset.label);
         button.setAttribute("aria-pressed", state);
-        const preview = document.createElement("span");
+        const preview = surface.ownerDocument.win.createSpan();
         preview.className = "bc-paper-preview";
         preview.dataset.bcPaper = preset.id;
         preview.textContent = preset.sample;
@@ -887,7 +892,7 @@ export default class NodeMenuUnifier {
     }
     if (isSketch) {
       const presetSection = addSection(t("Presets", "功能预设"));
-      const presets = document.createElement("div");
+      const presets = surface.ownerDocument.win.createDiv();
       presets.className = "bc-sketch-presets";
       presetSection.appendChild(presets);
       for (const preset of SKETCH_PRESETS) {
@@ -904,21 +909,21 @@ export default class NodeMenuUnifier {
         button.title = preset.label + " · " + preset.use;
         button.setAttribute("aria-label", t(preset.label + ": " + preset.use, preset.label + "：" + preset.use));
         button.setAttribute("aria-pressed", state);
-        const preview = document.createElement("span");
+        const preview = surface.ownerDocument.win.createSpan();
         preview.className = "bc-sketch-preset-preview shape-" + preset.style.shape +
           " fill-" + preset.style.fill + " border-" + preset.style.border + " align-" + preset.style.align;
         preview.style.setProperty("--bc-sketch-preset-color", preset.style.color);
         preview.setAttribute("aria-hidden", "true");
         preview.textContent = preset.sample;
         button.appendChild(preview);
-        const label = document.createElement("span");
+        const label = surface.ownerDocument.win.createSpan();
         label.className = "bc-sketch-preset-name";
         label.textContent = preset.label;
         button.appendChild(label);
       }
 
       const fillSection = addSection(t("Fill", "填充"));
-      const fills = document.createElement("div");
+      const fills = surface.ownerDocument.win.createDiv();
       fills.className = "bc-sketch-fills";
       fillSection.appendChild(fills);
       for (const fill of SKETCH_FILLS) {
@@ -934,14 +939,14 @@ export default class NodeMenuUnifier {
         button.setAttribute("aria-label", fill.label);
         button.setAttribute("aria-pressed", state);
         button.disabled = !hasSelection;
-        const swatch = document.createElement("span");
+        const swatch = surface.ownerDocument.win.createSpan();
         swatch.className = "bc-sketch-fill-swatch fill-" + fill.id;
         swatch.setAttribute("aria-hidden", "true");
         button.appendChild(swatch);
       }
     }
     if (isSoft) {
-      const presets = document.createElement("div");
+      const presets = surface.ownerDocument.win.createDiv();
       presets.className = "bc-soft-presets";
       addSection(t("Soft Notes · Presets", "柔软便签 · 功能预设")).appendChild(presets);
       const applicable = nodes.filter((node): node is CanvasNodeData => node?.type === "text");
@@ -957,14 +962,14 @@ export default class NodeMenuUnifier {
         button.title = preset.label + " · " + preset.use;
         button.setAttribute("aria-label", button.title);
         button.setAttribute("aria-pressed", state);
-        const preview = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        const preview = surface.ownerDocument.win.createSvg("svg");
         preview.setAttribute("viewBox", "0 0 320 240");
         preview.setAttribute("aria-hidden", "true");
-        const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const shape = surface.ownerDocument.win.createSvg("path");
         shape.setAttribute("d", preset.path);
         shape.setAttribute("fill", preset.color);
         preview.appendChild(shape);
-        const sample = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const sample = surface.ownerDocument.win.createSvg("path");
         sample.setAttribute("d", preset.id === "free"
           ? "M105 55H215M160 55V165M130 165H190M100 200H220"
           : "M90 92H220M90 123H230M90 152H180");
@@ -975,16 +980,16 @@ export default class NodeMenuUnifier {
         preview.appendChild(sample);
         button.appendChild(preview);
       }
-      const hint = document.createElement("p");
+      const hint = surface.ownerDocument.win.createEl("p");
       hint.className = "bc-soft-hint";
       hint.textContent = t("Applies to selected text nodes and keeps the body text. No preset adds a border.", "应用到选中的文本节点；保留正文。所有预设均无边框。");
       body.appendChild(hint);
     }
     if (isRounded) {
-      const presets = document.createElement("div");
+      const presets = surface.ownerDocument.win.createDiv();
       presets.className = "bc-rounded-presets";
       addSection(t("Gummy Whiteboard · Presets", "软糖白板 · 功能预设")).appendChild(presets);
-      const applicable = nodes.filter(node => node?.type !== "group").map(node => styleOf(node as CanvasNodeData));
+      const applicable = nodes.filter(node => node.type !== "group").map(styleOf);
       for (const preset of ROUNDED_MAP_PRESETS) {
         const state = stateForStyles(applicable, style => matchesPreset(style, preset));
         const button = this.addPresetButton(presets, "", optionClass("bc-rounded-preset", state),
@@ -994,12 +999,12 @@ export default class NodeMenuUnifier {
         button.setAttribute("aria-label", preset.label);
         button.setAttribute("aria-pressed", state);
         button.title = preset.label;
-        const preview = document.createElement("span");
+        const preview = surface.ownerDocument.win.createSpan();
         preview.className = "bc-rounded-preview";
         preview.setAttribute("aria-hidden", "true");
         for (const [key, value] of Object.entries(roundedMapCss(preset.style.shape, 120, 80))) preview.style.setProperty(key, value);
         preview.style.setProperty("--bc-rounded-fill", preset.style.color);
-        const sample = document.createElement("span");
+        const sample = surface.ownerDocument.win.createSpan();
         sample.textContent = preset.sample;
         preview.appendChild(sample);
         button.appendChild(preview);
@@ -1007,7 +1012,7 @@ export default class NodeMenuUnifier {
     }
     if (!isScrapbook && !isSketch && !isRounded && !isResearch && !isSoft) {
     const presetSection = addSection(t("Presets", "预设"));
-    const presets = document.createElement("div");
+    const presets = surface.ownerDocument.win.createDiv();
     presets.className = "bc-node-style-presets";
     presetSection.appendChild(presets);
     for (const preset of NODE_STYLE_PRESET_LIST) {
@@ -1024,12 +1029,12 @@ export default class NodeMenuUnifier {
       button.setAttribute("aria-label", t(preset.label + " preset", preset.label + "预设"));
       button.setAttribute("aria-pressed", state);
 
-      const preview = document.createElement("span");
+      const preview = surface.ownerDocument.win.createSpan();
       preview.className = "bc-node-style-preset-preview shape-" + preset.style.shape +
         " border-" + preset.style.border + " align-" + preset.style.align;
       preview.style.setProperty("--bc-preset-color", preset.style.color);
       preview.setAttribute("aria-hidden", "true");
-      const sample = document.createElement("span");
+      const sample = surface.ownerDocument.win.createSpan();
       sample.className = "bc-node-style-preset-sample";
       sample.textContent = "Aa";
       preview.appendChild(sample);
@@ -1038,7 +1043,7 @@ export default class NodeMenuUnifier {
     }
 
     const colorSection = addSection(t("Color", "颜色"));
-    const colors = document.createElement("div");
+    const colors = surface.ownerDocument.win.createDiv();
     colors.className = "bc-node-style-colors";
     colorSection.appendChild(colors);
     const roundedColors = ROUNDED_MAP_PRESETS.map(preset => ({ id: preset.id, label: preset.label, value: preset.style.color }));
@@ -1055,7 +1060,7 @@ export default class NodeMenuUnifier {
       button.setAttribute("aria-label", color.label);
       button.setAttribute("aria-pressed", state);
       button.disabled = !hasSelection;
-      const swatch = document.createElement("span");
+      const swatch = surface.ownerDocument.win.createSpan();
       swatch.className = "bc-node-style-swatch";
       swatch.style.backgroundColor = color.value;
       button.appendChild(swatch);
@@ -1063,7 +1068,7 @@ export default class NodeMenuUnifier {
 
     if (!isSoft) {
     const shapeSection = addSection(t("Shape", "形状"));
-    const shapes = document.createElement("div");
+    const shapes = surface.ownerDocument.win.createDiv();
     shapes.className = "bc-node-style-shapes";
     shapeSection.appendChild(shapes);
     for (const shape of NODE_STYLE_SHAPES) {
@@ -1081,7 +1086,7 @@ export default class NodeMenuUnifier {
       button.disabled = !hasSelection;
       // The preview alone identifies the option; the name stays a tooltip and
       // accessible label instead of printed text under the preview.
-      const preview = document.createElement("span");
+      const preview = surface.ownerDocument.win.createSpan();
       preview.className = "bc-node-shape-preview shape-" + shape.id;
       if (isRounded) {
         const css = roundedMapCss(shape.id, 32, 24);
@@ -1095,7 +1100,7 @@ export default class NodeMenuUnifier {
     }
 
     const borderSection = addSection(t("Border", "边框"));
-    const borders = document.createElement("div");
+    const borders = surface.ownerDocument.win.createDiv();
     borders.className = "bc-node-style-borders";
     borderSection.appendChild(borders);
     for (const border of NODE_STYLE_BORDERS) {
@@ -1114,7 +1119,7 @@ export default class NodeMenuUnifier {
     }
 
     const alignSection = addSection(t("Text align", "文本对齐"));
-    const alignments = document.createElement("div");
+    const alignments = surface.ownerDocument.win.createDiv();
     alignments.className = "bc-node-style-alignments";
     alignSection.appendChild(alignments);
     for (const align of NODE_STYLE_ALIGNMENTS) {

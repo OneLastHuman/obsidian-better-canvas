@@ -1,5 +1,61 @@
-import { TFile } from "obsidian";
-import { appendCanvasNodeMetadata, isVaultLinkDestination, parseCanvasMarkdownMetadata } from "./canvas-metadata-parser";
+import { TFile, type App, type MetadataCache, type Plugin, type Vault, type WorkspaceLeaf } from "obsidian";
+import { appendCanvasNodeMetadata, isVaultLinkDestination, parseCanvasMarkdownMetadata, type CanvasMetadataAggregate } from "./canvas-metadata-parser";
+
+interface FileCacheRecord {
+  mtime: number;
+  size: number;
+  hash: string;
+}
+
+/** Version-dependent metadata internals, with opaque cache payloads. */
+interface MetadataCacheHost {
+  getCache: (this: MetadataCacheHost, path: string, ...args: unknown[]) => unknown;
+  fileCache?: Record<string, FileCacheRecord>;
+  metadataCache?: Record<string, unknown>;
+  uniqueFileLookup?: {
+    add(name: string, file: TFile): void;
+    remove?(name: string, file: TFile): void;
+  };
+  saveFileCache?(path: string, record: FileCacheRecord): void;
+  saveMetaCache?(hash: string, metadata: IndexedCanvasMetadata): void;
+  computeMetadataAsync?(buffer: ArrayBuffer): Promise<unknown>;
+  resolvedLinks?: Record<string, Record<string, number>>;
+  unresolvedLinks?: Record<string, Record<string, number>>;
+  getFirstLinkpathDest: MetadataCache["getFirstLinkpathDest"];
+  trigger: MetadataCache["trigger"];
+}
+
+interface IndexedCanvasMetadata extends Required<CanvasMetadataAggregate> {
+  v: number;
+  frontmatter: Record<string, unknown>;
+  frontmatterPosition: { start: { line: number; col: number; offset: number }; end: { line: number; col: number; offset: number } };
+  frontmatterLinks: unknown[];
+}
+
+interface CanvasMetadataDocument {
+  metadata?: unknown;
+  nodes?: unknown;
+}
+
+type MarkdownFilesGetter = (this: Vault, ...args: unknown[]) => TFile[];
+
+interface MarkdownFilesHost {
+  getMarkdownFiles: MarkdownFilesGetter;
+}
+
+type BacklinkRecompute = (this: BacklinkTarget, ...args: unknown[]) => unknown;
+interface BacklinkTarget { recomputeBacklink: BacklinkRecompute; }
+
+function isBacklinkTarget(value: unknown): value is BacklinkTarget {
+  return value !== null && typeof value === "object" &&
+    "recomputeBacklink" in value && typeof value.recomputeBacklink === "function";
+}
+
+function hasPromiseFinalizer(value: unknown): value is { then: (...args: unknown[]) => unknown; finally(callback: () => void): unknown } {
+  return value !== null && (typeof value === "object" || typeof value === "function") &&
+    "then" in value && typeof value.then === "function" &&
+    "finally" in value && typeof value.finally === "function";
+}
 
 /**
  * Makes .canvas files visible to Obsidian's metadata cache.
@@ -9,37 +65,38 @@ import { appendCanvasNodeMetadata, isVaultLinkDestination, parseCanvasMarkdownMe
  * falls back to the original implementation for every other file.
  */
 export class CanvasMetadataIndexer {
-  private cache: any;
-  private originalGetCache: ((...args: any[]) => any) | null = null;
-  private getCacheWrapper: ((...args: any[]) => any) | null = null;
-  private app: any;
-  private plugin: any;
+  private cache: MetadataCacheHost;
+  private originalGetCache: MetadataCacheHost["getCache"] | null = null;
+  private getCacheWrapper: MetadataCacheHost["getCache"] | null = null;
+  private app: App;
+  private plugin: Pick<Plugin, "register" | "registerEvent">;
   private enabled: () => boolean;
   private indexing = new Set<string>();
   private stopped = false;
   private backlinkScanDepth = 0;
-  private originalGetMarkdownFiles: ((...args: any[]) => any) | null = null;
-  private getMarkdownFilesWrapper: ((...args: any[]) => any) | null = null;
-  private backlinkWrappers = new Map<any, { original: (...args: any[]) => any; wrapped: (...args: any[]) => any }>();
+  private originalGetMarkdownFiles: MarkdownFilesGetter | null = null;
+  private getMarkdownFilesWrapper: MarkdownFilesGetter | null = null;
+  private backlinkWrappers = new Map<BacklinkTarget, { original: BacklinkRecompute; wrapped: BacklinkRecompute }>();
 
-  constructor(app: any, plugin: any, enabled: () => boolean) {
+  constructor(app: App, plugin: Pick<Plugin, "register" | "registerEvent">, enabled: () => boolean) {
+    this.cache = app.metadataCache;
     this.app = app;
     this.plugin = plugin;
     this.enabled = enabled;
   }
 
   start(): void {
-    this.cache = this.app.metadataCache as any;
-    if (!this.cache || typeof this.cache.getCache !== "function") return;
+    this.cache = this.app.metadataCache;
+    if (typeof this.cache.getCache !== "function") return;
 
-    this.originalGetCache = this.cache.getCache;
-    const original = this.originalGetCache!;
-    const self = this;
-    this.getCacheWrapper = function (path: string, ...args: any[]) {
-      if (self.isCanvasPath(path)) {
-        if (!self.enabled()) return null;
-        const record = this.fileCache?.[path];
-        const hash = record?.hash;
+    const original = this.cache.getCache;
+    this.originalGetCache = original;
+    const useCanvasCache = (path: string) => this.isCanvasPath(path);
+    const enabled = () => this.enabled();
+    this.getCacheWrapper = function (this: MetadataCacheHost, path: string, ...args: unknown[]) {
+      if (useCanvasCache(path)) {
+        if (!enabled()) return null;
+        const hash = this.fileCache?.[path]?.hash;
         return hash ? this.metadataCache?.[hash] ?? null : null;
       }
       return original.call(this, path, ...args);
@@ -48,29 +105,29 @@ export class CanvasMetadataIndexer {
     this.installBacklinkBridge();
 
     this.plugin.register(() => this.stop());
-    this.plugin.registerEvent(this.app.vault.on("create", (file: any) => this.queueIfCanvas(file)));
-    this.plugin.registerEvent(this.app.vault.on("modify", (file: any) => this.queueIfCanvas(file)));
-    this.plugin.registerEvent(this.app.vault.on("rename", (file: any, oldPath: string) => {
+    this.plugin.registerEvent(this.app.vault.on("create", file => this.queueIfCanvas(file)));
+    this.plugin.registerEvent(this.app.vault.on("modify", file => this.queueIfCanvas(file)));
+    this.plugin.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
       if (this.isCanvasPath(oldPath)) {
         delete this.cache.resolvedLinks?.[oldPath];
         delete this.cache.unresolvedLinks?.[oldPath];
         if (this.cache.fileCache) delete this.cache.fileCache[oldPath];
         const oldName = oldPath.split("/").pop()?.toLowerCase();
         try {
-          if (oldName) this.cache.uniqueFileLookup?.remove?.(oldName, file);
+          if (oldName && file instanceof TFile) this.cache.uniqueFileLookup?.remove?.(oldName, file);
         } catch {
           // Keep the cache patch working even if this Obsidian version uses a different lookup API.
         }
       }
       this.queueIfCanvas(file);
     }));
-    this.plugin.registerEvent(this.app.vault.on("delete", (file: any) => {
+    this.plugin.registerEvent(this.app.vault.on("delete", file => {
       if (!this.isCanvasPath(file?.path)) return;
       delete this.cache.resolvedLinks?.[file.path];
       delete this.cache.unresolvedLinks?.[file.path];
       if (this.cache.fileCache) delete this.cache.fileCache[file.path];
       try {
-        if (file?.name) this.cache.uniqueFileLookup?.remove?.(String(file.name).toLowerCase(), file);
+        if (file instanceof TFile) this.cache.uniqueFileLookup?.remove?.(file.name.toLowerCase(), file);
       } catch {
         // Internal lookup cleanup is best-effort across Obsidian versions.
       }
@@ -90,7 +147,7 @@ export class CanvasMetadataIndexer {
     }
     this.getCacheWrapper = null;
     this.originalGetCache = null;
-    const vault = this.app?.vault as any;
+    const vault = this.app.vault;
     if (vault && this.originalGetMarkdownFiles && vault.getMarkdownFiles === this.getMarkdownFilesWrapper) {
       vault.getMarkdownFiles = this.originalGetMarkdownFiles;
     }
@@ -109,52 +166,51 @@ export class CanvasMetadataIndexer {
   }
 
   private installBacklinkBridge(): void {
-    const vault = this.app?.vault as any;
-    if (!vault || typeof vault.getMarkdownFiles !== "function") return;
-    this.originalGetMarkdownFiles = vault.getMarkdownFiles;
-    const original = this.originalGetMarkdownFiles!;
-    const self = this;
-    this.getMarkdownFilesWrapper = function (...args: any[]) {
-      const files = original.apply(this, args) as TFile[];
-      if (self.backlinkScanDepth <= 0) return files;
-      const canvases = self.app.vault.getFiles().filter((file: TFile) => self.isCanvasPath(file.path));
+    const vault = this.app.vault;
+    if (typeof vault.getMarkdownFiles !== "function") return;
+    const host: MarkdownFilesHost = vault;
+    const original = host.getMarkdownFiles;
+    this.originalGetMarkdownFiles = original;
+    const includeCanvasFiles = (files: TFile[]) => {
+      if (this.backlinkScanDepth <= 0) return files;
+      const canvases = this.app.vault.getFiles().filter(file => this.isCanvasPath(file.path));
       const unique = new Map<string, TFile>();
       for (const file of [...files, ...canvases]) unique.set(file.path, file);
       return [...unique.values()];
+    };
+    this.getMarkdownFilesWrapper = function (this: Vault, ...args: unknown[]) {
+      return includeCanvasFiles(original.apply(this, args));
     };
     vault.getMarkdownFiles = this.getMarkdownFilesWrapper;
   }
 
   private patchBacklinkViews(): void {
     if (this.stopped || !this.enabled()) return;
-    let leaves: any[] = [];
+    let leaves: WorkspaceLeaf[] = [];
     try {
       leaves = this.app.workspace.getLeavesOfType("backlink") ?? [];
     } catch {
       return;
     }
     for (const leaf of leaves) {
-      const view = leaf?.view;
-      const targets = [view?.backlink, view].filter(Boolean);
+      const view = leaf.view;
+      const targets: unknown[] = ["backlink" in view ? view.backlink : undefined, view];
       for (const target of targets) {
-        if (typeof target.recomputeBacklink !== "function" || this.backlinkWrappers.has(target)) continue;
+        if (!isBacklinkTarget(target) || this.backlinkWrappers.has(target)) continue;
         const original = target.recomputeBacklink;
-        const self = this;
-        const wrapped = function (...args: any[]) {
-          self.backlinkScanDepth += 1;
-          let result: any;
+        const beginScan = () => { this.backlinkScanDepth += 1; };
+        const finishScan = () => { this.backlinkScanDepth = Math.max(0, this.backlinkScanDepth - 1); };
+        const wrapped: BacklinkRecompute = function (this: BacklinkTarget, ...args: unknown[]) {
+          beginScan();
+          let result: unknown;
           try {
             result = original.apply(this, args);
           } catch (error) {
-            self.backlinkScanDepth = Math.max(0, self.backlinkScanDepth - 1);
+            finishScan();
             throw error;
           }
-          if (result && typeof result.then === "function") {
-            return result.finally(() => {
-              self.backlinkScanDepth = Math.max(0, self.backlinkScanDepth - 1);
-            });
-          }
-          self.backlinkScanDepth = Math.max(0, self.backlinkScanDepth - 1);
+          if (hasPromiseFinalizer(result)) return result.finally(finishScan);
+          finishScan();
           return result;
         };
         target.recomputeBacklink = wrapped;
@@ -167,9 +223,9 @@ export class CanvasMetadataIndexer {
     return typeof path === "string" && path.toLowerCase().endsWith(".canvas");
   }
 
-  private queueIfCanvas(file: any): void {
-    if (this.stopped || !this.enabled() || !this.isCanvasPath(file?.path)) return;
+  private queueIfCanvas(file: unknown): void {
     if (!(file instanceof TFile)) return;
+    if (this.stopped || !this.enabled() || !this.isCanvasPath(file.path)) return;
     void this.index(file);
   }
 
@@ -197,14 +253,14 @@ export class CanvasMetadataIndexer {
       const rawBinary = await this.app.vault.readBinary(file);
       const bytes = new Uint8Array(rawBinary);
       const text = new TextDecoder().decode(bytes);
-      let canvas: any;
+      let canvas: unknown;
       try {
         canvas = JSON.parse(text || "{}");
       } catch (error) {
         console.warn("Better Canvas could not index malformed Canvas JSON:", path, error);
         return;
       }
-      const data = canvas && typeof canvas === "object" ? canvas : {};
+      const data: CanvasMetadataDocument = canvas !== null && typeof canvas === "object" ? canvas : {};
       const hash = await this.hash(bytes);
       // Obsidian's link resolver consults uniqueFileLookup to resolve Vault
       // files by basename. Registering the Canvas itself allows notes to link
@@ -214,7 +270,7 @@ export class CanvasMetadataIndexer {
       } catch {
         // Internal lookup implementation differs across Obsidian versions.
       }
-      let metadata = this.cache.metadataCache?.[hash];
+      let metadata: unknown = this.cache.metadataCache?.[hash];
 
       try {
         this.cache.saveFileCache?.(path, {
@@ -228,9 +284,10 @@ export class CanvasMetadataIndexer {
       }
 
       if (!metadata) {
-        metadata = await this.buildMetadata(data);
+        const builtMetadata = await this.buildMetadata(data);
+        metadata = builtMetadata;
         try {
-          this.cache.saveMetaCache?.(hash, metadata);
+          this.cache.saveMetaCache?.(hash, builtMetadata);
         } catch {
           this.cache.metadataCache ??= {};
           this.cache.metadataCache[hash] = metadata;
@@ -243,13 +300,14 @@ export class CanvasMetadataIndexer {
       this.cache.unresolvedLinks ??= {};
       const resolved: Record<string, number> = {};
       const unresolved: Record<string, number> = {};
-      const references = [
-        ...(Array.isArray(metadata?.links) ? metadata.links : []),
-        ...(Array.isArray(metadata?.embeds) ? metadata.embeds : []),
-        ...(Array.isArray(metadata?.frontmatterLinks) ? metadata.frontmatterLinks : [])
+      const cached = metadata !== null && typeof metadata === "object" ? metadata as CanvasMetadataAggregate & { frontmatterLinks?: unknown[] } : {};
+      const references: unknown[] = [
+        ...(Array.isArray(cached.links) ? cached.links : []),
+        ...(Array.isArray(cached.embeds) ? cached.embeds : []),
+        ...(Array.isArray(cached.frontmatterLinks) ? cached.frontmatterLinks : [])
       ];
       for (const reference of references) {
-        const link = typeof reference?.link === "string" ? reference.link : "";
+        const link = reference !== null && typeof reference === "object" && "link" in reference && typeof reference.link === "string" ? reference.link : "";
         if (!link) continue;
         // URI destinations belong to external-link consumers, not Obsidian's
         // unresolved Vault-link map. Keep them in metadata.links for inspection.
@@ -275,9 +333,12 @@ export class CanvasMetadataIndexer {
     }
   }
 
-  private async buildMetadata(canvas: any): Promise<any> {
-    const frontmatter = canvas?.metadata?.frontmatter ?? {};
-    const metadata: any = {
+  private async buildMetadata(canvas: CanvasMetadataDocument): Promise<IndexedCanvasMetadata> {
+    const rawFrontmatter: unknown = canvas.metadata !== null && typeof canvas.metadata === "object" && "frontmatter" in canvas.metadata
+      ? canvas.metadata.frontmatter : undefined;
+    const frontmatter: Record<string, unknown> = rawFrontmatter !== null && typeof rawFrontmatter === "object" && !Array.isArray(rawFrontmatter)
+      ? rawFrontmatter as Record<string, unknown> : {};
+    const metadata: IndexedCanvasMetadata = {
       v: 1,
       frontmatter,
       frontmatterPosition: {
@@ -330,37 +391,39 @@ export class CanvasMetadataIndexer {
       });
     }
 
-    const nodes = Array.isArray(canvas?.nodes) ? canvas.nodes : [];
+    const nodes: unknown[] = Array.isArray(canvas.nodes) ? canvas.nodes : [];
     for (const node of nodes) {
-      if (node?.type === "text" && typeof node.text === "string") {
-        let nodeMetadata: any = null;
+      if (node === null || typeof node !== "object") continue;
+      const data = node as { id?: unknown; type?: unknown; text?: unknown; file?: unknown; url?: unknown };
+      if (data.type === "text" && typeof data.text === "string") {
+        let nodeMetadata: unknown = null;
         if (typeof this.cache.computeMetadataAsync === "function") {
           try {
-            nodeMetadata = await this.cache.computeMetadataAsync(new TextEncoder().encode(node.text).buffer);
+            nodeMetadata = await this.cache.computeMetadataAsync(new TextEncoder().encode(data.text).buffer);
           } catch {
             nodeMetadata = null;
           }
         }
-        nodeMetadata ??= this.fallbackMarkdownMetadata(node.text);
-        appendCanvasNodeMetadata(metadata, String(node.id), nodeMetadata);
-      } else if (node?.type === "file" && typeof node.file === "string") {
+        nodeMetadata ??= parseCanvasMarkdownMetadata(data.text);
+        appendCanvasNodeMetadata(metadata, String(data.id), nodeMetadata);
+      } else if (data.type === "file" && typeof data.file === "string") {
         metadata.embeds.push({
-          link: node.file,
-          original: node.file,
-          displayText: node.file,
+          link: data.file,
+          original: data.file,
+          displayText: data.file,
           position: {
-            nodeId: String(node.id),
+            nodeId: String(data.id),
             start: { line: 0, col: 0, offset: 0 },
             end: { line: 0, col: 0, offset: 0 }
           }
         });
-      } else if (node?.type === "link" && typeof node.url === "string") {
+      } else if (data.type === "link" && typeof data.url === "string") {
         metadata.links.push({
-          link: node.url,
-          original: node.url,
-          displayText: node.url,
+          link: data.url,
+          original: data.url,
+          displayText: data.url,
           position: {
-            nodeId: String(node.id),
+            nodeId: String(data.id),
             start: { line: 0, col: 0, offset: 0 },
             end: { line: 0, col: 0, offset: 0 }
           }
@@ -370,8 +433,5 @@ export class CanvasMetadataIndexer {
     return metadata;
   }
 
-  private fallbackMarkdownMetadata(text: string): any {
-    return parseCanvasMarkdownMetadata(text);
-  }
 
 }

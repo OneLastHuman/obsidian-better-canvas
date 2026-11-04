@@ -1,3 +1,7 @@
+import * as childProcess from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as processModule from "node:process";
 import { EventEmitter } from "node:events";
 import * as path from "node:path";
 import { PassThrough, Writable } from "node:stream";
@@ -10,10 +14,16 @@ import {
   textFromACPUpdate
 } from "./opencode-acp";
 import { clearAgentDiscoveryCache } from "./local-agent-discovery";
-import { loadNodeRuntimeModules } from "./node-runtime";
+import { loadNodeRuntimeModules, type NodeRuntimeModules } from "./node-runtime";
 
 vi.mock("./node-runtime", () => ({
   loadNodeRuntimeModules: vi.fn()
+}));
+
+// Forward imported Node timers to the clock controlled by vi.useFakeTimers.
+vi.mock("node:timers", () => ({
+  setTimeout: (callback: () => void, delay?: number) => global.setTimeout(callback, delay),
+  clearTimeout: (timer: NodeJS.Timeout | undefined) => global.clearTimeout(timer)
 }));
 
 interface WireMessage {
@@ -81,11 +91,22 @@ class FakeACPChild extends EventEmitter {
 }
 
 const spawn = vi.fn();
-const runtime = {
-  childProcess: { spawn },
-  os: { tmpdir: () => "/tmp/acp-test" },
-  process: { platform: "linux" }
-};
+function runtimeFixture(overrides: {
+  os?: Partial<NodeRuntimeModules["os"]>;
+  process?: Partial<NodeRuntimeModules["process"]>;
+  fs?: object;
+  path?: NodeRuntimeModules["path"];
+} = {}): NodeRuntimeModules {
+  // The protocol tests replace only the host methods used by the child fixture.
+  return {
+    childProcess: { ...childProcess, spawn },
+    os: { ...os, tmpdir: () => "/tmp/acp-test", ...overrides.os },
+    process: { ...processModule, platform: "linux", env: {}, ...overrides.process },
+    fs: { ...fs, ...overrides.fs },
+    path: overrides.path ?? path
+  } as unknown as NodeRuntimeModules;
+}
+const runtime = runtimeFixture();
 const deletableSessionInitialization = {
   protocolVersion: 1,
   agentCapabilities: { sessionCapabilities: { delete: {} } }
@@ -407,8 +428,8 @@ describe("OpenCode ACP model selection", () => {
   });
 
   it("resolves the CLI from a common install directory when PATH misses it", async () => {
-    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
-      ...runtime,
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtimeFixture({
+      os: { homedir: () => "/home/tester" },
       process: { platform: "linux", env: { PATH: "/usr/bin:/bin", HOME: "/home/tester" } },
       fs: {
         statSync: (file: string) => {
@@ -417,7 +438,7 @@ describe("OpenCode ACP model selection", () => {
         }
       },
       path
-    });
+    }));
     prepareAgent();
     await expect(runOpenCodeACP([{ role: "user", content: "Question" }])).resolves.toBe("Answer");
     expect(spawn).toHaveBeenCalledWith(
@@ -501,18 +522,18 @@ describe("OpenCode ACP model selection", () => {
 describe("OpenCode ACP process safety", () => {
   it("keeps Windows executable launch behavior for existing npm installations", async () => {
     prepareAgent();
-    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
-      ...runtime, process: { platform: "win32" }
-    });
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtimeFixture({
+      process: { platform: "win32" }
+    }));
     await listOpenCodeModels({ binaryPath: "opencode.cmd" });
     expect(spawn).toHaveBeenCalledWith("opencode.cmd", ["acp"], expect.objectContaining({ shell: true }));
   });
 
   it("quotes a Windows executable path that contains spaces", async () => {
     prepareAgent();
-    vi.mocked(loadNodeRuntimeModules).mockResolvedValue({
-      ...runtime, process: { platform: "win32" }
-    });
+    vi.mocked(loadNodeRuntimeModules).mockResolvedValue(runtimeFixture({
+      process: { platform: "win32" }
+    }));
     await listOpenCodeModels({ binaryPath: '"C:\\Users\\John Smith\\AppData\\Roaming\\npm\\opencode.cmd"' });
     expect(spawn).toHaveBeenCalledWith(
       '"C:\\Users\\John Smith\\AppData\\Roaming\\npm\\opencode.cmd"',

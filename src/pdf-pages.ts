@@ -1,8 +1,14 @@
-import { Component, loadPdfJs, TFile } from "obsidian";
+import { App, Component, Plugin, TFile } from "obsidian";
+import { getPdfJs, type PdfDocument, type PdfJsHost, type PdfTextItem, type PdfViewport } from "./pdf-context";
 import { t } from "./i18n";
 
+interface EmbedContext { containerEl: HTMLElement }
+type EmbedFactory = (context: EmbedContext, file: TFile, subpath?: string) => Component;
+interface EmbedRegistry { embedByExtension: Record<string, EmbedFactory | undefined> }
+type EmbedApp = App & { embedRegistry?: EmbedRegistry };
+
 const PINNED_MARKER = "pinned=true";
-const PDF_CACHE = new Map<string, Promise<any>>();
+const PDF_CACHE = new Map<string, Promise<PdfDocument>>();
 
 function getPageNumber(subpath?: string): number | null {
   if (!subpath || !subpath.includes(PINNED_MARKER)) return null;
@@ -11,13 +17,13 @@ function getPageNumber(subpath?: string): number | null {
   return Number.isInteger(page) && page > 0 ? page : null;
 }
 
-async function getPdfDocument(app: any, file: TFile): Promise<any> {
+async function getPdfDocument(app: App, file: TFile): Promise<PdfDocument> {
   const cached = PDF_CACHE.get(file.path);
   if (cached) return cached;
   const promise = (async () => {
-    if (!(window as any).pdfjsLib) await loadPdfJs();
+    const pdfjs = await getPdfJs();
     const bytes = await app.vault.readBinary(file);
-    return (window as any).pdfjsLib.getDocument({ data: bytes }).promise;
+    return pdfjs.getDocument({ data: bytes }).promise;
   })();
   PDF_CACHE.set(file.path, promise);
   try {
@@ -29,8 +35,8 @@ async function getPdfDocument(app: any, file: TFile): Promise<any> {
 }
 
 class PinnedPdfPageEmbed extends Component {
-  private plugin: any;
-  private context: any;
+  private plugin: Plugin;
+  private context: EmbedContext;
   private file: TFile;
   private subpath?: string;
   private canvas: HTMLCanvasElement | null = null;
@@ -39,14 +45,14 @@ class PinnedPdfPageEmbed extends Component {
   private textContentEl: HTMLDivElement | null = null;
   private excerptButton: HTMLButtonElement | null = null;
   private highlightButton: HTMLButtonElement | null = null;
-  private pageTextItems: any[] = [];
-  private pageViewport: any = null;
+  private pageTextItems: PdfTextItem[] = [];
+  private pageViewport: PdfViewport | null = null;
   private textResizeObserver: ResizeObserver | null = null;
   private cancelled = false;
   private rendered = false;
   private loadPromise: Promise<void> | null = null;
 
-  constructor(plugin: any, context: any, file: TFile, subpath?: string) {
+  constructor(plugin: Plugin, context: EmbedContext, file: TFile, subpath?: string) {
     super();
     this.plugin = plugin;
     this.context = context;
@@ -55,36 +61,36 @@ class PinnedPdfPageEmbed extends Component {
   }
 
   onload(): void {
-    const container = this.context?.containerEl as HTMLElement | undefined;
+    const container = this.context.containerEl;
     if (!container) return;
     container.classList.add("bc-pinned-pdf-embed-container");
-    const canvas = document.createElement("canvas");
+    const canvas = container.ownerDocument.win.createEl("canvas");
     canvas.className = "bc-pinned-pdf-page";
     canvas.setAttribute("aria-label", t("Pinned PDF page", "固定的 PDF 页面"));
     container.appendChild(canvas);
     this.canvas = canvas;
 
     // A transparent selectable text layer sits directly over the rendered page.
-    const textLayer = document.createElement("div");
+    const textLayer = container.ownerDocument.win.createDiv();
     textLayer.className = "bc-pdf-text-layer";
     textLayer.setAttribute("aria-label", t("Selectable PDF text overlay", "可选择的 PDF 文本层"));
     container.appendChild(textLayer);
     this.textLayerEl = textLayer;
 
-    const details = document.createElement("details");
+    const details = container.ownerDocument.win.createEl("details");
     details.className = "bc-pdf-text-selection";
-    const summary = document.createElement("summary");
+    const summary = container.ownerDocument.win.createEl("summary");
     summary.textContent = t("PDF text (select text to create an excerpt node)", "PDF 文本（选择文字后可创建摘录节点）");
     details.appendChild(summary);
-    const textContent = document.createElement("div");
+    const textContent = container.ownerDocument.win.createDiv();
     textContent.className = "bc-pdf-selectable-text";
     textContent.textContent = t("Extracting page text…", "正在提取页面文本…");
     details.appendChild(textContent);
-    const excerptButton = document.createElement("button");
+    const excerptButton = container.ownerDocument.win.createEl("button");
     excerptButton.type = "button";
     excerptButton.className = "bc-pdf-create-excerpt";
     excerptButton.textContent = t("Create excerpt node from selection", "从选中文字创建摘录节点");
-    const highlightButton = document.createElement("button");
+    const highlightButton = container.ownerDocument.win.createEl("button");
     highlightButton.type = "button";
     highlightButton.className = "bc-pdf-highlight-selection";
     highlightButton.textContent = t("Highlight the selected text on the page", "持久化高亮页面上的选中文字");
@@ -159,14 +165,14 @@ class PinnedPdfPageEmbed extends Component {
     const cssScale = canvas.width > 0 && canvas.clientWidth > 0
       ? canvas.clientWidth / canvas.width
       : 1;
-    const pdfjs = (window as any).pdfjsLib;
-    const measureCanvas = document.createElement("canvas");
+    const pdfjs = (window as Window & { pdfjsLib?: PdfJsHost }).pdfjsLib;
+    const measureCanvas = layer.ownerDocument.win.createEl("canvas");
     const measure = measureCanvas.getContext("2d");
 
     for (const item of this.pageTextItems) {
       const text = typeof item?.str === "string" ? item.str : "";
       if (!text || !Array.isArray(item.transform)) continue;
-      let transform = item.transform as number[];
+      let transform = item.transform;
       try {
         if (typeof pdfjs?.Util?.transform === "function") {
           transform = pdfjs.Util.transform(viewport.transform, item.transform);
@@ -183,7 +189,7 @@ class PinnedPdfPageEmbed extends Component {
       const left = transform[4] * cssScale;
       const top = (transform[5] - fontSize) * cssScale;
       const targetWidth = Math.max(1, Number(item.width ?? 0) * viewport.scale * cssScale);
-      const span = document.createElement("span");
+      const span = layer.ownerDocument.win.createSpan();
       span.className = "bc-pdf-selectable-text-run";
       span.textContent = text;
       span.setCssStyles({
@@ -260,7 +266,7 @@ class PinnedPdfPageEmbed extends Component {
         this.pageViewport = viewport;
         this.renderSelectableTextLayer();
         const selectableText = this.pageTextItems
-          .map((item: any) => typeof item?.str === "string" ? item.str : "")
+          .map(item => item.str ?? "")
           .filter(Boolean)
           .join(" ")
           .replace(/\s+/g, " ")
@@ -283,9 +289,9 @@ class PinnedPdfPageEmbed extends Component {
       delete target.dataset.loading;
       target.dataset.error = "true";
       target.title = error instanceof Error ? error.message : String(error);
-      const container = this.context?.containerEl as HTMLElement | undefined;
+      const container = this.context.containerEl;
       if (container && !container.querySelector(".bc-pinned-pdf-error")) {
-        const message = document.createElement("div");
+        const message = container.ownerDocument.win.createDiv();
         message.className = "bc-pinned-pdf-error";
         message.textContent = t("Failed to load the PDF page. Open the developer console for details.", "PDF 页面加载失败。请打开开发者控制台查看详情。");
         container.appendChild(message);
@@ -317,20 +323,20 @@ class PinnedPdfPageEmbed extends Component {
  * continue to use Obsidian's original factory.
  */
 export class PinnedPdfPageRenderer {
-  private plugin: any;
-  private originalEmbed: any;
-  private wrappedEmbed: any;
-  private registry: any;
+  private plugin: Plugin;
+  private originalEmbed: EmbedFactory | null = null;
+  private wrappedEmbed: EmbedFactory | null = null;
+  private registry: EmbedRegistry | undefined;
 
-  constructor(plugin: any) {
+  constructor(plugin: Plugin) {
     this.plugin = plugin;
   }
 
   start(): void {
-    const currentEntries = (this.plugin.app as any).embedRegistry?.embedByExtension;
+    const currentEntries = (this.plugin.app as EmbedApp).embedRegistry?.embedByExtension;
     if (this.wrappedEmbed && currentEntries?.pdf === this.wrappedEmbed) return;
     this.stop();
-    this.registry = (this.plugin.app as any).embedRegistry;
+    this.registry = (this.plugin.app as EmbedApp).embedRegistry;
     const entries = this.registry?.embedByExtension;
     const original = entries?.pdf;
     if (!entries || typeof original !== "function") {
@@ -340,7 +346,7 @@ export class PinnedPdfPageRenderer {
 
     this.originalEmbed = original;
     const plugin = this.plugin;
-    this.wrappedEmbed = function (context: any, file: TFile, subpath?: string) {
+    this.wrappedEmbed = function (this: unknown, context: EmbedContext, file: TFile, subpath?: string) {
       if (file instanceof TFile && getPageNumber(subpath) !== null) {
         return new PinnedPdfPageEmbed(plugin, context, file, subpath);
       }

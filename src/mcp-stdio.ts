@@ -1,9 +1,13 @@
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { clearTimeout, setTimeout } from "node:timers";
+import { isJsonObject } from "./prompt-input";
 import { normalizeMcpToolResult, type RemoteMcpResult } from "./mcp-result";
 import {
   formatMcpPromptResult,
   formatMcpResourceRead,
   normalizeMcpPromptPage,
   normalizeMcpResourcePage,
+  normalizeMcpTools,
   type McpPrompt,
   type McpResource
 } from "./mcp-catalog";
@@ -26,50 +30,47 @@ export interface LocalMcpTool {
 export function parseLocalMcpConfig(raw: string): LocalMcpServerConfig {
   if (!raw.trim()) throw new Error(t("Enter the local MCP stdio configuration JSON in settings.", "请在设置中填写本地 MCP stdio 配置 JSON。"));
   if (raw.length > 30_000) throw new Error(t("The MCP stdio configuration is too long.", "MCP stdio 配置过长。"));
-  let value: any;
+  let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch {
     throw new Error(t("The MCP stdio configuration is not valid JSON.", "MCP stdio 配置不是有效 JSON。"));
   }
-  if (!value || typeof value !== "object" || Array.isArray(value) ||
-      typeof value.command !== "string" || !value.command.trim()) {
+  if (!isJsonObject(value) || typeof value.command !== "string" || !value.command.trim()) {
     throw new Error(t('The MCP stdio configuration must include a non-empty "command" string.', 'MCP stdio 配置必须包含非空的 "command" 字符串。'));
   }
   const args = value.args === undefined ? [] : value.args;
   if (!Array.isArray(args) || args.length > 64 ||
-      args.some((arg: unknown) => typeof arg !== "string" || arg.length > 2000)) {
+      !args.every((arg: unknown): arg is string => typeof arg === "string" && arg.length <= 2000)) {
     throw new Error(t('"args" must be an array of at most 64 strings.', '"args" 必须是最多 64 项的字符串数组。'));
   }
   const cwd = value.cwd === undefined ? "" : value.cwd;
   if (typeof cwd !== "string" || cwd.length > 2000) {
     throw new Error(t('"cwd" must be a valid path string.', '"cwd" 必须是有效的路径字符串。'));
   }
-  const env = value.env === undefined ? {} : value.env;
-  if (!env || typeof env !== "object" || Array.isArray(env) ||
-      Object.keys(env).length > 64 ||
-      Object.entries(env).some(([key, val]) =>
-        !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof val !== "string" || val.length > 4000
-      )) {
+  const rawEnv = value.env === undefined ? {} : value.env;
+  if (!isJsonObject(rawEnv) || Object.keys(rawEnv).length > 64) {
     throw new Error(t('"env" must be an object mapping environment variable names to string values.', '"env" 必须是环境变量名到字符串值的对象。'));
+  }
+  const env: Record<string, string> = {};
+  for (const [key, val] of Object.entries(rawEnv)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof val !== "string" || val.length > 4000) {
+      throw new Error(t('"env" must be an object mapping environment variable names to string values.', '"env" 必须是环境变量名到字符串值的对象。'));
+    }
+    env[key] = val;
   }
 
   return {
     command: value.command.trim(),
-    args: args as string[],
+    args,
     cwd: cwd.trim(),
-    env: env as Record<string, string>
+    env
   };
 }
 
-interface RpcEnvelope {
-  id?: string;
-  result?: any;
-  error?: { code?: number; message?: string; data?: unknown };
-}
 
 type PendingRpc = {
-  resolve: (value: any) => void;
+  resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 };
@@ -85,7 +86,7 @@ const localSessions = new Map<string, LocalMcpSession>();
  * after idle timeout, protocol failure, plugin unload or LRU eviction.
  */
 class LocalMcpSession {
-  private child: any = null;
+  private child: ChildProcessWithoutNullStreams | null = null;
   private startPromise: Promise<void> | null = null;
   private closed = false;
   private buffer = "";
@@ -115,7 +116,7 @@ class LocalMcpSession {
     this.idleTimer = setTimeout(() => {
       this.fail(new Error("Local MCP stdio session expired after five idle minutes."));
     }, LOCAL_MCP_IDLE_TIMEOUT_MS);
-    (this.idleTimer as any).unref?.();
+    this.idleTimer.unref();
   }
 
   private async ensureStarted(): Promise<void> {
@@ -197,16 +198,16 @@ class LocalMcpSession {
     });
   }
 
-  private sendRequest<T>(method: string, params: Record<string, unknown>, timeoutMs = LOCAL_MCP_REQUEST_TIMEOUT_MS): Promise<T> {
+  private sendRequest(method: string, params: Record<string, unknown>, timeoutMs = LOCAL_MCP_REQUEST_TIMEOUT_MS): Promise<unknown> {
     if (this.closed) return Promise.reject(new Error("Local MCP stdio session is closed."));
     const id = "bc-stdio-" + (++this.sequence);
-    return new Promise<T>((resolveRequest, rejectRequest) => {
+    return new Promise<unknown>((resolveRequest, rejectRequest) => {
       const timer = setTimeout(() => {
         // An unresolved request makes server state ambiguous. Close this session
         // so the next command starts a clean child process rather than reuse it.
         this.fail(new Error(t("MCP stdio request timed out (" + Math.round(timeoutMs / 1000) + "s); the session was reset.", "MCP stdio 请求超时（" + Math.round(timeoutMs / 1000) + " 秒）；会话已重置。")));
       }, timeoutMs);
-      (timer as any).unref?.();
+      timer.unref();
       this.pending.set(id, { resolve: resolveRequest, reject: rejectRequest, timer });
       try {
         this.write({ jsonrpc: "2.0", id, method, params });
@@ -221,25 +222,24 @@ class LocalMcpSession {
 
   private consumeLine(line: string): void {
     if (!line.trim() || this.closed) return;
-    let message: RpcEnvelope;
+    let message: unknown;
     try {
-      message = JSON.parse(line) as RpcEnvelope;
+      message = JSON.parse(line);
     } catch {
       // Servers must reserve stdout for protocol messages. Tolerate logs,
       // but do not expose them as tool results.
       return;
     }
-    if (typeof message.id !== "string") return;
+    if (!isJsonObject(message) || typeof message.id !== "string") return;
     const handler = this.pending.get(message.id);
     if (!handler) return;
     this.pending.delete(message.id);
     clearTimeout(handler.timer);
     if (message.error) {
-      handler.reject(new Error(
-        t("MCP stdio error", "MCP stdio 错误") +
-        (message.error.code === undefined ? "" : " (" + message.error.code + ")") +
-        ": " + String(message.error.message ?? JSON.stringify(message.error))
-      ));
+      const error = message.error;
+      const code = isJsonObject(error) && typeof error.code === "number" ? " (" + error.code + ")" : "";
+      const detail = isJsonObject(error) && typeof error.message === "string" ? error.message : JSON.stringify(error);
+      handler.reject(new Error(t("MCP stdio error", "MCP stdio 错误") + code + ": " + detail));
     } else if ("result" in message) {
       handler.resolve(message.result);
     } else {
@@ -266,16 +266,16 @@ class LocalMcpSession {
           try { child.kill("SIGKILL"); } catch { /* Ignore exit races. */ }
         }
       }, 1200);
-      (this.killTimer as any).unref?.();
+      this.killTimer.unref();
     }
     this.onClosed();
   }
 
-  async request<T>(method: string, params: Record<string, unknown>, timeoutMs = LOCAL_MCP_REQUEST_TIMEOUT_MS): Promise<T> {
+  async request(method: string, params: Record<string, unknown>, timeoutMs = LOCAL_MCP_REQUEST_TIMEOUT_MS): Promise<unknown> {
     await this.ensureStarted();
     if (this.closed) throw new Error("Local MCP stdio session is closed.");
     this.clearIdleTimer();
-    return await this.sendRequest<T>(method, params, timeoutMs);
+    return await this.sendRequest(method, params, timeoutMs);
   }
 
   close(): void {
@@ -305,7 +305,7 @@ function getLocalMcpSession(config: LocalMcpServerConfig): LocalMcpSession {
   if (existing) localSessions.delete(key);
 
   while (localSessions.size >= LOCAL_MCP_MAX_SESSIONS) {
-    const oldest = localSessions.entries().next().value as [string, LocalMcpSession] | undefined;
+    const oldest = localSessions.entries().next().value;
     if (!oldest) break;
     localSessions.delete(oldest[0]);
     oldest[1].close();
@@ -333,9 +333,8 @@ function catalogEntryKey(
   item: unknown,
   catalogKey: "tools" | "resources" | "prompts"
 ): string | undefined {
-  if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
-  const record = item as Record<string, unknown>;
-  const value = catalogKey === "resources" ? record.uri : record.name;
+  if (!isJsonObject(item)) return undefined;
+  const value = catalogKey === "resources" ? item.uri : item.name;
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
@@ -355,62 +354,61 @@ function deduplicateCatalogEntries(
   });
 }
 
-async function oneStdioRequest<T>(
+async function oneStdioRequest(
   config: LocalMcpServerConfig,
   method: string,
   params: Record<string, unknown>,
   timeoutMs = LOCAL_MCP_REQUEST_TIMEOUT_MS,
   catalogKey?: "tools" | "resources" | "prompts"
-): Promise<T> {
+): Promise<unknown> {
   const session = getLocalMcpSession(config);
-  let result: any = await session.request<any>(method, params, timeoutMs);
-  if (catalogKey) {
-    if (!result || typeof result !== "object" || !Array.isArray(result[catalogKey])) {
-      throw new Error(t("MCP stdio did not return a valid " + catalogKey + " array.", "MCP stdio 没有返回有效的 " + catalogKey + " 数组。"));
+  const result = await session.request(method, params, timeoutMs);
+  if (!catalogKey) return result;
+  if (!isJsonObject(result)) {
+    throw new Error(t("MCP stdio did not return a valid " + catalogKey + " array.", "MCP stdio 没有返回有效的 " + catalogKey + " 数组。"));
+  }
+  const firstEntries = result[catalogKey];
+  if (!Array.isArray(firstEntries)) {
+    throw new Error(t("MCP stdio did not return a valid " + catalogKey + " array.", "MCP stdio 没有返回有效的 " + catalogKey + " 数组。"));
+  }
+  let receivedEntryCount = firstEntries.length;
+  if (receivedEntryCount > LOCAL_MCP_CATALOG_MAX_ENTRIES) {
+    throw new Error("MCP stdio catalog exceeded the 1000-entry safety limit.");
+  }
+  let entries = deduplicateCatalogEntries(firstEntries, catalogKey);
+  const cursorSet = new Set<string>();
+  let cursor = typeof result.nextCursor === "string" ? result.nextCursor : "";
+  let pageCount = 1;
+  while (cursor) {
+    if (cursorSet.has(cursor)) throw new Error(t("MCP stdio catalog returned a repeated pagination cursor.", "MCP stdio catalog 返回重复 pagination cursor。"));
+    cursorSet.add(cursor);
+    if (++pageCount > LOCAL_MCP_CATALOG_MAX_PAGES) {
+      throw new Error(t("MCP stdio catalog exceeded the 50-page safety limit.", "MCP stdio catalog 超过 50 页安全限制。"));
     }
-    let receivedEntryCount = result[catalogKey].length;
+    const page = await session.request(method, { ...params, cursor }, timeoutMs);
+    const pageEntries = isJsonObject(page) ? page[catalogKey] : undefined;
+    if (!isJsonObject(page) || !Array.isArray(pageEntries)) {
+      throw new Error(t("An MCP stdio follow-up page did not return a valid " + catalogKey + " array.", "MCP stdio 后续页面没有返回有效的 " + catalogKey + " 数组。"));
+    }
+    receivedEntryCount += pageEntries.length;
     if (receivedEntryCount > LOCAL_MCP_CATALOG_MAX_ENTRIES) {
       throw new Error("MCP stdio catalog exceeded the 1000-entry safety limit.");
     }
-    result = { ...result, [catalogKey]: deduplicateCatalogEntries([...result[catalogKey]], catalogKey) };
-    const cursorSet = new Set<string>();
-    let cursor = typeof result.nextCursor === "string" ? result.nextCursor : "";
-    let pageCount = 1;
-    while (cursor) {
-      if (cursorSet.has(cursor)) throw new Error(t("MCP stdio catalog returned a repeated pagination cursor.", "MCP stdio catalog 返回重复 pagination cursor。"));
-      cursorSet.add(cursor);
-      if (++pageCount > LOCAL_MCP_CATALOG_MAX_PAGES) {
-        throw new Error(t("MCP stdio catalog exceeded the 50-page safety limit.", "MCP stdio catalog 超过 50 页安全限制。"));
-      }
-      const page: any = await session.request<any>(method, { ...params, cursor }, timeoutMs);
-      if (!Array.isArray(page?.[catalogKey])) {
-        throw new Error(t("An MCP stdio follow-up page did not return a valid " + catalogKey + " array.", "MCP stdio 后续页面没有返回有效的 " + catalogKey + " 数组。"));
-      }
-      receivedEntryCount += page[catalogKey].length;
-      if (receivedEntryCount > LOCAL_MCP_CATALOG_MAX_ENTRIES) {
-        throw new Error("MCP stdio catalog exceeded the 1000-entry safety limit.");
-      }
-      result[catalogKey] = deduplicateCatalogEntries(
-        [...result[catalogKey], ...page[catalogKey]],
-        catalogKey
-      );
-      cursor = typeof page.nextCursor === "string" ? page.nextCursor : "";
-    }
-    delete result.nextCursor;
+    const nextEntries: unknown[] = pageEntries;
+    entries = deduplicateCatalogEntries([...entries, ...nextEntries], catalogKey);
+    cursor = typeof page.nextCursor === "string" ? page.nextCursor : "";
   }
-  return result as T;
+  const combined = { ...result, [catalogKey]: entries };
+  delete combined.nextCursor;
+  return combined;
 }
 
 export async function listLocalMcpTools(configJson: string): Promise<LocalMcpTool[]> {
   const config = parseLocalMcpConfig(configJson);
-  const result = await oneStdioRequest<any>(config, "tools/list", {}, 60_000, "tools");
-  const tools = result?.tools;
+  const result = await oneStdioRequest(config, "tools/list", {}, 60_000, "tools");
+  const tools = isJsonObject(result) ? result.tools : undefined;
   if (!Array.isArray(tools)) throw new Error(t("The local MCP stdio server did not return a tools array.", "本地 MCP stdio 服务没有返回 tools 数组。"));
-  return tools.filter((tool: any) => typeof tool?.name === "string").map((tool: any) => ({
-    name: tool.name,
-    description: typeof tool.description === "string" ? tool.description : "",
-    inputSchema: tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : {}
-  }));
+  return normalizeMcpTools(tools);
 }
 
 export async function callLocalMcpTool(
@@ -420,31 +418,31 @@ export async function callLocalMcpTool(
 ): Promise<RemoteMcpResult> {
   const config = parseLocalMcpConfig(configJson);
   if (!name.trim()) throw new Error(t("MCP tool name cannot be empty.", "MCP tool 名称不能为空。"));
-  const result = await oneStdioRequest<any>(config, "tools/call", {
+  const result = await oneStdioRequest(config, "tools/call", {
     name: name.trim(),
     arguments: args
   });
-  if (result?.isError) throw new Error(t("Local MCP tool call failed: ", "本地 MCP 工具执行失败：") + JSON.stringify(result.content ?? result));
+  if (isJsonObject(result) && result.isError) throw new Error(t("Local MCP tool call failed: ", "本地 MCP 工具执行失败：") + JSON.stringify(result.content ?? result));
   return normalizeMcpToolResult(result);
 }
 
 
 export async function listLocalMcpResources(configJson: string): Promise<McpResource[]> {
   const config = parseLocalMcpConfig(configJson);
-  const result = await oneStdioRequest<any>(config, "resources/list", {}, 60_000, "resources");
+  const result = await oneStdioRequest(config, "resources/list", {}, 60_000, "resources");
   return normalizeMcpResourcePage(result).items;
 }
 
 export async function readLocalMcpResource(configJson: string, uri: string): Promise<RemoteMcpResult> {
   const config = parseLocalMcpConfig(configJson);
   if (!uri.trim()) throw new Error(t("MCP resource URI cannot be empty.", "MCP resource URI 不能为空。"));
-  const result = await oneStdioRequest<any>(config, "resources/read", { uri: uri.trim() });
+  const result = await oneStdioRequest(config, "resources/read", { uri: uri.trim() });
   return formatMcpResourceRead(uri.trim(), result);
 }
 
 export async function listLocalMcpPrompts(configJson: string): Promise<McpPrompt[]> {
   const config = parseLocalMcpConfig(configJson);
-  const result = await oneStdioRequest<any>(config, "prompts/list", {}, 60_000, "prompts");
+  const result = await oneStdioRequest(config, "prompts/list", {}, 60_000, "prompts");
   return normalizeMcpPromptPage(result).items;
 }
 
@@ -455,7 +453,7 @@ export async function getLocalMcpPrompt(
 ): Promise<RemoteMcpResult> {
   const config = parseLocalMcpConfig(configJson);
   if (!name.trim()) throw new Error(t("MCP prompt name cannot be empty.", "MCP prompt 名称不能为空。"));
-  const result = await oneStdioRequest<any>(config, "prompts/get", {
+  const result = await oneStdioRequest(config, "prompts/get", {
     name: name.trim(),
     arguments: args
   });

@@ -1,5 +1,6 @@
-import { Modal, Notice, setIcon, type App, type Plugin } from "obsidian";
+import { ItemView, Modal, Notice, setIcon, type App, type Events, type Plugin } from "obsidian";
 import { readCanvasData } from "./canvas";
+import { isCanvasViewRuntime, type CanvasRuntime } from "./canvas-runtime";
 import { clearSketchCanvas } from "./sketch-renderer";
 import { SKETCH_FONT_CSS } from "./sketch-font";
 import { SOFT_NOTES_FONT_CSS } from "./soft-notes-font";
@@ -15,8 +16,8 @@ import { t } from "./i18n";
  * than a `<button>`, so the entry inherits the same 32px box, 8px padding and
  * muted icon colour as the neighbouring Canvas controls.
  */
-export function createThemeControl(): HTMLElement {
-  const control = document.createElement("div");
+export function createThemeControl(ownerDocument: Document = document): HTMLElement {
+  const control = ownerDocument.win.createDiv();
   control.className = "canvas-control-item bc-theme-control-button";
   control.setAttribute("role", "button");
   control.setAttribute("tabindex", "0");
@@ -74,11 +75,8 @@ body { color-scheme: light; --background-primary: #fff8e8; --background-secondar
   --text-accent: #956247; --text-accent-hover: #70452f; --color-accent: #a16d50;
   --code-background: #eadfc9; --code-normal: #614b3e; --background-modifier-border: #ccbba1;
   --text-selection: #e2c99c; color: #43372f; background: transparent; }
-.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #43372f; }
-/* CodeMirror paints text nodes inside .cm-content, which the rules above do not reach.
-   This sheet is adopted by the iframe document, so it loses to selectors with more
-   specificity in the host CSS; !important is what keeps the ink readable on paper. */
-.cm-content { color: #43372f !important; caret-color: #43372f; }
+html.bc-theme-editor .markdown-source-view, html.bc-theme-editor .cm-editor, html.bc-theme-editor .cm-scroller { background: transparent; color: #43372f; }
+html.bc-theme-editor .markdown-source-view .cm-content { color: #43372f; caret-color: #43372f; }
 `;
 const RESEARCH_EDITOR_CSS = `
 body { color-scheme: light; --background-primary: #fffdf7; --background-secondary: #eeece5;
@@ -98,7 +96,7 @@ body { color-scheme: light; --background-primary: #fffefb; --background-secondar
   --code-background: #f1f0ea; --code-normal: #45443e; --background-modifier-border: #d9d8cf;
   --text-selection: #ddd6ff; color: #262520; background: transparent;
   font-family: "BC Sketch Hand", "Segoe Print", cursive; font-weight: 600; }
-.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #262520; }
+html.bc-theme-editor .markdown-source-view, html.bc-theme-editor .cm-editor, html.bc-theme-editor .cm-scroller { background: transparent; color: #262520; }
 .markdown-preview-view, .markdown-source-view, .cm-content, .inline-title {
   font-family: "BC Sketch Hand", "Segoe Print", cursive; font-weight: 600; }
 `;
@@ -109,11 +107,11 @@ function softNotesEditorCss(preset = "", align = "left"): string {
 body { color-scheme: light; --text-normal: #292e28; --text-muted: #78816e;
   --background-primary: transparent; --background-secondary: #f1f3e9;
   --text-accent: #61744e; --text-selection: #d6e6c7; color: #292e28; background: transparent; }
-.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: #292e28; }
+html.bc-theme-editor .markdown-source-view, html.bc-theme-editor .cm-editor, html.bc-theme-editor .cm-scroller { background: transparent; color: #292e28; }
 .markdown-preview-view, .markdown-source-view, .cm-content {
   font-family: "BC Sketch Hand", cursive; font-size: ${preset === "free" ? 16 : 18}px; line-height: 1.65;
   text-align: ${align === "center" || align === "right" ? align : "left"}; }
-:is(h1,h2,h3,h4,h5,h6,.cm-header) { font-family: "BC Soft Notes Title", cursive !important; font-weight: 400; }
+html.bc-theme-editor :is(h1,h2,h3,h4,h5,h6,.cm-header) { font-family: "BC Soft Notes Title", cursive; font-weight: 400; }
 .cm-header { font-size: ${preset === "free" ? 42 : 28}px; }
 `;
 }
@@ -121,11 +119,11 @@ body { color-scheme: light; --text-normal: #292e28; --text-muted: #78816e;
 function roundedEditorCss(appearance: "dark" | "light"): string {
   const ink = appearance === "dark" ? "#20262d" : "#34372f";
   return `body { color-scheme: light; --text-normal: ${ink}; --text-muted: #515b60; --text-faint: #6c747c; --text-accent: #315b86; --text-accent-hover: #24486b; --background-primary: #e5e7e1; --background-secondary: #d7dbd5; --code-background: #d7dbd5; --code-normal: ${ink}; --text-selection: #a9c3d8; color: ${ink}; background: transparent; }
-.markdown-source-view, .cm-editor, .cm-scroller { background: transparent !important; color: ${ink}; }`;
+html.bc-theme-editor .markdown-source-view, html.bc-theme-editor .cm-editor, html.bc-theme-editor .cm-scroller { background: transparent; color: ${ink}; }`;
 }
 
 class CanvasThemeModal extends Modal {
-  constructor(app: App, private readonly canvas: any, private readonly changed: () => void) {
+  constructor(app: App, private readonly canvas: CanvasRuntime, private readonly changed: () => void) {
     super(app);
   }
 
@@ -160,17 +158,16 @@ class CanvasThemeModal extends Modal {
           : theme.id === "soft-notes" ? t("Let ideas grow freely.", "让想法自由生长")
             : t("A space to think.", "一个思考的空间。")
       });
-      // createElementNS is necessary for SVG in Obsidian's HTML helpers.
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const svg = board.ownerDocument.win.createSvg("svg");
       svg.setAttribute("viewBox", "0 0 240 140");
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const path = board.ownerDocument.win.createSvg("path");
       path.setAttribute("d", theme.id === "sketch"
         ? "M74 72 C116 64 101 106 157 99 M149 93 L158 99 L150 106"
         : "M82 67 C125 60 100 104 152 100 M145 94 L153 100 L146 106");
       svg.appendChild(path);
       board.appendChild(svg);
       if (theme.id === "soft-notes") {
-        ensureSoftNotesGeometry(document);
+        ensureSoftNotesGeometry(board.ownerDocument);
         for (const [kind, text] of [["spark", t("Inspiration", "灵感")], ["action", t("Take it slow", "慢慢做")], ["question", t("Want to try more", "还想试试")]]) {
           const preset = softNotesPreset(kind);
           const sample = board.createSpan({ cls: "bc-soft-mini bc-mini-" + kind, text });
@@ -224,8 +221,8 @@ class CanvasThemeModal extends Modal {
 
 /** Coordinates view lifetime, native history events and same-origin editors. */
 export default class CanvasThemeController {
-  private readonly controls = new Map<any, HTMLElement>();
-  private readonly decoratedCanvases = new Set<any>();
+  private readonly controls = new Map<CanvasRuntime, HTMLElement>();
+  private readonly decoratedCanvases = new Set<CanvasRuntime>();
   private pendingFrame: number | null = null;
   private modal: CanvasThemeModal | null = null;
   private stopped = false;
@@ -234,11 +231,12 @@ export default class CanvasThemeController {
 
   start(): void {
     this.ensureFont();
-    const workspace = this.plugin.app.workspace as any;
+    const workspace = this.plugin.app.workspace;
+    const events: Events = workspace;
     for (const name of ["layout-change", "active-leaf-change", "css-change", "advanced-canvas:data-loaded:after",
       "advanced-canvas:node-added", "advanced-canvas:node-changed", "advanced-canvas:node-editing-state-changed",
       "advanced-canvas:canvas-changed", "advanced-canvas:viewport-changed:after"]) {
-      this.plugin.registerEvent(workspace.on(name, () => this.schedule()));
+      this.plugin.registerEvent(events.on(name, () => this.schedule()));
     }
     workspace.onLayoutReady(() => this.schedule());
     this.plugin.registerDomEvent(document, "load", event => {
@@ -248,8 +246,8 @@ export default class CanvasThemeController {
     this.plugin.addCommand({
       id: "choose-canvas-theme", name: t("Switch Canvas theme", "切换当前画布主题"),
       checkCallback: (checking: boolean) => {
-        const view = workspace.activeLeaf?.view;
-        if (view?.getViewType?.() !== "canvas" || !view.canvas) return false;
+        const view = workspace.getActiveViewOfType(ItemView);
+        if (!isCanvasViewRuntime(view)) return false;
         if (!checking) this.open(view.canvas);
         return true;
       }
@@ -258,11 +256,11 @@ export default class CanvasThemeController {
     this.schedule();
   }
 
-  private open(canvas: any): void {
+  private open(canvas: CanvasRuntime): void {
     this.modal?.close();
     this.modal = new CanvasThemeModal(this.plugin.app, canvas, () => {
       this.scan();
-      (this.plugin.app.workspace as any).trigger("better-canvas:theme-changed");
+      this.plugin.app.workspace.trigger("better-canvas:theme-changed");
     });
     this.modal.open();
   }
@@ -284,11 +282,11 @@ export default class CanvasThemeController {
 
   private scan(): void {
     if (this.stopped) return;
-    const live = new Set<any>();
+    const live = new Set<CanvasRuntime>();
     for (const leaf of this.plugin.app.workspace.getLeavesOfType("canvas")) {
-      const view = leaf.view as any;
+      const view = leaf.view;
+      if (!isCanvasViewRuntime(view)) continue;
       const canvas = view.canvas;
-      if (!canvas) continue;
       live.add(canvas);
       this.decoratedCanvases.add(canvas);
       decorateCanvasTheme(canvas);
@@ -303,9 +301,9 @@ export default class CanvasThemeController {
         group = undefined;
       }
       if (!group) {
-        group = document.createElement("div");
+        group = stack.ownerDocument.win.createDiv();
         group.className = "canvas-control-group mod-raised bc-theme-control";
-        const control = createThemeControl();
+        const control = createThemeControl(stack.ownerDocument);
         const activate = (event: Event): void => {
           event.preventDefault();
           event.stopPropagation();
@@ -320,7 +318,8 @@ export default class CanvasThemeController {
         stack.insertBefore(group, stack.firstChild);
         this.controls.set(canvas, group);
       }
-      const control = group.firstElementChild as HTMLElement;
+      const control = group.firstElementChild;
+      if (!control) continue;
       const themeName = theme === "scrapbook" ? t("Scrapbook", "拼贴手账") : theme === "sketch" ? t("Hand-drawn Whiteboard", "手绘白板") : theme === "rounded-map" ? t("Gummy Whiteboard", "软糖白板") : theme === "research" ? t("Paper Research", "纸本研究") : theme === "soft-notes" ? t("Soft Notes", "柔软便签") : t("Default", "默认");
       control.setAttribute("aria-label", t("Canvas theme · ", "画布主题 · ") + themeName);
     }
@@ -346,13 +345,13 @@ export default class CanvasThemeController {
     return iframeDark || hostDark ? "dark" : "light";
   }
 
-  private syncEditors(canvas: any, theme: CanvasThemeId): void {
-    for (const iframe of canvas.wrapperEl?.querySelectorAll("iframe.canvas-node-iframe, .markdown-embed iframe.embed-iframe.is-controlled") ?? []) {
+  private syncEditors(canvas: CanvasRuntime, theme: CanvasThemeId): void {
+    for (const frame of canvas.wrapperEl?.querySelectorAll<HTMLIFrameElement>("iframe.canvas-node-iframe, .markdown-embed iframe.embed-iframe.is-controlled") ?? []) {
       try {
-        const frame = iframe as HTMLIFrameElement;
         const doc = frame.contentDocument;
         if (!doc?.head) continue;
-        const anchor = frame.closest?.("[data-bc-soft-notes]") as HTMLElement | null;
+        doc.documentElement.classList.toggle("bc-theme-editor", theme !== "default");
+        const anchor = frame.closest<HTMLElement>("[data-bc-soft-notes]");
         const preset = anchor?.dataset.bcSoftNotes ?? "";
         const align = anchor?.style.getPropertyValue("--bc-soft-align") ?? "left";
         // Theme switching is not the only trigger: `css-change` fires on light/dark
@@ -395,16 +394,17 @@ export default class CanvasThemeController {
     stopRoundedMapGeometry();
   }
 
-  private clearDecoration(canvas: any): void {
+  private clearDecoration(canvas: CanvasRuntime): void {
     if (canvas.wrapperEl?.dataset) delete canvas.wrapperEl.dataset.bcTheme;
     clearSketchCanvas(canvas);
-    for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-soft-notes]") ?? []) clearSoftNotesNode(el);
+    for (const el of canvas.wrapperEl?.querySelectorAll<HTMLElement>("[data-bc-soft-notes]") ?? []) clearSoftNotesNode(el);
     for (const node of canvas.nodes?.values?.() ?? []) {
       const element = node.nodeEl ?? node.containerEl ?? node.el;
+      if (!element) continue;
       clearRoundedMapNode(element);
-      if (element?.dataset) clearResearchNode(element);
+      clearResearchNode(element);
     }
-    for (const el of canvas.wrapperEl?.querySelectorAll("[data-bc-paper]") ?? []) {
+    for (const el of canvas.wrapperEl?.querySelectorAll<HTMLElement>("[data-bc-paper]") ?? []) {
       delete el.dataset.bcPaper;
       delete el.dataset.bcPaperBorder;
     }

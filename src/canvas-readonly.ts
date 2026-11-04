@@ -50,27 +50,48 @@ export function shouldBlockReadonlyInput(
   return false;
 }
 
+interface ReadonlyEventContainer {
+  addEventListener(type: string, listener: EventListener, options: AddEventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListener, options: AddEventListenerOptions): void;
+}
+
+interface ReadonlyWrapper {
+  classList: Pick<DOMTokenList, "contains">;
+}
+
+function hasClosest(target: EventTarget | null): target is EventTarget & Pick<Element, "closest"> {
+  return target !== null && "closest" in target && typeof target.closest === "function";
+}
+
+function isReadonlyEventContainer(value: Partial<ReadonlyEventContainer> | undefined): value is ReadonlyEventContainer {
+  return typeof value?.addEventListener === "function" && typeof value.removeEventListener === "function";
+}
+
 interface ReadonlyListenerRecord {
   type: CanvasReadonlyInputType;
-  listener: (event: any) => void;
+  listener: EventListener;
   options: AddEventListenerOptions;
 }
 
 interface ReadonlyBinding {
-  container: any;
-  wrapper: any;
+  container: ReadonlyEventContainer;
+  wrapper: ReadonlyWrapper;
   options: CanvasReadonlyOptions;
   listeners: ReadonlyListenerRecord[];
 }
 
 /** Installs/removes read-only interaction guards without patching Canvas data APIs. */
 export class CanvasReadonlyController {
-  private readonly bindings = new Map<any, ReadonlyBinding>();
+  private readonly bindings = new Map<ReadonlyEventContainer, ReadonlyBinding>();
 
-  bind(view: any, canvas: any, options: CanvasReadonlyOptions): void {
+  bind(
+    view: { containerEl?: ReadonlyEventContainer; contentEl?: ReadonlyEventContainer } | null | undefined,
+    canvas: { wrapperEl?: ReadonlyWrapper & Partial<ReadonlyEventContainer> } | null | undefined,
+    options: CanvasReadonlyOptions
+  ): void {
     const container = view?.containerEl ?? view?.contentEl ?? canvas?.wrapperEl;
     const wrapper = canvas?.wrapperEl;
-    if (!container?.addEventListener || !container?.removeEventListener || !wrapper) return;
+    if (!isReadonlyEventContainer(container) || !wrapper) return;
 
     const existing = this.bindings.get(container);
     if (existing) {
@@ -90,26 +111,26 @@ export class CanvasReadonlyController {
     ];
 
     for (const type of eventTypes) {
-      const listener = (event: any): void => {
-        const readOnly = Boolean(binding.wrapper?.classList?.contains?.("bc-readonly"));
-        const target = event?.target as any;
-        const editable = Boolean(target?.closest?.("input, textarea, select, [contenteditable='true'], .cm-editor"));
+      const listener: EventListener = (event): void => {
+        const readOnly = binding.wrapper.classList.contains("bc-readonly");
+        const target = event.target;
+        const editable = hasClosest(target) && Boolean(target.closest("input, textarea, select, [contenteditable='true'], .cm-editor"));
         const blocked = shouldBlockReadonlyInput(
           readOnly,
           binding.options,
           type,
-          String(event?.key ?? ""),
+          "key" in event && typeof event.key === "string" ? event.key : "",
           editable,
           {
-            ctrlKey: Boolean(event?.ctrlKey),
-            metaKey: Boolean(event?.metaKey),
-            shiftKey: Boolean(event?.shiftKey)
+            ctrlKey: "ctrlKey" in event && Boolean(event.ctrlKey),
+            metaKey: "metaKey" in event && Boolean(event.metaKey),
+            shiftKey: "shiftKey" in event && Boolean(event.shiftKey)
           }
         );
         if (!blocked) return;
-        if (event?.cancelable !== false) event?.preventDefault?.();
-        event?.stopPropagation?.();
-        event?.stopImmediatePropagation?.();
+        if (event.cancelable !== false) event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
       };
       const listenerOptions: AddEventListenerOptions = { capture: true, passive: false };
       container.addEventListener(type, listener, listenerOptions);
@@ -118,7 +139,7 @@ export class CanvasReadonlyController {
     this.bindings.set(container, binding);
   }
 
-  unbind(container: any): void {
+  unbind(container: ReadonlyEventContainer): void {
     const binding = this.bindings.get(container);
     if (!binding) return;
     for (const item of binding.listeners) {
@@ -128,7 +149,7 @@ export class CanvasReadonlyController {
     this.bindings.delete(container);
   }
 
-  retainOnly(activeContainers: Iterable<any>): void {
+  retainOnly(activeContainers: Iterable<ReadonlyEventContainer>): void {
     const active = new Set(activeContainers);
     for (const container of [...this.bindings.keys()]) {
       if (!active.has(container)) this.unbind(container);

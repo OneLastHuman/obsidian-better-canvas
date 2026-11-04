@@ -125,13 +125,13 @@ function parseDefinition(body: string, kind: CustomStyleKind): CustomStyleDefini
       currentOption = {};
       rawOptions.push(currentOption);
       const initialPair = listItem[1].trim() ? parseYamlPair(listItem[1]) : null;
-      if (initialPair) currentOption[initialPair[0] as keyof RawOption] = initialPair[1] as never;
+      if (initialPair) currentOption[initialPair[0] as keyof RawOption] = initialPair[1];
       else if (listItem[1].trim()) currentOption = null;
       continue;
     }
     if (!currentOption) continue;
     const pair = parseYamlPair(trimmed);
-    if (pair) currentOption[pair[0] as keyof RawOption] = pair[1] as never;
+    if (pair) currentOption[pair[0] as keyof RawOption] = pair[1];
   }
 
   if (!key || !/^[a-z][a-z0-9-]*$/.test(key) || !label?.trim() || rawOptions.length === 0) {
@@ -223,7 +223,7 @@ export function applyCustomStyleChoice<
         styleAttributes: { ...styleAttributes, [definition.key]: value }
       };
     });
-    return { data: { ...data, nodes } as TData, updated };
+    return { data: { ...data, nodes }, updated };
   }
 
   const edges = data.edges.map(edge => {
@@ -238,7 +238,7 @@ export function applyCustomStyleChoice<
       styleAttributes: { ...styleAttributes, [definition.key]: value }
     };
   });
-  return { data: { ...data, edges } as TData, updated };
+  return { data: { ...data, edges }, updated };
 }
 
 

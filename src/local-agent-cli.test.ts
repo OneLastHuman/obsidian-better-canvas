@@ -10,6 +10,12 @@ import type { ChatMessage } from "./ai";
 
 vi.mock("./node-runtime", () => ({ loadNodeRuntimeModules: vi.fn() }));
 
+// Forward imported Node timers to the clock controlled by vi.useFakeTimers.
+vi.mock("node:timers", () => ({
+  setTimeout: (callback: () => void, delay?: number) => global.setTimeout(callback, delay),
+  clearTimeout: (timer: NodeJS.Timeout | undefined) => global.clearTimeout(timer)
+}));
+
 const messages: ChatMessage[] = [
   { role: "system", content: "Respond in Markdown." },
   { role: "user", content: [{ type: "text", text: "Summarize this note; $(do-not-run) `literal` & echo NO." }] }

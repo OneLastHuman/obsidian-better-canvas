@@ -822,15 +822,15 @@ kbd {
   margin-top: 0.9rem;
 }
 
-.optional-note {
-  margin-top: 1.4rem !important;
+.ai-side p.optional-note {
+  margin-top: 1.4rem;
   padding: 0.9rem 1rem;
   border-left: 2px solid var(--green);
   background: var(--green-wash);
-  color: var(--green-deep) !important;
-  font-family: var(--serif) !important;
-  font-size: 0.94rem !important;
-  line-height: 1.55 !important;
+  color: var(--green-deep);
+  font-family: var(--serif);
+  font-size: 0.94rem;
+  line-height: 1.55;
 }
 
 .export-grid {

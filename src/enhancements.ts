@@ -1,4 +1,5 @@
-import { CanvasData, CanvasEdgeData, CanvasNodeData, createId, readCanvasData } from "./canvas";
+import { readCanvasData, type CanvasEdgeData, type CanvasNodeData } from "./canvas";
+import type { CanvasRuntime, CanvasEdgeRuntime } from "./canvas-runtime";
 import { decorateCanvasTheme, mergeFloatingSidesIntoCurrentHistory, resolveCanvasTheme } from "./canvas-theme";
 import { decorateAutoResizeInsets, measureRenderedNodeLayout } from "./node-rendered-layout";
 import {
@@ -43,7 +44,7 @@ export function normalizeNodeShape(shape: string): string | undefined {
   return CANONICAL_NODE_SHAPES[shape.trim().toLowerCase()];
 }
 
-export function patchNode(canvas: any, nodeId: string, patch: Record<string, unknown>, saveHistory = true): boolean {
+export function patchNode(canvas: CanvasRuntime, nodeId: string, patch: Partial<CanvasNodeData>, saveHistory = true): boolean {
   const data = readCanvasData(canvas);
   let found = false;
   const nodes = data.nodes.map(node => {
@@ -69,7 +70,7 @@ export function patchNode(canvas: any, nodeId: string, patch: Record<string, unk
   return true;
 }
 
-export function reorderNode(canvas: any, nodeId: string, bringToFront: boolean): boolean {
+export function reorderNode(canvas: CanvasRuntime, nodeId: string, bringToFront: boolean): boolean {
   const data = readCanvasData(canvas);
   const node = data.nodes.find(item => item.id === nodeId);
   if (!node) return false;
@@ -81,7 +82,7 @@ export function reorderNode(canvas: any, nodeId: string, bringToFront: boolean):
   return true;
 }
 
-export function flipIncidentEdges(canvas: any, nodeId: string): number {
+export function flipIncidentEdges(canvas: CanvasRuntime, nodeId: string): number {
   const data = readCanvasData(canvas);
   let count = 0;
   const edges = data.edges.map(edge => {
@@ -109,7 +110,7 @@ export function flipIncidentEdges(canvas: any, nodeId: string): number {
   return count;
 }
 
-export function colorIncidentEdges(canvas: any, nodeId: string, color: string): number {
+export function colorIncidentEdges(canvas: CanvasRuntime, nodeId: string, color: string): number {
   const data = readCanvasData(canvas);
   let count = 0;
   const edges = data.edges.map(edge => {
@@ -125,7 +126,7 @@ export function colorIncidentEdges(canvas: any, nodeId: string, color: string): 
   return count;
 }
 
-export function styleSelectedEdges(canvas: any, color: string, pathStyle: "solid" | "dashed" | "dotted"): number {
+export function styleSelectedEdges(canvas: CanvasRuntime, color: string, pathStyle: "solid" | "dashed" | "dotted"): number {
   const selected = canvas?.selection;
   if (!selected || typeof selected.values !== "function") return 0;
   const ids = new Set<string>();
@@ -144,7 +145,7 @@ export function styleSelectedEdges(canvas: any, color: string, pathStyle: "solid
       bcColor: color,
       bcPathStyle: pathStyle,
       styleAttributes: {
-        ...((edge as any).styleAttributes ?? {}),
+        ...(edge.styleAttributes ?? {}),
         path: pathStyle === "solid" ? "solid" : pathStyle === "dashed" ? "short-dashed" : "dotted"
       }
     };
@@ -159,7 +160,7 @@ export function styleSelectedEdges(canvas: any, color: string, pathStyle: "solid
 
 export type EdgePathfindingMethod = "bezier" | "direct" | "square" | "a-star";
 
-export function styleSelectedEdgePathfinding(canvas: any, method: EdgePathfindingMethod): number {
+export function styleSelectedEdgePathfinding(canvas: CanvasRuntime, method: EdgePathfindingMethod): number {
   const selected = canvas?.selection;
   if (!selected || typeof selected.values !== "function") return 0;
   const ids = new Set<string>();
@@ -173,7 +174,7 @@ export function styleSelectedEdgePathfinding(canvas: any, method: EdgePathfindin
   const edges = data.edges.map(edge => {
     if (!ids.has(edge.id)) return edge;
     count += 1;
-    const styleAttributes = { ...((edge as any).styleAttributes ?? {}) };
+    const styleAttributes = { ...(edge.styleAttributes ?? {}) };
     if (method === "bezier") delete styleAttributes.pathfindingMethod;
     else styleAttributes.pathfindingMethod = method;
     return { ...edge, styleAttributes, bcPathfindingMethod: method === "bezier" ? undefined : method };
@@ -188,7 +189,7 @@ export function styleSelectedEdgePathfinding(canvas: any, method: EdgePathfindin
 
 export type EdgeArrowStyle = "default" | "triangle-outline" | "half-triangle" | "thin-triangle" | "diamond" | "diamond-outline" | "circle" | "circle-outline" | "blunt" | "none";
 
-export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle): number {
+export function styleSelectedEdgeArrow(canvas: CanvasRuntime, arrowStyle: EdgeArrowStyle): number {
   const selected = canvas?.selection;
   if (!selected || typeof selected.values !== "function") return 0;
   const ids = new Set<string>();
@@ -207,7 +208,7 @@ export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle):
       ...edge,
       bcArrowStyle: arrowStyle,
       styleAttributes: {
-        ...((edge as any).styleAttributes ?? {}),
+        ...(edge.styleAttributes ?? {}),
         ...(standardArrow === "none" ? { arrow: "triangle" } : { arrow: standardArrow })
       },
       ...(standardArrow === "none"
@@ -222,17 +223,13 @@ export function styleSelectedEdgeArrow(canvas: any, arrowStyle: EdgeArrowStyle):
   }
   return count;
 }
-export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" | "expanded" | "empty" | "missing" | "not-group" {
+export function toggleGroupCollapse(canvas: CanvasRuntime, groupId: string): "collapsed" | "expanded" | "empty" | "missing" | "not-group" {
   const data = readCanvasData(canvas);
   const group = data.nodes.find(node => node.id === groupId);
   if (!group) return "missing";
   if (group.type !== "group") return "not-group";
 
-  const extended = group as CanvasNodeData & {
-    bcCollapsed?: boolean;
-    bcCollapsedNodes?: CanvasNodeData[];
-    bcCollapsedEdges?: CanvasEdgeData[];
-  };
+  const extended = group;
 
   if (extended.bcCollapsed) {
     const hiddenNodes = Array.isArray(extended.bcCollapsedNodes) ? extended.bcCollapsedNodes : [];
@@ -298,7 +295,7 @@ export function toggleGroupCollapse(canvas: any, groupId: string): "collapsed" |
   return "collapsed";
 }
 
-export function moveSelectionEdgesToTop(canvas: any, direction: "all" | "incoming" | "outgoing" = "all"): number {
+export function moveSelectionEdgesToTop(canvas: CanvasRuntime, direction: "all" | "incoming" | "outgoing" = "all"): number {
   const selection = canvas?.selection;
   if (!selection || typeof selection.values !== "function") return 0;
   const ids = new Set<string>();
@@ -323,9 +320,9 @@ export function moveSelectionEdgesToTop(canvas: any, direction: "all" | "incomin
   return edgeIds.length;
 }
 
-export function selectAllCanvasEdges(canvas: any): number {
+export function selectAllCanvasEdges(canvas: CanvasRuntime): number {
   if (!canvas || typeof canvas.select !== "function" || !canvas.edges?.values) return 0;
-  const edges = [...canvas.edges.values()].filter((edge: any) => edge && edge.id);
+  const edges = [...canvas.edges.values()].filter(edge => edge.id);
   if (!edges.length) return 0;
   canvas.deselectAll?.();
   let selected = 0;
@@ -349,22 +346,22 @@ export function selectAllCanvasEdges(canvas: any): number {
  * too-small block and pushes the text downward. Set the sizer to the current
  * text height instead, then clear the scroll position so padding stays even.
  */
-function refreshTextNodePreview(canvas: any, nodeId: string, contentHeight: number): void {
+function refreshTextNodePreview(canvas: CanvasRuntime, nodeId: string, contentHeight: number): void {
   const internal = canvas?.nodes?.get?.(nodeId);
   const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
-  const preview = element?.querySelector?.(".markdown-preview-view") as HTMLElement | null;
+  const preview = element?.querySelector<HTMLElement>(".markdown-preview-view");
   if (!preview) return;
-  const sizer = preview.querySelector?.(".markdown-preview-sizer") as HTMLElement | null;
+  const sizer = preview.querySelector<HTMLElement>(".markdown-preview-sizer");
   if (sizer) {
     sizer.setCssStyles({ minHeight: `${Math.max(0, Math.round(contentHeight))}px`, height: "auto" });
   }
   preview.scrollTop = 0;
 }
 
-function textMeasureForNode(canvas: any, nodeId: string): TextMeasure {
+function textMeasureForNode(canvas: CanvasRuntime, nodeId: string): TextMeasure {
   const internal = canvas?.nodes?.get?.(nodeId);
   const element = internal?.nodeEl ?? internal?.containerEl ?? internal?.el;
-  const preview = element?.querySelector?.(".markdown-preview-view") as HTMLElement | null;
+  const preview = element?.querySelector<HTMLElement>(".markdown-preview-view");
   let family = "";
   if (preview && typeof getComputedStyle === "function") {
     try {
@@ -383,7 +380,7 @@ function textMeasureForNode(canvas: any, nodeId: string): TextMeasure {
  * left-aligned. Empty text keeps the node at its current size.
  */
 export function resizeNodeToText(
-  canvas: any,
+  canvas: CanvasRuntime,
   nodeId: string,
   measure?: TextMeasure,
   saveHistory = true
@@ -407,15 +404,9 @@ export function resizeNodeToText(
   const layout = rendered ?? calculateTextNodeLayout(node.text, measure ?? textMeasureForNode(canvas, nodeId));
   if (!layout) return false;
 
-  const currentAttributes = node.styleAttributes &&
-    typeof node.styleAttributes === "object" &&
-    !Array.isArray(node.styleAttributes)
-    ? node.styleAttributes as Record<string, unknown>
-    : {};
+  const currentAttributes = node.styleAttributes ?? {};
   const styleAttributes = { ...currentAttributes, textAlign: layout.alignment };
-  const currentAlignment = typeof (node as any).bcTextAlign === "string"
-    ? (node as any).bcTextAlign
-    : currentAttributes.textAlign;
+  const currentAlignment = node.bcTextAlign ?? currentAttributes.textAlign;
 
   const contentHeight = rendered?.contentHeight ?? layout.lines * AUTO_RESIZE_LAYOUT.lineHeight;
 
@@ -451,12 +442,13 @@ export function bestFloatingSide(box: RouteBox, other: RoutePoint): "left" | "ri
   return dy >= 0 ? "bottom" : "top";
 }
 
-function normalizeBBox(value: any): RouteBox | null {
+function normalizeBBox(value: unknown): RouteBox | null {
   if (!value || typeof value !== "object") return null;
-  const minX = Number(value.minX ?? value.x);
-  const minY = Number(value.minY ?? value.y);
-  const maxX = Number(value.maxX ?? (Number(value.x) + Number(value.width)));
-  const maxY = Number(value.maxY ?? (Number(value.y) + Number(value.height)));
+  const bounds = value as Record<string, unknown>;
+  const minX = Number(bounds.minX ?? bounds.x);
+  const minY = Number(bounds.minY ?? bounds.y);
+  const maxX = Number(bounds.maxX ?? (Number(bounds.x) + Number(bounds.width)));
+  const maxY = Number(bounds.maxY ?? (Number(bounds.y) + Number(bounds.height)));
   if (![minX, minY, maxX, maxY].every(Number.isFinite) || maxX < minX || maxY < minY) return null;
   return { minX, minY, maxX, maxY };
 }
@@ -496,10 +488,6 @@ function pointsToSvgPath(points: RoutePoint[]): string {
   return compactPath(points).map((point, index) =>
     (index === 0 ? "M " : "L ") + point.x.toFixed(2) + " " + point.y.toFixed(2)
   ).join(" ");
-}
-
-function directRoute(start: RoutePoint, end: RoutePoint): RoutePoint[] {
-  return [start, end];
 }
 
 function squareRoute(start: RoutePoint, end: RoutePoint, fromSide: string, toSide: string): RoutePoint[] {
@@ -615,15 +603,15 @@ export function routePointsForMethod(
     ?? compactPath(squareRoute(start, end, fromSide, toSide));
 }
 
-function setSvgPath(target: any, path: string): void {
+function setSvgPath(target: SVGElement | undefined, path: string): void {
   if (typeof target?.setAttr === "function") target.setAttr("d", path);
   else if (typeof target?.setAttribute === "function") target.setAttribute("d", path);
 }
 
-function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes: CanvasNodeData[]): void {
-  const method = edgeData?.styleAttributes?.pathfindingMethod;
-  const supported = ["direct", "square", "a-star"].includes(method);
-  if (!supported) {
+function applyConfiguredEdgePath(edge: CanvasEdgeRuntime | undefined, edgeData: CanvasEdgeData, allNodes: CanvasNodeData[]): void {
+  if (!edge) return;
+  const method = edgeData.styleAttributes?.pathfindingMethod;
+  if (method !== "direct" && method !== "square" && method !== "a-star") {
     // Restore the native Bézier path if a previous custom route was cleared.
     if (edge?.__bcRouteSignature && typeof edge.updatePath === "function") {
       edge.center = undefined;
@@ -656,7 +644,7 @@ function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes
   if (edge.__bcRouteSignature === signature) return;
 
   const points = routePointsForMethod(
-    method as CanvasEdgeRouteMethod,
+    method,
     start,
     end,
     fromSide,
@@ -667,8 +655,12 @@ function applyConfiguredEdgePath(canvas: any, edge: any, edgeData: any, allNodes
   const svgPath = pointsToSvgPath(points);
   edge.__bcRouteSignature = signature;
   edge.center = points[Math.floor(points.length / 2)] ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-  setSvgPath(edge.path?.interaction, svgPath);
-  setSvgPath(edge.path?.display, svgPath);
+  const path = edge.path;
+  if (path && "setAttribute" in path) setSvgPath(path, svgPath);
+  else {
+    setSvgPath(path?.interaction, svgPath);
+    setSvgPath(path?.display, svgPath);
+  }
 }
 
 function syncCustomStyleDataAttributes(element: Element | null | undefined, styleAttributes: Record<string, unknown>): void {
@@ -700,7 +692,7 @@ function syncCustomStyleDataAttributes(element: Element | null | undefined, styl
   tracked.__bcCustomStyleAttributeNames = [...next.keys()];
 }
 
-export function decorateCanvas(canvas: any, saveHistory = true): void {
+export function decorateCanvas(canvas: CanvasRuntime, saveHistory = true): void {
   decorateCanvasTheme(canvas);
   let data = readCanvasData(canvas);
 
@@ -736,7 +728,7 @@ export function decorateCanvas(canvas: any, saveHistory = true): void {
     const node = canvas?.nodes?.get?.(nodeData.id);
     const element = node?.nodeEl ?? node?.containerEl ?? node?.el;
     if (!(element instanceof HTMLElement)) continue;
-    const styleAttributes = (nodeData as any).styleAttributes ?? {};
+    const styleAttributes = nodeData.styleAttributes ?? {};
     syncCustomStyleDataAttributes(element, styleAttributes);
     const storedShape = typeof nodeData.bcShape === "string" ? nodeData.bcShape
       : typeof styleAttributes.shape === "string" ? styleAttributes.shape : "default";
@@ -751,21 +743,23 @@ export function decorateCanvas(canvas: any, saveHistory = true): void {
     const textAlign = typeof nodeData.bcTextAlign === "string" ? nodeData.bcTextAlign
       : typeof styleAttributes.textAlign === "string" ? styleAttributes.textAlign : "left";
     if (element.dataset.bcTextAlign !== textAlign) element.dataset.bcTextAlign = textAlign;
-    if (element.style.textAlign !== textAlign) element.setCssStyles({ textAlign });
+    if (element.style.getPropertyValue("--bc-node-text-align") !== textAlign) element.style.setProperty("--bc-node-text-align", textAlign);
+    if (element.style.textAlign) element.style.removeProperty("text-align");
     const contents = element.querySelectorAll<HTMLElement>(".canvas-node-content, .canvas-node-container, .canvas-node-iframe");
     contents.forEach(child => {
-      if (child.style.textAlign !== textAlign) child.setCssStyles({ textAlign });
+      if (child.style.textAlign) child.style.removeProperty("text-align");
     });
   }
 
-  for (const edgeData of data.edges as Array<CanvasEdgeData & { bcColor?: string; bcPathStyle?: string; bcArrowStyle?: EdgeArrowStyle }>) {
+  for (const edgeData of data.edges) {
     const edge = canvas?.edges?.get?.(edgeData.id);
-    applyConfiguredEdgePath(canvas, edge, edgeData, data.nodes);
-    const path = edge?.path?.display ?? edge?.path?.el ?? edge?.path;
-    const styleAttributes = (edgeData as any).styleAttributes ?? {};
+    applyConfiguredEdgePath(edge, edgeData, data.nodes);
+    const runtimePath = edge?.path;
+    const path = runtimePath && "setAttribute" in runtimePath ? runtimePath : runtimePath?.display ?? runtimePath?.el;
+    const styleAttributes = edgeData.styleAttributes ?? {};
     syncCustomStyleDataAttributes(path, styleAttributes);
-    syncCustomStyleDataAttributes(edge?.path?.interaction, styleAttributes);
-    const storedPath = edgeData.bcPathStyle
+    syncCustomStyleDataAttributes(runtimePath && !("setAttribute" in runtimePath) ? runtimePath.interaction : undefined, styleAttributes);
+    const storedPath = (typeof edgeData.bcPathStyle === "string" ? edgeData.bcPathStyle : undefined)
       ?? (styleAttributes.path === "short-dashed" || styleAttributes.path === "long-dashed" ? "dashed"
         : styleAttributes.path === "dotted" ? "dotted" : "solid");
     const styleColor = typeof edgeData.bcColor === "string" ? edgeData.bcColor
@@ -776,23 +770,12 @@ export function decorateCanvas(canvas: any, saveHistory = true): void {
         : storedPath === "dotted" ? "2 5" : "" });
     }
 
-    const storedArrow = edgeData.bcArrowStyle
+    const storedArrow = (typeof edgeData.bcArrowStyle === "string" ? edgeData.bcArrowStyle : undefined)
       ?? (typeof styleAttributes.arrow === "string"
         ? styleAttributes.arrow === "halved-triangle" ? "half-triangle"
         : styleAttributes.arrow === "triangle" ? "default" : styleAttributes.arrow
         : undefined);
     if (!storedArrow) continue;
-    const points: Record<string, string> = {
-      "default": "0,0 6.5,10.4 -6.5,10.4",
-      "triangle-outline": "0,0 6.5,10.4 -6.5,10.4",
-      "half-triangle": "-2,0 7.5,12 -2,12",
-      "thin-triangle": "0,0 7,10 0,0 0,10 0,0 -7,10",
-      "diamond": "0,0 5,10 0,20 -5,10",
-      "diamond-outline": "0,0 5,10 0,20 -5,10",
-      "circle": "0,0 4.95,1.8 7.5,6.45 6.6,11.7 2.7,15 -2.7,15 -6.6,11.7 -7.5,6.45 -4.95,1.8",
-      "circle-outline": "0,0 4.95,1.8 7.5,6.45 6.6,11.7 2.7,15 -2.7,15 -6.6,11.7 -7.5,6.45 -4.95,1.8",
-      "blunt": "-10,8 10,8 10,6 -10,6"
-    };
     for (const lineEnd of [edge?.fromLineEnd, edge?.toLineEnd]) {
       const polygon = lineEnd?.el?.querySelector?.("polygon");
       if (!(polygon instanceof SVGElement)) continue;

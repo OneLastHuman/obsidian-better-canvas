@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { clearTimeout, setTimeout } from "node:timers";
 import { resolveAgentBinary } from "./local-agent-discovery";
 import { loadNodeRuntimeModules } from "./node-runtime";
 import { t } from "./i18n";
@@ -16,32 +17,34 @@ export interface OpenCodeACPOptions {
   onDelta?: (delta: string) => void;
 }
 
-type ACPRequest = (method: string, params: Record<string, unknown>) => Promise<any>;
+type ACPRequest = (method: string, params: Record<string, unknown>) => Promise<unknown>;
+
+interface ACPSession extends Record<string, unknown> {
+  sessionId: string;
+}
 
 interface ACPModelCatalog {
   options: Array<{ id: string; name: string }>;
   configId?: string;
 }
 
-interface JsonRpcMessage {
-  jsonrpc?: string;
-  id?: string | number;
-  method?: string;
-  params?: any;
-  result?: any;
-  error?: { code?: number; message?: string; data?: unknown };
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 interface PendingRequest {
   method: string;
-  resolve: (value: any) => void;
+  resolve: (value: unknown) => void;
   reject: (error: Error) => void;
 }
 
 function contentText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  return content.map((part: any) => {
+  return content.map((value: unknown) => {
+    const part = record(value);
     if (part?.type === "text" && typeof part.text === "string") return part.text;
     if (part?.type === "image_url") return "[image attached in the original message]";
     if (part?.type === "file_data") return "[file attached in the original message]";
@@ -67,18 +70,23 @@ export function buildACPUserPrompt(messages: ACPChatMessage[]): string {
 export function hasUnsupportedACPContent(messages: ACPChatMessage[]): boolean {
   return messages.some(message =>
     Array.isArray(message.content) &&
-    message.content.some((part: any) => part && typeof part === "object" && part.type !== "text")
+    message.content.some((part: unknown) => {
+      const content = record(part);
+      return content !== undefined && content.type !== "text";
+    })
   );
 }
 
 /** Extract user-visible answer chunks; ignore tool progress and unrelated sessions. */
 export function textFromACPUpdate(value: unknown, expectedSessionId?: string): string {
-  const message = value as JsonRpcMessage | null;
-  if (!message || message.method !== "session/update" || !message.params) return "";
-  if (expectedSessionId && message.params.sessionId && message.params.sessionId !== expectedSessionId) return "";
-  const update = message.params.update;
+  const message = record(value);
+  const params = record(message?.params);
+  if (!message || message.method !== "session/update" || !params) return "";
+  if (expectedSessionId && params.sessionId && params.sessionId !== expectedSessionId) return "";
+  const update = record(params.update);
   if (!update || update.sessionUpdate !== "agent_message_chunk") return "";
-  if (update.content?.type === "text" && typeof update.content.text === "string") return update.content.text;
+  const content = record(update.content);
+  if (content?.type === "text" && typeof content.text === "string") return content.text;
   return "";
 }
 
@@ -92,32 +100,43 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function modelCatalog(session: any): ACPModelCatalog {
-  const configuration = Array.isArray(session?.configOptions)
-    ? session.configOptions.find((option: any) =>
-      option?.type === "select" &&
-      (option.category === "model" || (!option.category && option.id === "model"))
-    )
+function modelCatalog(session: Record<string, unknown>): ACPModelCatalog {
+  const configuration = Array.isArray(session.configOptions)
+    ? record(session.configOptions.find((value: unknown) => {
+      const option = record(value);
+      return option?.type === "select" &&
+        (option.category === "model" || (!option.category && option.id === "model"));
+    }))
     : undefined;
-  const entries: any[] = [];
+  const entries: unknown[] = [];
+  let configId: string | undefined;
   if (configuration) {
     if (typeof configuration.id !== "string" || !configuration.id.trim() || !Array.isArray(configuration.options)) {
       throw new Error(t("OpenCode ACP returned an invalid model configuration.", "OpenCode ACP 返回了无效的模型配置。"));
     }
-    for (const option of configuration.options) {
+    configId = configuration.id;
+    for (const value of configuration.options) {
+      const option = record(value);
       if (option && typeof option.group === "string" && Array.isArray(option.options)) {
-        entries.push(...option.options);
+        const options: unknown[] = option.options;
+        entries.push(...options);
       } else {
         entries.push(option);
       }
     }
-  } else if (Array.isArray(session?.models?.availableModels)) {
-    entries.push(...session.models.availableModels);
+  } else {
+    const models = record(session.models);
+    if (Array.isArray(models?.availableModels)) {
+      const availableModels: unknown[] = models.availableModels;
+      entries.push(...availableModels);
+    }
   }
 
   const models = new Map<string, { id: string; name: string }>();
-  for (const entry of entries) {
-    const id = configuration ? entry?.value : entry?.modelId;
+  for (const value of entries) {
+    const entry = record(value);
+    if (!entry) continue;
+    const id = configuration ? entry.value : entry.modelId;
     if (typeof id !== "string" || !id.trim()) continue;
     if (!models.has(id)) {
       models.set(id, { id, name: typeof entry.name === "string" && entry.name.trim() ? entry.name : id });
@@ -126,23 +145,24 @@ function modelCatalog(session: any): ACPModelCatalog {
   if (models.size === 0) {
     throw new Error(t("OpenCode ACP offered no selectable models. Check OpenCode's model configuration or update OpenCode.", "OpenCode ACP 没有提供可选择的模型。请检查 OpenCode 的模型配置或更新 OpenCode。"));
   }
-  return { options: [...models.values()], configId: configuration?.id };
+  return { options: [...models.values()], configId };
 }
 
-async function selectSessionModel(session: any, model: string, request: ACPRequest): Promise<void> {
+async function selectSessionModel(session: ACPSession, model: string, request: ACPRequest): Promise<void> {
   const catalog = modelCatalog(session);
   if (!catalog.options.some(option => option.id === model)) {
     throw new Error(t("OpenCode ACP does not currently offer the selected model: " + model + ". Refresh the model list in settings and choose again.", "OpenCode ACP 当前未提供所选模型：" + model + "。请在设置中刷新模型列表后重新选择。"));
   }
   if (catalog.configId) {
-    const result = await request("session/set_config_option", {
+    const result = record(await request("session/set_config_option", {
       sessionId: session.sessionId,
       configId: catalog.configId,
       value: model
+    }));
+    const confirmed = Array.isArray(result?.configOptions) && result.configOptions.some((value: unknown) => {
+      const option = record(value);
+      return option?.id === catalog.configId && option?.currentValue === model;
     });
-    const confirmed = Array.isArray(result?.configOptions) && result.configOptions.some((option: any) =>
-      option?.id === catalog.configId && option.currentValue === model
-    );
     if (!confirmed) throw new Error(t("OpenCode ACP did not confirm the selected model; generation stopped.", "OpenCode ACP 未确认应用所选模型，已停止生成。"));
   } else {
     await request("session/set_model", { sessionId: session.sessionId, modelId: model });
@@ -170,13 +190,14 @@ export async function runOpenCodeACP(
     const model = options.model?.trim();
     if (model) await selectSessionModel(session, model, request);
 
-    const result = await request("session/prompt", {
+    const result = record(await request("session/prompt", {
       sessionId: session.sessionId,
       prompt: [{ type: "text", text: prompt }]
-    });
+    }));
     if (result?.stopReason === "cancelled" || options.signal?.aborted) throw abortError();
     if (result?.stopReason === "error") {
-      throw new Error(t("OpenCode ACP generation failed.", "OpenCode ACP 生成失败。") + (result?.error?.message ? " " + result.error.message : ""));
+      const detail = record(result.error)?.message;
+      throw new Error(t("OpenCode ACP generation failed.", "OpenCode ACP 生成失败。") + (typeof detail === "string" && detail ? " " + detail : ""));
     }
     if (!answer().trim()) throw new Error(t("OpenCode ACP ended the request without returning displayable text.", "OpenCode ACP 结束了请求，但没有返回可显示的文本内容。"));
     return answer().trim();
@@ -189,7 +210,7 @@ export async function runOpenCodeACP(
  */
 async function withOpenCodeSession<T>(
   options: OpenCodeACPOptions,
-  action: (session: any, request: ACPRequest, answer: () => string) => Promise<T>,
+  action: (session: ACPSession, request: ACPRequest, answer: () => string) => Promise<T>,
   deleteSessionAfterwards = false
 ): Promise<T> {
   if (options.signal?.aborted) throw abortError();
@@ -213,9 +234,9 @@ async function withOpenCodeSession<T>(
         windowsHide: true,
         // OpenCode is commonly installed as opencode.cmd on Windows.
         shell: runtime.process.platform === "win32"
-      }) as ChildProcessWithoutNullStreams;
+      });
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
       return;
     }
 
@@ -240,19 +261,19 @@ async function withOpenCodeSession<T>(
       killTimer.unref?.();
     };
 
-    const finish = (error?: Error, result?: T) => {
+    const finish = (outcome: { error: Error } | { value: T }) => {
       if (settled) return;
       settled = true;
       if (timeout) clearTimeout(timeout);
       options.signal?.removeEventListener("abort", onAbort);
-      if (error) {
-        for (const request of pending.values()) request.reject(error);
+      if ("error" in outcome) {
+        for (const request of pending.values()) request.reject(outcome.error);
         pending.clear();
       }
       try { child.stdin.end(); } catch { /* stdin may already be closed */ }
       terminate();
-      if (error) reject(error);
-      else resolve(result as T);
+      if ("error" in outcome) reject(outcome.error);
+      else resolve(outcome.value);
     };
 
     const send = (message: Record<string, unknown>) => {
@@ -266,7 +287,7 @@ async function withOpenCodeSession<T>(
       try { send({ jsonrpc: "2.0", method, params }); } catch { /* process is terminating */ }
     };
 
-    const request = (method: string, params: Record<string, unknown>): Promise<any> => {
+    const request: ACPRequest = (method, params) => {
       const id = ++nextId;
       return new Promise((requestResolve, requestReject) => {
         pending.set(String(id), { method, resolve: requestResolve, reject: requestReject });
@@ -279,11 +300,13 @@ async function withOpenCodeSession<T>(
       });
     };
 
-    const rejectPermission = (message: JsonRpcMessage) => {
-      const choices = Array.isArray(message.params?.options) ? message.params.options : [];
-      const rejectOption = choices.find((item: any) =>
-        typeof item?.optionId === "string" && (item.kind === "reject_once" || item.kind === "reject_always")
-      );
+    const rejectPermission = (message: Record<string, unknown>) => {
+      const params = record(message.params);
+      const choices: unknown[] = Array.isArray(params?.options) ? params.options : [];
+      const rejectOption = record(choices.find(value => {
+        const item = record(value);
+        return typeof item?.optionId === "string" && (item.kind === "reject_once" || item.kind === "reject_always");
+      }));
       // ACP v1 wraps the selected/cancelled outcome in an outcome object.
       const result = rejectOption
         ? { outcome: { outcome: "selected", optionId: rejectOption.optionId } }
@@ -293,16 +316,22 @@ async function withOpenCodeSession<T>(
 
     const consumeLine = (line: string) => {
       if (!line.trim() || settled) return;
-      let message: JsonRpcMessage;
-      try { message = JSON.parse(line) as JsonRpcMessage; } catch { return; }
-      if (!message || typeof message !== "object" || Array.isArray(message)) return;
+      let message: Record<string, unknown> | undefined;
+      try {
+        const parsed: unknown = JSON.parse(line);
+        message = record(parsed);
+      } catch { return; }
+      if (!message) return;
+      const validId = typeof message.id === "string" || typeof message.id === "number";
 
-      if (message.id !== undefined && !message.method) {
+      if (validId && !message.method) {
         const entry = pending.get(String(message.id));
         if (!entry) return;
         pending.delete(String(message.id));
         if (message.error) {
-          const detail = message.error.message || t("Unknown ACP error", "未知的 ACP 错误");
+          const error = record(message.error);
+          const detail = typeof error?.message === "string" && error.message
+            ? error.message : t("Unknown ACP error", "未知的 ACP 错误");
           const authHint = /auth_required|authentication|required.*auth/i.test(detail)
             ? t("; run opencode auth login in a terminal first", "；请先在终端运行 opencode auth login")
             : "";
@@ -318,7 +347,7 @@ async function withOpenCodeSession<T>(
         if (delta) {
           answer += delta;
           if (answer.length > 2_000_000) {
-            finish(new Error(t("OpenCode ACP output exceeded 2 MB; stopped to protect memory.", "OpenCode ACP 输出超过 2 MB，已终止以保护内存。")));
+            finish({ error: new Error(t("OpenCode ACP output exceeded 2 MB; stopped to protect memory.", "OpenCode ACP 输出超过 2 MB，已终止以保护内存。")) });
             return;
           }
           try { options.onDelta?.(delta); } catch { /* keep protocol handling isolated from UI callbacks */ }
@@ -326,13 +355,13 @@ async function withOpenCodeSession<T>(
         return;
       }
 
-      if (message.method === "session/request_permission" && message.id !== undefined) {
+      if (message.method === "session/request_permission" && validId) {
         // This client has no interactive permission UI; decline tool and file operations by default.
         rejectPermission(message);
         return;
       }
 
-      if (message.method && message.id !== undefined) {
+      if (typeof message.method === "string" && validId) {
         try {
           send({
             jsonrpc: "2.0",
@@ -345,19 +374,19 @@ async function withOpenCodeSession<T>(
 
     const onAbort = () => {
       if (activeSessionId) notify("session/cancel", { sessionId: activeSessionId });
-      finish(abortError());
+      finish({ error: abortError() });
     };
 
     options.signal?.addEventListener("abort", onAbort, { once: true });
     timeout = setTimeout(() => {
-      finish(new Error(t("OpenCode ACP timed out after " + Math.round(timeoutMs / 1000) + " seconds.", "OpenCode ACP 超时（" + Math.round(timeoutMs / 1000) + " 秒）。")));
+      finish({ error: new Error(t("OpenCode ACP timed out after " + Math.round(timeoutMs / 1000) + " seconds.", "OpenCode ACP 超时（" + Math.round(timeoutMs / 1000) + " 秒）。")) });
     }, timeoutMs);
 
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
       stdoutBuffer += chunk;
       if (stdoutBuffer.length > 2_000_000) {
-        finish(new Error(t("OpenCode ACP protocol output grew too large; stopped to protect memory.", "OpenCode ACP 协议输出过大，已终止以保护内存。")));
+        finish({ error: new Error(t("OpenCode ACP protocol output grew too large; stopped to protect memory.", "OpenCode ACP 协议输出过大，已终止以保护内存。")) });
         return;
       }
       const lines = stdoutBuffer.split(/\r?\n/);
@@ -374,7 +403,7 @@ async function withOpenCodeSession<T>(
       const hint = /ENOENT/i.test(error.message)
         ? t("OpenCode CLI was not found. Install OpenCode, then use Find in settings to locate it, or enter the absolute path to the opencode executable.", "找不到 OpenCode CLI。请安装 OpenCode，或在设置中点击「查找」自动定位，或填写 opencode 可执行文件的绝对路径。")
         : t("Could not start OpenCode ACP: ", "无法启动 OpenCode ACP：") + error.message;
-      finish(new Error(hint));
+      finish({ error: new Error(hint) });
     });
 
     child.once("close", (code: number | null, signalName: string | null) => {
@@ -382,11 +411,11 @@ async function withOpenCodeSession<T>(
       if (settled) return;
       const detail = stderrTail.trim();
       const suffix = detail ? t("; stderr: " + detail.slice(-1200), "；stderr：" + detail.slice(-1200)) : "";
-      finish(new Error(t("OpenCode ACP process exited (code=" + String(code) + ", signal=" + String(signalName) + ")", "OpenCode ACP 进程已退出（code=" + String(code) + ", signal=" + String(signalName) + "）") + suffix));
+      finish({ error: new Error(t("OpenCode ACP process exited (code=" + String(code) + ", signal=" + String(signalName) + ")", "OpenCode ACP 进程已退出（code=" + String(code) + ", signal=" + String(signalName) + "）") + suffix) });
     });
 
     child.stdin.once("error", (error: Error) => {
-      finish(new Error(t("Could not send the request to OpenCode ACP: ", "无法向 OpenCode ACP 发送请求：") + error.message));
+      finish({ error: new Error(t("Could not send the request to OpenCode ACP: ", "无法向 OpenCode ACP 发送请求：") + error.message) });
     });
     if (options.signal?.aborted) {
       onAbort();
@@ -395,43 +424,44 @@ async function withOpenCodeSession<T>(
 
     void (async () => {
       try {
-        const init = await request("initialize", {
+        const init = record(await request("initialize", {
           protocolVersion: 1,
           clientCapabilities: {},
           clientInfo: { name: "obsidian-better-canvas", version: "0.1.0" }
-        });
+        }));
         if (init?.protocolVersion !== 1) throw new Error(t("OpenCode ACP returned an incompatible protocol version.", "OpenCode ACP 返回了不兼容的协议版本。"));
 
-        const session = await request("session/new", { cwd: tmpdir(), mcpServers: [] });
-        if (typeof session?.sessionId !== "string" || !session.sessionId) {
+        const sessionData = record(await request("session/new", { cwd: tmpdir(), mcpServers: [] }));
+        if (typeof sessionData?.sessionId !== "string" || !sessionData.sessionId) {
           throw new Error(t("OpenCode ACP did not return a valid sessionId.", "OpenCode ACP 没有返回有效的 sessionId。"));
         }
+        const session: ACPSession = { ...sessionData, sessionId: sessionData.sessionId };
         activeSessionId = session.sessionId;
 
-        let result: T | undefined;
-        let actionError: Error | undefined;
+        let outcome: { value: T } | { error: Error };
         try {
-          result = await action(session, request, () => answer);
+          outcome = { value: await action(session, request, () => answer) };
         } catch (error) {
-          actionError = new Error(errorMessage(error));
-        } finally {
-          const deleteCapability = init?.agentCapabilities?.sessionCapabilities?.delete;
-          // Model discovery creates no conversation; remove its empty history entry when supported.
-          if (deleteSessionAfterwards && !settled && deleteCapability &&
-              typeof deleteCapability === "object" && !Array.isArray(deleteCapability)) {
-            try {
-              await request("session/delete", { sessionId: activeSessionId });
-            } catch (error) {
-              const detail = t("Could not delete the temporary session created for model discovery; OpenCode history may keep an empty session: ", "无法删除模型列表查询创建的临时会话，OpenCode 历史可能保留一个空会话：") + errorMessage(error);
-              actionError = new Error(actionError ? actionError.message + t("; ", "；") + detail : detail);
-            }
+          outcome = { error: new Error(errorMessage(error)) };
+        }
+        const capabilities = record(init.agentCapabilities);
+        const sessionCapabilities = record(capabilities?.sessionCapabilities);
+        const deleteCapability = sessionCapabilities?.delete;
+        // Model discovery creates no conversation; remove its empty history entry when supported.
+        if (deleteSessionAfterwards && !settled && deleteCapability &&
+            typeof deleteCapability === "object" && !Array.isArray(deleteCapability)) {
+          try {
+            await request("session/delete", { sessionId: activeSessionId });
+          } catch (error) {
+            const detail = t("Could not delete the temporary session created for model discovery; OpenCode history may keep an empty session: ", "无法删除模型列表查询创建的临时会话，OpenCode 历史可能保留一个空会话：") + errorMessage(error);
+            outcome = { error: new Error("error" in outcome ? outcome.error.message + t("; ", "；") + detail : detail) };
           }
         }
-        if (actionError) throw actionError;
-        finish(undefined, result);
+        if ("error" in outcome) throw outcome.error;
+        finish(outcome);
       } catch (error) {
-        if (options.signal?.aborted) finish(abortError());
-        else finish(new Error(errorMessage(error)));
+        if (options.signal?.aborted) finish({ error: abortError() });
+        else finish({ error: new Error(errorMessage(error)) });
       }
     })();
   });

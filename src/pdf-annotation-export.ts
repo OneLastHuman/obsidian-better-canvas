@@ -61,7 +61,12 @@ function getPageNumber(subpath: string): number | null {
   const page = Number.parseInt(match[1], 10);
   return Number.isInteger(page) && page > 0 ? page : null;
 }
-function isPinnedPdf(node: Record<string, unknown>): boolean {
+interface PinnedPdfNode extends Record<string, unknown> {
+  type: "file";
+  file: string;
+  subpath: string;
+}
+function isPinnedPdf(node: Record<string, unknown>): node is PinnedPdfNode {
   return node.type === "file" &&
     typeof node.file === "string" &&
     node.file.toLowerCase().endsWith(".pdf") &&
@@ -167,7 +172,7 @@ function escapeMarkdownText(value: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/([\\*_{}\[\]()#+!|>~-])/g, "\\$1")
+    .replace(/([\\*_{}[\]()#+!|>~-])/g, "\\$1")
     .replace(new RegExp(String.fromCharCode(96), "g"), "&#96;");
 }
 function quoteText(value: string): string {
@@ -202,14 +207,14 @@ export function buildPdfAnnotationMarkdown(
   generatedAt = new Date()
 ): PdfAnnotationBundleSummary | null {
   if (!Array.isArray(nodes)) return null;
-  const candidates = nodes.filter((value): value is Record<string, unknown> => {
+  const candidates = nodes.filter((value): value is PinnedPdfNode => {
     if (!isRecord(value) || !isPinnedPdf(value)) return false;
     return (Array.isArray(value.bcPdfTextHighlights) && value.bcPdfTextHighlights.length > 0) ||
       (Array.isArray(value.bcPdfStrokes) && value.bcPdfStrokes.length > 0);
   }).map(node => ({
     node,
-    page: getPageNumber(String(node.subpath || "")) ?? 0,
-    file: String(node.file || ""),
+    page: getPageNumber(node.subpath) ?? 0,
+    file: node.file,
     id: typeof node.id === "string" ? node.id : ""
   })).sort((left, right) =>
     left.file.localeCompare(right.file) || left.page - right.page || left.id.localeCompare(right.id)

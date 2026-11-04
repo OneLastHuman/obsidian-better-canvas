@@ -16,7 +16,7 @@ interface FakeElement {
     setProperty(key: string, value: string): void;
     removeProperty(key: string): void;
   };
-  ownerDocument: any;
+  ownerDocument: unknown;
   isConnected: boolean;
   offsetWidth: number;
   offsetHeight: number;
@@ -34,11 +34,17 @@ class FakeResizeObserver {
   disconnect() { observed.clear(); }
 }
 
-const doc = { defaultView: { ResizeObserver: FakeResizeObserver } };
+class FakeHTMLElement {
+  instanceOf<T extends object>(constructor: new (...args: never[]) => T): this is this & T {
+    return this instanceof constructor;
+  }
+}
+
+const doc = { defaultView: { ResizeObserver: FakeResizeObserver, HTMLElement: FakeHTMLElement } };
 
 function fakeNode(width: number, height: number, connected = true): FakeElement {
   const map = new Map<string, string>();
-  return {
+  return Object.assign(new FakeHTMLElement(), {
     dataset: {},
     style: {
       map,
@@ -50,7 +56,7 @@ function fakeNode(width: number, height: number, connected = true): FakeElement 
     isConnected: connected,
     offsetWidth: width,
     offsetHeight: height
-  };
+  });
 }
 
 function paint(element: FakeElement): void {

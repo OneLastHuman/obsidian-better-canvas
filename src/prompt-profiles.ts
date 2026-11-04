@@ -10,8 +10,10 @@ export function normalizeNamedPromptProfiles(value: unknown): NamedPromptProfile
   if (!Array.isArray(value)) return [];
   const profiles: NamedPromptProfile[] = [];
   const seen = new Set<string>();
-  for (const item of value) {
+  const items: unknown[] = value;
+  for (const item of items) {
     if (!item || typeof item !== "object") continue;
+    if (!("id" in item) || !("name" in item) || !("prompt" in item)) continue;
     const id = typeof item.id === "string" ? item.id.trim() : "";
     const name = typeof item.name === "string" ? item.name.trim() : "";
     const prompt = typeof item.prompt === "string" ? item.prompt : "";
