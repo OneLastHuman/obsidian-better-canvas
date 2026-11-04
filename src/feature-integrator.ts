@@ -1196,11 +1196,22 @@ export default class BetterCanvasFeatures {
     }
 
     const initial = JSON.stringify((target).styleAttributes ?? {}, null, 2);
+    const parseAttributes = (raw: string): Record<string, unknown> => {
+      const parsed = parseJsonObjectPrompt(raw, "styleAttributes");
+      const snapshot = {
+        nodes: node ? [{ ...node, styleAttributes: parsed }] : [],
+        edges: edge ? [{ ...edge, styleAttributes: parsed }] : []
+      };
+      if (!isCanvasData(snapshot)) {
+        throw new Error(t("Known style attributes must be strings or null.", "已知样式属性必须是字符串或 null。"));
+      }
+      return parsed;
+    };
     this.input(
       t("Edit styleAttributes JSON", "编辑 styleAttributes JSON"),
       t("Enter a valid JSON object, e.g. { \"shape\": \"diamond\" }", "输入有效的 JSON 对象，例如 { \"shape\": \"diamond\" }"),
       raw => {
-        const parsed = parseJsonObjectPrompt(raw, "styleAttributes");
+        const parsed = parseAttributes(raw);
         if (node) {
           patchNode(canvas, node.id, { styleAttributes: parsed });
         } else if (edge) {
@@ -1216,7 +1227,7 @@ export default class BetterCanvasFeatures {
       },
       initial,
       false,
-      promptValidator(value => parseJsonObjectPrompt(value, "styleAttributes"))
+      promptValidator(parseAttributes)
     );
   }
 
