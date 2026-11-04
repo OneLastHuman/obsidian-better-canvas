@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { requestStream } from "./desktop-stream-request";
 import {
   callSseMcpTool,
   getSseMcpPrompt,
@@ -11,7 +12,12 @@ import {
   splitSseFrames
 } from "./mcp-sse";
 
+vi.mock("./desktop-stream-request", () => ({
+  requestStream: vi.fn()
+}));
+
 beforeEach(() => {
+  vi.mocked(requestStream).mockReset();
   vi.stubGlobal("window", {
     setTimeout: (callback: () => void, timeoutMs: number) => globalThis.setTimeout(callback, timeoutMs),
     clearTimeout: (timer: NodeJS.Timeout) => globalThis.clearTimeout(timer)
@@ -50,8 +56,8 @@ describe("legacy MCP SSE parsing", () => {
   it("makes the connection terminal and aborts transport after an idle stream closes", async () => {
     const encoder = new TextEncoder();
     let eventController: ReadableStreamDefaultController<Uint8Array> | undefined;
-    const fakeFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(init?.method ?? "GET").toUpperCase()).toBe("GET");
+    const streamRequest = vi.mocked(requestStream).mockImplementation(async (_url, options) => {
+      expect(options.method.toUpperCase()).toBe("GET");
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
           eventController = controller;
@@ -60,7 +66,6 @@ describe("legacy MCP SSE parsing", () => {
       });
       return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
     });
-    vi.stubGlobal("fetch", fakeFetch);
     const connection = new SseMcpConnection("https://mcp.example/sse", "secret");
     try {
       await connection.connect();
@@ -73,7 +78,7 @@ describe("legacy MCP SSE parsing", () => {
       expect((connection as any).controller.signal.aborted).toBe(true);
       expect((connection as any).pending.size).toBe(0);
       await expect(connection.request("tools/list", {})).rejects.toThrow(/closed/i);
-      expect(fakeFetch).toHaveBeenCalledTimes(1);
+      expect(streamRequest).toHaveBeenCalledTimes(1);
     } finally {
       connection.close();
     }
@@ -86,9 +91,8 @@ describe("legacy MCP SSE JSON-RPC round trip", () => {
     const encoder = new TextEncoder();
     let eventController: ReadableStreamDefaultController<Uint8Array> | undefined;
 
-    const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = String(init?.method ?? "GET").toUpperCase();
+    vi.mocked(requestStream).mockImplementation(async (url, options) => {
+      const method = options.method.toUpperCase();
       if (method === "GET") {
         const stream = new ReadableStream<Uint8Array>({
           start(controller) {
@@ -99,7 +103,7 @@ describe("legacy MCP SSE JSON-RPC round trip", () => {
         return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
       }
       expect(url).toBe("https://mcp.example/messages?session=fixture");
-      const message = JSON.parse(String(init?.body ?? "{}"));
+      const message = JSON.parse(options.body ?? "{}");
       if (message.id !== undefined) {
         let result: unknown;
         if (message.method === "initialize") {
@@ -124,7 +128,6 @@ describe("legacy MCP SSE JSON-RPC round trip", () => {
       return new Response(null, { status: 202 });
     });
 
-    vi.stubGlobal("fetch", fakeFetch);
     const tools = await listSseMcpTools("https://mcp.example/sse", "secret");
     expect(tools.map(tool => tool.name)).toEqual(["echo"]);
 

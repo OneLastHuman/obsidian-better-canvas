@@ -1,5 +1,6 @@
 import { normalizeMcpToolResult, type RemoteMcpResult } from "./mcp-result";
 import type { RemoteMcpTool } from "./mcp";
+import { requestStream } from "./desktop-stream-request";
 import { t } from "./i18n";
 import { isJsonObject } from "./prompt-input";
 import {
@@ -107,7 +108,7 @@ export class SseMcpConnection {
       throw new Error(t("The MCP SSE endpoint must use HTTP or HTTPS.", "MCP SSE endpoint 必须使用 HTTP 或 HTTPS。"));
     }
 
-    const response = await this.waitFor(fetch(parsed.toString(), {
+    const response = await this.waitFor(requestStream(parsed.toString(), {
       method: "GET",
       headers: this.headers("text/event-stream"),
       signal: this.controller.signal
@@ -204,7 +205,7 @@ export class SseMcpConnection {
     const message: Record<string, unknown> = { jsonrpc: "2.0", method, params };
     if (id !== undefined) message.id = id;
 
-    return fetch(this.postUrl, {
+    return requestStream(this.postUrl, {
       method: "POST",
       headers: { ...this.headers("application/json, text/event-stream"), "Content-Type": "application/json" },
       body: JSON.stringify(message),

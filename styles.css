@@ -193,7 +193,10 @@ textarea.bc-modal-prompt-textarea {
   --bc-node-border-color: transparent;
   border-color: var(--bc-node-border-color);
   /* Shared with the ring masks and the panel previews below. */
+  /* CanIUse #2 concerns external SVG clips; this variable contains polygon(). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-shape-outline);
+  /* doiuse-enable css-clip-path */
 }
 
 /* Shape constants shared by canvas nodes and the style panel previews: the
@@ -1199,7 +1202,10 @@ textarea.bc-modal-prompt-textarea {
 .bc-node-style-preset-preview.shape-document {
   border: 0;
   border-radius: 0;
+  /* CanIUse #2 concerns external SVG clips; this variable contains polygon(). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-shape-outline);
+  /* doiuse-enable css-clip-path */
 }
 .bc-node-style-preset-preview.shape-diamond::after,
 .bc-node-style-preset-preview.shape-hexagon::after,
@@ -1347,7 +1353,10 @@ textarea.bc-modal-prompt-textarea {
   border: 0;
   border-radius: 0;
   background: var(--background-primary);
+  /* CanIUse #2 concerns external SVG clips; this variable contains polygon(). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-shape-outline);
+  /* doiuse-enable css-clip-path */
 }
 .bc-node-shape-preview.shape-diamond::after,
 .bc-node-shape-preview.shape-hexagon::after,
@@ -1460,7 +1469,10 @@ textarea.bc-modal-prompt-textarea {
   background: repeating-linear-gradient(115deg, #ffffff20 0 3px, transparent 3px 7px), #b1b78fbf;
   border-inline: 1px dashed #8b946b70;
   box-shadow: 0 1px 2px #715e3120;
+  /* CanIUse #2 concerns external SVG clips; polygon() does not use them. */
+  /* doiuse-disable css-clip-path */
   clip-path: polygon(1% 0, 98% 2%, 100% 14%, 98% 29%, 100% 43%, 98% 61%, 100% 79%, 98% 100%, 0 97%, 2% 83%, 0 67%, 2% 50%, 0 33%, 2% 17%);
+  /* doiuse-enable css-clip-path */
   pointer-events: none;
 }
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="lined"] .canvas-node-container,
@@ -1470,7 +1482,10 @@ textarea.bc-modal-prompt-textarea {
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"][data-bc-paper-border="theme"]:is([data-bc-shape="default"], [data-bc-shape="square"]) .canvas-node-container,
 .bc-paper-preview[data-bc-paper="torn"] {
   border-radius: 0;
+  /* CanIUse #2 concerns external SVG clips; polygon() does not use them. */
+  /* doiuse-disable css-clip-path */
   clip-path: polygon(0 1%, 7% 0, 14% 1%, 21% 0, 28% 1%, 35% 0, 42% 1%, 49% 0, 56% 1%, 63% 0, 70% 1%, 77% 0, 84% 1%, 91% 0, 100% 1%, 100% 98%, 94% 100%, 87% 98%, 80% 100%, 73% 98%, 66% 100%, 59% 98%, 52% 100%, 45% 98%, 38% 100%, 31% 98%, 24% 100%, 17% 98%, 10% 100%, 3% 98%, 0 100%);
+  /* doiuse-enable css-clip-path */
 }
 .canvas-wrapper[data-bc-theme="scrapbook"] .canvas-node[data-bc-paper="torn"] {
   filter: drop-shadow(1px 3px 2px #72583a25);
@@ -1957,7 +1972,10 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .bc-sketch-preset-preview.shape-pill { border-radius: 999px; }
 .bc-sketch-preset-preview.shape-diamond {
   border: 0;
+  /* CanIUse #2 concerns external SVG clips; polygon() does not use them. */
+  /* doiuse-disable css-clip-path */
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  /* doiuse-enable css-clip-path */
   background: color-mix(in srgb, currentColor 22%, var(--background-primary));
 }
 .bc-sketch-preset-preview.shape-diamond.fill-solid {
@@ -2083,7 +2101,10 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   border-radius: 0;
   box-shadow: none;
   outline: none;
+  /* CanIUse #2 concerns external SVG clips; this variable uses same-document url(#id). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-soft-clip);
+  /* doiuse-enable css-clip-path */
   transition: none;
   color: #292e28;
 }
@@ -2176,7 +2197,10 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   display: grid;
   place-content: center;
   background: var(--bc-soft-color);
+  /* CanIUse #2 concerns external SVG clips; this variable uses same-document url(#id). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-soft-clip);
+  /* doiuse-enable css-clip-path */
   font: 15px "BC Soft Notes Title", cursive;
 }
 .bc-soft-mini.bc-mini-spark { left: 12px; top: 48px; width: 95px; height: 76px; }
@@ -2302,9 +2326,12 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   --bc-research-title-border: 0;
 }
 .canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="argument"] .markdown-rendered strong {
+  /* CanIUse partial support concerns unused text-decoration-skip variants; these longhands are supported. */
+  /* doiuse-disable text-decoration */
   text-decoration-line: underline;
   text-decoration-color: color-mix(in srgb, var(--bc-research-accent) 28%, transparent);
   text-decoration-thickness: 4px;
+  /* doiuse-enable text-decoration */
   text-underline-offset: 2px;
 }
 .canvas-wrapper[data-bc-theme="research"] [data-bc-research-preset="argument"] :is(h1, h2, h3, h4, h5, h6) :is(strong, em, code, a) { color: inherit; }
@@ -2406,7 +2433,10 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .bc-node-shape-preview:is(.shape-right-arrow, .shape-parallelogram) {
   border: 0;
   border-radius: 0;
+  /* CanIUse #2 concerns external SVG clips; this variable contains polygon(). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-shape-outline);
+  /* doiuse-enable css-clip-path */
   background: var(--text-muted);
 }
 
@@ -2455,7 +2485,10 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded] .canvas-node-container {
   border: 0;
   border-radius: 0;
+  /* CanIUse #2 concerns external SVG clips; this variable contains path(). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-rounded-clip);
+  /* doiuse-enable css-clip-path */
 }
 .canvas-wrapper[data-bc-theme="rounded-map"] .canvas-node[data-bc-rounded]::after {
   content: "";
@@ -2571,7 +2604,10 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   position: absolute;
   inset: 0;
   background: var(--bc-rounded-fill, #c8dff3);
+  /* CanIUse #2 concerns external SVG clips; this variable contains path(). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-rounded-clip);
+  /* doiuse-enable css-clip-path */
 }
 .bc-rounded-preview::after, .bc-node-shape-preview.bc-rounded-shape-preview::after {
   content: "";
@@ -2590,7 +2626,10 @@ button.bc-theme-choice:hover { border-color: var(--text-muted); }
   border: 0;
   border-radius: 0;
   background: #c8dff3;
+  /* CanIUse #2 concerns external SVG clips; this variable contains path(). */
+  /* doiuse-disable css-clip-path */
   clip-path: var(--bc-rounded-clip);
+  /* doiuse-enable css-clip-path */
 }
 .bc-theme-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .bc-theme-mini-board[data-bc-theme="rounded-map"] {

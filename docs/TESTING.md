@@ -51,7 +51,7 @@ npm view vitest version --fetch-retries=0 --fetch-timeout=5000
 
 本仓库的 package scripts 定义如下：
 
-- `npm run lint`：运行 Obsidian 官方 recommended 规则并将显式 `any` 作为错误；不关闭 unsafe 系列类型检查，也不批量降低官方错误级别。流式 AI/MCP 的直接 `fetch` 仍保留官方警告，须单独复核；`requestUrl` 的公开接口没有流式响应体或取消信号。
+- `npm run lint`：运行 Obsidian 官方 recommended 规则并将显式 `any` 作为错误；`--max-warnings 0` 阻止新增警告通过。不关闭 unsafe 系列类型检查，也不降低官方错误级别。AI/MCP 流式请求通过桌面网络适配器保留响应流与取消；普通缓冲请求继续使用 `requestUrl`。
 - `npm run validate:metadata`：校验 package.json、manifest.json 与 versions.json 的插件版本和最低 Obsidian 版本是否一致；不依赖 node_modules，CI 在安装依赖之前运行。
 - `npm run typecheck`：TypeScript 类型检查。
 - `npm test`：运行 Vitest 单元测试。
@@ -93,7 +93,7 @@ CI 只能证明 workflow 实际运行过的步骤。读取 Actions 时至少核�
 - WikiLink / Canvas link 解析；
 - 连线样式、箭头、floating side、分组折叠/展开与 z-order；
 - SVG 导出尺寸处理、MCP 文本/图片结果规范化；
-- AI provider 请求构造、流式响应解析、错误处理和取消逻辑（通过 mock fetch）。
+- AI provider 请求构造、流式响应解析、错误处理和取消逻辑（通过 mock 流式传输接口）。
 
 测试应验证输出数据、保存/刷新调用、输入边界和原始数据不被意外破坏，而不是只断言函数“没有抛错”。
 
@@ -156,7 +156,7 @@ Obsidian CLI 不是 Node 包或纯 Headless Runtime 的替代品。执行前必�
 - 只在专用测试 Vault 中验证；检查磁盘数据而不只看当前内存对象。
 
 ### AI、HTTP 和 MCP
-- 使用 mock HTTP/固定响应测试请求格式、非 2xx、超时、断网、坏 JSON、流式结束、流式中止和重复生成；
+- 使用 mock HTTP/固定响应测试请求格式、非 2xx、超时、断网、坏 JSON、流式结束、流式中止和重复生成；`desktop-stream-request.test.ts` 提供最小 Electron 桥接，由 Node 原生 fetch 访问本地 HTTP fixture，验证真实增量传输、取消、重定向凭据隔离和压缩响应。该 fixture 不等同于 Electron；桌面端还需单独验证当前会话的网络路径。
 - API Key 不得进入日志、截图、测试 fixture 或提交记录；
 - Provider request parameters：测试 JSON 格式/大小/键数/嵌套限制、保留字段与凭据字段拒绝、不同协议的参数合并位置、Temperature 和最大输出 token 数边界；不要在测试中调用真实供应商。
 - 模型能力探测：用固定 mock 验证文本/图片请求的接受、失败时跳过第二个请求、键值脱敏和报告按 provider/protocol/model 隔离。普通 CI 不调用真实供应商；真实探测须由用户明确点击并确认。

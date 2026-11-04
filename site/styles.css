@@ -92,14 +92,20 @@ img {
 a {
   color: var(--ink);
   text-decoration: underline;
+  /* Chromium supports this decoration styling; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
   text-decoration-color: var(--rule-dark);
+  /* doiuse-enable text-decoration */
 }
 
 a:hover {
   color: var(--green-deep);
+  /* Chromium supports decoration colors; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-color: var(--green);
+  /* doiuse-enable text-decoration */
 }
 
 :where(a, button, summary):focus-visible {
@@ -318,8 +324,11 @@ code {
   font-family: var(--sans);
   font-size: 0.81rem;
   line-height: 1.2;
+  /* Chromium supports decoration colors and thickness; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-color: var(--green);
   text-decoration-thickness: 1px;
+  /* doiuse-enable text-decoration */
   text-underline-offset: 0.3em;
 }
 
@@ -468,7 +477,7 @@ code {
 .section-intro {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: clamp(1.2rem, 2.5vw, 2rem);
+  gap: 0 clamp(1.2rem, 2.5vw, 2rem);
   align-items: start;
 }
 
@@ -592,7 +601,7 @@ code {
 .theme-roster ul {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: clamp(2rem, 4vw, 3rem);
+  gap: 0 clamp(2rem, 4vw, 3rem);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -685,7 +694,7 @@ kbd {
 .preset-ledger {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: clamp(2.5rem, 5vw, 4.5rem);
+  gap: 0 clamp(2.5rem, 5vw, 4.5rem);
   margin-top: 0.6rem;
 }
 
@@ -956,12 +965,18 @@ kbd {
 
 .text-link-light {
   color: var(--paper-bright);
+  /* Chromium supports decoration colors; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-color: rgba(251, 248, 240, 0.45);
+  /* doiuse-enable text-decoration */
 }
 
 .text-link-light:hover {
   color: var(--paper-bright);
+  /* Chromium supports decoration colors; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-color: var(--paper-bright);
+  /* doiuse-enable text-decoration */
 }
 
 .install-requirement {
@@ -1056,13 +1071,19 @@ kbd {
 
 .install-foot a {
   color: var(--paper-bright);
+  /* Chromium supports decoration colors; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-color: rgba(251, 248, 240, 0.45);
+  /* doiuse-enable text-decoration */
   white-space: nowrap;
 }
 
 .install-foot a:hover {
   color: var(--paper-bright);
+  /* Chromium supports decoration colors; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-color: var(--paper-bright);
+  /* doiuse-enable text-decoration */
 }
 
 .install-foot code {
@@ -1163,7 +1184,10 @@ kbd {
 
 .footer-links a {
   color: var(--ink-soft);
+  /* Chromium supports decoration colors; partial support concerns unused skip variants. */
+  /* doiuse-disable text-decoration */
   text-decoration-color: var(--rule-dark);
+  /* doiuse-enable text-decoration */
 }
 
 .footer-links a:hover {
