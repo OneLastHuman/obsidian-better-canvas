@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="site/assets/better-canvas-icon.webp" alt="Better Canvas 图标：三个相连的节点，右下角节点内有 AI 星芒" width="96" height="96" />
+</p>
+
 <h1 align="center">Better Canvas</h1>
 
 <p align="center">

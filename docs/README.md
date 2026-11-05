@@ -63,4 +63,6 @@
 
 网站无需构建或安装依赖。在仓库根目录运行 `python3 -m http.server 4173 --directory site`，访问 `http://localhost:4173/` 或 `/zh/`。`site/site.js` 只负责主题预览；禁用 JavaScript 时，主题选项仍可打开对应截图。截图来源与验证边界见[截图说明](screenshots/README.md)。
 
+网站导航、首屏与中英文 README 共用 `site/assets/better-canvas-icon.webp`。图标采用轻磨砂质感的三个分支圆角节点，右下角青色节点内的白色星芒表示 AI。图标由 MCP 图片生成工具（`remote-magpie/codex/gpt-image-2`）生成，原图保留在 `site/assets/better-canvas-icon.png`；64px 的 `favicon.png` 与 180px 的 `apple-touch-icon.png` 从同一原图缩放。所有图标均从本站加载。
+
 合并 `site/` 的改动到 `main` 后，[Pages 工作流](../.github/workflows/pages.yml) 自动部署；也可手动触发该工作流。GitHub 仓库的 Settings → Pages → Source 应为 **GitHub Actions**。部署结果以 Actions 中 Pages 的成功状态和线上页面为准。
