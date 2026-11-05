@@ -33,14 +33,14 @@ button { font: inherit; }
 .site-header { padding-block: 1.4rem; border-bottom: 1px solid var(--line); }
 .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
 .brand { display: inline-flex; align-items: center; gap: .65rem; font-size: 1.2rem; font-weight: 700; text-decoration: none; letter-spacing: -.04em; white-space: nowrap; }
-.brand-mark { width: 2rem; height: 2rem; fill: var(--lilac); stroke: var(--blue); stroke-width: 1.8; }
-.brand-mark path { fill: none; }
+.brand-mark { width: 2.5rem; height: 2.5rem; flex-shrink: 0; border-radius: .65rem; }
 .site-nav { display: flex; align-items: center; gap: 1.6rem; font-size: .9rem; }
 .site-nav a { text-decoration: none; }
 .lang-switch { border-left: 1px solid var(--line); padding-left: 1.3rem; }
 .site-nav .nav-install { padding: .55rem 1rem; border: 1px solid var(--line); border-radius: .5rem; }
 .site-nav .nav-install:hover { border-color: var(--blue); }
 .hero { display: grid; grid-template-columns: .88fr 1.12fr; gap: 3rem; align-items: center; padding-block: 6rem 5rem; }
+.hero-icon { width: 5rem; height: 5rem; margin-bottom: 1.5rem; border-radius: 1.2rem; }
 .product-context { display: flex; align-items: center; gap: .55rem; margin-bottom: 1.8rem; font-size: .86rem; color: var(--muted); }
 .context-dot, .saved-dot { width: .5rem; height: .5rem; flex-shrink: 0; border-radius: 50%; background: #667cb5; }
 .lede { max-width: 33rem; margin-top: 1.6rem; color: var(--muted); font-size: 1.08rem; line-height: 1.85; }

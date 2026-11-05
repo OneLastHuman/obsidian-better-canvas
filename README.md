@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="site/assets/better-canvas-icon.webp" alt="Better Canvas icon: three connected nodes with an AI star in the lower-right node" width="96" height="96" />
+</p>
+
 <h1 align="center">Better Canvas</h1>
 
 <p align="center">
